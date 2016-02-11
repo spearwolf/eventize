@@ -25,8 +25,13 @@
 
 function eventize (o) {
 
-    _defineHiddenPropertyRO(o, '_eventize', {});
-    _defineHiddenPropertyRO(o._eventize, 'callbacks', { _id: 0, _off: [] });
+    if (o._eventize) return o;  // <= already eventized TODO test
+
+    _defineHiddenPropertyRO(o, '_eventize', {
+        silenced: false,
+        off     : []
+    });
+    _defineHiddenPropertyRO(o._eventize, 'callbacks', { _id: 0 });
     _defineHiddenPropertyRO(o._eventize, 'boundObjects', []);
 
     _definePublicPropertiesRO(eventize, {
@@ -47,14 +52,16 @@ function eventize (o) {
 
     o.on = function (eventName, prio, fn) {
 
+        // TODO
+        // - global on (reactivate all - reverse of off())
+
         var argsLen = arguments.length;
-        var eventizeCallbacks = o._eventize.callbacks;
         var i;
 
         if (argsLen === 1) {
-            i = eventizeCallbacks._off.indexOf(eventName);
+            i = o._eventize.off.indexOf(eventName);
             if (i >= 0) {
-                eventizeCallbacks._off.splice(i, 1);
+                o._eventize.off.splice(i, 1);
             }
             return;
         }
@@ -64,13 +71,14 @@ function eventize (o) {
             prio = eventize.PRIO_DEFAULT;
         }
 
+        var eventizeCallbacks = o._eventize.callbacks;
         var eventListener = eventizeCallbacks[eventName] || (eventizeCallbacks[eventName] = []);
         var listenerId = createId();
         var listener = _definePublicPropertiesRO({}, {
             id         : listenerId,
             fn         : fn,
             prio       : (typeof prio !== 'number' ? eventize.PRIO_DEFAULT : prio),
-            isFunction : (typeof fn === 'function')
+            isFunction : (typeof fn === 'function')  // TODO test fn -> object
         });
 
         eventListener.push(listener);
@@ -85,7 +93,11 @@ function eventize (o) {
     }
 
     function sortListenerByPrio (a, b) {
+
+        // TODO added second order by (id?) creation order
+
         return b.prio - a.prio;
+
     }
 
     // -----------------------------------------------------------------
@@ -120,21 +132,24 @@ function eventize (o) {
 
     o.off = function (id) {
 
-        var eventizeCallbacks = o._eventize.callbacks;
+        // TODO
+        // - global off (deactivate all)
+        // - test id === object (registered with on())
 
         if (typeof id === 'string') {
             //
             // by event name
             //
-            if (eventizeCallbacks._off.indexOf(id) === -1) {
-                eventizeCallbacks._off.push(id);
+            if (o._eventize.off.indexOf(id) === -1) {
+                o._eventize.off.push(id);
             }
             return;
         }
 
+        var eventizeCallbacks = o._eventize.callbacks;
         var cb, i, j, _callbacks, keys;
 
-        if (typeof id === 'number' || typeof id === 'function') {
+        if (typeof id === 'number' || typeof id === 'function' || typeof id === 'object') {
             //
             // by id or function reference
             //
@@ -149,7 +164,9 @@ function eventize (o) {
                     }
                 }
             }
-        } else {
+        }
+
+        if (typeof id === 'object') {
             //
             // by bound object reference
             //
@@ -209,7 +226,7 @@ function eventize (o) {
 
     o.emit = function (eventName /*, arguments ..*/) {
 
-        if (o._eventize.callbacks._off.indexOf(eventName) >= 0) return;
+        if (o._eventize.off.indexOf(eventName) >= 0) return;
 
         var args = Array.prototype.slice.call(arguments, 1);
         var _callbacks = o._eventize.callbacks[eventName];
@@ -226,6 +243,8 @@ function eventize (o) {
                 }
             }
         }
+
+        // TODO move bound objects calls to PRIO_DEFAULT (functions)
 
         len = o._eventize.boundObjects.length;
         if (len) {
@@ -261,6 +280,9 @@ function eventize (o) {
                 args[0] = cb.isFunction ? cb.fn.apply(this, args) : cb.fn.emitReduce(eventName, args);
             }
         }
+
+        // TODO move bound objects calls to PRIO_DEFAULT (functions)
+
         len = o._eventize.boundObjects.length;
         if (len) {
             //args.unshift(this);
