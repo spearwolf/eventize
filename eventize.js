@@ -17,6 +17,8 @@
 //
 'use strict';
 
+var LOG_NAMESPACE = '[eventize.js]';
+
 // =====================================================================
 //
 // eventize( object )
@@ -31,6 +33,7 @@ function eventize (o) {
         silenced: false,
         off     : []
     });
+
     _defineHiddenPropertyRO(o._eventize, 'callbacks', { _id: 0 });
     _defineHiddenPropertyRO(o._eventize, 'boundObjects', []);
 
@@ -52,10 +55,14 @@ function eventize (o) {
 
     o.on = function (eventName, prio, fn) {
 
-        // TODO
-        // - global on (reactivate all - reverse of off())
-
         var argsLen = arguments.length;
+
+        if (argsLen === 0) {
+            o._eventize.silenced = false;
+            o._eventize.off.length = 0;
+            return;
+        }
+
         var i;
 
         if (argsLen === 1) {
@@ -93,11 +100,7 @@ function eventize (o) {
     }
 
     function sortListenerByPrio (a, b) {
-
-        // TODO added second order by (id?) creation order
-
-        return b.prio - a.prio;
-
+        return a.prio !== b.prio ? b.prio - a.prio : a.id - b.id;
     }
 
     // -----------------------------------------------------------------
@@ -107,6 +110,11 @@ function eventize (o) {
     // -----------------------------------------------------------------
 
     o.once = function (eventName, prio, fn) {
+
+        if (arguments.length < 2) {
+            console.warn(LOG_NAMESPACE, '.once() called with insufficient arguments!', arguments);
+            return;
+        }
 
         if (arguments.length === 2) {
             fn = prio;
@@ -126,15 +134,21 @@ function eventize (o) {
     //
     // object.off( id )
     //
-    // id: id or previously bound object or function reference
+    // deactive listener by id or previously bound object or
+    // function reference or silence all events
     //
     // -----------------------------------------------------------------
 
     o.off = function (id) {
 
         // TODO
-        // - global off (deactivate all)
         // - test id === object (registered with on())
+
+        if (arguments.length === 0) {
+            o._eventize.silenced = true;
+            o._eventize.off.length = 0;
+            return;
+        }
 
         if (typeof id === 'string') {
             //
@@ -148,8 +162,9 @@ function eventize (o) {
 
         var eventizeCallbacks = o._eventize.callbacks;
         var cb, i, j, _callbacks, keys;
+        var isObject = typeof id === 'object';
 
-        if (typeof id === 'number' || typeof id === 'function' || typeof id === 'object') {
+        if (typeof id === 'number' || typeof id === 'function' || isObject) {
             //
             // by id or function reference
             //
@@ -160,13 +175,13 @@ function eventize (o) {
                     cb = _callbacks[i];
                     if (cb.id === id || cb.fn === id) {
                         _callbacks.splice(i, 1);
-                        return;
+                        if (!isObject) return;
                     }
                 }
             }
         }
 
-        if (typeof id === 'object') {
+        if (isObject) {
             //
             // by bound object reference
             //
@@ -226,6 +241,7 @@ function eventize (o) {
 
     o.emit = function (eventName /*, arguments ..*/) {
 
+        if (o._eventize.silenced) return;
         if (o._eventize.off.indexOf(eventName) >= 0) return;
 
         var args = Array.prototype.slice.call(arguments, 1);
@@ -239,7 +255,7 @@ function eventize (o) {
                 if (cb.isFunction) {
                     cb.fn.apply(this, args);
                 } else {
-                    cb.fn.emit(eventName, args);
+                    cb.fn.emit.apply(cb.fn, [eventName].concat(args));
                 }
             }
         }
@@ -267,6 +283,12 @@ function eventize (o) {
     // -----------------------------------------------------------------
 
     o.emitReduce = function (eventName /*, value, [arguments ..] */) {
+
+        // TODO add specs
+
+        if (o._eventize.silenced) return;
+        if (o._eventize.off.indexOf(eventName) >= 0) return;
+
         var args = Array.prototype.slice.call(arguments, 1);
         var _callbacks = o._eventize.callbacks[eventName];
         var i, len, cb;
@@ -277,7 +299,7 @@ function eventize (o) {
             len = _callbacks.length;
             for (i = 0; i < len; i++) {
                 cb = _callbacks[i];
-                args[0] = cb.isFunction ? cb.fn.apply(this, args) : cb.fn.emitReduce(eventName, args);
+                args[0] = cb.isFunction ? cb.fn.apply(this, args) : cb.fn.emitReduce.apply(cb.fn, [eventName].concat(args));
             }
         }
 

@@ -69,5 +69,33 @@ describe("eventizedObj.off", function () {
         expect(result).toBe(9);
 
     });
+
+    it("should silence eventized object if called with no arguments", function () {
+
+        let result = [];
+
+        let listen = {
+            'bar': function (x) { result.push(x) },
+            'foo': function (x) { result.push(x) }
+        };
+
+        obj.bindOn(listen);
+
+        obj.emit('bar', 1);
+        obj.emit('foo', 2);
+        obj.off('bar');
+        obj.emit('bar', 3);
+        obj.emit('foo', 4);
+        obj.off();
+        obj.emit('bar', 5);
+        obj.emit('foo', 6);
+        obj.on();
+        obj.emit('bar', 7);
+        obj.emit('foo', 8);
+
+        expect(result).toEqual([1, 2, 4, 7, 8]);
+
+    });
+
 });
 

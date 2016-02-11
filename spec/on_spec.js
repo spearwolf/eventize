@@ -25,20 +25,71 @@ describe("eventizedObj.on", function () {
         expect(isCalled).toBe(75);
     });
 
-    it("should sort all listeners based on their priorities", function () {
+    it("should work with an object as last argument", function () {
+
+        let tricky = 0;
+        let tracky = 0;
+
+        let obj2 = eventize({});
+
+        obj2.on('tricky', function (x) { tricky = x });
+        obj2.on('tracky', function (x) { tracky = x-1 });
+
+        obj.emit('tricky', 999);
+        obj.emit('tracky', 888);
+        expect(tricky).toBe(0);
+        expect(tracky).toBe(0);
+
+        obj.on('tricky', obj2);
+
+        obj.emit('tricky', 666);
+        obj.emit('tracky', 555);
+        expect(tricky).toBe(666);
+        expect(tracky).toBe(0);
+
+        obj.on('tracky', eventize.PRIO_A, obj2);
+
+        obj.emit('tricky', 444);
+        obj.emit('tracky', 333);
+        expect(tricky).toBe(444);
+        expect(tracky).toBe(332);
+
+        obj2.on('tracky', eventize.PRIO_LOW, function (x) { tracky = x });
+
+        obj.emit('tricky', 222);
+        obj.emit('tracky', 111);
+        expect(tricky).toBe(222);
+        expect(tracky).toBe(111);
+
+        obj.off(obj2);
+
+        obj.emit('tricky', 99);
+        obj.emit('tracky', 98);
+        expect(tricky).toBe(222);
+        expect(tracky).toBe(111);
+
+    });
+
+    it("should sort all listeners based on their priorities and as second order by creation time", function () {
 
         let results = [];
 
+        obj.on('prio.test', function () { results.push('_0'); });
         obj.on('prio.test', eventize.PRIO_B, function () { results.push('b'); });
+        obj.on('prio.test', function () { results.push('_1'); });
         obj.on('prio.test', eventize.PRIO_A+1, function () { results.push('aa'); });
         obj.on('prio.test', eventize.PRIO_C, function () { results.push('c'); });
+        obj.on('prio.test', eventize.PRIO_C, function () { results.push('c2'); });
         obj.on('prio.test', eventize.PRIO_MIN, function () { results.push('min'); });
+        obj.on('prio.test', eventize.PRIO_C, function () { results.push('c3'); });
         obj.on('prio.test', eventize.PRIO_A, function () { results.push('a'); });
+        obj.on('prio.test', function () { results.push('_2'); });
         obj.on('prio.test', eventize.PRIO_MAX, function () { results.push('max'); });
+        obj.on('prio.test', eventize.PRIO_C, function () { results.push('c4'); });
 
         obj.emit('prio.test');
 
-        expect(results).toEqual(['max', 'aa', 'a', 'b', 'c', 'min']);
+        expect(results).toEqual(['max', 'aa', 'a', 'b', 'c', 'c2', 'c3', 'c4', '_0', '_1', '_2', 'min']);
 
     });
 
