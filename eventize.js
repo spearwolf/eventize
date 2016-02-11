@@ -85,7 +85,7 @@ function eventize (o) {
             id         : listenerId,
             fn         : fn,
             prio       : (typeof prio !== 'number' ? eventize.PRIO_DEFAULT : prio),
-            isFunction : (typeof fn === 'function')  // TODO test fn -> object
+            isFunction : (typeof fn === 'function')
         });
 
         eventListener.push(listener);
@@ -140,9 +140,6 @@ function eventize (o) {
     // -----------------------------------------------------------------
 
     o.off = function (id) {
-
-        // TODO
-        // - test id === object (registered with on())
 
         if (arguments.length === 0) {
             o._eventize.silenced = true;
