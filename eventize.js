@@ -25,7 +25,7 @@
 
 function eventize (o) {
 
-    if (o._eventize) return o;  // <= already eventized TODO test
+    if (o._eventize) return o;
 
     _defineHiddenPropertyRO(o, '_eventize', {
         silenced: false,

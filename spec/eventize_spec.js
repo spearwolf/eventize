@@ -12,6 +12,17 @@ describe("eventize", function () {
         expect(typeof eventize === 'function').toBe(true);
     });
 
+    it('do not eventize eventized objects', function () {
+        let o = eventize({});
+        expect(o._eventize).toBeDefined();
+        expect(o._eventize.foo).toBeUndefined();
+        o._eventize.foo = 23;
+        expect(o._eventize.foo).toBe(23);
+        let o1 = eventize(o);
+        expect(o1._eventize.foo).toBe(23);
+        expect(o1).toBe(o);
+    });
+
 });
 
 describe("eventize has pre-defined priorities", function () {
