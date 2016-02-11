@@ -6,7 +6,7 @@ describe("eventizedObj.bindOn", function () {
 
     let obj = eventize({});
 
-    it("should return the object from first argument", function () {
+    it("should return the object given as first argument", function () {
 
         let a = {};
         let b = obj.bindOn(a);
@@ -15,7 +15,7 @@ describe("eventizedObj.bindOn", function () {
 
     });
 
-    it("should call the same-name-as-the-event method", function () {
+    it("should call the same-name-as-event method", function () {
 
         let result = 0;
         let a = {
