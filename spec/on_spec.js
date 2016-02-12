@@ -4,14 +4,14 @@ let eventize = require('../eventize');
 
 describe("eventizedObj.on", function () {
 
-    let obj = eventize({});
-
     it("should return an id as number", function () {
+        let obj = eventize({});
         let id = obj.on('foo', function () {});
         expect(typeof id === 'number').toBe(true, 'but is ' + (typeof id));
     });
 
     it("should work with 2 arguments", function () {
+        let obj = eventize({});
         let isCalled = false;
         obj.on('bar', function (x) { isCalled = x; });
         obj.emit('bar', true);
@@ -19,6 +19,7 @@ describe("eventizedObj.on", function () {
     });
 
     it("should work with 3 arguments", function () {
+        let obj = eventize({});
         let isCalled = 19;
         obj.on('plah', eventize.PRIO_A, function (x) { isCalled = x; });
         obj.emit('plah', 75);
@@ -26,6 +27,8 @@ describe("eventizedObj.on", function () {
     });
 
     it("should work with an object as last argument", function () {
+
+        let obj = eventize({});
 
         let tricky = 0;
         let tracky = 0;
@@ -72,6 +75,7 @@ describe("eventizedObj.on", function () {
 
     it("should sort all listeners based on their priorities and as second order by creation time", function () {
 
+        let obj = eventize({});
         let results = [];
 
         obj.on('prio.test', function () { results.push('_0'); });
@@ -95,6 +99,7 @@ describe("eventizedObj.on", function () {
 
     it("called with only one argument should reactivate previously off'd events by name", function () {
 
+        let obj = eventize({});
         let result = null;
         let result2 = null;
 
@@ -122,12 +127,30 @@ describe("eventizedObj.on", function () {
 
     it("this context of callback should be the eventized object", function () {
 
+        let obj = eventize({});
         let scope = null;
 
         obj.on('nein', function () { scope = this; });
         obj.emit('nein');
 
         expect(scope).toBe(obj);
+
+    });
+
+    it("catch all listeners will be always called after other listeners", function () {
+
+        let obj = eventize({});
+        let result = [];
+
+        obj.on(function (x) { result.push(x); });
+        obj.on('*', eventize.PRIO_A, function (x) { result.push(x+2000); });
+        obj.on('foo', function (x) { result.push(x+1000); });
+        obj.on('bar', eventize.PRIO_B, function (x) { result.push(x+3000); });
+
+        obj.emit('foo', 1);
+        obj.emit('bar', 2);
+
+        expect(result).toEqual([1001, 2001, 1, 3002, 2002, 2]);
 
     });
 

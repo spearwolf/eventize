@@ -17,7 +17,8 @@
 //
 'use strict';
 
-var LOG_NAMESPACE = '[eventize.js]';
+var LOG_NAMESPACE   = '[eventize.js]';
+var CATCH_ALL_EVENT = '*';
 
 // =====================================================================
 //
@@ -34,7 +35,7 @@ function eventize (o) {
         off     : []
     });
 
-    _defineHiddenPropertyRO(o._eventize, 'callbacks', { _id: 0 });
+    _defineHiddenPropertyRO(o._eventize, 'callbacks', { _id: 0, '*': [] });
     _defineHiddenPropertyRO(o._eventize, 'boundObjects', []);
 
     _definePublicPropertiesRO(eventize, {
@@ -66,11 +67,26 @@ function eventize (o) {
         var i;
 
         if (argsLen === 1) {
-            i = o._eventize.off.indexOf(eventName);
-            if (i >= 0) {
-                o._eventize.off.splice(i, 1);
+            if (typeof eventName === 'string') {
+
+                i = o._eventize.off.indexOf(eventName);
+                if (i >= 0) {
+                    o._eventize.off.splice(i, 1);
+                }
+                return;
+
+            } else if (typeof eventName === 'object' || typeof eventName === 'function') {
+
+                // alias for: on('*', listener)
+
+                fn = eventName;
+                eventName = CATCH_ALL_EVENT;
+                prio = eventize.PRIO_DEFAULT;
+
+            } else {
+                console.warn(LOG_NAMESPACE, '.on() called with insufficient arguments!', arguments);
+                return;
             }
-            return;
         }
 
         if (argsLen === 2) {
@@ -111,22 +127,33 @@ function eventize (o) {
 
     o.once = function (eventName, prio, fn) {
 
-        if (arguments.length < 2) {
+        var argsLen = arguments.length;
+
+        if (!argsLen || argsLen > 3) {
             console.warn(LOG_NAMESPACE, '.once() called with insufficient arguments!', arguments);
             return;
         }
 
-        if (arguments.length === 2) {
+        if (argsLen === 1) {
+
+            fn = eventName;
+            eventName = CATCH_ALL_EVENT;
+            prio = eventize.PRIO_DEFAULT;
+
+        } else if (argsLen === 2) {
+
             fn = prio;
             prio = eventize.PRIO_DEFAULT;
+
         }
 
-        var lid = o.on(eventName, prio, function () {
-            o.off(lid);
-            return fn.apply(this, arguments);
+        var id = o.on(eventName, prio, function () {
+            var res = fn.apply(this, arguments);
+            o.off(id);
+            return res;
         });
 
-        return lid;
+        return id;
 
     };
 
@@ -243,9 +270,11 @@ function eventize (o) {
 
         var args = Array.prototype.slice.call(arguments, 1);
         var _callbacks = o._eventize.callbacks[eventName];
+        var _catchAllcallbacks = o._eventize.callbacks[CATCH_ALL_EVENT];
         var i, len, cb;
 
-        if (_callbacks) {
+        if (_callbacks || _catchAllcallbacks.length) {
+            _callbacks = _callbacks ? _callbacks.concat(_catchAllcallbacks) : _catchAllcallbacks;
             len = _callbacks.length;
             for (i = 0; i < len; i++) {
                 cb = _callbacks[i];
@@ -281,18 +310,25 @@ function eventize (o) {
 
     o.emitReduce = function (eventName /*, value, [arguments ..] */) {
 
-        // TODO add specs
+        // TODO
+        // - refactor: DRY re-use code from emit()
+        // - add specs
 
         if (o._eventize.silenced) return;
         if (o._eventize.off.indexOf(eventName) >= 0) return;
 
         var args = Array.prototype.slice.call(arguments, 1);
-        var _callbacks = o._eventize.callbacks[eventName];
-        var i, len, cb;
+
         if (args.length === 0) {
             args.push({});
         }
-        if (_callbacks) {
+
+        var _callbacks = o._eventize.callbacks[eventName];
+        var _catchAllcallbacks = o._eventize.callbacks[CATCH_ALL_EVENT];
+        var i, len, cb;
+
+        if (_callbacks || _catchAllcallbacks.length) {
+            _callbacks = _callbacks ? _callbacks.concat(_catchAllcallbacks) : _catchAllcallbacks;
             len = _callbacks.length;
             for (i = 0; i < len; i++) {
                 cb = _callbacks[i];

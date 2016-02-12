@@ -97,5 +97,61 @@ describe("eventizedObj.off", function () {
 
     });
 
+    it("should deregister catch all listeners by id", function () {
+
+        let result = [];
+
+        let id = obj.on(function (x) { result.push(x); });
+        obj.on('fooo', function (x) { result.push(x+1000); });
+
+        obj.emit('fooo', 1);
+
+        obj.off(id);
+
+        obj.emit('fooo', 2);
+
+        expect(result).toEqual([1001, 1, 1002]);
+
+    });
+
+    it("should deregister catch all listeners by function reference", function () {
+
+        let result = [];
+
+        let fn = function (x) { result.push(x); };
+
+        obj.on(fn);
+        obj.on('rokko', function (x) { result.push(x+1000); });
+
+        obj.emit('rokko', 1);
+
+        obj.off(fn);
+
+        obj.emit('rokko', 2);
+
+        expect(result).toEqual([1001, 1, 1002]);
+
+    });
+
+    it("should deregister catch all listeners by object reference", function () {
+
+        let result = [];
+
+        let obj2 = eventize({});
+        obj2.on('sahel', function (x) { result.push(x); });
+
+        obj.on(obj2);
+        obj.on('sahel', function (x) { result.push(x+1000); });
+
+        obj.emit('sahel', 1);
+
+        obj.off(obj2);
+
+        obj.emit('sahel', 2);
+
+        expect(result).toEqual([1001, 1, 1002]);
+
+    });
+
 });
 
