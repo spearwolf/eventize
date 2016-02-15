@@ -8,9 +8,6 @@ describe("eventizedObj.emit", function () {
 
     it("should call proper listeners in correct order", function () {
 
-        // TODO current implementation should be changed:
-        //   bound objects will be always called *after* other callbacks (registered via on() or once())
-
         let results = [];
 
         let a = {
@@ -56,8 +53,8 @@ describe("eventizedObj.emit", function () {
             'on.foo_1:a/2',
             'on.foo_2:a/2',
             'on.foo_3:a/2',
-            'on.foo:a/2',
             'a.foo:a/3',
+            'on.foo:a/2',
             'on.bar:b/1',
             'a.bar:b/2'
         ]);

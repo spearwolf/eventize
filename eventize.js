@@ -265,12 +265,48 @@ function eventize (o) {
 
     o.emit = function (eventName /*, arguments ..*/) {
 
+        var ctx = this;
+        var args = Array.prototype.slice.call(arguments, 1);
+        var args1 = args.concat([ctx]);
+
+        _emit(eventName, function (cb) {
+
+            if (cb.isFunction) {
+                cb.fn.apply(ctx, args);
+            } else {
+                cb.fn.emit.apply(cb.fn, [eventName].concat(args));
+            }
+
+        }, function (fn, ctx) {
+
+            fn.apply(ctx, args1);
+
+        });
+
+    };
+
+    function _emit (eventName, callback, callback1) {
+
         if (o._eventize.silenced) return;
         if (o._eventize.off.indexOf(eventName) >= 0) return;
 
-        var args = Array.prototype.slice.call(arguments, 1);
         var _callbacks = o._eventize.callbacks[eventName];
         var _catchAllcallbacks = o._eventize.callbacks[CATCH_ALL_EVENT];
+        var hasCalledBoundObjects = false;
+        var lenBoundObjs = o._eventize.boundObjects.length;
+
+        function callBoundObjects () {
+            var j, _cb;
+            if (lenBoundObjs) {
+                for (j = 0; j < lenBoundObjs; j++) {
+                    _cb = o._eventize.boundObjects[j][eventName];
+                    if (typeof _cb === 'function') {
+                        callback1(_cb, o._eventize.boundObjects[j]);
+                    }
+                }
+            }
+        }
+
         var i, len, cb;
 
         if (_callbacks || _catchAllcallbacks.length) {
@@ -278,29 +314,17 @@ function eventize (o) {
             len = _callbacks.length;
             for (i = 0; i < len; i++) {
                 cb = _callbacks[i];
-                if (cb.isFunction) {
-                    cb.fn.apply(this, args);
-                } else {
-                    cb.fn.emit.apply(cb.fn, [eventName].concat(args));
+                if (!hasCalledBoundObjects && cb && cb.prio < eventize.PRIO_DEFAULT) {
+                    callBoundObjects();
+                    hasCalledBoundObjects = true;
                 }
+                callback(cb);
             }
         }
 
-        // TODO move bound objects calls to PRIO_DEFAULT (functions)
+        if (!hasCalledBoundObjects) callBoundObjects();
 
-        len = o._eventize.boundObjects.length;
-        if (len) {
-            //args.unshift(this);
-            args.push(this);
-            for (i = 0; i < len; i++) {
-                cb = o._eventize.boundObjects[i][eventName];
-                if (typeof cb === 'function') {
-                    cb.apply(o._eventize.boundObjects[i], args);
-                }
-            }
-        }
-
-    };
+    }
 
     // -----------------------------------------------------------------
     //
@@ -311,46 +335,45 @@ function eventize (o) {
     o.emitReduce = function (eventName /*, value, [arguments ..] */) {
 
         // TODO
-        // - refactor: DRY re-use code from emit()
         // - add specs
 
-        if (o._eventize.silenced) return;
-        if (o._eventize.off.indexOf(eventName) >= 0) return;
-
         var args = Array.prototype.slice.call(arguments, 1);
+        var value;
 
         if (args.length === 0) {
-            args.push({});
+            value = {};
+            args.push(value);
         }
 
-        var _callbacks = o._eventize.callbacks[eventName];
-        var _catchAllcallbacks = o._eventize.callbacks[CATCH_ALL_EVENT];
-        var i, len, cb;
+        var ctx = this;
+        var args1 = args.concat([ctx]);
 
-        if (_callbacks || _catchAllcallbacks.length) {
-            _callbacks = _callbacks ? _callbacks.concat(_catchAllcallbacks) : _catchAllcallbacks;
-            len = _callbacks.length;
-            for (i = 0; i < len; i++) {
-                cb = _callbacks[i];
-                args[0] = cb.isFunction ? cb.fn.apply(this, args) : cb.fn.emitReduce.apply(cb.fn, [eventName].concat(args));
+        function setValue (val) {
+            if (val !== undefined) {
+                value = val;
             }
         }
 
-        // TODO move bound objects calls to PRIO_DEFAULT (functions)
+        _emit(eventName, function (cb) {
 
-        len = o._eventize.boundObjects.length;
-        if (len) {
-            //args.unshift(this);
-            args.push(this);
-            for (i = 0; i < len; i++) {
-                cb = o._eventize.boundObjects[i][eventName];
-                if (typeof cb === 'function') {
-                    args[1] = cb.apply(o._eventize.boundObjects[i], args);
-                }
+            args[0] = value;
+
+            if (cb.isFunction) {
+                setValue(cb.fn.apply(ctx, args));
+            } else {
+                setValue(value = cb.fn.emit.apply(cb.fn, [eventName].concat(args)));
             }
-            return args[1];
-        }
-        return args[0];
+
+        }, function (fn, ctx) {
+
+            args[1] = value;
+
+            setValue(fn.apply(ctx, args1));
+
+        });
+
+        return value;
+
     };
 
     return o;
