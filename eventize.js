@@ -38,15 +38,17 @@ function eventize (o) {
     _defineHiddenPropertyRO(o._eventize, 'callbacks', { _id: 0, '*': [] });
     _defineHiddenPropertyRO(o._eventize, 'boundObjects', []);
 
-    _definePublicPropertiesRO(eventize, {
-        PRIO_MAX     : Number.POSITIVE_INFINITY,
-        PRIO_A       : 1000000000,
-        PRIO_B       : 10000000,
-        PRIO_C       : 100000,
-        PRIO_DEFAULT : 0,
-        PRIO_LOW     : -100000,
-        PRIO_MIN     : Number.NEGATIVE_INFINITY
-    });
+    if (eventize.PRIO_DEFAULT === undefined) {
+        _definePublicPropertiesRO(eventize, {
+            PRIO_MAX     : Number.POSITIVE_INFINITY,
+            PRIO_A       : 1000000000,
+            PRIO_B       : 10000000,
+            PRIO_C       : 100000,
+            PRIO_DEFAULT : 0,
+            PRIO_LOW     : -100000,
+            PRIO_MIN     : Number.NEGATIVE_INFINITY
+        });
+    }
 
     // -----------------------------------------------------------------
     //
@@ -162,7 +164,7 @@ function eventize (o) {
     // object.off( id )
     //
     // deactive listener by id or previously bound object or
-    // function reference or silence all events
+    // function reference or event name or silence all events
     //
     // -----------------------------------------------------------------
 
