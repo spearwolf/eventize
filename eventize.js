@@ -30,15 +30,20 @@ function eventize (o) {
 
     if (o._eventize) return o;
 
-    _defineHiddenPropertyRO(o, '_eventize', {
-        silenced: false,
-        off     : []
-    });
+    var _e = {
+        silenced       : false,
+        off            : [],
+        lastCallbackId : 0,
+        callbacks      : {},
+        boundObjects   : []
+    };
 
-    _defineHiddenPropertyRO(o._eventize, 'callbacks', { _id: 0, '*': [] });
-    _defineHiddenPropertyRO(o._eventize, 'boundObjects', []);
+    _e.callbacks[CATCH_ALL_EVENT] = [];
+
+    _defineHiddenPropertyRO(o, '_eventize', _e);
 
     if (eventize.PRIO_DEFAULT === undefined) {
+
         _definePublicPropertiesRO(eventize, {
             PRIO_MAX     : Number.POSITIVE_INFINITY,
             PRIO_A       : 1000000000,
@@ -48,6 +53,7 @@ function eventize (o) {
             PRIO_LOW     : -100000,
             PRIO_MIN     : Number.NEGATIVE_INFINITY
         });
+
     }
 
     // -----------------------------------------------------------------
@@ -61,8 +67,8 @@ function eventize (o) {
         var argsLen = arguments.length;
 
         if (argsLen === 0) {
-            o._eventize.silenced = false;
-            o._eventize.off.length = 0;
+            _e.silenced = false;
+            _e.off.length = 0;
             return;
         }
 
@@ -71,9 +77,9 @@ function eventize (o) {
         if (argsLen === 1) {
             if (typeof eventName === 'string') {
 
-                i = o._eventize.off.indexOf(eventName);
+                i = _e.off.indexOf(eventName);
                 if (i >= 0) {
-                    o._eventize.off.splice(i, 1);
+                    _e.off.splice(i, 1);
                 }
                 return;
 
@@ -96,7 +102,7 @@ function eventize (o) {
             prio = eventize.PRIO_DEFAULT;
         }
 
-        var eventizeCallbacks = o._eventize.callbacks;
+        var eventizeCallbacks = _e.callbacks;
         var eventListener = eventizeCallbacks[eventName] || (eventizeCallbacks[eventName] = []);
         var listenerId = createId();
         var listener = _definePublicPropertiesRO({}, {
@@ -114,7 +120,7 @@ function eventize (o) {
     };
 
     function createId () {
-        return ++o._eventize.callbacks._id;
+        return ++_e.lastCallbackId;
     }
 
     function sortListenerByPrio (a, b) {
@@ -171,8 +177,8 @@ function eventize (o) {
     o.off = function (id) {
 
         if (arguments.length === 0) {
-            o._eventize.silenced = true;
-            o._eventize.off.length = 0;
+            _e.silenced = true;
+            _e.off.length = 0;
             return;
         }
 
@@ -180,13 +186,13 @@ function eventize (o) {
             //
             // by event name
             //
-            if (o._eventize.off.indexOf(id) === -1) {
-                o._eventize.off.push(id);
+            if (_e.off.indexOf(id) === -1) {
+                _e.off.push(id);
             }
             return;
         }
 
-        var eventizeCallbacks = o._eventize.callbacks;
+        var eventizeCallbacks = _e.callbacks;
         var cb, i, j, _callbacks, keys;
         var isObject = typeof id === 'object';
 
@@ -211,9 +217,9 @@ function eventize (o) {
             //
             // by bound object reference
             //
-            i = o._eventize.boundObjects.indexOf(id);
+            i = _e.boundObjects.indexOf(id);
             if ( i >= 0 ) {
-                o._eventize.boundObjects.splice(i, 1);
+                _e.boundObjects.splice(i, 1);
             }
         }
 
@@ -233,9 +239,9 @@ function eventize (o) {
         // - support senderContextArgument: 'prepend'|'append'|false
 
         if (!obj) return;
-        var i = o._eventize.boundObjects.indexOf(obj);
+        var i = _e.boundObjects.indexOf(obj);
         if (i === -1) {
-            o._eventize.boundObjects.push(obj);
+            _e.boundObjects.push(obj);
         }
         return obj;
 
@@ -289,21 +295,21 @@ function eventize (o) {
 
     function _emit (eventName, callback, callback1) {
 
-        if (o._eventize.silenced) return;
-        if (o._eventize.off.indexOf(eventName) >= 0) return;
+        if (_e.silenced) return;
+        if (_e.off.indexOf(eventName) >= 0) return;
 
-        var _callbacks = o._eventize.callbacks[eventName];
-        var _catchAllcallbacks = o._eventize.callbacks[CATCH_ALL_EVENT];
+        var _callbacks = _e.callbacks[eventName];
+        var _catchAllcallbacks = _e.callbacks[CATCH_ALL_EVENT];
         var hasCalledBoundObjects = false;
-        var lenBoundObjs = o._eventize.boundObjects.length;
+        var lenBoundObjs = _e.boundObjects.length;
 
         function callBoundObjects () {
             var j, _cb;
             if (lenBoundObjs) {
                 for (j = 0; j < lenBoundObjs; j++) {
-                    _cb = o._eventize.boundObjects[j][eventName];
+                    _cb = _e.boundObjects[j][eventName];
                     if (typeof _cb === 'function') {
-                        callback1(_cb, o._eventize.boundObjects[j]);
+                        callback1(_cb, _e.boundObjects[j]);
                     }
                 }
             }
@@ -336,19 +342,8 @@ function eventize (o) {
 
     o.emitReduce = function (eventName /*, value, [arguments ..] */) {
 
-        // TODO
-        // - add specs
-
         var args = Array.prototype.slice.call(arguments, 1);
         var value;
-
-        if (args.length === 0) {
-            value = {};
-            args.push(value);
-        }
-
-        var ctx = this;
-        var args1 = args.concat([ctx]);
 
         function setValue (val) {
             if (val !== undefined) {
@@ -356,21 +351,31 @@ function eventize (o) {
             }
         }
 
+        if (args.length === 0) {
+            value = {};
+            args.push(value);
+        } else {
+            setValue(args[0]);
+        }
+
+        var ctx = this;
+        var argsWithEventName = [eventName].concat(args);
+        var argsWithCtx = args.concat([ctx]);
+
         _emit(eventName, function (cb) {
 
-            args[0] = value;
-
             if (cb.isFunction) {
+                args[0] = value;
                 setValue(cb.fn.apply(ctx, args));
             } else {
-                setValue(value = cb.fn.emit.apply(cb.fn, [eventName].concat(args)));
+                argsWithEventName[1] = value;
+                setValue(cb.fn.emit.apply(cb.fn, argsWithEventName));
             }
 
         }, function (fn, ctx) {
 
-            args[1] = value;
-
-            setValue(fn.apply(ctx, args1));
+            argsWithCtx[0] = value;
+            setValue(fn.apply(ctx, argsWithCtx));
 
         });
 
