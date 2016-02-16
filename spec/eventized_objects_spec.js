@@ -18,16 +18,14 @@ describe("eventized objects", function () {
         expect(typeof obj.off === 'function').toBe(true);
     });
 
+    // TODO - isOff([eventName, ..])
+
     it("should have .emit() method", function () {
         expect(typeof obj.emit === 'function').toBe(true);
     });
 
     it("should have .emitReduce() method", function () {
         expect(typeof obj.emitReduce === 'function').toBe(true);
-    });
-
-    it("should have .bindOn() method", function () {
-        expect(typeof obj.bindOn === 'function').toBe(true);
     });
 
     it("should have .connect() method", function () {

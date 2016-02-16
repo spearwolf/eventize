@@ -59,7 +59,7 @@ describe("eventizedObj.emitReduce", function () {
             return str + '|' + s;
         });
 
-        obj.bindOn(a);
+        obj.connect(a);
 
         var foo = obj.emitReduce('foo', 'FOO:', 'a', 23, 12);
         var bar = obj.emitReduce('bar', 'BAR:', 'b', 65);

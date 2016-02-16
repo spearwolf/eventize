@@ -43,7 +43,7 @@ describe("eventizedObj.emit", function () {
             results.push('on.foo_3:'+x+'/'+arguments.length);
         });
 
-        obj.bindOn(a);
+        obj.connect(a);
 
         obj.emit('foo', 'a', 0);
         obj.emit('bar', 'b');

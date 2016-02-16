@@ -2,14 +2,14 @@
 
 let eventize = require('../eventize');
 
-describe("eventizedObj.bindOn", function () {
+describe("eventizedObj.connect(obj)", function () {
 
     let obj = eventize({});
 
     it("should return the object given as first argument", function () {
 
         let a = {};
-        let b = obj.bindOn(a);
+        let b = obj.connect(a);
 
         expect(a).toBe(b);
 
@@ -22,7 +22,7 @@ describe("eventizedObj.bindOn", function () {
             foo: function (x) { result = x; }
         };
 
-        obj.bindOn(a);
+        obj.connect(a);
         obj.emit('foo', 23);
 
         expect(result).toBe(23);
@@ -36,7 +36,7 @@ describe("eventizedObj.bindOn", function () {
             bar: function () { scope = this; }
         };
 
-        obj.bindOn(a);
+        obj.connect(a);
         obj.emit('bar');
 
         expect(scope).toBe(a);
@@ -50,7 +50,7 @@ describe("eventizedObj.bindOn", function () {
             pfuu: function () { result = 13; }
         };
 
-        obj.bindOn(a);
+        obj.connect(a);
 
         obj.emit('xxcxcxc'); // <= undefined
         obj.emit('pfuu');    // <= defined
@@ -71,7 +71,7 @@ describe("eventizedObj.bindOn", function () {
             }
         };
 
-        obj.bindOn(a);
+        obj.connect(a);
         obj.emit('plah', 7, 666);
 
         expect(result).toEqual([a, 7, 666, obj]);

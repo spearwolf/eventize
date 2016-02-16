@@ -27,7 +27,7 @@ describe("eventizedObj.off", function () {
             'bar': function (x) { result = x; }
         };
 
-        obj.bindOn(listen);
+        obj.connect(listen);
 
         obj.emit('bar', 55);
         obj.off(listen);
@@ -79,7 +79,7 @@ describe("eventizedObj.off", function () {
             'foo': function (x) { result.push(x) }
         };
 
-        obj.bindOn(listen);
+        obj.connect(listen);
 
         obj.emit('bar', 1);
         obj.emit('foo', 2);

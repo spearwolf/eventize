@@ -23,6 +23,12 @@ describe("eventize", function () {
         expect(o1).toBe(o);
     });
 
+    it("has .is() helper function", function () {
+        expect(eventize.is).toBeDefined();
+        expect(eventize.is(eventize({}))).toBe(true);
+        expect(eventize.is({})).toBe(false);
+    });
+
 });
 
 describe("eventize has pre-defined priorities", function () {

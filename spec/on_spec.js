@@ -32,23 +32,31 @@ describe("eventizedObj.on", function () {
 
         let tricky = 0;
         let tracky = 0;
+        let trecky = 0;
 
         let obj2 = eventize({});
+        let obj3 = {};
 
         obj2.on('tricky', function (x) { tricky = x });
         obj2.on('tracky', function (x) { tracky = x-1 });
+        obj3.trecky = function (x) { trecky = x+1 };
 
         obj.emit('tricky', 999);
         obj.emit('tracky', 888);
+        obj.emit('trecky', 777);
         expect(tricky).toBe(0);
         expect(tracky).toBe(0);
+        expect(trecky).toBe(0);
 
         obj.on('tricky', obj2);
+        obj.on('trecky', obj3);
 
         obj.emit('tricky', 666);
         obj.emit('tracky', 555);
+        obj.emit('trecky', 444);
         expect(tricky).toBe(666);
         expect(tracky).toBe(0);
+        expect(trecky).toBe(445);
 
         obj.on('tracky', eventize.PRIO_A, obj2);
 
@@ -56,20 +64,32 @@ describe("eventizedObj.on", function () {
         obj.emit('tracky', 333);
         expect(tricky).toBe(444);
         expect(tracky).toBe(332);
+        expect(trecky).toBe(445);
 
         obj2.on('tracky', eventize.PRIO_LOW, function (x) { tracky = x });
 
+        var obj4 = {
+            trecky: function (x) { trecky = x }
+        };
+        obj.on('trecky', eventize.PRIO_LOW, obj4);
+
         obj.emit('tricky', 222);
         obj.emit('tracky', 111);
+        obj.emit('trecky', 10);
         expect(tricky).toBe(222);
         expect(tracky).toBe(111);
+        expect(trecky).toBe(10);
 
         obj.off(obj2);
+        obj.off(obj3);
+        obj.off(obj4);
 
         obj.emit('tricky', 99);
         obj.emit('tracky', 98);
+        obj.emit('trecky', 98);
         expect(tricky).toBe(222);
         expect(tracky).toBe(111);
+        expect(trecky).toBe(10);
 
     });
 
@@ -105,7 +125,7 @@ describe("eventizedObj.on", function () {
 
         obj.on('krah', function (x) { result = x; });
 
-        obj.bindOn({
+        obj.connect({
             'krah': function (x) { result2 = x; }
         });
 

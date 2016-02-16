@@ -17,8 +17,9 @@
 //
 'use strict';
 
-var LOG_NAMESPACE   = '[eventize.js]';
+var PROP_NAMESPACE  = '_eventize';
 var CATCH_ALL_EVENT = '*';
+var LOG_NAMESPACE   = '[eventize.js]';
 
 // =====================================================================
 //
@@ -28,11 +29,9 @@ var CATCH_ALL_EVENT = '*';
 
 function eventize (o) {
 
-    if (o._eventize) return o;
+    if (o[PROP_NAMESPACE]) return o;
 
     var _e = {
-        silenced       : false,
-        off            : [],
         lastCallbackId : 0,
         callbacks      : {},
         boundObjects   : []
@@ -40,7 +39,12 @@ function eventize (o) {
 
     _e.callbacks[CATCH_ALL_EVENT] = [];
 
-    _defineHiddenPropertyRO(o, '_eventize', _e);
+    var _ePublic = _definePublicPropertiesRO({}, {
+        silenced : false,
+        off      : []
+    });
+
+    _defineHiddenPropertyRO(o, PROP_NAMESPACE, _ePublic);
 
     if (eventize.PRIO_DEFAULT === undefined) {
 
@@ -58,17 +62,25 @@ function eventize (o) {
 
     // -----------------------------------------------------------------
     //
-    // object.on( eventName [, [ prio, ] callback ] )
+    // object.on( eventName, [ prio, ] callbackFunc )
+    // object.on( eventName, [ prio, ] obj )
+    //
+    // object.on( callbackFunc )    => object.on( '*', callbackFunc )
+    // object.on( obj )             => object.on( '*', obj )
+    //
+    // object.on()
     //
     // -----------------------------------------------------------------
 
-    o.on = function (eventName, prio, fn) {
+    o.on = function (eventName, prio, fn) {  // --- {{{
 
         var argsLen = arguments.length;
 
         if (argsLen === 0) {
-            _e.silenced = false;
-            _e.off.length = 0;
+            if (_ePublic.silenced) {
+                _definePublicPropertyRO(_ePublic, 'silenced', false);
+                _ePublic.off.length = 0;
+            }
             return;
         }
 
@@ -77,9 +89,9 @@ function eventize (o) {
         if (argsLen === 1) {
             if (typeof eventName === 'string') {
 
-                i = _e.off.indexOf(eventName);
+                i = _ePublic.off.indexOf(eventName);
                 if (i >= 0) {
-                    _e.off.splice(i, 1);
+                    _ePublic.off.splice(i, 1);
                 }
                 return;
 
@@ -109,7 +121,7 @@ function eventize (o) {
             id         : listenerId,
             fn         : fn,
             prio       : (typeof prio !== 'number' ? eventize.PRIO_DEFAULT : prio),
-            isFunction : (typeof fn === 'function')
+            isFunction : (typeof fn === 'function'),
         });
 
         eventListener.push(listener);
@@ -127,13 +139,19 @@ function eventize (o) {
         return a.prio !== b.prio ? b.prio - a.prio : a.id - b.id;
     }
 
-    // -----------------------------------------------------------------
-    //
-    // object.once( eventName, [ prio, ] callback )
-    //
-    // -----------------------------------------------------------------
+    // --- on }}}
 
-    o.once = function (eventName, prio, fn) {
+    // ----------------------------------------------------------------------
+    //
+    // object.once( eventName, [ prio, ] callbackFunc )
+    // object.once( eventName, [ prio, ] obj )
+    //
+    // object.once( callbackFunc )      => object.once( '*', callbackFunc )
+    // object.once( obj )               => object.once( '*', obj )
+    //
+    // ----------------------------------------------------------------------
+
+    o.once = function (eventName, prio, fn) {  // --- {{{
 
         var argsLen = arguments.length;
 
@@ -165,20 +183,28 @@ function eventize (o) {
 
     };
 
+    // --- once }}}
+
     // -----------------------------------------------------------------
     //
     // object.off( id )
+    // object.off( callback )
+    // object.off( obj )
+    // object.off( eventName )
+    // object.off()
     //
     // deactive listener by id or previously bound object or
     // function reference or event name or silence all events
     //
     // -----------------------------------------------------------------
 
-    o.off = function (id) {
+    o.off = function (id) {  // -- {{{
 
         if (arguments.length === 0) {
-            _e.silenced = true;
-            _e.off.length = 0;
+            if (!_ePublic.silenced) {
+                _definePublicPropertyRO(_ePublic, 'silenced', true);
+                _ePublic.off.length = 0;
+            }
             return;
         }
 
@@ -186,8 +212,8 @@ function eventize (o) {
             //
             // by event name
             //
-            if (_e.off.indexOf(id) === -1) {
-                _e.off.push(id);
+            if (_ePublic.off.indexOf(id) === -1) {
+                _ePublic.off.push(id);
             }
             return;
         }
@@ -225,31 +251,12 @@ function eventize (o) {
 
     };
 
-    // -----------------------------------------------------------------
-    //
-    // object.bindOn( object )
-    //
-    // -----------------------------------------------------------------
-
-    o.bindOn = function (obj) {
-
-        // TODO bindOn should ..
-        // - support priority
-        // - support filters (via only, except options)
-        // - support senderContextArgument: 'prepend'|'append'|false
-
-        if (!obj) return;
-        var i = _e.boundObjects.indexOf(obj);
-        if (i === -1) {
-            _e.boundObjects.push(obj);
-        }
-        return obj;
-
-    };
+    // --- off }}}
 
     // -----------------------------------------------------------------
     //
-    // object.connect(options, listenMap)
+    // object.connect( obj )
+    // object.connect( obj, mapping )
     //
     // Example:
     //
@@ -261,9 +268,58 @@ function eventize (o) {
     //
     // -----------------------------------------------------------------
 
-    o.connect = function (from, listenMap) {
-        return setListenerFromOptions(this, from, listenMap);
+    o.connect = function (obj, mapping) {  // --- {{{
+        var argsLen = arguments.length;
+        if (argsLen === 1) {
+            return _bindObject(obj);
+        } else if (argsLen === 2) {
+            return _connectWithMapping(this, obj, mapping);
+        } else {
+            console.warn(LOG_NAMESPACE, '.connect() called with insufficient arguments!', arguments);
+        }
     };
+
+    function _bindObject (obj) {
+
+        // TODO connect(obj) should ..
+        // - support priority
+        // - support filters? (via only, except options)
+        // - support senderContextArgument?: 'prepend'|'append'|false
+
+        if (!obj) return;
+        var i = _e.boundObjects.indexOf(obj);
+        if (i === -1) {
+            _e.boundObjects.push(obj);
+        }
+        return obj;
+
+    }
+
+    function _connectWithMapping (obj, options, listenerMap) {
+
+        var eventName, listenName, listenFunc, prio;
+
+        for (listenName in listenerMap) {
+            if (listenerMap.hasOwnProperty(listenName)) {
+                listenFunc = options[listenName];
+                if (typeof listenFunc === 'function') {
+                    eventName = listenerMap[listenName];
+                    if (Array.isArray(eventName)) {
+                        prio = eventName[0];
+                        eventName = eventName[1];
+                    } else {
+                        prio = eventize.PRIO_DEFAULT;
+                    }
+                    obj.on(eventName, prio, listenFunc);
+                }
+            }
+        }
+
+        return obj;
+
+    }
+
+    // --- connect }}}
 
     // -----------------------------------------------------------------
     //
@@ -271,76 +327,88 @@ function eventize (o) {
     //
     // -----------------------------------------------------------------
 
-    o.emit = function (eventName /*, arguments ..*/) {
+    o.emit = function (eventName) {  // --- {{{
 
-        var ctx = this;
+        var senderCtx = this;
         var args = Array.prototype.slice.call(arguments, 1);
-        var args1 = args.concat([ctx]);
+        var argsCtx = args.concat([senderCtx]);
 
-        _emit(eventName, function (cb) {
+        _emit(eventName, function (listener) {
 
-            if (cb.isFunction) {
-                cb.fn.apply(ctx, args);
+            if (listener.isFunction) {
+                listener.fn.apply(senderCtx, args);
             } else {
-                cb.fn.emit.apply(cb.fn, [eventName].concat(args));
+                if (listener.fn[PROP_NAMESPACE]) {
+                    listener.fn.emit.apply(listener.fn, [eventName].concat(args));
+                } else {
+                    var fn = listener.fn[eventName];
+                    if (typeof fn === 'function') {
+                        fn.apply(listener.fn, argsCtx)
+                    }
+                }
             }
 
-        }, function (fn, ctx) {
+        }, function (fn, boundObj) {
 
-            fn.apply(ctx, args1);
+            fn.apply(boundObj, argsCtx);
 
         });
 
     };
 
-    function _emit (eventName, callback, callback1) {
+    function _emit (eventName, emitListener, emitBoundObject) {
 
-        if (_e.silenced) return;
-        if (_e.off.indexOf(eventName) >= 0) return;
+        if (_ePublic.silenced) return;
+        if (_ePublic.off.indexOf(eventName) >= 0) return;
 
-        var _callbacks = _e.callbacks[eventName];
-        var _catchAllcallbacks = _e.callbacks[CATCH_ALL_EVENT];
-        var hasCalledBoundObjects = false;
-        var lenBoundObjs = _e.boundObjects.length;
+        var listeners              = _e.callbacks[eventName];
+        var catchAllListeners      = _e.callbacks[CATCH_ALL_EVENT];
+        var boundObjsCount         = _e.boundObjects.length;
+        var hasBoundObjectsEmitted = false;
 
-        function callBoundObjects () {
-            var j, _cb;
-            if (lenBoundObjs) {
-                for (j = 0; j < lenBoundObjs; j++) {
-                    _cb = _e.boundObjects[j][eventName];
-                    if (typeof _cb === 'function') {
-                        callback1(_cb, _e.boundObjects[j]);
+        function _emitBoundObjects () {
+            var j, bo, fn;
+            if (boundObjsCount) {
+                for (j = 0; j < boundObjsCount; j++) {
+                    bo = _e.boundObjects[j];
+                    fn = bo[eventName];
+                    if (typeof fn === 'function') {
+                        emitBoundObject(fn, bo);
                     }
                 }
             }
         }
 
-        var i, len, cb;
+        var i, len, listen;
 
-        if (_callbacks || _catchAllcallbacks.length) {
-            _callbacks = _callbacks ? _callbacks.concat(_catchAllcallbacks) : _catchAllcallbacks;
-            len = _callbacks.length;
+        if (listeners || catchAllListeners.length) {
+
+            listeners = listeners ? listeners.concat(catchAllListeners) : catchAllListeners;
+            len = listeners.length;
+
             for (i = 0; i < len; i++) {
-                cb = _callbacks[i];
-                if (!hasCalledBoundObjects && cb && cb.prio < eventize.PRIO_DEFAULT) {
-                    callBoundObjects();
-                    hasCalledBoundObjects = true;
+                listen = listeners[i];
+                if (!hasBoundObjectsEmitted && listen && listen.prio < eventize.PRIO_DEFAULT) {
+                    _emitBoundObjects();
+                    hasBoundObjectsEmitted = true;
                 }
-                callback(cb);
+                emitListener(listen);
             }
         }
 
-        if (!hasCalledBoundObjects) callBoundObjects();
+        if (!hasBoundObjectsEmitted) _emitBoundObjects();
 
     }
 
-    // -----------------------------------------------------------------
-    //
-    // object.emitReduce( eventName [, value ] [, arguments .. ] )
-    //
-    // -----------------------------------------------------------------
+    // --- emit }}}
 
-    o.emitReduce = function (eventName /*, value, [arguments ..] */) {
+    // --------------------------------------------------------------------
+    //
+    // object.emitReduce( eventName [, value= {} ] [, arguments .. ] )
+    //
+    // --------------------------------------------------------------------
+
+    o.emitReduce = function (eventName) {  // --- {{{
 
         var args = Array.prototype.slice.call(arguments, 1);
         var value;
@@ -360,22 +428,30 @@ function eventize (o) {
 
         var ctx = this;
         var argsWithEventName = [eventName].concat(args);
-        var argsWithCtx = args.concat([ctx]);
+        var argsCtx = args.concat([ctx]);
 
-        _emit(eventName, function (cb) {
+        _emit(eventName, function (listener) {
 
-            if (cb.isFunction) {
+            if (listener.isFunction) {
                 args[0] = value;
-                setValue(cb.fn.apply(ctx, args));
+                setValue(listener.fn.apply(ctx, args));
             } else {
-                argsWithEventName[1] = value;
-                setValue(cb.fn.emit.apply(cb.fn, argsWithEventName));
+                if (listener.fn[PROP_NAMESPACE]) {
+                    argsWithEventName[1] = value;
+                    setValue(listener.fn.emitReduce.apply(listener.fn, argsWithEventName));
+                } else {
+                    var fn = listener.fn[eventName];
+                    if (typeof fn === 'function') {
+                        argsCtx[0] = value;
+                        setValue(fn.apply(listener.fn, argsCtx));
+                    }
+                }
             }
 
-        }, function (fn, ctx) {
+        }, function (fn, boundObj) {
 
-            argsWithCtx[0] = value;
-            setValue(fn.apply(ctx, argsWithCtx));
+            argsCtx[0] = value;
+            setValue(fn.apply(boundObj, argsCtx));
 
         });
 
@@ -383,54 +459,18 @@ function eventize (o) {
 
     };
 
+    // --- emit }}}
+
     return o;
 
 } // <= eventize()
 
+eventize.is = function (obj) {
+    return !!( obj && obj[PROP_NAMESPACE] );
+};
+
 module.exports = eventize;
 
-
-// ---------------------------------------------------------------------
-//
-// setListenerFromOptions
-//
-// Example:
-//
-//   setListenerFromOptions(
-//      obj,
-//      options,
-//      {
-//          onProjectionUpdated: [100, 'projectionUpdated'],
-//          onFrame: 'frame',
-//          onFrameEnd: 'frameEnd'
-//      }
-//   )
-//
-// ---------------------------------------------------------------------
-
-function setListenerFromOptions (obj, options, listenerMap) {
-
-    var eventName, listenName, listenFunc, prio;
-
-    for (listenName in listenerMap) {
-        if (listenerMap.hasOwnProperty(listenName)) {
-            listenFunc = options[listenName];
-            if (typeof listenFunc === 'function') {
-                eventName = listenerMap[listenName];
-                if (Array.isArray(eventName)) {
-                    prio = eventName[0];
-                    eventName = eventName[1];
-                } else {
-                    prio = eventize.PRIO_DEFAULT;
-                }
-                obj.on(eventName, prio, listenFunc);
-            }
-        }
-    }
-
-    return obj;
-
-}
 
 // =====================================================================
 //
