@@ -51,13 +51,13 @@ Check if the given object is _eventized_ (has the _eventized object_ api). Retur
 #### on()
 
 ```
-object.on( eventName, [ prio, ] callbackFunc )
-object.on( eventName, [ prio, ] obj )
+obj.on( eventName, [ prio, ] callbackFunc )
+obj.on( eventName, [ prio, ] obj )
 
-object.on( callbackFunc )    // => alias for: object.on( '*', callbackFunc )
-object.on( obj )             // => alias for: object.on( '*', obj )
+obj.on( callbackFunc )    // => alias for: object.on( '*', callbackFunc )
+obj.on( obj )             // => alias for: object.on( '*', obj )
 
-object.on()
+obj.on()
 ```
 
 Adds a listener to an event name.
@@ -67,11 +67,11 @@ When the event is fired all listeners will be called.
 #### once()
 
 ```
-object.once( eventName, [ prio, ] callbackFunc )
-object.once( eventName, [ prio, ] obj )
+obj.once( eventName, [ prio, ] callbackFunc )
+obj.once( eventName, [ prio, ] obj )
 
-object.once( callbackFunc )      // => object.once( '*', callbackFunc )
-object.once( obj )               // => object.once( '*', obj )
+obj.once( callbackFunc )      // => object.once( '*', callbackFunc )
+obj.once( obj )               // => object.once( '*', obj )
 ```
 
 Adds a listener to an event name.
@@ -82,8 +82,8 @@ When the event is fired all listeners will be called in _priority_ and _creation
 #### connect()
 
 ```
-object.connect( obj )
-object.connect( obj, mapping )
+obj.connect( obj )
+obj.connect( obj, mapping )
 ```
 
 Bind multiple functions to events.
@@ -93,31 +93,31 @@ Bind multiple functions to events.
 Connect multiple events to object methods:
 
 ```javascript
-object.connect({
+obj.connect({
     foo () { console.log('hello') }
 });
 
-object.emit('foo');   // => 'hello'
-object.emit('bar');   // nothing will happen
+obj.emit('foo');   // => 'hello'
+obj.emit('bar');   // nothing will happen
 ```
 
 Connect an object with a mapping:
 
 ```javascript
-object.connect(options, {
+obj.connect(options, {
     onProjectionUpdated : [100, 'projectionUpdated'],
     onFrame             : 'frame',
     onFrameEnd          : 'frameEnd'
 });
 
-object.emit('frame', ..);   // => options.onFrame(..)
+obj.emit('frame', ..);   // => options.onFrame(..)
 ```
 
 
 #### emit()
 
 ```
-object.emit( eventName [, arguments .. ] )
+obj.emit( eventName [, arguments .. ] )
 ```
 
 Fire an event.
@@ -127,7 +127,7 @@ The listeners calling order is determinated by priority and creation time.
 #### emitReduce()
 
 ```
-object.emitReduce( eventName [, value= {} ] [, arguments .. ] )
+obj.emitReduce( eventName [, value= {} ] [, arguments .. ] )
 ```
 
 Fire an event and returns a result.
@@ -141,11 +141,11 @@ The calling order is determinated by listener priority.
 #### off()
 
 ```
-object.off( id )
-object.off( callback )
-object.off( obj )
-object.off( eventName )
-object.off()
+obj.off( id )
+obj.off( callback )
+obj.off( obj )
+obj.off( eventName )
+obj.off()
 ```
 
 Remove a listener from an event.
