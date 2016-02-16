@@ -18,11 +18,17 @@ Attach the _eventized object_ api to any object you want.
 const eventize = require('eventize');
 
 var obj = eventize({});
+
+obj.on('foo', (to) => console.log('hello', to))
+
+obj.emit('foo', 'world')       // => "hello world"
 ```
 
-## The _eventize_ API
+## API
 
-### eventize()
+### The _eventize_ API
+
+#### eventize()
 
 ```
 eventize( obj )
@@ -31,7 +37,7 @@ eventize( obj )
 Attach the _eventized object_ api to an object. Returns the object.
 
 
-### eventize.is()
+#### eventize.is()
 
 ```
 eventize.is( obj )
@@ -40,9 +46,9 @@ eventize.is( obj )
 Check if the given object is _eventized_ (has the _eventized object_ api). Returns `true` or `false`
 
 
-## The _eventized object_ API
+### The _eventized object_ API
 
-### on()
+#### on()
 
 ```
 object.on( eventName, [ prio, ] callbackFunc )
@@ -58,7 +64,7 @@ Adds a listener to an event name.
 When the event is fired all listeners will be called.
 
 
-### once()
+#### once()
 
 ```
 object.once( eventName, [ prio, ] callbackFunc )
@@ -73,7 +79,7 @@ __The listener will be removed after the function gets called once.__
 When the event is fired all listeners will be called in _priority_ and _creation time_ order.
 
 
-### connect()
+#### connect()
 
 ```
 object.connect( obj )
@@ -82,7 +88,7 @@ object.connect( obj, mapping )
 
 Bind multiple functions to events.
 
-#### Examples
+##### Examples
 
 Connect multiple events to object methods:
 
@@ -108,7 +114,7 @@ object.emit('frame', ..)   // => options.onFrame(..)
 ```
 
 
-### emit()
+#### emit()
 
 ```
 object.emit( eventName [, arguments .. ] )
@@ -118,7 +124,7 @@ Fire an event.
 The listeners calling order is determinated by priority and creation time.
 
 
-### emitReduce()
+#### emitReduce()
 
 ```
 object.emitReduce( eventName [, value= {} ] [, arguments .. ] )
@@ -132,7 +138,7 @@ Thats means that the *result* is the returned value from the *last* called liste
 The calling order is determinated by listener priority.
 
 
-### off()
+#### off()
 
 ```
 object.off( id )
