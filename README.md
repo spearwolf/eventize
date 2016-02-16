@@ -10,9 +10,14 @@ features:
 - fully tested (specs included) and battle-proved
 - apache-2.0 license
 
+## Getting Started
+
+Attach the _eventized-object_ api to any object you want.
+
 ```
 const eventize = require('eventize');
-var obj = eventize({})                 // attach the eventized-object api to an object
+
+var obj = eventize({});
 ```
 
 ## The _eventized-object_ API
