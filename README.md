@@ -14,14 +14,14 @@ features:
 
 Attach the _eventized object_ api to any object you want.
 
-```
+```javascript
 const eventize = require('eventize');
 
 var obj = eventize({});
 
-obj.on('foo', (to) => console.log('hello', to))
+obj.on('foo', (to) => console.log('hello', to));
 
-obj.emit('foo', 'world')       // => "hello world"
+obj.emit('foo', 'world');       // => "hello world"
 ```
 
 ## API
@@ -92,25 +92,25 @@ Bind multiple functions to events.
 
 Connect multiple events to object methods:
 
-```
+```javascript
 object.connect({
-    foo: functions () { console.log('hello') }
-})
+    foo () { console.log('hello') }
+});
 
-object.emit('foo')   // => 'hello'
-object.emit('bar')   // nothing will happen
+object.emit('foo');   // => 'hello'
+object.emit('bar');   // nothing will happen
 ```
 
 Connect an object with a mapping:
 
-```
+```javascript
 object.connect(options, {
     onProjectionUpdated : [100, 'projectionUpdated'],
     onFrame             : 'frame',
     onFrameEnd          : 'frameEnd'
-})
+});
 
-object.emit('frame', ..)   // => options.onFrame(..)
+object.emit('frame', ..);   // => options.onFrame(..)
 ```
 
 
