@@ -4,7 +4,11 @@
 
 yet another fantastic pub/sub events micro framework for javascript!
 
-## Getting Started
+features:
+- simple and minimal api
+- all api calls and calls-to-listeners are 100% synchronous, no async
+- fully tested (specs included) and battle-proved
+- apache-2.0 license
 
 ```
 const eventize = require('eventize');
