@@ -6,13 +6,13 @@ yet another fantastic pub/sub events micro framework for javascript!
 
 features:
 - simple and minimal api
-- all api calls and calls-to-listeners are 100% synchronous, no async
+- all api-calls and calls-to-listeners are 100% synchronous, no async
 - fully tested (specs included) and battle-proved
 - apache-2.0 license
 
 ## Getting Started
 
-Attach the _eventized-object_ api to any object you want.
+Attach the _eventized object_ api to any object you want.
 
 ```
 const eventize = require('eventize');
@@ -20,7 +20,27 @@ const eventize = require('eventize');
 var obj = eventize({});
 ```
 
-## The _eventized-object_ API
+## The _eventize_ API
+
+### eventize()
+
+```
+eventize( obj )
+```
+
+Attach the _eventized object_ api to an object. Returns the object.
+
+
+### eventize.is()
+
+```
+eventize.is( obj )
+```
+
+Check if the given object is _eventized_ (has the _eventized object_ api). Returns `true` or `false`
+
+
+## The _eventized object_ API
 
 ### on()
 
@@ -28,8 +48,8 @@ var obj = eventize({});
 object.on( eventName, [ prio, ] callbackFunc )
 object.on( eventName, [ prio, ] obj )
 
-object.on( callbackFunc )    // => object.on( '*', callbackFunc )
-object.on( obj )             // => object.on( '*', obj )
+object.on( callbackFunc )    // => alias for: object.on( '*', callbackFunc )
+object.on( obj )             // => alias for: object.on( '*', obj )
 
 object.on()
 ```
@@ -64,24 +84,24 @@ Bind multiple functions to events.
 
 #### Examples
 
-connect an object:
+Connect multiple events to object methods:
 
 ```
 object.connect({
-     foo: functions () { console.log('hello') }
+    foo: functions () { console.log('hello') }
 })
 
 object.emit('foo')   // => 'hello'
 object.emit('bar')   // nothing will happen
 ```
 
-connect an object with mapping:
+Connect an object with a mapping:
 
 ```
 object.connect(options, {
-     onProjectionUpdated : [100, 'projectionUpdated'],
-     onFrame             : 'frame',
-     onFrameEnd          : 'frameEnd'
+    onProjectionUpdated : [100, 'projectionUpdated'],
+    onFrame             : 'frame',
+    onFrameEnd          : 'frameEnd'
 })
 
 object.emit('frame', ..)   // => options.onFrame(..)
@@ -122,7 +142,7 @@ object.off( eventName )
 object.off()
 ```
 
-Removes a listener from an event.
+Remove a listener from an event.
 
 Deactivate listener by id or previously bound object or
 function reference or event name or silence all events.
