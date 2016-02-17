@@ -1,6 +1,6 @@
 {
   "name": "eventize",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "author": {
     "name": "Wolfger Schramm",
     "email": "wolfger@spearwolf.de",
@@ -17,9 +17,20 @@
     "url": "https://github.com/spearwolf/eventize/issues"
   },
   "scripts": {
-    "test": "./node_modules/.bin/jasmine"
+    "build": "cat ./src/LICENSE.js |sed -e 's/#VERSION#/'$(node -e 'console.log(require(\"./package.json\").version)')'/' >eventize.js && ./node_modules/browserify/bin/cmd.js --standalone eventize src/eventize.js |./node_modules/uglify-js/bin/uglifyjs - -m -c 'sequences=true,dead_code=true,drop_debugger=true,unsafe=true,conditionals=true,booleans=true,loops=true,unused=true,if_return=true,join_vars=true,cascade=true' --screw-ie8 >>eventize.js",
+    "test": "npm run build && npm run jasmine",
+    "jasmine": "./node_modules/jasmine/bin/jasmine.js",
+    "karma": "./node_modules/karma/bin/karma start karma.conf.js"
   },
   "devDependencies": {
-    "jasmine": "^2.4.1"
+    "browserify": "^13.0.0",
+    "jasmine": "^2.4.1",
+    "karma": "^0.13.21",
+    "karma-browserify": "^5.0.1",
+    "karma-chrome-launcher": "^0.2.2",
+    "karma-firefox-launcher": "^0.1.7",
+    "karma-jasmine": "^0.3.7",
+    "uglifyify": "^3.0.1",
+    "watchify": "^3.7.0"
   }
 }
