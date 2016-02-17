@@ -30,7 +30,7 @@
     "karma-chrome-launcher": "^0.2.2",
     "karma-firefox-launcher": "^0.1.7",
     "karma-jasmine": "^0.3.7",
-    "uglifyify": "^3.0.1",
+    "uglify-js": "^2.6.1",
     "watchify": "^3.7.0"
   }
 }
