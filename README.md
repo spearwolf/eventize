@@ -5,23 +5,31 @@
 yet another fantastic pub/sub events micro framework for javascript!
 
 features:
-- simple and minimal api
-- all api-calls and calls-to-listeners are 100% synchronous, no async
-- fully tested (specs included) and battle-proved
+- clean, minimal and easy api
+- all api-calls and downstream-listeners-calls are 100% synchronous, no async
+- fully tested (specs included) and battle-proven
 - apache-2.0 license
 
 ## Getting Started
 
-Attach the _eventized object_ api to any object you want.
+Attach the _eventized object_ **api** to any custom object you want.
 
 ```javascript
 const eventize = require('eventize');
 
 var obj = eventize({});
 
-obj.on('foo', (to) => console.log('hello', to));
+obj.on('foo', (bar) => console.log('hello', bar));
 
 obj.emit('foo', 'world');       // => "hello world"
+
+obj.connect({
+    foo (bar) {
+        console.log('hejho', bar);
+    }
+});
+
+obj.emit('foo', 'eventize');       // => "hello eventize", "hejho eventize"
 ```
 
 ## API
@@ -34,7 +42,7 @@ obj.emit('foo', 'world');       // => "hello world"
 eventize( obj )
 ```
 
-Attach the _eventized object_ api to an object. Returns the object.
+Attach the _eventized object_ **api** to an object. Returns the object.
 
 
 #### eventize.is()
@@ -43,7 +51,7 @@ Attach the _eventized object_ api to an object. Returns the object.
 eventize.is( obj )
 ```
 
-Check if the given object is _eventized_ (has the _eventized object_ api). Returns `true` or `false`
+Check if the given object is _eventized_ (has the _eventized object_ **api**). Returns `true` or `false`
 
 
 ### The _eventized object_ API
