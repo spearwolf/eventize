@@ -175,17 +175,17 @@ The context (that's the `this` reference) of your listener depends on ..
 
 All additional arguments will be transferred to the listeners.
 
-All listeners which are registered by _object reference_ or by `connect()` will receive an extra argument (as last arg) which
-is a reference to the _sender object_.
+Returns nothing (*undefined*).
 
-_EXPERT NOTE_
+All listeners which are registered by _object reference_ via `on()` or by `connect()` will receive an extra argument (as last arg) which is a reference to the _sender object_.
 
-The difference between `a.on('*', obj)` and `a.connect(obj)` is ..
-- _connected_ objects will always get (as last argument) a reference to the _emitting_ object (that's the object which is calling `emit()`)
-- _object_ listeners registered by `a.on()` will always get (as last argument) a reference to the object in which they were filed
+_SENDER OBJECTS_
 
+The only difference between `a.on('*', obj)` and `a.connect(obj)` is ..
+- _connected_ objects will always get a reference to the _emitting_ object (that's the object which is executing `emit()`)
+- _object_ listeners registered by `a.on()` will always get a reference to the object in which they were _filed_
 
-Returns nothing (*undefined*)
+_what? ok, please forget it .. chances are good that you won't need to understand this difference_
 
 
 ##### Examples
