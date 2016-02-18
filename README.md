@@ -172,23 +172,27 @@ All additional arguments will be transferred to the listeners.
 ##### Examples
 
 ```javascript
-let a = eventize({})
+'use strict';
+const eventize = require('./eventize');
+const PRIO = 100;
 
-a.on('foo', (x, y, z) => {          // by function
-    console.log(x, y, z);
-})
+let a = eventize({});
 
-a.on('foo', {                       // by object
+a.on('foo', (x, y, z) => {           // by function
+    console.log(x+3, y+3, z+3);
+});
+
+a.on('*', PRIO, {                    // by object
     foo (x, y, z) {
-      console.log(x+3, y+3, z+3);  
+      console.log(x+6, y+6, z+6);
     }
-})
+});
 
-let b = eventize({})                // by eventized object
+let b = eventize({});                // by eventized object
 b.on('foo', (x, y, z) => {
-    console.log(x+6, y+6, z+6);
-})
-a.on('foo', b)
+    console.log(x, y, z);
+});
+a.on('foo', PRIO, b);
 
 a.emit('foo', 1, 2, 3);
 // "1 2 3"
