@@ -37,7 +37,9 @@ obj.emit('foo', 'eventize');       // => "hello eventize", "hejho eventize"
 
 ### The _eventize_ API
 
-#### eventize()
+---
+
+#### `eventize()`
 
 ```
 eventize( obj )
@@ -45,8 +47,9 @@ eventize( obj )
 
 Attach the _eventized object_ **api** to an object. Returns the object.
 
+---
 
-#### eventize.is()
+#### `eventize.is()`
 
 ```
 eventize.is( obj )
@@ -57,7 +60,9 @@ Check if the given object is _eventized_ (has the _eventized object_ **api**). R
 
 ### The _eventized object_ API
 
-#### on()
+---
+
+#### `on()`
 
 ```
 obj.on( eventName, [ prio, ] callbackFunc )
@@ -81,8 +86,9 @@ obj.on()
 
 Reactivate all listeners or by event name. You can deactivate listeners with `obj.off()`
 
+---
 
-#### once()
+#### `once()`
 
 ```
 obj.once( eventName, [ prio, ] callbackFunc )
@@ -96,8 +102,9 @@ Adds a listener to an event name.
 __The listener will be removed after the function gets called once.__
 Apart from that `once()` works like `on()`
 
+---
 
-#### connect()
+#### `connect()`
 
 ```
 obj.connect( obj )
@@ -131,8 +138,9 @@ obj.connect(options, {
 obj.emit('frame', ..);   // => options.onFrame(..)
 ```
 
+---
 
-#### emit()
+#### `emit()`
 
 ```
 obj.emit( eventName [, arguments .. ] )
@@ -141,8 +149,9 @@ obj.emit( eventName [, arguments .. ] )
 Fire an event.
 The listeners calling order is determinated by priority and creation time.
 
+---
 
-#### emitReduce()
+#### `emitReduce()`
 
 ```
 obj.emitReduce( eventName [, value= {} ] [, arguments .. ] )
@@ -155,8 +164,9 @@ Thats means that the *result* is the returned value from the *last* called liste
 
 The calling order is determinated by listener priority.
 
+---
 
-#### off()
+#### `off()`
 
 ```
 obj.off( id )
