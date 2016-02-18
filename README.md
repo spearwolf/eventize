@@ -20,7 +20,7 @@ const eventize = require('eventize');
 
 var obj = eventize({});
 
-obj.on('foo', (bar) => console.log('hello', bar));
+obj.on('foo', hello => console.log('hello', hello));
 
 obj.emit('foo', 'world');       // => "hello world"
 
@@ -37,7 +37,9 @@ obj.emit('foo', 'eventize');       // => "hello eventize", "hejho eventize"
 
 ### The _eventize_ API
 
-#### eventize()
+---
+
+#### `eventize()`
 
 ```
 eventize( obj )
@@ -45,8 +47,9 @@ eventize( obj )
 
 Attach the _eventized object_ **api** to an object. Returns the object.
 
+---
 
-#### eventize.is()
+#### `eventize.is()`
 
 ```
 eventize.is( obj )
@@ -57,21 +60,34 @@ Check if the given object is _eventized_ (has the _eventized object_ **api**). R
 
 ### The _eventized object_ API
 
-#### on()
+---
+
+#### `on()`
 
 ```
-obj.on( eventName, [ prio, ] callbackFunc )
-obj.on( eventName, [ prio, ] object )
+obj.on( eventName, [ priority, ] callbackFunc )
+obj.on( eventName, [ priority, ] object )
 
 obj.on( callbackFunc )    // => alias for: object.on( '*', callbackFunc )
-obj.on( obj )             // => alias for: object.on( '*', object )
+obj.on( object )          // => alias for: object.on( '*', object )
 ```
 
 Adds a listener to an event name.
-When the event is fired all listeners will be called in _priority_ and _creation time_ order.
 
-The context (`this` reference) of a _callbackFunc_ will be set to the sender `obj`.
-When your listener is an _object_ the context is your _object_.
+The **priority** is optional and should be a _number_. The _default_ **priority** is defined by `eventize.PRIO_DEFAULT` (which is `0` by default)
+
+The **eventName** is mandatory and should be a _string_.
+
+The _catch'm all_ **eventName** `*` is special: listeners will be called ..
+- regardless off the event name
+- _after_ all other listeners with _same priority_
+
+Returns an *id* as *number*. Use this *id* to unregister your listener via `off()`
+
+_DEFINE A LISTENER BY OBJECT_
+
+- When the event is fired, a method with the same name as the event will be called
+- When the listener is an _eventized object_ and a event is fired, the `emit()` method will be called
 
 
 ```
@@ -81,27 +97,29 @@ obj.on()
 
 Reactivate all listeners or by event name. You can deactivate listeners with `obj.off()`
 
+---
 
-#### once()
+#### `once()`
 
 ```
-obj.once( eventName, [ prio, ] callbackFunc )
-obj.once( eventName, [ prio, ] object )
+obj.once( eventName, [ priority, ] callbackFunc )
+obj.once( eventName, [ priority, ] object )
 
 obj.once( callbackFunc )      // => object.once( '*', callbackFunc )
-obj.once( obj )               // => object.once( '*', object )
+obj.once( object )            // => object.once( '*', object )
 ```
 
 Adds a listener to an event name.
 __The listener will be removed after the function gets called once.__
 Apart from that `once()` works like `on()`
 
+---
 
-#### connect()
+#### `connect()`
 
 ```
-obj.connect( obj )
-obj.connect( obj, mapping )
+obj.connect( object )
+obj.connect( object, mapping )
 ```
 
 Bind multiple functions to events.
@@ -131,18 +149,76 @@ obj.connect(options, {
 obj.emit('frame', ..);   // => options.onFrame(..)
 ```
 
+---
 
-#### emit()
+#### `emit()`
 
 ```
 obj.emit( eventName [, arguments .. ] )
 ```
 
 Fire an event.
-The listeners calling order is determinated by priority and creation time.
+
+All listeners will be called in (1st) _priority_ and (2nd) _creation time_ order.
+
+There are two expections of this rule:
+- _catch'm all_ event listeners will be called _after_ all other listeners within _same priority_
+- listeners registered by `connect()` will be called with _priority_ = `eventize.PRIO_DEFAULT` BUT _before_ the _catch'm all_ listeners for this priority.
+
+_You should NOT emit the **catch'm all** event!_
+
+The context (that's the `this` reference) of your listener depends on ..
+- when registered by _callback function_
+  - .. is the sender context (that's your _eventized object_ which has the `emit()` method)
+- when registered by _object reference_ or by `connect()`
+  - .. is, of course, the listener!
+
+All additional arguments will be transferred to the listeners.
+
+Returns nothing (*undefined*).
+
+All listeners which are registered by _object reference_ via `on()` or by `connect()` will receive an extra argument (as last arg) which is a reference to the _sender object_.
+
+_SENDER OBJECTS_
+
+The difference between `a.on('*', obj)` and `a.connect(obj)` is ..
+- _connected_ objects will always get a reference to the _emitting_ object (that's the object which is executing `emit()`)
+- _object_ listeners registered by `a.on()` will always get a reference to the object in which they were _filed_
 
 
-#### emitReduce()
+##### Examples
+
+```javascript
+const PRIO = 100;
+
+let a = eventize({});
+
+a.on('foo', (x, y, z) => {           // by function
+    console.log(x+3, y+3, z+3);
+});
+
+a.on('*', PRIO, {                    // by object
+    foo (x, y, z) {
+      console.log(x+6, y+6, z+6);
+    }
+});
+
+let b = eventize({});                // by eventized object
+b.on('foo', (x, y, z) => {
+    console.log(x, y, z);
+});
+a.on('foo', PRIO, b);
+
+a.emit('foo', 1, 2, 3);
+
+// "1 2 3"
+// "4 5 6"
+// "7 8 9"
+```
+
+---
+
+#### `emitReduce()`
 
 ```
 obj.emitReduce( eventName [, value= {} ] [, arguments .. ] )
@@ -153,15 +229,14 @@ Fire an event and returns a result.
 The returned result from a listener function is the new value for the next listener (if the value is not undefined).
 Thats means that the *result* is the returned value from the *last* called listener function.
 
-The calling order is determinated by listener priority.
+---
 
-
-#### off()
+#### `off()`
 
 ```
 obj.off( id )
 obj.off( callback )
-obj.off( obj )
+obj.off( object )
 obj.off( eventName )
 obj.off()
 ```
