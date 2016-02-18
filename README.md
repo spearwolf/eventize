@@ -80,8 +80,7 @@ The **eventName** is mandatory and should be a _string_.
 
 The _catch'm all_ **eventName** `*` is special: listeners will be called ..
 - regardless off the event name
-- _after all_ other listeners with _same priority_
-- with an extra function argument (as last arg) set to the current event name
+- _after_ all other listeners with _same priority_
 
 Returns an *id* as *number*. Use this *id* to unregister your listener via `off()`
 
@@ -163,13 +162,18 @@ There are two expections of this rule:
 
 _You should NOT emit the **catch'm all** event!_
 
-The context (that's the `this` reference) depends on your listener ..
+The context (that's the `this` reference) of your listener depends on ..
 - when registered by _callback function_
   - .. is the sender context (that's your _eventized object_ which has the `emit()` method)
 - when registered by _object reference_ or by `connect()`
   - .. is, of course, the listener!
 
 All additional arguments will be transferred to the listeners.
+
+All listeners which are registered by _object reference_ or by `connect()` will get an extra argument (as last arg) which
+is a reference to the _sender object_.
+
+_EXPERT NOTE:_ When a listener object is an _eventized object_ then `emit()` will be called instead of the function!
 
 Returns nothing (*undefined*)
 
