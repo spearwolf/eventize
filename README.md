@@ -87,7 +87,7 @@ Returns an *id* as *number*. Use this *id* to unregister your listener via `off(
 _DEFINE A LISTENER BY OBJECT_
 
 - When the event is fired, a method with the same name as the event will be called
-- When the listener is an _eventized object_ and a event is fired, the `emit()` method will be called´
+- When the listener is an _eventized object_ and a event is fired, the `emit()` method will be called
 
 
 ```
@@ -181,7 +181,7 @@ All listeners which are registered by _object reference_ via `on()` or by `conne
 
 _SENDER OBJECTS_
 
-The only difference between `a.on('*', obj)` and `a.connect(obj)` is ..
+The difference between `a.on('*', obj)` and `a.connect(obj)` is ..
 - _connected_ objects will always get a reference to the _emitting_ object (that's the object which is executing `emit()`)
 - _object_ listeners registered by `a.on()` will always get a reference to the object in which they were _filed_
 
@@ -228,8 +228,6 @@ Fire an event and returns a result.
 
 The returned result from a listener function is the new value for the next listener (if the value is not undefined).
 Thats means that the *result* is the returned value from the *last* called listener function.
-
-The calling order is determinated by listener priority.
 
 ---
 
