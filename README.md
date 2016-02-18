@@ -181,8 +181,8 @@ is a reference to the _sender object_.
 _EXPERT NOTE_
 
 The difference between `a.on('*', obj)` and `a.connect(obj)` is ..
-- _connected_ objects will always get (as last argument) a reference to the _emitting_ object
-- object listeners registered by `a.on()` will always get (as last argument) a reference to object `a`
+- _connected_ objects will always get (as last argument) a reference to the _emitting_ object (that's the object which is calling `emit()`)
+- _object_ listeners registered by `a.on()` will always get (as last argument) a reference to the object in which they were filed
 
 
 Returns nothing (*undefined*)
