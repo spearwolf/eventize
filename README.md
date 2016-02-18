@@ -167,6 +167,35 @@ The context (that's the `this` reference) depends on your listener ..
 - when registered by _object reference_ or by `connect()`
   - .. is, of course, the listener!
 
+All additional arguments will be transferred to the listeners.
+
+##### Examples
+
+```javascript
+let a = eventize({})
+
+a.on('foo', (x, y, z) => {          // by function
+    console.log(x, y, z);
+})
+
+a.on('foo', {                       // by object
+    foo (x, y, z) {
+      console.log(x+3, y+3, z+3);  
+    }
+})
+
+let b = eventize({})                // by eventized object
+b.on('foo', (x, y, z) => {
+    console.log(x+6, y+6, z+6);
+})
+a.on('foo', b)
+
+a.emit('foo', 1, 2, 3);
+// "1 2 3"
+// "4 5 6"
+// "7 8 9"
+```
+
 ---
 
 #### `emitReduce()`
