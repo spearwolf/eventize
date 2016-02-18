@@ -159,13 +159,13 @@ There are two expections of this rule:
 - _catch'm all_ event listeners will be called _after_ all other listeners within _same priority_
 - listeners registered by `connect()` will be called with _priority_ = `eventize.PRIO_DEFAULT` BUT _before_ the _catch'm all_ listeners for this priority.
 
-_You should not emit the _catch'm all_ event!_
+_You should NOT emit the **catch'm all** event!_
 
-The context (that's the `this` reference) of a listener ..
+The context (that's the `this` reference) depends on your listener ..
 - when registered by _callback function_
-  - .. is the sender context (thats your eventized object with the `emit()` method)
+  - .. is the sender context (that's your _eventized object_ which has the `emit()` method)
 - when registered by _object reference_ or by `connect()`
-  - .. is, of course, the listener
+  - .. is, of course, the listener!
 
 ---
 
