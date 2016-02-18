@@ -172,8 +172,6 @@ All additional arguments will be transferred to the listeners.
 ##### Examples
 
 ```javascript
-'use strict';
-const eventize = require('./eventize');
 const PRIO = 100;
 
 let a = eventize({});
