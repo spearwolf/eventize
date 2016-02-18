@@ -20,7 +20,7 @@ const eventize = require('eventize');
 
 var obj = eventize({});
 
-obj.on('foo', (bar) => console.log('hello', bar));
+obj.on('foo', hello => console.log('hello', hello));
 
 obj.emit('foo', 'world');       // => "hello world"
 
@@ -65,8 +65,8 @@ Check if the given object is _eventized_ (has the _eventized object_ **api**). R
 #### `on()`
 
 ```
-obj.on( eventName, [ prio, ] callbackFunc )
-obj.on( eventName, [ prio, ] object )
+obj.on( eventName, [ priority, ] callbackFunc )
+obj.on( eventName, [ priority, ] object )
 
 obj.on( callbackFunc )    // => alias for: object.on( '*', callbackFunc )
 obj.on( obj )             // => alias for: object.on( '*', object )
@@ -75,9 +75,12 @@ obj.on( obj )             // => alias for: object.on( '*', object )
 Adds a listener to an event name.
 When the event is fired all listeners will be called in (1st) _priority_ and (2nd) _creation time_ order.
 
-The _catch'm all_ event `*` is special: listeners will be called ..
+The **eventName** is mandatory and should be a _string_.
+The **priority** is optional and should be a _number_. The _default_ **priority** is defined by `eventize.PRIO_DEFAULT` (which is `0` by default)
+
+The **catch'm all** event name `*` is special: listeners will be called ..
 - regardless off the event name
-- **after all** other listeners with **same priority**
+- _after all_ other listeners with _same priority_
 - with an extra function argument (as last arg) set to the current event name
 
 The context (`this` reference) of a _callbackFunc_ will be set to the sender `obj`.
