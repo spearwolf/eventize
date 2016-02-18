@@ -226,8 +226,10 @@ obj.emitReduce( eventName [, value= {} ] [, arguments .. ] )
 
 Fire an event and returns a result.
 
-The returned result from a listener function is the new value for the next listener (if the value is not undefined).
-Thats means that the *result* is the returned value from the *last* called listener function.
+The *return value* from a listener is the *new* value used for the next listener in the call chain (unless the return value is `undefined`).
+That means the *result* (return value from `emitReduce()`) is the return value from the _last called listener_.
+
+Apart from that it works like `emit()`.
 
 ---
 
