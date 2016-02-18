@@ -61,31 +61,40 @@ Check if the given object is _eventized_ (has the _eventized object_ **api**). R
 
 ```
 obj.on( eventName, [ prio, ] callbackFunc )
-obj.on( eventName, [ prio, ] obj )
+obj.on( eventName, [ prio, ] object )
 
 obj.on( callbackFunc )    // => alias for: object.on( '*', callbackFunc )
-obj.on( obj )             // => alias for: object.on( '*', obj )
-
-obj.on()
+obj.on( obj )             // => alias for: object.on( '*', object )
 ```
 
 Adds a listener to an event name.
-When the event is fired all listeners will be called.
+When the event is fired all listeners will be called in _priority_ and _creation time_ order.
+
+The context (`this` reference) of a _callbackFunc_ will be set to the sender `obj`.
+When your listener is an _object_ the context is your _object_.
+
+
+```
+obj.on( eventName )
+obj.on()
+```
+
+Reactivate all listeners or by event name. You can deactivate listeners with `obj.off()`
 
 
 #### once()
 
 ```
 obj.once( eventName, [ prio, ] callbackFunc )
-obj.once( eventName, [ prio, ] obj )
+obj.once( eventName, [ prio, ] object )
 
 obj.once( callbackFunc )      // => object.once( '*', callbackFunc )
-obj.once( obj )               // => object.once( '*', obj )
+obj.once( obj )               // => object.once( '*', object )
 ```
 
 Adds a listener to an event name.
 __The listener will be removed after the function gets called once.__
-When the event is fired all listeners will be called in _priority_ and _creation time_ order.
+Apart from that `once()` works like `on()`
 
 
 #### connect()

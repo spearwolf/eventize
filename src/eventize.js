@@ -51,6 +51,7 @@ function eventize (o) {
     // object.on( callbackFunc )    => object.on( '*', callbackFunc )
     // object.on( obj )             => object.on( '*', obj )
     //
+    // object.on( eventName )
     // object.on()
     //
     // -----------------------------------------------------------------
