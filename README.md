@@ -84,6 +84,11 @@ The _catch'm all_ **eventName** `*` is special: listeners will be called ..
 
 Returns an *id* as *number*. Use this *id* to unregister your listener via `off()`
 
+_DEFINE A LISTENER BY OBJECT_
+
+- When the event is fired, a method with the same name as the event will be called
+- When the listener is an _eventized object_ and a event is fired, the `emit()` method will be called´
+
 
 ```
 obj.on( eventName )
@@ -170,10 +175,15 @@ The context (that's the `this` reference) of your listener depends on ..
 
 All additional arguments will be transferred to the listeners.
 
-All listeners which are registered by _object reference_ or by `connect()` will get an extra argument (as last arg) which
+All listeners which are registered by _object reference_ or by `connect()` will receive an extra argument (as last arg) which
 is a reference to the _sender object_.
 
-_EXPERT NOTE:_ When a listener object is an _eventized object_ then `emit()` will be called instead of the function!
+_EXPERT NOTE_
+
+The difference between `a.on('*', obj)` and `a.connect(obj)` is ..
+- _connected_ objects will always get (as last argument) a reference to the _emitting_ object
+- object listeners registered by `a.on()` will always get (as last argument) a reference to object `a`
+
 
 Returns nothing (*undefined*)
 
