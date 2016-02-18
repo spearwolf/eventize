@@ -1,6 +1,7 @@
 # eventize.js
 
 [![Build Status](https://img.shields.io/travis/spearwolf/eventize.svg?style=flat-square)](https://travis-ci.org/spearwolf/eventize)
+[![npm](https://img.shields.io/npm/v/eventize-js.svg?style=flat-square)](https://www.npmjs.com/package/eventize-js)
 
 yet another fantastic pub/sub events micro framework for javascript!
 
@@ -16,7 +17,7 @@ yet another fantastic pub/sub events micro framework for javascript!
 Attach the _eventized object_ **api** to any custom object you want.
 
 ```javascript
-const eventize = require('eventize');
+const eventize = require('eventize-js');
 
 var obj = eventize({});
 
@@ -32,6 +33,13 @@ obj.connect({
 
 obj.emit('foo', 'eventize');       // => "hello eventize", "hejho eventize"
 ```
+
+## Installation
+
+```
+npm install eventize-js
+```
+
 
 ## API
 
