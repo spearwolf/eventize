@@ -185,8 +185,6 @@ The only difference between `a.on('*', obj)` and `a.connect(obj)` is ..
 - _connected_ objects will always get a reference to the _emitting_ object (that's the object which is executing `emit()`)
 - _object_ listeners registered by `a.on()` will always get a reference to the object in which they were _filed_
 
-_what? ok, please forget it .. chances are good that you won't need to understand this difference_
-
 
 ##### Examples
 
