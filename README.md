@@ -73,7 +73,12 @@ obj.on( obj )             // => alias for: object.on( '*', object )
 ```
 
 Adds a listener to an event name.
-When the event is fired all listeners will be called in _priority_ and _creation time_ order.
+When the event is fired all listeners will be called in (1st) _priority_ and (2nd) _creation time_ order.
+
+The _catch'm all_ event `*` is special: listeners will be called ..
+- regardless off the event name
+- **after all** other listeners with **same priority**
+- with an extra function argument (as last arg) set to the current event name
 
 The context (`this` reference) of a _callbackFunc_ will be set to the sender `obj`.
 When your listener is an _object_ the context is your _object_.
