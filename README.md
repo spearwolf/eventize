@@ -69,7 +69,7 @@ obj.on( eventName, [ priority, ] callbackFunc )
 obj.on( eventName, [ priority, ] object )
 
 obj.on( callbackFunc )    // => alias for: object.on( '*', callbackFunc )
-obj.on( obj )             // => alias for: object.on( '*', object )
+obj.on( object )          // => alias for: object.on( '*', object )
 ```
 
 Adds a listener to an event name.
@@ -82,6 +82,8 @@ The _catch'm all_ **eventName** `*` is special: listeners will be called ..
 - regardless off the event name
 - _after all_ other listeners with _same priority_
 - with an extra function argument (as last arg) set to the current event name
+
+Returns an *id* as *number*. Use this *id* to unregister your listener via `off()`
 
 
 ```
@@ -96,11 +98,11 @@ Reactivate all listeners or by event name. You can deactivate listeners with `ob
 #### `once()`
 
 ```
-obj.once( eventName, [ prio, ] callbackFunc )
-obj.once( eventName, [ prio, ] object )
+obj.once( eventName, [ priority, ] callbackFunc )
+obj.once( eventName, [ priority, ] object )
 
 obj.once( callbackFunc )      // => object.once( '*', callbackFunc )
-obj.once( obj )               // => object.once( '*', object )
+obj.once( object )            // => object.once( '*', object )
 ```
 
 Adds a listener to an event name.
@@ -112,8 +114,8 @@ Apart from that `once()` works like `on()`
 #### `connect()`
 
 ```
-obj.connect( obj )
-obj.connect( obj, mapping )
+obj.connect( object )
+obj.connect( object, mapping )
 ```
 
 Bind multiple functions to events.
@@ -169,6 +171,9 @@ The context (that's the `this` reference) depends on your listener ..
 
 All additional arguments will be transferred to the listeners.
 
+Returns nothing (*undefined*)
+
+
 ##### Examples
 
 ```javascript
@@ -193,6 +198,7 @@ b.on('foo', (x, y, z) => {
 a.on('foo', PRIO, b);
 
 a.emit('foo', 1, 2, 3);
+
 // "1 2 3"
 // "4 5 6"
 // "7 8 9"
@@ -220,7 +226,7 @@ The calling order is determinated by listener priority.
 ```
 obj.off( id )
 obj.off( callback )
-obj.off( obj )
+obj.off( object )
 obj.off( eventName )
 obj.off()
 ```
