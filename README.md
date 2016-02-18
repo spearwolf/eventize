@@ -73,18 +73,15 @@ obj.on( obj )             // => alias for: object.on( '*', object )
 ```
 
 Adds a listener to an event name.
-When the event is fired all listeners will be called in (1st) _priority_ and (2nd) _creation time_ order.
 
-The **eventName** is mandatory and should be a _string_.
 The **priority** is optional and should be a _number_. The _default_ **priority** is defined by `eventize.PRIO_DEFAULT` (which is `0` by default)
 
-The **catch'm all** event name `*` is special: listeners will be called ..
+The **eventName** is mandatory and should be a _string_.
+
+The _catch'm all_ **eventName** `*` is special: listeners will be called ..
 - regardless off the event name
 - _after all_ other listeners with _same priority_
 - with an extra function argument (as last arg) set to the current event name
-
-The context (`this` reference) of a _callbackFunc_ will be set to the sender `obj`.
-When your listener is an _object_ the context is your _object_.
 
 
 ```
@@ -155,7 +152,20 @@ obj.emit( eventName [, arguments .. ] )
 ```
 
 Fire an event.
-The listeners calling order is determinated by priority and creation time.
+
+All listeners will be called in (1st) _priority_ and (2nd) _creation time_ order.
+
+There are two expections of this rule:
+- _catch'm all_ event listeners will be called _after_ all other listeners within _same priority_
+- listeners registered by `connect()` will be called with _priority_ = `eventize.PRIO_DEFAULT` BUT _before_ the _catch'm all_ listeners for this priority.
+
+_You should not emit the _catch'm all_ event!_
+
+The context (that's the `this` reference) of a listener ..
+- when registered by _callback function_
+  - .. is the sender context (thats your eventized object with the `emit()` method)
+- when registered by _object reference_ or by `connect()`
+  - .. is, of course, the listener
 
 ---
 
