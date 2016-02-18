@@ -314,33 +314,54 @@ function eventize (o) {
     o.emit = function (eventName) {  // --- {{{
 
         var senderCtx = this;
-        var args = Array.prototype.slice.call(arguments, 1);
-        var argsCtx = args.concat([senderCtx]);
+        var rootCtx;
+        var args;
+        var argsCtx;
 
-        _emit(eventName, function (listener) {
+        if (arguments.length > 1 && typeof arguments[0] !== 'string' && typeof arguments[1] === 'string') {
+            args = Array.prototype.slice.call(arguments, 2);
+            eventName = arguments[1];
+            rootCtx = arguments[0];
+            args[args.length - 1] = rootCtx;
+            argsCtx = args;
+        } else {
+            args = Array.prototype.slice.call(arguments, 1);
+            argsCtx = args.concat([senderCtx]);
+        }
+
+        _dispatch(eventName, function (listener) {
 
             if (listener.isFunction) {
                 listener.fn.apply(senderCtx, args);
             } else {
                 if (listener.fn[PROP_NAMESPACE]) {
                     listener.fn.emit.apply(listener.fn, [eventName].concat(args));
+                    //listener.fn.emit.apply(listener.fn, [senderCtx, eventName].concat(argsCtx));
                 } else {
                     var fn = listener.fn[eventName];
                     if (typeof fn === 'function') {
-                        fn.apply(listener.fn, argsCtx)
+                        //fn.apply(listener.fn, args);
+                        fn.apply(listener.fn, argsCtx);
                     }
                 }
             }
 
         }, function (fn, boundObj) {
 
-            fn.apply(boundObj, argsCtx);
+            // TODO
+            // - should be the same? a.connect(b) vs a.on(b)
+
+            if (fn) {
+                fn.apply(boundObj, argsCtx);
+            } else {
+                boundObj.emit.apply(boundObj, [senderCtx, eventName].concat(argsCtx));
+            }
 
         });
 
-    };
+    }
 
-    function _emit (eventName, emitListener, emitBoundObject) {
+    function _dispatch (eventName, emitListener, emitBoundObject) {
 
         if (_ePublic.silenced) return;
         if (_ePublic.off.indexOf(eventName) >= 0) return;
@@ -355,9 +376,13 @@ function eventize (o) {
             if (boundObjsCount) {
                 for (j = 0; j < boundObjsCount; j++) {
                     bo = _e.boundObjects[j];
-                    fn = bo[eventName];
-                    if (typeof fn === 'function') {
-                        emitBoundObject(fn, bo);
+                    if (bo[PROP_NAMESPACE]) {
+                        emitBoundObject(null, bo);
+                    } else {
+                        fn = bo[eventName];
+                        if (typeof fn === 'function') {
+                            emitBoundObject(fn, bo);
+                        }
                     }
                 }
             }
@@ -414,7 +439,7 @@ function eventize (o) {
         var argsWithEventName = [eventName].concat(args);
         var argsCtx = args.concat([ctx]);
 
-        _emit(eventName, function (listener) {
+        _dispatch(eventName, function (listener) {
 
             if (listener.isFunction) {
                 args[0] = value;
@@ -434,8 +459,10 @@ function eventize (o) {
 
         }, function (fn, boundObj) {
 
-            argsCtx[0] = value;
-            setValue(fn.apply(boundObj, argsCtx));
+            if (fn) {
+                argsCtx[0] = value;
+                setValue(fn.apply(boundObj, argsCtx));
+            }
 
         });
 
