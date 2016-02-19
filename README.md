@@ -153,7 +153,7 @@ obj.emit('frame', ..);   // => options.onFrame(..)
 obj.emit( eventName [, args... ] )
 ```
 
-Fire an event.
+_Fire an event._
 
 All listeners will be called in (1st) _priority_ and (2nd) _creation time_ order.
 
@@ -165,7 +165,7 @@ There are two expections of this rule:
 
 _You should NOT emit the **catch'm all** event!_
 
-##### The listener context
+##### The Listener Context
 
 (the `this` reference _inside_ your listener function)
 
@@ -177,7 +177,7 @@ All additional `args` will be transferred to the listener.
 All _object_ listeners (which are registered by _object reference_ via `on()` or by `connect()`) will receive an extra argument
 (as last argument) which is a reference to the _sender object_.
 
-##### Sender object
+##### Sender Object
 
 The _sender object_ passed into the listener as additional argument is defined by how the listener was registered ..
 - _connected_ objects (registered by `connect()`) will always get a reference to the _emitting_ object (that is the object which is executing `emit()`)
@@ -221,7 +221,7 @@ a.emit('foo', 1, 2, 3);
 obj.emitReduce( eventName [, value= {} ] [, args... ] )
 ```
 
-Fires an event and returns a result.
+Fire an event and return a result.
 
 The *return value* from a listener is the *new* `value` used for the next listener in the call chain (unless the return value is `undefined`).
 That means the *result* (return value from `emitReduce()`) is the return value from the _last called listener_.
@@ -245,7 +245,7 @@ De-activate listener by `id` or previously bound `object` (registered by `.on()`
 `callback` function reference or `eventName` or silence *all* events.
 
 
-## API Helpers
+## Extra API Helpers
 
 ```
 eventize.is( obj )
