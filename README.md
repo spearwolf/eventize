@@ -131,7 +131,7 @@ obj.connect( object )
 
 Bind an object or multiple functions to multiple events.
 
-Has almost the same effect as writing `obj.on('*', object)` but this **should be the preferred way** (there are some differences affecting the _sender context_ argument passed over to _eventized object listener_ .. see `emit()` for more details).
+Has almost the same effect as writing `obj.on(object)` but this **should be the preferred way** (there are some differences affecting the _sender context_ argument passed over to _eventized object listener_ .. see `emit()` for more details).
 
 ```
 obj.connect( object, mapping )
