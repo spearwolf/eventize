@@ -78,7 +78,7 @@ Use `*` as `eventName` to create a _catch'm all_ listener. Catch'm all listeners
 - regardless off the event name
 - but _after_ all other listeners within _same priority_
 
-_DEFINE LISTENER BY OBJECT_
+##### Define listener by object
 
 - When the event is fired, a method with the same name as the event will be called (but only if such a method exists otherwise nothing will happen)
 - When the listener is an _eventized object_ and a event is fired, the `emit()` method of the listener object will be called
@@ -120,7 +120,7 @@ obj.connect( object, mapping )
 
 Binds multiple functions from an object to multiple events configured by a mapping. Configure the _event name_ to _function name_ mapping with an optional priority for each event.
 
-#### Examples
+##### Examples
 
 Connect multiple events to object methods:
 
@@ -165,7 +165,7 @@ There are two expections of this rule:
 
 _You should NOT emit the **catch'm all** event!_
 
-THE LISTENER CONTEXT
+##### The listener context
 
 (the `this` reference _inside_ your listener function)
 
@@ -177,14 +177,14 @@ All additional `args` will be transferred to the listener.
 All _object_ listeners (which are registered by _object reference_ via `on()` or by `connect()`) will receive an extra argument
 (as last argument) which is a reference to the _sender object_.
 
-_SENDER OBJECTS_
+##### Sender object
 
 The _sender object_ passed into the listener as additional argument is defined by how the listener was registered ..
 - _connected_ objects (registered by `connect()`) will always get a reference to the _emitting_ object (that is the object which is executing `emit()`)
 - _object_ listeners registered by `a.on()` will always get a reference to the object in which they were _filed_ (that is the object with `.on()`)
 
 
-#### Examples
+##### Examples
 
 ```javascript
 const PRIO = 100;
