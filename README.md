@@ -146,10 +146,12 @@ Connect multiple events to object methods:
 ```javascript
 obj.connect({
     foo () { console.log('hello') }
+    bar (sender) { console.log(obj === sender) }
 });
 
 obj.emit('foo');   // => 'hello'
-obj.emit('bar');   // nothing will happen
+obj.emit('bar');   // => 'true'
+obj.emit('plah');  // nothing will happen
 ```
 
 Connect an object with a mapping:
