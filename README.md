@@ -137,7 +137,7 @@ Has almost the same effect as writing `obj.on(object)` but this **should be the 
 obj.connect( object, mapping )
 ```
 
-Bind multiple functions from an object to multiple events configured by a mapping. The mapping defines the event name to function name mapping with an optional priority for each event.
+Bind multiple functions from an object to multiple events configured by a mapping. Configure the _event name_ to _function name_ mapping with an optional priority for each event.
 
 ##### Examples
 
