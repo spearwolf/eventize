@@ -41,36 +41,23 @@ npm install eventize-js
 ```
 
 
-## API
+# API
 
-### The _eventize_ API
+## The _eventize_ API
 
----
-
-#### `eventize()`
+### `eventize()`
 
 ```
 eventize( obj )
 ```
 
-Attach the _eventized object_ **api** to an object. Returns the object.
-
----
-
-#### `eventize.is()`
-
-```
-eventize.is( obj )
-```
-
-Check if the given object is _eventized_ (has the _eventized object_ **api**). Returns `true` or `false`
+Attach the _eventized object_ **api** to an object. Returns the `obj`.
 
 
-### The _eventized object_ API
 
----
+## The _eventized object_ API
 
-#### `on()`
+### `on()`
 
 ```
 obj.on( eventName, [ priority, ] callbackFunc )
@@ -80,22 +67,21 @@ obj.on( callbackFunc )    // => alias for: object.on( '*', callbackFunc )
 obj.on( object )          // => alias for: object.on( '*', object )
 ```
 
-Adds a listener to an event name.
+Registers a listener to be executed whenever `eventName` gets fired.
 
-The **priority** is optional and should be a _number_. The _default_ **priority** is defined by `eventize.PRIO_DEFAULT` (which is `0` by default)
+- Define the listener by a _callback function_ (`callbackFunc`) or by an _object reference_ (`object`).
+- The `priority` is optional and should be a _number_. The _default_ `priority` is defined by `eventize.PRIO_DEFAULT` (which is `0` by default).
+- The `eventName` is mandatory and should be a _string_.
+- Returns a listener _de-registration id_ (which is a *number*). Use the *id* to unregister your listener via `off()`.
 
-The **eventName** is mandatory and should be a _string_.
-
-The _catch'm all_ **eventName** `*` is special: listeners will be called ..
+Use `*` as `eventName` to create a _catch'm all_ listener. Catch'm all listeners will be called ..
 - regardless off the event name
-- _after_ all other listeners with _same priority_
+- but _after_ all other listeners within _same priority_
 
-Returns an *id* as *number*. Use this *id* to unregister your listener via `off()`
+_DEFINE LISTENER BY OBJECT_
 
-_DEFINE A LISTENER BY OBJECT_
-
-- When the event is fired, a method with the same name as the event will be called
-- When the listener is an _eventized object_ and a event is fired, the `emit()` method will be called
+- When the event is fired, a method with the same name as the event will be called (but only if such a method exists otherwise nothing will happen)
+- When the listener is an _eventized object_ and a event is fired, the `emit()` method of the listener object will be called
 
 
 ```
@@ -103,11 +89,9 @@ obj.on( eventName )
 obj.on()
 ```
 
-Reactivate all listeners or by event name. You can deactivate listeners with `obj.off()`
+Re-activates all listeners or by event name. You can de-activate listeners with `obj.off()`.
 
----
-
-#### `once()`
+### `once()`
 
 ```
 obj.once( eventName, [ priority, ] callbackFunc )
@@ -117,19 +101,16 @@ obj.once( callbackFunc )      // => object.once( '*', callbackFunc )
 obj.once( object )            // => object.once( '*', object )
 ```
 
-Adds a listener to an event name.
-__The listener will be removed after the function gets called once.__
-Apart from that `once()` works like `on()`
+Registers a listener to be executed when `eventName` gets fired. **Once the listener is called, de-register the listener.**
+Apart from that `once()` works like `on()`.
 
----
-
-#### `connect()`
+### `connect()`
 
 ```
 obj.connect( object )
 ```
 
-Bind an object or multiple functions to multiple events.
+Binds an object or multiple functions to multiple events.
 
 Has almost the same effect as writing `obj.on(object)` but this **should be the preferred way** (there are some differences affecting the _sender context_ argument passed over to _eventized object listener_ .. see `emit()` for more details).
 
@@ -137,9 +118,9 @@ Has almost the same effect as writing `obj.on(object)` but this **should be the 
 obj.connect( object, mapping )
 ```
 
-Bind multiple functions from an object to multiple events configured by a mapping. Configure the _event name_ to _function name_ mapping with an optional priority for each event.
+Binds multiple functions from an object to multiple events configured by a mapping. Configure the _event name_ to _function name_ mapping with an optional priority for each event.
 
-##### Examples
+#### Examples
 
 Connect multiple events to object methods:
 
@@ -166,12 +147,10 @@ obj.connect(options, {
 obj.emit('frame', ..);   // => options.onFrame(..)
 ```
 
----
-
-#### `emit()`
+### `emit()`
 
 ```
-obj.emit( eventName [, arguments .. ] )
+obj.emit( eventName [, args... ] )
 ```
 
 Fire an event.
@@ -179,31 +158,33 @@ Fire an event.
 All listeners will be called in (1st) _priority_ and (2nd) _creation time_ order.
 
 There are two expections of this rule:
-- _catch'm all_ event listeners will be called _after_ all other listeners within _same priority_
-- listeners registered by `connect()` will be called with _priority_ = `eventize.PRIO_DEFAULT` BUT _before_ the _catch'm all_ listeners for this priority.
+- _catch'm all_ listeners will be called **after** _all_ other listeners within _same priority_
+- listeners registered by `connect()` will be called with `priority = eventize.PRIO_DEFAULT` BUT _before_ all _catch'm all_ listeners for this priority.
+
+`emit()` will not return any value (*undefined*).
 
 _You should NOT emit the **catch'm all** event!_
 
-The context (that's the `this` reference) of your listener depends on ..
-- when registered by _callback function_
-  - .. is the sender context (that's your _eventized object_ which has the `emit()` method)
-- when registered by _object reference_ or by `connect()`
-  - .. is, of course, the listener!
+THE LISTENER CONTEXT
 
-All additional arguments will be transferred to the listeners.
+(the `this` reference _inside_ your listener function)
 
-Returns nothing (*undefined*).
+- When the listener is registered by a _callback function_, is the *sender context* (this is your _eventized object_ which owns the `emit()` method)
+- When the listener is registered by an _object reference_ or by `connect()`, is, of course, the listener object itself!
 
-All listeners which are registered by _object reference_ via `on()` or by `connect()` will receive an extra argument (as last arg) which is a reference to the _sender object_.
+All additional `args` will be transferred to the listener.
+
+All _object_ listeners (which are registered by _object reference_ via `on()` or by `connect()`) will receive an extra argument
+(as last argument) which is a reference to the _sender object_.
 
 _SENDER OBJECTS_
 
-The difference between `a.on('*', obj)` and `a.connect(obj)` is ..
-- _connected_ objects will always get a reference to the _emitting_ object (that's the object which is executing `emit()`)
-- _object_ listeners registered by `a.on()` will always get a reference to the object in which they were _filed_
+The _sender object_ passed into the listener as additional argument is defined by how the listener was registered ..
+- _connected_ objects (registered by `connect()`) will always get a reference to the _emitting_ object (that is the object which is executing `emit()`)
+- _object_ listeners registered by `a.on()` will always get a reference to the object in which they were _filed_ (that is the object with `.on()`)
 
 
-##### Examples
+#### Examples
 
 ```javascript
 const PRIO = 100;
@@ -233,24 +214,22 @@ a.emit('foo', 1, 2, 3);
 // "7 8 9"
 ```
 
----
 
-#### `emitReduce()`
+### `emitReduce()`
 
 ```
-obj.emitReduce( eventName [, value= {} ] [, arguments .. ] )
+obj.emitReduce( eventName [, value= {} ] [, args... ] )
 ```
 
-Fire an event and returns a result.
+Fires an event and returns a result.
 
-The *return value* from a listener is the *new* value used for the next listener in the call chain (unless the return value is `undefined`).
+The *return value* from a listener is the *new* `value` used for the next listener in the call chain (unless the return value is `undefined`).
 That means the *result* (return value from `emitReduce()`) is the return value from the _last called listener_.
 
 Apart from that it works like `emit()`.
 
----
 
-#### `off()`
+### `off()`
 
 ```
 obj.off( id )
@@ -260,9 +239,30 @@ obj.off( eventName )
 obj.off()
 ```
 
-Remove a listener from an event.
+Removes a listener from an event.
 
-Deactivate listener by id or previously bound object or
-function reference or event name or silence all events.
+De-activate listener by `id` or previously bound `object` (registered by `.on()` or `.connect()`) or
+`callback` function reference or `eventName` or silence *all* events.
+
+
+## API Helpers
+
+```
+eventize.is( obj )
+```
+
+Check if `obj` is an _eventized object_ (has the _eventized object_ **api**). Returns `true` or `false`
+
+```
+eventize.PRIO_MAX
+eventize.PRIO_A
+eventize.PRIO_B
+eventize.PRIO_C
+eventize.PRIO_DEFAULT = 0
+eventize.PRIO_LOW
+eventize.PRIO_MIN
+```
+
+Some predefined priorities. Use it or not. They are defined just for convenience.
 
 
