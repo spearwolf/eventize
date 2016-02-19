@@ -1,7 +1,7 @@
 # eventize.js
 
-[![Build Status](https://img.shields.io/travis/spearwolf/eventize.svg?style=flat-square)](https://travis-ci.org/spearwolf/eventize)
 [![npm](https://img.shields.io/npm/v/eventize-js.svg?style=flat-square)](https://www.npmjs.com/package/eventize-js)
+[![Build Status](https://img.shields.io/travis/spearwolf/eventize.svg?style=flat-square)](https://travis-ci.org/spearwolf/eventize)
 
 yet another fantastic pub/sub events micro framework for javascript!
 
@@ -127,10 +127,17 @@ Apart from that `once()` works like `on()`
 
 ```
 obj.connect( object )
+```
+
+Bind an object or multiple functions to multiple events.
+
+Has almost the same effect as writing `obj.on('*', object)` but this should be the preferred way (there are some differences affecting the _sender context_ argument passed over to _eventized object listener_ .. see `emit()` for more details).
+
+```
 obj.connect( object, mapping )
 ```
 
-Bind multiple functions to events.
+Bind multiple functions from an object to multiple events configured by a mapping. The mapping defines the event name to function name mapping with an optional priority for each event.
 
 ##### Examples
 
