@@ -45,7 +45,7 @@ npm install eventize-js
 
 ## The _eventize_ API
 
-### `eventize()`
+### <img src="https://cdn.rawgit.com/spearwolf/eventize/master/doc/images/eventize.svg" alt="eventize()" width="240">
 
 ```
 eventize( obj )
@@ -57,7 +57,7 @@ Attach the _eventized object_ **api** to an object. Returns the `obj`.
 
 ## The _eventized object_ API
 
-### `on()`
+### <img src="https://cdn.rawgit.com/spearwolf/eventize/master/doc/images/on.svg" alt="on()" width="96">
 
 ```
 obj.on( eventName, [ priority, ] callbackFunc )
@@ -89,9 +89,9 @@ obj.on( eventName )
 obj.on()
 ```
 
-Re-activates all listeners or by event name. You can de-activate listeners with `obj.off()`.
+Re-activates all listeners or by event name. You can de-activate listeners with `off()`.
 
-### `once()`
+### <img src="https://cdn.rawgit.com/spearwolf/eventize/master/doc/images/once.svg" alt="once()" width="144">
 
 ```
 obj.once( eventName, [ priority, ] callbackFunc )
@@ -104,7 +104,7 @@ obj.once( object )            // => object.once( '*', object )
 Registers a listener to be executed when `eventName` gets fired. **Once the listener is called, de-register the listener.**
 Apart from that `once()` works like `on()`.
 
-### `connect()`
+### <img src="https://cdn.rawgit.com/spearwolf/eventize/master/doc/images/connect.svg" alt="connect()" width="216">
 
 ```
 obj.connect( object )
@@ -147,7 +147,8 @@ obj.connect(options, {
 obj.emit('frame', ..);   // => options.onFrame(..)
 ```
 
-### `emit()`
+
+### <img src="https://cdn.rawgit.com/spearwolf/eventize/master/doc/images/emit.svg" alt="emit()" width="144">
 
 ```
 obj.emit( eventName [, args... ] )
@@ -215,7 +216,8 @@ a.emit('foo', 1, 2, 3);
 ```
 
 
-### `emitReduce()`
+### <img src="https://cdn.rawgit.com/spearwolf/eventize/master/doc/images/emitReduce.svg" alt="emitReduce()" width="288">
+
 
 ```
 obj.emitReduce( eventName [, value= {} ] [, args... ] )
@@ -229,7 +231,7 @@ That means the *result* (return value from `emitReduce()`) is the return value f
 Apart from that it works like `emit()`.
 
 
-### `off()`
+### <img src="https://cdn.rawgit.com/spearwolf/eventize/master/doc/images/off.svg" alt="off()" width="120">
 
 ```
 obj.off( id )
