@@ -334,15 +334,13 @@ function eventize (o) {
             if (listener.isFunction) {
                 listener.fn.apply(senderCtx, args);
             } else {
-                if (listener.fn[PROP_NAMESPACE]) {
+                var fn = listener.fn[eventName];
+                if (typeof fn === 'function') {
+                    //fn.apply(listener.fn, args);
+                    fn.apply(listener.fn, argsCtx);
+                } else if (listener.fn[PROP_NAMESPACE]) {
                     listener.fn.emit.apply(listener.fn, [eventName].concat(args));
                     //listener.fn.emit.apply(listener.fn, [senderCtx, eventName].concat(argsCtx));
-                } else {
-                    var fn = listener.fn[eventName];
-                    if (typeof fn === 'function') {
-                        //fn.apply(listener.fn, args);
-                        fn.apply(listener.fn, argsCtx);
-                    }
                 }
             }
 
@@ -376,13 +374,11 @@ function eventize (o) {
             if (boundObjsCount) {
                 for (j = 0; j < boundObjsCount; j++) {
                     bo = _e.boundObjects[j];
-                    if (bo[PROP_NAMESPACE]) {
+                    fn = bo[eventName];
+                    if (typeof fn === 'function') {
+                        emitBoundObject(fn, bo);
+                    } else if (bo[PROP_NAMESPACE]) {
                         emitBoundObject(null, bo);
-                    } else {
-                        fn = bo[eventName];
-                        if (typeof fn === 'function') {
-                            emitBoundObject(fn, bo);
-                        }
                     }
                 }
             }
@@ -445,15 +441,13 @@ function eventize (o) {
                 args[0] = value;
                 setValue(listener.fn.apply(ctx, args));
             } else {
-                if (listener.fn[PROP_NAMESPACE]) {
+                var fn = listener.fn[eventName];
+                if (typeof fn === 'function') {
+                    argsCtx[0] = value;
+                    setValue(fn.apply(listener.fn, argsCtx));
+                } else if (listener.fn[PROP_NAMESPACE]) {
                     argsWithEventName[1] = value;
                     setValue(listener.fn.emitReduce.apply(listener.fn, argsWithEventName));
-                } else {
-                    var fn = listener.fn[eventName];
-                    if (typeof fn === 'function') {
-                        argsCtx[0] = value;
-                        setValue(fn.apply(listener.fn, argsCtx));
-                    }
                 }
             }
 
