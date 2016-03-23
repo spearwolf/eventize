@@ -3,7 +3,7 @@
 [![npm](https://img.shields.io/npm/v/eventize-js.svg?style=flat-square)](https://www.npmjs.com/package/eventize-js)
 [![Build Status](https://img.shields.io/travis/spearwolf/eventize.svg?style=flat-square)](https://travis-ci.org/spearwolf/eventize)
 
-yet another fantastic pub/sub events micro framework for javascript!
+yet another *fantastic* pub/sub events micro framework for javascript!
 
 ##### Features
 
@@ -72,7 +72,7 @@ Registers a listener to be executed whenever `eventName` gets fired.
 - Define the listener by a _callback function_ (`callbackFunc`) or by an _object reference_ (`object`).
 - The `priority` is optional and should be a _number_. The _default_ `priority` is defined by `eventize.PRIO_DEFAULT` (which is `0` by default).
 - The `eventName` is mandatory and should be a _string_.
-- Returns a listener _de-registration id_ (which is a *number*). Use the *id* to unregister your listener via `off()`.
+- Returns a listener _de-registration id_ (which is a *number*). Use this *id* to unregister your listener via `off()`.
 
 Use `*` as `eventName` to create a _catch'm all_ listener. Catch'm all listeners will be called ..
 - regardless off the event name
@@ -80,8 +80,8 @@ Use `*` as `eventName` to create a _catch'm all_ listener. Catch'm all listeners
 
 ##### Define listener by object
 
-- When the event is fired, a method with the same name as the event will be called (but only if such a method exists otherwise nothing will happen)
-- When the listener is an _eventized object_ and a event is fired, the `emit()` method of the listener object will be called
+- When the event is fired, a method with the same name as the event will be called (but only if such a method exists)
+- When such a method does *not* exists, but the listener is an _eventized object_, the `emit()` method of the listener object will be called instead
 
 
 ```
@@ -170,10 +170,10 @@ _You should NOT emit the **catch'm all** event!_
 
 (the `this` reference _inside_ your listener function)
 
-- When the listener is registered by a _callback function_, is the *sender context* (this is your _eventized object_ which owns the `emit()` method)
-- When the listener is registered by an _object reference_ or by `connect()`, is, of course, the listener object itself!
+- When the listener is registered by a _callback function_, `this` is the *sender context* (this is your _eventized object_ which owns the `emit()` method)
+- When the listener is registered by an _object reference_ or by `connect()`, is always the listener object itself!
 
-All additional `args` will be transferred to the listener.
+All other `args` will be transferred to the listener.
 
 All _object_ listeners (which are registered by _object reference_ via `on()` or by `connect()`) will receive an extra argument
 (as last argument) which is a reference to the _sender object_.
@@ -192,27 +192,36 @@ const PRIO = 100;
 
 let a = eventize({});
 
-a.on('foo', (x, y, z) => {           // by function
-    console.log(x+3, y+3, z+3);
+a.on('foo', (x, y, z, undef) => {    // by function
+    console.log(x+3, y+3, z+3, undef === undefined);
 });
 
 a.on('*', PRIO, {                    // by object
-    foo (x, y, z) {
-      console.log(x+6, y+6, z+6);
+    foo (x, y, z, senderCtx) {
+      console.log(x+6, y+6, z+6, a === senderCtx);
+    }
+});
+
+a.connect({                          // connect object
+    foo (x, y, z, senderCtx) {
+      console.log(x+9, y+9, z+9, a === senderCtx);
     }
 });
 
 let b = eventize({});                // by eventized object
-b.on('foo', (x, y, z) => {
-    console.log(x, y, z);
+
+b.on('foo', (x, y, z, senderCtx) => {
+    console.log(x, y, z, b === senderCtx);
 });
+
 a.on('foo', PRIO, b);
 
 a.emit('foo', 1, 2, 3);
 
-// "1 2 3"
-// "4 5 6"
-// "7 8 9"
+// "1 2 3 false"
+// "4 5 6 true"
+// "7 8 9 true"
+// "10 11 12 true"
 ```
 
 
