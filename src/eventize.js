@@ -311,21 +311,26 @@ function eventize (o) {
     //
     // -----------------------------------------------------------------
 
-    o.emit = function (eventName) {  // --- {{{
+    o.emit = function () {  // --- {{{
 
+        // https://github.com/petkaantonov/bluebird/wiki/Optimization-killers#3-managing-arguments
+        var args = new Array(arguments.length);
+        for (var i = 0; i < args.length; ++i) {
+            args[i] = arguments[i];
+        }
+
+        var eventName;
         var senderCtx = this;
         var rootCtx;
-        var args;
         var argsCtx;
 
-        if (arguments.length > 1 && typeof arguments[0] !== 'string' && typeof arguments[1] === 'string') {
-            args = Array.prototype.slice.call(arguments, 2);
-            eventName = arguments[1];
-            rootCtx = arguments[0];
+        if (args.length > 1 && typeof args[0] !== 'string' && typeof args[1] === 'string') {
+            rootCtx = args.shift();
+            eventName = args.shift();
             args[args.length - 1] = rootCtx;
             argsCtx = args;
         } else {
-            args = Array.prototype.slice.call(arguments, 1);
+            eventName = args.shift();  // throw out eventName
             argsCtx = args.concat([senderCtx]);
         }
 
@@ -336,18 +341,13 @@ function eventize (o) {
             } else {
                 var fn = listener.fn[eventName];
                 if (typeof fn === 'function') {
-                    //fn.apply(listener.fn, args);
                     fn.apply(listener.fn, argsCtx);
                 } else if (listener.fn[PROP_NAMESPACE]) {
                     listener.fn.emit.apply(listener.fn, [eventName].concat(args));
-                    //listener.fn.emit.apply(listener.fn, [senderCtx, eventName].concat(argsCtx));
                 }
             }
 
         }, function (fn, boundObj) {
-
-            // TODO
-            // - should be the same? a.connect(b) vs a.on(b)
 
             if (fn) {
                 fn.apply(boundObj, argsCtx);
@@ -413,9 +413,14 @@ function eventize (o) {
     //
     // --------------------------------------------------------------------
 
-    o.emitReduce = function (eventName) {  // --- {{{
+    o.emitReduce = function () {  // --- {{{
 
-        var args = Array.prototype.slice.call(arguments, 1);
+        var args = new Array(arguments.length);
+        for (var i = 0; i < args.length; ++i) {
+            args[i] = arguments[i];
+        }
+
+        var eventName = args.shift();
         var value;
 
         function setValue (val) {
