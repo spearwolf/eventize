@@ -14,12 +14,12 @@ describe("eventize", function () {
 
     it('do not eventize eventized objects', function () {
         let o = eventize({});
-        expect(o._eventize).toBeDefined();
-        expect(o._eventize.foo).toBeUndefined();
-        o._eventize.foo = 23;
-        expect(o._eventize.foo).toBe(23);
+        expect(o[eventize.EventizeNamespace]).toBeDefined();
+        expect(o[eventize.EventizeNamespace].foo).toBeUndefined();
+        o[eventize.EventizeNamespace].foo = 23;
+        expect(o[eventize.EventizeNamespace].foo).toBe(23);
         let o1 = eventize(o);
-        expect(o1._eventize.foo).toBe(23);
+        expect(o1[eventize.EventizeNamespace].foo).toBe(23);
         expect(o1).toBe(o);
     });
 

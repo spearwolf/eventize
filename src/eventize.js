@@ -1,6 +1,6 @@
 'use strict';
 
-var PROP_NAMESPACE  = '_eventize';
+var PROP_NAMESPACE  = typeof Symbol !== undefined ? Symbol('eventize') : '_eventize';
 var CATCH_ALL_EVENT = '*';
 var LOG_NAMESPACE   = '[eventize.js]';
 
@@ -478,6 +478,8 @@ function eventize (o) {
 eventize.is = function (obj) {
     return !!( obj && obj[PROP_NAMESPACE] );
 };
+
+eventize.EventizeNamespace = PROP_NAMESPACE;
 
 module.exports = eventize;
 
