@@ -54,6 +54,16 @@ describe("eventize.queue(name)", function () {
             expect(queue.state).toEqual('play');
         });
 
+        it("should provide a .play() function", function () {
+            const queue = eventize.queue();
+            expect(typeof queue.play).toEqual('function');
+        });
+
+        it("should provide a .collect() function", function () {
+            const queue = eventize.queue();
+            expect(typeof queue.collect).toEqual('function');
+        });
+
     });
 
 });

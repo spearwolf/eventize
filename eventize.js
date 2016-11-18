@@ -1,6 +1,6 @@
 /**
  * ===============================================================
- * eventize.js v0.0.12 -- https://github.com/spearwolf/eventize
+ * eventize.js v0.0.13 -- https://github.com/spearwolf/eventize
  * ===============================================================
  *
  * Copyright 2015-16 Wolfger Schramm <wolfger@spearwolf.de>
