@@ -481,7 +481,99 @@ eventize.is = function (obj) {
 
 eventize.EventizeNamespace = PROP_NAMESPACE;
 
-module.exports = eventize;
+
+// =====================================================================
+//
+// eventize.queue( queueName[, options]) : queue
+//
+// options are:
+//    - replace: true|false  - replace previous events with same name
+//                             when queue is in collect mode
+//
+// queue.play()
+// queue.collect()
+// queue.state
+//
+// =====================================================================
+
+_defineHiddenPropertyRO(eventize, 'queues', canUseMap() ? new Map : {});
+
+eventize.queue = function (name, options) {
+
+    var hasMap = canUseMap();
+    var queue = name ? (hasMap ? eventize.queues.get(name) : eventize.queues[name]) : null;
+
+    if (!queue) {
+        queue = createQueue(name, options);
+        if (hasMap) {
+            eventize.queues.set(queue.name, queue);
+        } else {
+            eventize.queues[queue.name] = queue;
+        }
+    }
+
+    return queue;
+
+};
+
+
+var STATE = 'state';
+var PLAY = 'play';
+var COLLECT = 'collect';
+
+function createQueue(name, options) {
+
+    var queueName = ((typeof name === 'string' || typeof name === 'symbol') && name) || createUuid();
+    var queue = eventize({});
+    var isReplace = !!(options && options.replace);
+
+    var setState = function (state) {
+        _definePublicPropertyRO(queue, STATE, state);
+    };
+
+    var emit = function (args) {
+        queue.emit.apply(queue, args);
+    };
+
+    _defineHiddenPropertyRO(queue, 'events', []);
+    _definePublicPropertyRO(queue, 'name', queueName);
+
+    queue.collect = function () {
+        if (queue[STATE] !== COLLECT) {
+            setState(COLLECT);
+        }
+        return queue;
+    };
+
+    queue.emit = function () {
+        var args = Array.prototype.slice.call(arguments, 0);
+        if (queue[STATE] === PLAY) {
+            emit(args);
+        } else {  // COLLECT
+            if (isReplace) {
+                for (var i = 0, len = queue.events.length; i < len; i++) {
+                    if (queue.events[i][0] === args[0]) {
+                        queue.events[i] = args;
+                        return;
+                    }
+                }
+            }
+            queue.events.push(args);
+        }
+    };
+
+    queue.play = function () {
+        if (queue[STATE] !== PLAY) {
+            setState(PLAY);
+            queue.events.forEach(emit);
+            queue.events.length = 0;
+        }
+        return queue;
+    };
+
+    return queue.play();
+
+}
 
 
 // =====================================================================
@@ -489,6 +581,27 @@ module.exports = eventize;
 // helper functions
 //
 // =====================================================================
+
+function createUuid() {
+    // http://stackoverflow.com/questions/105034/create-guid-uuid-in-javascript
+    var d = Date.now() + Math.random();
+    if (typeof window !== 'undefined' && window.performance && typeof window.performance.now === "function"){
+        d += performance.now(); //use high-precision timer if available
+    }
+    var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = d*16|0, v = c == 'x' ? r : (r&0x3|0x8);
+        return v.toString(16);
+    });
+    return canUseSymbol() ? Symbol(uuid) : uuid;
+}
+
+function canUseSymbol () {
+    return typeof Symbol !== 'undefined';
+}
+
+function canUseMap () {
+    return typeof Map !== 'undefined';
+}
 
 function _definePublicPropertyRO (obj, name, value) {
     Object.defineProperty(obj, name, {
@@ -516,3 +629,6 @@ function _defineHiddenPropertyRO (obj, name, value) {
 }
 
 
+// --- end
+//
+module.exports = eventize;
