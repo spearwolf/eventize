@@ -6,7 +6,7 @@ yet another *fantastic* pub/sub events micro framework for javascript!
 
 ##### Features
 
-- clean, minimal & easy api
+- clean, minimal & powerful api
 - all api-calls and downstream-listeners-calls are 100% synchronous, no async
 - battle-proven & fully tested (jasmine specs & karma included)
 - apache-2.0 license
