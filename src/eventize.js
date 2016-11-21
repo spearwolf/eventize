@@ -533,9 +533,11 @@ function createQueue(name, options) {
         definePublicPropertyRO(queue, STATE, state);
     };
 
-    var emit = function (args) {
-        queue.emit.apply(queue, args);
-    };
+    var emit = (function (_emit) {
+            return function (args) {
+            _emit.apply(queue, args);
+        };
+    })(queue.emit);
 
     defineHiddenPropertyRO(queue, 'events', []);
     definePublicPropertyRO(queue, 'name', queueName);

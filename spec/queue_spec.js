@@ -66,5 +66,50 @@ describe("eventize.queue(name)", function () {
 
     });
 
+    describe("a queue in play mode", function () {
+
+        it("should emit events", function () {
+            const queue = eventize.queue();
+            expect(queue.state).toEqual('play');
+
+            var foo;
+            queue.on('foo', (x) => foo = x);
+            queue.emit('foo', 10);
+            expect(foo).toEqual(10);
+        });
+
+    });
+
+    describe("a queue in collect mode", function () {
+
+        it("should not emit events", function () {
+            const queue = eventize.queue().collect();
+            expect(queue.state).toEqual('collect');
+
+            var foo = 0;
+            queue.on('foo', (x) => foo = x);
+            queue.emit('foo', 10);
+            expect(foo).toEqual(0);
+        });
+
+        it("should immediately emit all collected events after going into play mode", function () {
+            const queue = eventize.queue().collect();
+            expect(queue.state).toEqual('collect');
+
+            var foo = 0;
+            queue.on('foo', (x) => foo += x);
+
+            queue.emit('foo', 10);
+            expect(foo).toEqual(0);
+            queue.emit('foo', 20);
+            expect(foo).toEqual(0);
+
+            queue.play();
+            expect(foo).toEqual(30);
+        });
+
+    });
+
+
 });
 
