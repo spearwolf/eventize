@@ -1,6 +1,9 @@
 'use strict';
 
-var PROP_NAMESPACE  = typeof Symbol !== undefined ? Symbol('eventize') : '_eventize';
+var hasMap = canUseMap();
+var hasSymbol = canUseSymbol();
+
+var PROP_NAMESPACE  = hasSymbol ? Symbol('eventize') : '_eventize';
 var CATCH_ALL_EVENT = '*';
 var LOG_NAMESPACE   = '[eventize.js]';
 
@@ -22,16 +25,16 @@ function eventize (o) {
 
     _e.callbacks[CATCH_ALL_EVENT] = [];
 
-    var _ePublic = _definePublicPropertiesRO({}, {
+    var _ePublic = definePublicPropertiesRO({}, {
         silenced : false,
         off      : []
     });
 
-    _defineHiddenPropertyRO(o, PROP_NAMESPACE, _ePublic);
+    defineHiddenPropertyRO(o, PROP_NAMESPACE, _ePublic);
 
     if (eventize.PRIO_DEFAULT === undefined) {
 
-        _definePublicPropertiesRO(eventize, {
+        definePublicPropertiesRO(eventize, {
             PRIO_MAX     : Number.POSITIVE_INFINITY,
             PRIO_A       : 1000000000,
             PRIO_B       : 10000000,
@@ -62,7 +65,7 @@ function eventize (o) {
 
         if (argsLen === 0) {
             if (_ePublic.silenced) {
-                _definePublicPropertyRO(_ePublic, 'silenced', false);
+                definePublicPropertyRO(_ePublic, 'silenced', false);
                 _ePublic.off.length = 0;
             }
             return;
@@ -101,7 +104,7 @@ function eventize (o) {
         var eventizeCallbacks = _e.callbacks;
         var eventListener = eventizeCallbacks[eventName] || (eventizeCallbacks[eventName] = []);
         var listenerId = createId();
-        var listener = _definePublicPropertiesRO({}, {
+        var listener = definePublicPropertiesRO({}, {
             id         : listenerId,
             fn         : fn,
             prio       : (typeof prio !== 'number' ? eventize.PRIO_DEFAULT : prio),
@@ -186,7 +189,7 @@ function eventize (o) {
 
         if (arguments.length === 0) {
             if (!_ePublic.silenced) {
-                _definePublicPropertyRO(_ePublic, 'silenced', true);
+                definePublicPropertyRO(_ePublic, 'silenced', true);
                 _ePublic.off.length = 0;
             }
             return;
@@ -479,7 +482,7 @@ eventize.is = function (obj) {
     return !!( obj && obj[PROP_NAMESPACE] );
 };
 
-eventize.EventizeNamespace = PROP_NAMESPACE;
+defineHiddenPropertyRO(eventize, 'EventizeNamespace', PROP_NAMESPACE);
 
 
 // =====================================================================
@@ -496,11 +499,10 @@ eventize.EventizeNamespace = PROP_NAMESPACE;
 //
 // =====================================================================
 
-_defineHiddenPropertyRO(eventize, 'queues', canUseMap() ? new Map : {});
+defineHiddenPropertyRO(eventize, 'queues', hasMap ? new Map : {});
 
 eventize.queue = function (name, options) {
 
-    var hasMap = canUseMap();
     var queue = name ? (hasMap ? eventize.queues.get(name) : eventize.queues[name]) : null;
 
     if (!queue) {
@@ -528,15 +530,15 @@ function createQueue(name, options) {
     var isReplace = !!(options && options.replace);
 
     var setState = function (state) {
-        _definePublicPropertyRO(queue, STATE, state);
+        definePublicPropertyRO(queue, STATE, state);
     };
 
     var emit = function (args) {
         queue.emit.apply(queue, args);
     };
 
-    _defineHiddenPropertyRO(queue, 'events', []);
-    _definePublicPropertyRO(queue, 'name', queueName);
+    defineHiddenPropertyRO(queue, 'events', []);
+    definePublicPropertyRO(queue, 'name', queueName);
 
     queue.collect = function () {
         if (queue[STATE] !== COLLECT) {
@@ -584,15 +586,11 @@ function createQueue(name, options) {
 
 function createUuid() {
     // http://stackoverflow.com/questions/105034/create-guid-uuid-in-javascript
-    var d = Date.now() + Math.random();
-    if (typeof window !== 'undefined' && window.performance && typeof window.performance.now === "function"){
-        d += performance.now(); //use high-precision timer if available
-    }
     var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = d*16|0, v = c == 'x' ? r : (r&0x3|0x8);
+        var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
         return v.toString(16);
     });
-    return canUseSymbol() ? Symbol(uuid) : uuid;
+    return hasSymbol ? Symbol(uuid) : uuid;
 }
 
 function canUseSymbol () {
@@ -603,7 +601,7 @@ function canUseMap () {
     return typeof Map !== 'undefined';
 }
 
-function _definePublicPropertyRO (obj, name, value) {
+function definePublicPropertyRO (obj, name, value) {
     Object.defineProperty(obj, name, {
         value        : value,
         configurable : true,
@@ -612,15 +610,15 @@ function _definePublicPropertyRO (obj, name, value) {
     return obj;
 }
 
-function _definePublicPropertiesRO (obj, attrs) {
+function definePublicPropertiesRO (obj, attrs) {
     var i, keys = Object.keys(attrs);
     for (i = keys.length; i--;) {
-        _definePublicPropertyRO(obj, keys[i], attrs[keys[i]]);
+        definePublicPropertyRO(obj, keys[i], attrs[keys[i]]);
     }
     return obj;
 }
 
-function _defineHiddenPropertyRO (obj, name, value) {
+function defineHiddenPropertyRO (obj, name, value) {
     Object.defineProperty(obj, name, {
         value        : value,
         configurable : true
