@@ -550,13 +550,17 @@ function createQueue(name, options) {
     };
 
     queue.emit = function () {
-        var args = Array.prototype.slice.call(arguments, 0);
+        var args = new Array(arguments.length);
+        for (var i = 0; i < args.length; ++i) {
+            args[i] = arguments[i];
+        }
         if (queue[STATE] === PLAY) {
             emit(args);
         } else {  // COLLECT
             if (isReplace) {
-                for (var i = 0, len = queue.events.length; i < len; i++) {
-                    if (queue.events[i][0] === args[0]) {
+                var eventName = args[0];
+                for (i = 0, len = queue.events.length; i < len; i++) {
+                    if (queue.events[i][0] === eventName) {
                         queue.events[i] = args;
                         return;
                     }
