@@ -485,32 +485,45 @@ eventize.is = function (obj) {
 defineHiddenPropertyRO(eventize, 'EventizeNamespace', PROP_NAMESPACE);
 
 
-// =====================================================================
+// ==========================================================================
 //
-// eventize.queue( queueName[, options]) : queue
+// eventize.queue([ queueId ][, options]) : queue
 //
 // options are:
 //    - replace: true|false  - replace previous events with same name
-//                             when queue is in collect mode
+//                             when queue is in collection mode
 //
-// queue.play()
-// queue.collect()
-// queue.state
+// queue.play()              - activate play (immediately emit) mode
+// queue.collect()           - activate collection (store all events) mode
+// queue.toggle()            - toggle state
+// queue.state               - 'play'|'collect'
 //
-// =====================================================================
+// ==========================================================================
 
 defineHiddenPropertyRO(eventize, 'queues', hasMap ? new Map : {});
 
-eventize.queue = function (name, options) {
+eventize.queue = function (id/*, options */) {
 
-    var queue = name ? (hasMap ? eventize.queues.get(name) : eventize.queues[name]) : null;
+    var queue, options;
+    var len = arguments.length;
+
+    if (len >= 1) {
+        if (typeof id !== 'object' || len === 2) {
+            queue = hasMap ? eventize.queues.get(id) : eventize.queues[id];
+        }
+        if (len === 2) {
+            options = arguments[1];
+        } else if (len === 1 && typeof id === 'object') {
+            options = id;
+        }
+    }
 
     if (!queue) {
-        queue = createQueue(name, options);
+        queue = createQueue(id, options);
         if (hasMap) {
-            eventize.queues.set(queue.name, queue);
+            eventize.queues.set(queue.id, queue);
         } else {
-            eventize.queues[queue.name] = queue;
+            eventize.queues[queue.id] = queue;
         }
     }
 
@@ -523,9 +536,9 @@ var STATE = 'state';
 var PLAY = 'play';
 var COLLECT = 'collect';
 
-function createQueue(name, options) {
+function createQueue(id, options) {
 
-    var queueName = ((typeof name === 'string' || typeof name === 'symbol') && name) || createUuid();
+    var queueId = ((typeof id === 'string' || typeof id === 'symbol') && id) || createUuid();
     var queue = eventize({});
     var isReplace = !!(options && options.replace);
 
@@ -540,7 +553,7 @@ function createQueue(name, options) {
     })(queue.emit);
 
     defineHiddenPropertyRO(queue, 'events', []);
-    definePublicPropertyRO(queue, 'name', queueName);
+    definePublicPropertyRO(queue, 'id', queueId);
 
     queue.collect = function () {
         if (queue[STATE] !== COLLECT) {
@@ -558,7 +571,7 @@ function createQueue(name, options) {
             emit(args);
         } else {  // COLLECT
             if (isReplace) {
-                var eventName = args[0];
+                var len, eventName = args[0];
                 for (i = 0, len = queue.events.length; i < len; i++) {
                     if (queue.events[i][0] === eventName) {
                         queue.events[i] = args;
@@ -577,6 +590,10 @@ function createQueue(name, options) {
             queue.events.length = 0;
         }
         return queue;
+    };
+
+    queue.toggle = function () {
+        return queue[STATE] !== PLAY ? queue.play() : queue.collect();
     };
 
     return queue.play();

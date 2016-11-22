@@ -2,21 +2,21 @@
 
 let eventize = require('../eventize');
 
-describe("eventize.queue(name)", function () {
+describe("eventize.queue(id)", function () {
 
-    it("should create a new queue when called with a name", function () {
+    it("should create a new queue when called with a id", function () {
         const queue = eventize.queue('queue-a');
         expect(eventize.is(queue)).toBeTruthy();
     });
 
-    it("should always create a new queue even when called without a name", function () {
+    it("should always create a new queue even when called without a id", function () {
         const a = eventize.queue();
         expect(eventize.is(a)).toBeTruthy();
-        const b = eventize.queue();
+        const b = eventize.queue({ replace: true });
         expect(eventize.is(b)).toBeTruthy();
         const c = eventize.queue();
         expect(eventize.is(c)).toBeTruthy();
-        const d = eventize.queue();
+        const d = eventize.queue({ replace: false });
         expect(eventize.is(d)).toBeTruthy();
         const e = eventize.queue();
         expect(eventize.is(e)).toBeTruthy();
@@ -33,15 +33,15 @@ describe("eventize.queue(name)", function () {
         expect(eventize.queue('queue-a')).toEqual(queue);
         const queueB = eventize.queue();
         expect(eventize.queue()).not.toEqual(queueB);
-        expect(eventize.queue(queueB.name)).toEqual(queueB);
+        expect(eventize.queue(queueB.id)).toEqual(queueB);
     });
 
     describe("a queue", function () {
 
-        it("should provide a .name property", function () {
+        it("should provide a .id property", function () {
             const NAME = 'asdfuh239rh23r';
             const queue = eventize.queue(NAME);
-            expect(queue.name).toEqual(NAME);
+            expect(queue.id).toEqual(NAME);
         });
 
         it("should provide a .state property", function () {
@@ -62,6 +62,20 @@ describe("eventize.queue(name)", function () {
         it("should provide a .collect() function", function () {
             const queue = eventize.queue();
             expect(typeof queue.collect).toEqual('function');
+        });
+
+        it("should provide a .toggle() function", function () {
+            const queue = eventize.queue();
+            expect(typeof queue.toggle).toEqual('function');
+        });
+
+        it("toggle should toggle between play and collect state", function () {
+            const queue = eventize.queue().play();
+            expect(queue.state).toEqual('play');
+            queue.toggle();
+            expect(queue.state).toEqual('collect');
+            queue.toggle();
+            expect(queue.state).toEqual('play');
         });
 
     });
@@ -106,6 +120,31 @@ describe("eventize.queue(name)", function () {
 
             queue.play();
             expect(foo).toEqual(30);
+        });
+
+    });
+
+    describe("a queue with :replace option", function () {
+
+        it("should replace events with same name and only emit last event", function () {
+
+            const queue = eventize.queue({ replace: true }).collect();
+
+            let foo = 0;
+            queue.on('foo', (x) => foo += x);
+            queue.on('bar', (x) => foo += x);
+
+            queue.emit('foo', 10);
+            queue.emit('bar', 6);
+            queue.emit('foo', 20);
+            queue.emit('foo', 60);
+
+            expect(foo).toEqual(0);
+
+            queue.play();
+
+            expect(foo).toEqual(66);
+
         });
 
     });
