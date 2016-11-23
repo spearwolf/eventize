@@ -1,6 +1,6 @@
 {
   "name": "@spearwolf/eventize",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "author": {
     "name": "Wolfger Schramm",
     "email": "wolfger@spearwolf.de",
@@ -56,5 +56,8 @@
     "vinyl-buffer": "^1.0.0",
     "vinyl-source-stream": "^1.1.0",
     "watchify": "^3.7.0"
+  },
+  "testDependencies": {
+    "rxjs": "^5.0.0-rc.4"
   }
 }

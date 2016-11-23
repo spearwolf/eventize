@@ -2,8 +2,15 @@
 
 var hasMap = canUseMap();
 var hasSymbol = canUseSymbol();
+var hasConsole = typeof console !== 'undefined';
 
-var PROP_NAMESPACE  = hasSymbol ? Symbol('eventize') : '_eventize';
+var PROP_NAMESPACE  = !hasSymbol ? '@@eventize' : (function() {
+    if (!Symbol.eventize) {
+        Symbol.eventize = Symbol('eventize');
+    }
+    return Symbol.eventize;
+})();
+
 var CATCH_ALL_EVENT = '*';
 var LOG_NAMESPACE   = '[eventize.js]';
 
@@ -91,7 +98,9 @@ function eventize (o) {
                 prio = eventize.PRIO_DEFAULT;
 
             } else {
-                console.warn(LOG_NAMESPACE, '.on() called with insufficient arguments!', arguments);
+                if (hasConsole) {
+                    console.warn(LOG_NAMESPACE, '.on() called with insufficient arguments!', arguments);
+                }
                 return;
             }
         }
@@ -143,7 +152,9 @@ function eventize (o) {
         var argsLen = arguments.length;
 
         if (!argsLen || argsLen > 3) {
-            console.warn(LOG_NAMESPACE, '.once() called with insufficient arguments!', arguments);
+            if (hasConsole) {
+                console.warn(LOG_NAMESPACE, '.once() called with insufficient arguments!', arguments);
+            }
             return;
         }
 
@@ -262,7 +273,9 @@ function eventize (o) {
         } else if (argsLen === 2) {
             return _connectWithMapping(this, obj, mapping);
         } else {
-            console.warn(LOG_NAMESPACE, '.connect() called with insufficient arguments!', arguments);
+            if (hasConsole) {
+                console.warn(LOG_NAMESPACE, '.connect() called with insufficient arguments!', arguments);
+            }
         }
     };
 
@@ -474,15 +487,74 @@ function eventize (o) {
 
     // --- emit }}}
 
+    // --------------------------------------------------------------------
+    //
+    // object.from( eventName, observable )
+    //
+    // See https://github.com/tc39/proposal-observable
+    //
+    // Example:
+    //
+    //      object
+    //          .from('foo', Rx.Observable)
+    //          .filter(x => x % 2 === 0)
+    //          .subscribe(x => console.log(x));
+    //
+    //
+    // --------------------------------------------------------------------
+
+    o.from = function (eventName, observable) {  // --- {{{
+        var self = this;
+        return new observable(function (observer) {
+
+            var id = self.on(eventName, function (data) {
+                observer.next(data);
+            });
+
+            return function () {
+                self.off(id);
+            };
+
+        });
+    };
+
+    // --- from }}}
+
+    // --------------------------------------------------------------------
+    //
+    // object.subscribe( Observable, onNext[, onError][, onComplete] )
+    //
+    // Example:
+    //
+    //      object.subscribe(a, 'value', 'error');   // a => Observable
+    //
+    // --------------------------------------------------------------------
+
+    o.subscribe = function (source, onNext, onError, onComplete) {  // --- {{{
+        var self = this;
+        return source.subscribe(function (value) {
+            self.emit(onNext, value);
+        }, onError ? function (errorValue) {
+            self.emit(onError, errorValue);
+        } : undefined, onComplete ? function (completeValue) {
+            self.emit(onComplete, completeValue);
+        } : undefined);
+    };
+
+    // --- subscribe }}}
+
     return o;
 
 } // <= eventize()
+
 
 eventize.is = function (obj) {
     return !!( obj && obj[PROP_NAMESPACE] );
 };
 
-defineHiddenPropertyRO(eventize, 'EventizeNamespace', PROP_NAMESPACE);
+
+defineHiddenPropertyRO( eventize,
+    'EventizeNamespace', PROP_NAMESPACE);
 
 
 // ==========================================================================
@@ -606,6 +678,7 @@ function createQueue(id, options) {
 // helper functions
 //
 // =====================================================================
+
 
 function createUuid() {
     // http://stackoverflow.com/questions/105034/create-guid-uuid-in-javascript
