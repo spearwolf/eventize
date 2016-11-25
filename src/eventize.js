@@ -4,7 +4,7 @@ var hasMap = canUseMap();
 var hasSymbol = canUseSymbol();
 var hasConsole = typeof console !== 'undefined';
 
-var PROP_NAMESPACE  = !hasSymbol ? '@@eventize' : (function() {
+var PROP_NAMESPACE  = !hasSymbol ? '@@eventize' : (function () {
     if (!Symbol.eventize) {
         Symbol.eventize = Symbol('eventize');
     }
@@ -489,7 +489,7 @@ function eventize (o) {
 
     // --------------------------------------------------------------------
     //
-    // object.from( eventName, observable )
+    // object.from( eventName, Observable )
     //
     // See https://github.com/tc39/proposal-observable
     //
@@ -608,7 +608,7 @@ var STATE = 'state';
 var PLAY = 'play';
 var COLLECT = 'collect';
 
-function createQueue(id, options) {
+function createQueue (id, options) {
 
     var queueId = ((typeof id === 'string' || typeof id === 'symbol') && id) || createUuid();
     var queue = eventize({});
@@ -636,7 +636,8 @@ function createQueue(id, options) {
 
     queue.emit = function () {
         var args = new Array(arguments.length);
-        for (var i = 0; i < args.length; ++i) {
+        var i;
+        for (i = 0; i < args.length; ++i) {
             args[i] = arguments[i];
         }
         if (queue[STATE] === PLAY) {
@@ -680,9 +681,9 @@ function createQueue(id, options) {
 // =====================================================================
 
 
-function createUuid() {
+function createUuid () {
     // http://stackoverflow.com/questions/105034/create-guid-uuid-in-javascript
-    var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
         return v.toString(16);
     });
