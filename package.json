@@ -1,6 +1,6 @@
 {
   "name": "@spearwolf/eventize",
-  "version": "0.0.16",
+  "version": "0.1.1",
   "author": {
     "name": "Wolfger Schramm",
     "email": "wolfger@spearwolf.de",
@@ -52,7 +52,7 @@
     "karma-chrome-launcher": "^2.1.1",
     "karma-firefox-launcher": "^1.0.1",
     "karma-jasmine": "^1.1.0",
-    "rxjs": "^5.0.0-rc.4",
+    "rxjs": "^5.4.1",
     "uglify-js": "^3.0.19",
     "vinyl-buffer": "^1.0.0",
     "vinyl-source-stream": "^1.1.0",
