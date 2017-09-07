@@ -43,7 +43,7 @@ describe("eventizedObj.emit", function () {
             results.push('on.foo_3:'+x+'/'+arguments.length);
         });
 
-        obj.connect(a);
+        obj.on(a);
 
         obj.emit('foo', 'a', 0);
         obj.emit('bar', 'b');
@@ -53,10 +53,10 @@ describe("eventizedObj.emit", function () {
             'on.foo_1:a/2',
             'on.foo_2:a/2',
             'on.foo_3:a/2',
-            'a.foo:a/3',
             'on.foo:a/2',
+            'a.foo:a/2',
             'on.bar:b/1',
-            'a.bar:b/2'
+            'a.bar:b/1'
         ]);
 
     });

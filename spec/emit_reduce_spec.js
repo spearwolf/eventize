@@ -59,23 +59,23 @@ describe("eventizedObj.emitReduce", function () {
             return str + '|' + s;
         });
 
-        obj.connect(a);
+        obj.on(a);
 
         var foo = obj.emitReduce('foo', 'FOO:', 'a', 23, 12);
         var bar = obj.emitReduce('bar', 'BAR:', 'b', 65);
 
-        expect(foo).toBe('FOO:|on.foo_0:a/4|on.foo_1:a/4|on.foo_2:a/4|on.foo_3:a/4|a.foo:a/5|on.foo:a/4');
-        expect(bar).toBe('BAR:|on.bar:b/3|a.bar:b/4');
+        expect(foo).toBe('FOO:|on.foo_0:a/4|on.foo_1:a/4|on.foo_2:a/4|on.foo_3:a/4|on.foo:a/4|a.foo:a/4');
+        expect(bar).toBe('BAR:|on.bar:b/3|a.bar:b/3');
 
         expect(results).toEqual([
             'on.foo_0:a/4',
             'on.foo_1:a/4',
             'on.foo_2:a/4',
             'on.foo_3:a/4',
-            'a.foo:a/5',
             'on.foo:a/4',
+            'a.foo:a/4',
             'on.bar:b/3',
-            'a.bar:b/4'
+            'a.bar:b/3'
         ]);
 
     });

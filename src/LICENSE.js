@@ -3,7 +3,7 @@
  * eventize.js v#VERSION# -- https://github.com/spearwolf/eventize
  * ===============================================================
  *
- * Copyright 2015-16 Wolfger Schramm <wolfger@spearwolf.de>
+ * Copyright 2015-17 Wolfger Schramm <wolfger@spearwolf.de>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.

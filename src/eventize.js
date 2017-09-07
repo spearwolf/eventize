@@ -253,7 +253,6 @@ function eventize (o) {
 
     // -----------------------------------------------------------------
     //
-    // object.connect( obj )
     // object.connect( obj, mapping )
     //
     // Example:
@@ -268,13 +267,11 @@ function eventize (o) {
 
     o.connect = function (obj, mapping) {  // --- {{{
         var argsLen = arguments.length;
-        if (argsLen === 1) {
-            return _bindObject(obj);
-        } else if (argsLen === 2) {
+        if (argsLen === 2) {
             return _connectWithMapping(this, obj, mapping);
         } else {
             if (hasConsole) {
-                console.warn(LOG_NAMESPACE, '.connect() called with insufficient arguments!', arguments);
+                console.warn(LOG_NAMESPACE, '.connect() called with insufficient arguments (need 2 args, but got ' + argsLen + ')', arguments);
             }
         }
     };
@@ -330,45 +327,34 @@ function eventize (o) {
     o.emit = function () {  // --- {{{
 
         // https://github.com/petkaantonov/bluebird/wiki/Optimization-killers#3-managing-arguments
-        var args = new Array(arguments.length);
-        for (var i = 0; i < args.length; ++i) {
-            args[i] = arguments[i];
+        var argsWithEventName = new Array(arguments.length);
+        for (var i = 0; i < argsWithEventName.length; ++i) {
+            argsWithEventName[i] = arguments[i];
         }
 
-        var eventName;
+        var eventName = argsWithEventName[0];
+        var argsWithoutEventName = argsWithEventName.slice(1);
         var senderCtx = this;
-        var rootCtx;
-        var argsCtx;
-
-        if (args.length > 1 && typeof args[0] !== 'string' && typeof args[1] === 'string') {
-            rootCtx = args.shift();
-            eventName = args.shift();
-            args[args.length - 1] = rootCtx;
-            argsCtx = args;
-        } else {
-            eventName = args.shift();  // throw out eventName
-            argsCtx = args.concat([senderCtx]);
-        }
 
         _dispatch(eventName, function (listener) {
 
             if (listener.isFunction) {
-                listener.fn.apply(senderCtx, args);
+                listener.fn.apply(senderCtx, argsWithoutEventName);
             } else {
                 var fn = listener.fn[eventName];
                 if (typeof fn === 'function') {
-                    fn.apply(listener.fn, argsCtx);
-                } else if (listener.fn[PROP_NAMESPACE]) {
-                    listener.fn.emit.apply(listener.fn, [eventName].concat(args));
+                    fn.apply(listener.fn, argsWithoutEventName);
+                } else if (listener.fn.emit) {
+                    listener.fn.emit.apply(listener.fn, argsWithEventName);
                 }
             }
 
         }, function (fn, boundObj) {
 
             if (fn) {
-                fn.apply(boundObj, argsCtx);
-            } else {
-                boundObj.emit.apply(boundObj, [senderCtx, eventName].concat(argsCtx));
+                fn.apply(boundObj, argsWithoutEventName);
+            } else if (boundObj.emit) {
+                boundObj.emit.apply(boundObj, argsWithEventName);
             }
 
         });
@@ -454,7 +440,6 @@ function eventize (o) {
 
         var ctx = this;
         var argsWithEventName = [eventName].concat(args);
-        var argsCtx = args.concat([ctx]);
 
         _dispatch(eventName, function (listener) {
 
@@ -464,9 +449,9 @@ function eventize (o) {
             } else {
                 var fn = listener.fn[eventName];
                 if (typeof fn === 'function') {
-                    argsCtx[0] = value;
-                    setValue(fn.apply(listener.fn, argsCtx));
-                } else if (listener.fn[PROP_NAMESPACE]) {
+                    args[0] = value;
+                    setValue(fn.apply(listener.fn, args));
+                } else if (listener.fn.emitReduce) {
                     argsWithEventName[1] = value;
                     setValue(listener.fn.emitReduce.apply(listener.fn, argsWithEventName));
                 }
@@ -475,8 +460,8 @@ function eventize (o) {
         }, function (fn, boundObj) {
 
             if (fn) {
-                argsCtx[0] = value;
-                setValue(fn.apply(boundObj, argsCtx));
+                args[0] = value;
+                setValue(fn.apply(boundObj, args));
             }
 
         });

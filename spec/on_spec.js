@@ -125,8 +125,8 @@ describe("eventizedObj.on", function () {
 
         obj.on('krah', function (x) { result = x; });
 
-        obj.connect({
-            'krah': function (x) { result2 = x; }
+        obj.on({
+            krah: function (x) { result2 = x; }
         });
 
         obj.emit('krah', 50);

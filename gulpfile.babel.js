@@ -12,10 +12,14 @@ const insert = require('gulp-insert');
 const size = require('gulp-size');
 const source = require('vinyl-source-stream');
 const uglify = require('gulp-uglify');
+const rename = require('gulp-rename');
 const watchify = require('watchify');
 const packageJson = require('./package');
 
-function compile (name, isWatch) {
+function compile (name, options) {
+
+    const isWatch = options && options.isWatch;
+    const compress = options && options.compress;
 
     let bundler = watchify(browserify('./src/' + name + '.js', {
         debug: false,
@@ -28,11 +32,13 @@ function compile (name, isWatch) {
 
         gutil.log("Bundling '" + gutil.colors.yellow(target) + "'...");
 
-        return bundler.bundle()
+        let bundle = bundler.bundle()
             .on('error', function (err) { console.error(err); this.emit('end'); })
             .pipe(source(target))
-            .pipe(buffer())
-            .pipe(uglify({
+            .pipe(buffer());
+
+        if (compress) {
+            bundle = bundle.pipe(uglify({
                 mangle: true,
                 compress: {
                     sequences: true,
@@ -48,9 +54,17 @@ function compile (name, isWatch) {
                     cascade: true
                 }
             }))
+        }
+
+        bundle = bundle
             .pipe(insert.prepend(fs.readFileSync('./src/LICENSE.js', 'utf8').replace(/#VERSION#/g, packageJson.version)))
-            .pipe(size({ showFiles: true }))
-            .pipe(gulp.dest('.'));
+            .pipe(size({ showFiles: true }));
+
+        if (options && options.target) {
+            bundle = bundle.pipe(rename(options.target));
+        }
+
+        return bundle.pipe(gulp.dest('.'));
     }
 
     if (isWatch) {
@@ -68,10 +82,11 @@ function compile (name, isWatch) {
 }
 
 function watch (name) {
-    return compile(name, true);
+    return compile(name, { isWatch: true });
 }
 
 gulp.task('build', () => compile('eventize'));
+gulp.task('build:minified', () => compile('eventize', { compress: true, target: './eventize.min.js' }));
 gulp.task('watch', () => watch('eventize'));
 
 gulp.task('default', ['build']);

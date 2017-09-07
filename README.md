@@ -79,7 +79,7 @@ Use `*` as `eventName` to create a _catch'm all_ listener. Catch'm all listeners
 ##### Define listener by object
 
 - When the event is fired, a method with the same name as the event will be called (but only if such a method exists)
-- When such a method does *not* exists, but the listener is an _eventized object_, the `emit()` method of the listener object will be called instead
+- When such a method does *not* exists, but the listener is an _eventized object_ or have an `emit()` method defined then the `emit()` method of the listener object will be called instead
 
 
 ```
@@ -172,15 +172,6 @@ _You should NOT emit the **catch'm all** event!_
 - When the listener is registered by an _object reference_ or by `connect()`, is always the listener object itself!
 
 All other `args` will be transferred to the listener.
-
-All _object_ listeners (which are registered by _object reference_ via `on()` or by `connect()`) will receive an extra argument
-(as last argument) which is a reference to the _sender object_.
-
-##### Sender Object
-
-The _sender object_ passed into the listener as additional argument is defined by how the listener was registered ..
-- _connected_ objects (registered by `connect()`) will always get a reference to the _emitting_ object (that is the object which is executing `emit()`)
-- _object_ listeners registered by `a.on()` will always get a reference to the object in which they were _filed_ (that is the object with `.on()`)
 
 
 ##### Examples
