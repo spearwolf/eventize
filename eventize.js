@@ -1,6 +1,6 @@
 /**
  * ===============================================================
- * eventize.js v0.2.0 -- https://github.com/spearwolf/eventize
+ * eventize.js v0.2.1 -- https://github.com/spearwolf/eventize
  * ===============================================================
  *
  * Copyright 2015-17 Wolfger Schramm <wolfger@spearwolf.de>
@@ -23,6 +23,8 @@
 var hasMap = canUseMap();
 var hasSymbol = canUseSymbol();
 var hasConsole = typeof console !== 'undefined';
+
+var warn = hasConsole ? console[console.warn ? 'warn' : 'log'].bind(console) : function () {};
 
 var PROP_NAMESPACE  = !hasSymbol ? '@@eventize' : (function () {
     if (!Symbol.eventize) {
@@ -119,7 +121,7 @@ function eventize (o) {
 
             } else {
                 if (hasConsole) {
-                    console.warn(LOG_NAMESPACE, '.on() called with insufficient arguments!', arguments);
+                    warn(LOG_NAMESPACE, '.on() called with insufficient arguments!', arguments);
                 }
                 return;
             }
@@ -173,7 +175,7 @@ function eventize (o) {
 
         if (!argsLen || argsLen > 3) {
             if (hasConsole) {
-                console.warn(LOG_NAMESPACE, '.once() called with insufficient arguments!', arguments);
+                warn(LOG_NAMESPACE, '.once() called with insufficient arguments!', arguments);
             }
             return;
         }
@@ -291,7 +293,7 @@ function eventize (o) {
             return _connectWithMapping(this, obj, mapping);
         } else {
             if (hasConsole) {
-                console.warn(LOG_NAMESPACE, '.connect() called with insufficient arguments (need 2 args, but got ' + argsLen + ')', arguments);
+                warn(LOG_NAMESPACE, '.connect() called with insufficient arguments (need 2 args, but got ' + argsLen + ')', arguments);
             }
         }
     };
