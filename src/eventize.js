@@ -4,8 +4,6 @@ var hasMap = canUseMap();
 var hasSymbol = canUseSymbol();
 var hasConsole = typeof console !== 'undefined';
 
-var warn = hasConsole ? console[console.warn ? 'warn' : 'log'].bind(console) : function () {};
-
 var PROP_NAMESPACE  = !hasSymbol ? '@@eventize' : (function () {
     if (!Symbol.eventize) {
         Symbol.eventize = Symbol('eventize');
@@ -15,6 +13,9 @@ var PROP_NAMESPACE  = !hasSymbol ? '@@eventize' : (function () {
 
 var CATCH_ALL_EVENT = '*';
 var LOG_NAMESPACE   = '[eventize.js]';
+
+var warn = hasConsole ? console[console.warn ? 'warn' : 'log'].bind(console, LOG_NAMESPACE) : function () {};
+
 
 // =====================================================================
 //
@@ -101,7 +102,7 @@ function eventize (o) {
 
             } else {
                 if (hasConsole) {
-                    warn(LOG_NAMESPACE, '.on() called with insufficient arguments!', arguments);
+                    warn('.on() called with insufficient arguments!', arguments);
                 }
                 return;
             }
@@ -155,7 +156,7 @@ function eventize (o) {
 
         if (!argsLen || argsLen > 3) {
             if (hasConsole) {
-                warn(LOG_NAMESPACE, '.once() called with insufficient arguments!', arguments);
+                warn('.once() called with insufficient arguments!', arguments);
             }
             return;
         }
@@ -273,26 +274,10 @@ function eventize (o) {
             return _connectWithMapping(this, obj, mapping);
         } else {
             if (hasConsole) {
-                warn(LOG_NAMESPACE, '.connect() called with insufficient arguments (need 2 args, but got ' + argsLen + ')', arguments);
+                warn('.connect() called with insufficient arguments (need 2 args, but got ' + argsLen + ')', arguments);
             }
         }
     };
-
-    function _bindObject (obj) {
-
-        // TODO connect(obj) should ..
-        // - support priority
-        // - support filters? (via only, except options)
-        // - support senderContextArgument?: 'prepend'|'append'|false
-
-        if (!obj) return;
-        var i = _e.boundObjects.indexOf(obj);
-        if (i === -1) {
-            _e.boundObjects.push(obj);
-        }
-        return obj;
-
-    }
 
     function _connectWithMapping (obj, options, listenerMap) {
 
