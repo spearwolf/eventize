@@ -1,0 +1,12 @@
+{
+  presets: [
+    ["env", {
+      loose: true,
+      debug: false,
+      useBuiltIns: true,
+      targets: {
+        browsers: ["> 5%"]
+      }
+    }]
+  ]
+}
