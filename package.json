@@ -1,6 +1,6 @@
 {
   "name": "@spearwolf/eventize",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "author": {
     "name": "Wolfger Schramm",
     "email": "wolfger@spearwolf.de",
@@ -19,7 +19,7 @@
   },
   "scripts": {
     "webpack": "webpack",
-    "prepublish": "webpack",
+    "prepare": "webpack",
     "lint": "eslint src2",
     "test": "jest"
   },
