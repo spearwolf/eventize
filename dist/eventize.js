@@ -1,6 +1,6 @@
 /**
  * =============================================================================
- * @spearwolf/eventize v0.6.0 -- https://github.com/spearwolf/eventize.git
+ * @spearwolf/eventize v0.6.1 -- https://github.com/spearwolf/eventize.git
  * =============================================================================
  *
  * Copyright 2015-2017 Wolfger Schramm <wolfger@spearwolf.de>
@@ -122,6 +122,8 @@ const NAMESPACE = exports.NAMESPACE = (() => {
   }
   return Symbol.eventize;
 })();
+
+const LOG_NAMESPACE = exports.LOG_NAMESPACE = '[@spearwolf/eventize]';
 
 /***/ }),
 /* 1 */
