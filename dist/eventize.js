@@ -1,4 +1,34 @@
-/******/ (function(modules) { // webpackBootstrap
+/**
+ * =============================================================================
+ * @spearwolf/eventize v0.6.0 -- https://github.com/spearwolf/eventize.git
+ * =============================================================================
+ *
+ * Copyright 2015-2017 Wolfger Schramm <wolfger@spearwolf.de>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+(function webpackUniversalModuleDefinition(root, factory) {
+	if(typeof exports === 'object' && typeof module === 'object')
+		module.exports = factory();
+	else if(typeof define === 'function' && define.amd)
+		define([], factory);
+	else if(typeof exports === 'object')
+		exports["eventize"] = factory();
+	else
+		root["eventize"] = factory();
+})(typeof self !== 'undefined' ? self : this, function() {
+return /******/ (function(modules) { // webpackBootstrap
 /******/ 	// The module cache
 /******/ 	var installedModules = {};
 /******/
@@ -191,10 +221,25 @@ exports.default = EventListener;
 "use strict";
 
 
+var _eventize = __webpack_require__(3);
+
+var _eventize2 = _interopRequireDefault(_eventize);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+module.exports = _eventize2.default;
+
+/***/ }),
+/* 3 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
 exports.__esModule = true;
 exports.PRIO_MIN = exports.PRIO_LOW = exports.PRIO_DEFAULT = exports.PRIO_C = exports.PRIO_B = exports.PRIO_A = exports.PRIO_MAX = exports.NAMESPACE = exports.EVENT_CATCH_EM_ALL = undefined;
 
-var _inject = __webpack_require__(3);
+var _inject = __webpack_require__(4);
 
 var _inject2 = _interopRequireDefault(_inject);
 
@@ -240,7 +285,7 @@ exports.PRIO_LOW = _constants.PRIO_LOW;
 exports.PRIO_MIN = _constants.PRIO_MIN;
 
 /***/ }),
-/* 3 */
+/* 4 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -249,13 +294,13 @@ exports.PRIO_MIN = _constants.PRIO_MIN;
 exports.__esModule = true;
 exports.default = injectEventizeApi;
 
-var _EventStore = __webpack_require__(4);
+var _EventStore = __webpack_require__(5);
 
 var _EventStore2 = _interopRequireDefault(_EventStore);
 
-var _propUtils = __webpack_require__(5);
+var _propUtils = __webpack_require__(6);
 
-var _subscribeTo = __webpack_require__(6);
+var _subscribeTo = __webpack_require__(7);
 
 var _subscribeTo2 = _interopRequireDefault(_subscribeTo);
 
@@ -322,7 +367,7 @@ function injectEventizeApi(obj) {
 }
 
 /***/ }),
-/* 4 */
+/* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -448,7 +493,7 @@ class EventStore {
 exports.default = EventStore;
 
 /***/ }),
-/* 5 */
+/* 6 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -482,7 +527,7 @@ const defineHiddenPropertyRO = exports.defineHiddenPropertyRO = (obj, name, valu
 };
 
 /***/ }),
-/* 6 */
+/* 7 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -494,7 +539,7 @@ var _EventListener = __webpack_require__(1);
 
 var _EventListener2 = _interopRequireDefault(_EventListener);
 
-var _logUtils = __webpack_require__(7);
+var _logUtils = __webpack_require__(8);
 
 var _constants = __webpack_require__(0);
 
@@ -546,7 +591,7 @@ const subscribeTo = (store, args) => {
 exports.default = subscribeTo;
 
 /***/ }),
-/* 7 */
+/* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -563,4 +608,5 @@ const warn = exports.warn = hasConsole ? console[console.warn ? 'warn' : 'log'].
 
 /***/ })
 /******/ ]);
+});
 //# sourceMappingURL=eventize.js.map
