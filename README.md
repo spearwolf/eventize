@@ -17,7 +17,7 @@ yet another *fantastic* event emitter micro framework for javascript!
 Attach the _eventizer_ **api** to any javascript object you want.
 
 ```javascript
-import eventize from 'eventize-js';
+import eventize from '@spearwolf/eventize';
 
 const say = hello => world => console.log(hello, world);
 const obj = eventize({});
