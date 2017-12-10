@@ -84,6 +84,37 @@ describe('off()', () => {
     });
   });
 
+  describe('by object', () => {
+    const obj = eventize({});
+    const listener = {
+      foo: jest.fn(),
+      bar: jest.fn(),
+    };
+
+    obj.on('foo', listener);
+    obj.on('bar', listener);
+
+    obj.emit('foo', 'bar', 666);
+    obj.emit('bar', 'foo', 666);
+
+    it('emit() calls the listeners', () => {
+      expect(listener.foo).toHaveBeenCalledWith('bar', 666);
+      expect(listener.bar).toHaveBeenCalledWith('foo', 666);
+    });
+
+    it('off() removes the listeners from the list of subscribers', () => {
+      listener.foo.mockClear();
+      listener.bar.mockClear();
+
+      obj.off(listener);
+      obj.emit('foo', 'bar', 666);
+      obj.emit('bar', 'foo', 666);
+
+      expect(listener.foo).not.toHaveBeenCalled();
+      expect(listener.bar).not.toHaveBeenCalled();
+    });
+  });
+
   describe('without arguments', () => {
     const obj = eventize({});
     const listenerFunc0 = jest.fn();
