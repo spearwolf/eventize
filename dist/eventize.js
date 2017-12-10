@@ -1,6 +1,6 @@
 /**
  * =============================================================================
- * @spearwolf/eventize v0.6.1 -- https://github.com/spearwolf/eventize.git
+ * @spearwolf/eventize v0.6.2 -- https://github.com/spearwolf/eventize.git
  * =============================================================================
  *
  * Copyright 2015-2017 Wolfger Schramm <wolfger@spearwolf.de>
@@ -203,7 +203,7 @@ class EventListener {
           const func = listener[eventName];
           if (this.isCatchEmAll || this.eventName === eventName) {
             if (typeof func === 'function') {
-              func(...args);
+              func.apply(listener, args);
             } else {
               emit(eventName, listener, args);
             }

@@ -75,7 +75,7 @@ export default class EventListener {
         const func = listener[eventName];
         if (this.isCatchEmAll || this.eventName === eventName) {
           if (typeof func === 'function') {
-            func(...args);
+            func.apply(listener, args);
           } else {
             emit(eventName, listener, args);
           }

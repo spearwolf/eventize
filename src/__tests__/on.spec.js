@@ -77,8 +77,15 @@ describe('on()', () => {
     });
     describe('on( eventName, priority, object )', () => {
       const listenerFunc = jest.fn();
+      let listenerContext;
+      const listener = {
+        foo(...args) {
+          listenerContext = this;
+          listenerFunc(...args);
+        },
+      };
       const obj = eventize({});
-      const subscriber = obj.on('foo', 13, { foo: listenerFunc });
+      const subscriber = obj.on('foo', 13, listener);
 
       it('priority is correct', () => {
         expect(subscriber.priority).toBe(13);
@@ -94,6 +101,9 @@ describe('on()', () => {
 
       it('emit() calls the listener', () => {
         expect(listenerFunc).toHaveBeenCalledWith('plah', 667);
+      });
+      it('emit() calls the listener with correct context', () => {
+        expect(listener).toBe(listenerContext);
       });
     });
 
