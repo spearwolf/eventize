@@ -1,3 +1,4 @@
+import { EVENT_CATCH_EM_ALL } from './constants';
 
 export default class EventKeeper {
   constructor() {
@@ -32,9 +33,13 @@ export default class EventKeeper {
   }
 
   emit(eventName, eventListener) {
-    const args = this.events.get(eventName);
-    if (args) {
-      eventListener.apply(eventName, args);
+    if (eventName === EVENT_CATCH_EM_ALL) {
+      this.eventNames.forEach(en => this.emit(en, eventListener));
+    } else {
+      const args = this.events.get(eventName);
+      if (args) {
+        eventListener.apply(eventName, args);
+      }
     }
   }
 }

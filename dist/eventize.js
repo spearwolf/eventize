@@ -1,6 +1,6 @@
 /**
  * =============================================================================
- * @spearwolf/eventize v0.6.3 -- https://github.com/spearwolf/eventize.git
+ * @spearwolf/eventize v0.6.4 -- https://github.com/spearwolf/eventize.git
  * =============================================================================
  *
  * Copyright 2015-2018 Wolfger Schramm <wolfger@spearwolf.de>
@@ -519,6 +519,9 @@ exports.default = EventStore;
 
 
 exports.__esModule = true;
+
+var _constants = __webpack_require__(0);
+
 class EventKeeper {
   constructor() {
     this.events = new Map();
@@ -552,9 +555,13 @@ class EventKeeper {
   }
 
   emit(eventName, eventListener) {
-    const args = this.events.get(eventName);
-    if (args) {
-      eventListener.apply(eventName, args);
+    if (eventName === _constants.EVENT_CATCH_EM_ALL) {
+      this.eventNames.forEach(en => this.emit(en, eventListener));
+    } else {
+      const args = this.events.get(eventName);
+      if (args) {
+        eventListener.apply(eventName, args);
+      }
     }
   }
 }

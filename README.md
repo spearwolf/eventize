@@ -111,7 +111,7 @@ eventizer.off()
 ### retain()
 
 ```
-eventizer.retain( eventName )
+eventizer.retain( eventName* )
 ```
 
 
