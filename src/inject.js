@@ -1,4 +1,5 @@
 import EventStore from './EventStore';
+import EventKeeper from './EventKeeper';
 import { defineHiddenPropertyRO } from './propUtils';
 import subscribeTo from './subscribeTo';
 
@@ -15,7 +16,8 @@ export default function injectEventizeApi(obj) {
   if (obj[NAMESPACE]) return obj;
 
   const store = new EventStore();
-  defineHiddenPropertyRO(obj, NAMESPACE, store);
+  const keeper = new EventKeeper();
+  defineHiddenPropertyRO(obj, NAMESPACE, { keeper, store });
 
   Object.assign(obj, {
     // ----------------------------------------------------------------------------------------
@@ -40,10 +42,10 @@ export default function injectEventizeApi(obj) {
     //
     // ----------------------------------------------------------------------------------------
     on(...args) {
-      return subscribeTo(store, args);
+      return subscribeTo(store, keeper, args);
     },
     once(...args) {
-      const listeners = subscribeTo(store, args);
+      const listeners = subscribeTo(store, keeper, args);
       if (Array.isArray(listeners)) {
         listeners.forEach(removeListener(obj));
       } else {
@@ -53,13 +55,25 @@ export default function injectEventizeApi(obj) {
     },
     off(listener, listenerObject) {
       store.remove(listener, listenerObject);
+      if (Array.isArray(listener)) {
+        keeper.remove(listener.filter(li => typeof li === 'string'));
+      } else if (typeof listener === 'string') {
+        keeper.remove(listener);
+      }
     },
     emit(eventName, ...args) {
       if (Array.isArray(eventName)) {
-        eventName.forEach(event => store.forEach(event, listener => listener.apply(event, args)));
+        eventName.forEach((event) => {
+          store.forEach(event, listener => listener.apply(event, args));
+          keeper.retain(event, args);
+        });
       } else if (eventName !== EVENT_CATCH_EM_ALL) {
         store.forEach(eventName, listener => listener.apply(eventName, args));
+        keeper.retain(eventName, args);
       }
+    },
+    retain(eventName) {
+      keeper.add(eventName);
     },
   });
   return obj;

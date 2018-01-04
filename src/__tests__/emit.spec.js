@@ -1,55 +1,54 @@
 /* eslint-env jest */
-import eventize, { PRIO_A, PRIO_LOW } from '../eventize';
+import eventize from '../eventize';
 
-describe('emit()', () => {
-  describe('calls the listener with all given args (except the event name)', () => {
+describe('retain()', () => {
+  it('calls the listener function after registration with on()', () => {
     const obj = eventize({});
-    const fn1 = jest.fn();
-    const fn2 = jest.fn();
-    obj.on('foo', 0, fn1);
-    obj.on('*', fn2);
-    obj.emit('foo', 'bar', 666);
+    const subscriber = jest.fn();
 
-    it('named event listener', () => {
-      expect(fn1).toHaveBeenCalledWith('bar', 666);
-    });
-    it('catch-em-all event listener', () => {
-      expect(fn2).toHaveBeenCalledWith('bar', 666);
-    });
+    obj.retain('foo');
+    obj.emit('foo', 'bar', [1, 2, 3]);
+
+    expect(subscriber).not.toHaveBeenCalled();
+
+    obj.on('foo', subscriber);
+
+    expect(subscriber).toHaveBeenCalledWith('bar', [1, 2, 3]);
   });
 
-  describe('getting started example', () => {
+  it('calls the listener object after registration with on()', () => {
     const obj = eventize({});
-    const results = [];
+    const subscriber = {
+      foo: jest.fn(),
+    };
 
-    obj.on('foo', hello => results.push(`hello ${hello}`));
+    obj.retain('foo');
+    obj.emit('foo', 'bar', [1, 2, 3]);
 
-    obj.once(['foo', 'bar'], PRIO_A, {
-      foo: hello => results.push(`hej ${hello}`),
-    });
+    expect(subscriber.foo).not.toHaveBeenCalled();
 
-    obj.on(['foo', 'bar'], PRIO_LOW, hello => results.push(`moin moin ${hello}`));
+    obj.on('foo', subscriber);
 
-    it('first emit()', () => {
-      obj.emit('foo', 'world');
+    expect(subscriber.foo).toHaveBeenCalledWith('bar', [1, 2, 3]);
+  });
 
-      expect(results).toEqual([
-        'hej world',
-        'hello world',
-        'moin moin world',
-      ]);
-    });
+  it('multiple event signals', () => {
+    const obj = eventize({});
+    const subscriber = {
+      foo: jest.fn(),
+    };
 
-    it('second emit()', () => {
-      results.length = 0;
+    obj.retain('foo');
+    obj.emit('foo', 'bar', [1, 2, 3]);
 
-      obj.on('foo', () => obj.off('foo'));
-      obj.emit(['foo', 'bar'], 'eventize');
+    expect(subscriber.foo).not.toHaveBeenCalled();
 
-      expect(results).toEqual([
-        'hello eventize',
-        'moin moin eventize',
-      ]);
-    });
+    obj.on('foo', subscriber);
+
+    expect(subscriber.foo).toHaveBeenCalledWith('bar', [1, 2, 3]);
+
+    obj.emit('foo', ['a']);
+
+    expect(subscriber.foo).toHaveBeenCalledWith(['a']);
   });
 });

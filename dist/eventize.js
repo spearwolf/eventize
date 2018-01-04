@@ -1,9 +1,9 @@
 /**
  * =============================================================================
- * @spearwolf/eventize v0.6.2 -- https://github.com/spearwolf/eventize.git
+ * @spearwolf/eventize v0.6.3 -- https://github.com/spearwolf/eventize.git
  * =============================================================================
  *
- * Copyright 2015-2017 Wolfger Schramm <wolfger@spearwolf.de>
+ * Copyright 2015-2018 Wolfger Schramm <wolfger@spearwolf.de>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -300,9 +300,13 @@ var _EventStore = __webpack_require__(5);
 
 var _EventStore2 = _interopRequireDefault(_EventStore);
 
-var _propUtils = __webpack_require__(6);
+var _EventKeeper = __webpack_require__(6);
 
-var _subscribeTo = __webpack_require__(7);
+var _EventKeeper2 = _interopRequireDefault(_EventKeeper);
+
+var _propUtils = __webpack_require__(7);
+
+var _subscribeTo = __webpack_require__(8);
 
 var _subscribeTo2 = _interopRequireDefault(_subscribeTo);
 
@@ -318,7 +322,8 @@ function injectEventizeApi(obj) {
   if (obj[_constants.NAMESPACE]) return obj;
 
   const store = new _EventStore2.default();
-  (0, _propUtils.defineHiddenPropertyRO)(obj, _constants.NAMESPACE, store);
+  const keeper = new _EventKeeper2.default();
+  (0, _propUtils.defineHiddenPropertyRO)(obj, _constants.NAMESPACE, { keeper, store });
 
   Object.assign(obj, {
     // ----------------------------------------------------------------------------------------
@@ -343,10 +348,10 @@ function injectEventizeApi(obj) {
     //
     // ----------------------------------------------------------------------------------------
     on(...args) {
-      return (0, _subscribeTo2.default)(store, args);
+      return (0, _subscribeTo2.default)(store, keeper, args);
     },
     once(...args) {
-      const listeners = (0, _subscribeTo2.default)(store, args);
+      const listeners = (0, _subscribeTo2.default)(store, keeper, args);
       if (Array.isArray(listeners)) {
         listeners.forEach(removeListener(obj));
       } else {
@@ -356,13 +361,25 @@ function injectEventizeApi(obj) {
     },
     off(listener, listenerObject) {
       store.remove(listener, listenerObject);
+      if (Array.isArray(listener)) {
+        keeper.remove(listener.filter(li => typeof li === 'string'));
+      } else if (typeof listener === 'string') {
+        keeper.remove(listener);
+      }
     },
     emit(eventName, ...args) {
       if (Array.isArray(eventName)) {
-        eventName.forEach(event => store.forEach(event, listener => listener.apply(event, args)));
+        eventName.forEach(event => {
+          store.forEach(event, listener => listener.apply(event, args));
+          keeper.retain(event, args);
+        });
       } else if (eventName !== _constants.EVENT_CATCH_EM_ALL) {
         store.forEach(eventName, listener => listener.apply(eventName, args));
+        keeper.retain(eventName, args);
       }
+    },
+    retain(eventName) {
+      keeper.add(eventName);
     }
   });
   return obj;
@@ -502,6 +519,55 @@ exports.default = EventStore;
 
 
 exports.__esModule = true;
+class EventKeeper {
+  constructor() {
+    this.events = new Map();
+    this.eventNames = new Set();
+  }
+
+  add(eventName) {
+    if (Array.isArray(eventName)) {
+      eventName.forEach(en => this.eventNames.add(en));
+    } else {
+      this.eventNames.add(eventName);
+    }
+  }
+
+  remove(eventName) {
+    if (Array.isArray(eventName)) {
+      eventName.forEach(en => this.remove(en));
+    } else {
+      this.eventNames.delete(eventName);
+    }
+  }
+
+  retain(eventName, args) {
+    if (this.eventNames.has(eventName)) {
+      this.events.set(eventName, args);
+    }
+  }
+
+  isKnown(eventName) {
+    return this.eventNames.has(eventName);
+  }
+
+  emit(eventName, eventListener) {
+    const args = this.events.get(eventName);
+    if (args) {
+      eventListener.apply(eventName, args);
+    }
+  }
+}
+exports.default = EventKeeper;
+
+/***/ }),
+/* 7 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+exports.__esModule = true;
 const definePublicPropertyRO = exports.definePublicPropertyRO = (obj, name, value) => {
   Object.defineProperty(obj, name, {
     value,
@@ -529,7 +595,7 @@ const defineHiddenPropertyRO = exports.defineHiddenPropertyRO = (obj, name, valu
 };
 
 /***/ }),
-/* 7 */
+/* 8 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -541,19 +607,20 @@ var _EventListener = __webpack_require__(1);
 
 var _EventListener2 = _interopRequireDefault(_EventListener);
 
-var _logUtils = __webpack_require__(8);
+var _logUtils = __webpack_require__(9);
 
 var _constants = __webpack_require__(0);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
-const registerEventListener = (store, eventName, priority, listener, listenerObject) => {
+const registerEventListener = (store, keeper, eventName, priority, listener, listenerObject) => {
   const eventListener = new _EventListener2.default(eventName, priority, listener, listenerObject);
   store.add(eventListener);
+  keeper.emit(eventName, eventListener);
   return eventListener;
 };
 
-const subscribeTo = (store, args) => {
+const subscribeTo = (store, keeper, args) => {
   const len = args.length;
   const typeOfFirstArg = typeof args[0];
 
@@ -582,7 +649,7 @@ const subscribeTo = (store, args) => {
     return;
   }
 
-  const register = event => registerEventListener(store, event, priority, listener, listenerObject);
+  const register = event => registerEventListener(store, keeper, event, priority, listener, listenerObject);
 
   if (Array.isArray(eventName)) {
     return eventName.map(register);
@@ -593,7 +660,7 @@ const subscribeTo = (store, args) => {
 exports.default = subscribeTo;
 
 /***/ }),
-/* 8 */
+/* 9 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";

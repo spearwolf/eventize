@@ -108,6 +108,12 @@ eventizer.off( eventName )
 eventizer.off()
 ```
 
+### retain()
+
+```
+eventizer.retain( eventName )
+```
+
 
 ## Additional API Helpers
 

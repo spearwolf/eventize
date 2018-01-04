@@ -7,13 +7,14 @@ import {
   PRIO_DEFAULT,
 } from './constants';
 
-const registerEventListener = (store, eventName, priority, listener, listenerObject) => {
+const registerEventListener = (store, keeper, eventName, priority, listener, listenerObject) => {
   const eventListener = new EventListener(eventName, priority, listener, listenerObject);
   store.add(eventListener);
+  keeper.emit(eventName, eventListener);
   return eventListener;
 };
 
-const subscribeTo = (store, args) => {
+const subscribeTo = (store, keeper, args) => {
   const len = args.length;
   const typeOfFirstArg = typeof args[0];
 
@@ -43,7 +44,7 @@ const subscribeTo = (store, args) => {
   }
 
   const register = event => registerEventListener(
-    store, event,
+    store, keeper, event,
     priority, listener, listenerObject,
   );
 
