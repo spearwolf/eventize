@@ -331,6 +331,30 @@ describe('on()', () => {
         expect(listeners[1].isCatchEmAll).toBe(false);
       });
     });
+    describe('on( eventName*, listenerFunc ) supports [ [eventName, PRIO], .. ]', () => {
+      const listenerFunc = jest.fn();
+      const obj = eventize({});
+      const listeners = obj.on([['foo', 500], ['bar', 1000]], listenerFunc);
+
+      obj.emit(['foo', 'bar'], 'plah', 669);
+
+      it('emit() calls the listener', () => {
+        expect(listenerFunc).toHaveBeenCalledTimes(2);
+        expect(listenerFunc).toHaveBeenCalledWith('plah', 669);
+      });
+      it('priorities are correct', () => {
+        expect(listeners[0].priority).toBe(500);
+        expect(listeners[1].priority).toBe(1000);
+      });
+      it('eventNames are correct', () => {
+        expect(listeners[0].eventName).toBe('foo');
+        expect(listeners[1].eventName).toBe('bar');
+      });
+      it('isCatchEmAll is correct', () => {
+        expect(listeners[0].isCatchEmAll).toBe(false);
+        expect(listeners[1].isCatchEmAll).toBe(false);
+      });
+    });
   }); // eventName is an array
 
   describe('on( priority, listenerFunc, listenerObject ) => object.on( "*", priority, listenerFunc, listenerObject )', () => {

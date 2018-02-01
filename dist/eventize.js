@@ -1,6 +1,6 @@
 /**
  * =============================================================================
- * @spearwolf/eventize v0.6.4 -- https://github.com/spearwolf/eventize.git
+ * @spearwolf/eventize v0.6.5 -- https://github.com/spearwolf/eventize.git
  * =============================================================================
  *
  * Copyright 2015-2018 Wolfger Schramm <wolfger@spearwolf.de>
@@ -656,12 +656,17 @@ const subscribeTo = (store, keeper, args) => {
     return;
   }
 
-  const register = event => registerEventListener(store, keeper, event, priority, listener, listenerObject);
+  const register = prio => event => registerEventListener(store, keeper, event, prio, listener, listenerObject);
 
   if (Array.isArray(eventName)) {
-    return eventName.map(register);
+    return eventName.map(name => {
+      if (Array.isArray(name)) {
+        return register(name[1])(name[0]);
+      }
+      return register(priority)(name);
+    });
   }
-  return register(eventName);
+  return register(priority)(eventName);
 };
 
 exports.default = subscribeTo;

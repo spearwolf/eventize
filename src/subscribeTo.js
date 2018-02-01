@@ -43,15 +43,20 @@ const subscribeTo = (store, keeper, args) => {
     return;
   }
 
-  const register = event => registerEventListener(
+  const register = prio => event => registerEventListener(
     store, keeper, event,
-    priority, listener, listenerObject,
+    prio, listener, listenerObject,
   );
 
   if (Array.isArray(eventName)) {
-    return eventName.map(register);
+    return eventName.map((name) => {
+      if (Array.isArray(name)) {
+        return register(name[1])(name[0]);
+      }
+      return register(priority)(name);
+    });
   }
-  return register(eventName);
+  return register(priority)(eventName);
 };
 
 export default subscribeTo;
