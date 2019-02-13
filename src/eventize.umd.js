@@ -1,3 +1,3 @@
 import eventize from './eventize';
 
-module.exports = eventize;
+export default eventize;

@@ -1,12 +1,5 @@
 {
   presets: [
-    ["env", {
-      loose: true,
-      debug: false,
-      useBuiltIns: true,
-      targets: {
-        browsers: ["> 5%"]
-      }
-    }]
+    ["@babel/preset-env", {}]
   ]
 }

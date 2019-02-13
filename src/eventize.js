@@ -38,7 +38,6 @@ Object.assign(eventize, {
   PRIO_MIN,
 });
 
-export default eventize;
 export {
   EVENT_CATCH_EM_ALL,
   NAMESPACE,
@@ -50,3 +49,5 @@ export {
   PRIO_LOW,
   PRIO_MIN,
 };
+
+export default eventize;
