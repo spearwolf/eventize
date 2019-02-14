@@ -24,7 +24,8 @@
     "build": "npm-run-all --silent --serial clean --parallel build:*",
     "prepublishOnly": "npm-run-all --silent build",
     "lint": "eslint src",
-    "test": "jest"
+    "jest": "jest",
+    "test": "run-s --silent lint jest"
   },
   "devDependencies": {
     "@babel/cli": "^7.2.3",
