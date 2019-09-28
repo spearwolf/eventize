@@ -42,7 +42,7 @@ describe('EventStore', () => {
 
     it('forEach() calls the listener listener in highest-priority-and-id-comes-first order for all listeners for the given event name', () => {
       const listeners = [];
-      store.forEach('a', listener => listeners.push(listener));
+      store.forEach('a', (listener) => listeners.push(listener));
       expect(listeners).toEqual([
         origListener[2],
         origListener[1],
@@ -68,7 +68,7 @@ describe('EventStore', () => {
 
     it('forEach() calls the listener listener in highest-priority-and-id-comes-first order for all catch-em-all listeners', () => {
       const listeners = [];
-      store.forEach('foo', listener => listeners.push(listener));
+      store.forEach('foo', (listener) => listeners.push(listener));
       expect(listeners).toEqual([
         origListener[2],
         origListener[1],
@@ -95,8 +95,8 @@ describe('EventStore', () => {
 
     it('forEach() calls the listener in highest-priority-and-id-comes-first order for all listeners', () => {
       const listeners = [];
-      store.forEach('a', listener => listeners.push(listener));
-      expect(listeners.map(h => h.listener)).toEqual([
+      store.forEach('a', (listener) => listeners.push(listener));
+      expect(listeners.map((h) => h.listener)).toEqual([
         '4',
         '3',
         '1',

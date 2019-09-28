@@ -8,7 +8,7 @@ import {
   NAMESPACE,
 } from './constants';
 
-const removeListener = obj => (listener) => {
+const removeListener = (obj) => (listener) => {
   listener.callAfterApply = () => obj.off(listener);
 };
 
@@ -56,7 +56,7 @@ export default function injectEventizeApi(obj) {
     off(listener, listenerObject) {
       store.remove(listener, listenerObject);
       if (Array.isArray(listener)) {
-        keeper.remove(listener.filter(li => typeof li === 'string'));
+        keeper.remove(listener.filter((li) => typeof li === 'string'));
       } else if (typeof listener === 'string') {
         keeper.remove(listener);
       }
@@ -64,11 +64,11 @@ export default function injectEventizeApi(obj) {
     emit(eventName, ...args) {
       if (Array.isArray(eventName)) {
         eventName.forEach((event) => {
-          store.forEach(event, listener => listener.apply(event, args));
+          store.forEach(event, (listener) => listener.apply(event, args));
           keeper.retain(event, args);
         });
       } else if (eventName !== EVENT_CATCH_EM_ALL) {
-        store.forEach(eventName, listener => listener.apply(eventName, args));
+        store.forEach(eventName, (listener) => listener.apply(eventName, args));
         keeper.retain(eventName, args);
       }
     },

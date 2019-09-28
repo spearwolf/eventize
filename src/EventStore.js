@@ -17,7 +17,7 @@ const removeListenerItem = (arr, listener) => {
 };
 
 const removeListener = (listeners, listener, listenerObject) => {
-  const idx = listeners.findIndex(item => item.isEqual(listener, listenerObject));
+  const idx = listeners.findIndex((item) => item.isEqual(listener, listenerObject));
   if (idx > -1) {
     listeners[idx].isRemoved = true;
     listeners.splice(idx, 1);
@@ -65,16 +65,16 @@ export default class EventStore {
       removeAllListeners(listeners);
     } else if (listener instanceof EventListener) {
       listener.isRemoved = true;
-      this.namedListeners.forEach(namedListeners => removeListenerItem(namedListeners, listener));
+      this.namedListeners.forEach((namedListeners) => removeListenerItem(namedListeners, listener));
       removeListenerItem(this.catchEmAllListeners, listener);
     } else {
-      this.namedListeners.forEach(namedListeners => removeListener(namedListeners, listener, listenerObject));
+      this.namedListeners.forEach((namedListeners) => removeListener(namedListeners, listener, listenerObject));
       removeListener(this.catchEmAllListeners, listener, listenerObject);
     }
   }
 
   removeAllListeners() {
-    this.namedListeners.forEach(namedListeners => removeAllListeners(namedListeners));
+    this.namedListeners.forEach((namedListeners) => removeAllListeners(namedListeners));
     this.namedListeners.clear();
     removeAllListeners(this.catchEmAllListeners);
   }

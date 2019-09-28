@@ -43,7 +43,7 @@ const subscribeTo = (store, keeper, args) => {
     return;
   }
 
-  const register = prio => event => registerEventListener(
+  const register = (prio) => (event) => registerEventListener(
     store, keeper, event,
     prio, listener, listenerObject,
   );

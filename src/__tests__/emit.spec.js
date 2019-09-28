@@ -22,13 +22,13 @@ describe('emit()', () => {
     const obj = eventize({});
     const results = [];
 
-    obj.on('foo', hello => results.push(`hello ${hello}`));
+    obj.on('foo', (hello) => results.push(`hello ${hello}`));
 
     obj.once(['foo', 'bar'], PRIO_A, {
-      foo: hello => results.push(`hej ${hello}`),
+      foo: (hello) => results.push(`hej ${hello}`),
     });
 
-    obj.on(['foo', 'bar'], PRIO_LOW, hello => results.push(`moin moin ${hello}`));
+    obj.on(['foo', 'bar'], PRIO_LOW, (hello) => results.push(`moin moin ${hello}`));
 
     it('first emit()', () => {
       obj.emit('foo', 'world');

@@ -8,7 +8,7 @@ export default class EventKeeper {
 
   add(eventName) {
     if (Array.isArray(eventName)) {
-      eventName.forEach(en => this.eventNames.add(en));
+      eventName.forEach((name) => this.eventNames.add(name));
     } else {
       this.eventNames.add(eventName);
     }
@@ -16,7 +16,7 @@ export default class EventKeeper {
 
   remove(eventName) {
     if (Array.isArray(eventName)) {
-      eventName.forEach(en => this.remove(en));
+      eventName.forEach((name) => this.remove(name));
     } else {
       this.eventNames.delete(eventName);
     }
@@ -34,7 +34,7 @@ export default class EventKeeper {
 
   emit(eventName, eventListener) {
     if (eventName === EVENT_CATCH_EM_ALL) {
-      this.eventNames.forEach(en => this.emit(en, eventListener));
+      this.eventNames.forEach((name) => this.emit(name, eventListener));
     } else {
       const args = this.events.get(eventName);
       if (args) {

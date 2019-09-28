@@ -18,7 +18,7 @@ function eventize(obj) {
 
 eventize.inject = injectEventizeApi;
 
-eventize.extend = obj => injectEventizeApi(Object.create(obj));
+eventize.extend = (obj) => injectEventizeApi(Object.create(obj));
 
 eventize.create = (obj) => {
   const eventizer = injectEventizeApi({});
@@ -26,7 +26,7 @@ eventize.create = (obj) => {
   return eventizer;
 };
 
-eventize.is = obj => !!(obj && obj[NAMESPACE]);
+eventize.is = (obj) => !!(obj && obj[NAMESPACE]);
 
 Object.assign(eventize, {
   PRIO_MAX,
