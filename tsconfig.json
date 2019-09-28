@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "noEmit": true,
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@spearwolf/eventize": ["."]
+    }
+  },
+  "include": [
+    "./src/**/*.ts"
+  ]
+}
+

@@ -1,6 +1,6 @@
 {
   "name": "@spearwolf/eventize",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "author": {
     "name": "Wolfger Schramm",
     "email": "wolfger@spearwolf.de",
@@ -13,6 +13,7 @@
   "license": "Apache-2.0",
   "main": "dist/eventize.umd.js",
   "module": "src/eventize.js",
+  "types": "src/eventize.d.ts",
   "homepage": "https://github.com/spearwolf/eventize/",
   "bugs": {
     "url": "https://github.com/spearwolf/eventize/issues"
@@ -23,7 +24,9 @@
     "clean": "rimraf -f dist",
     "build": "npm-run-all --silent --serial clean --parallel build:*",
     "prepublishOnly": "npm-run-all --silent build",
-    "lint": "eslint src",
+    "lint:js": "eslint src",
+    "lint:types": "tsc",
+    "lint": "run-s --silent lint:*",
     "jest": "jest",
     "test": "run-s --silent lint jest"
   },
@@ -41,7 +44,8 @@
     "rimraf": "^3.0.0",
     "rollup": "^1.21.4",
     "rollup-plugin-babel": "^4.3.3",
-    "rollup-plugin-terser": "^5.1.2"
+    "rollup-plugin-terser": "^5.1.2",
+    "typescript": "^3.6.3"
   },
   "jest": {
     "coverageDirectory": "<rootDir>/coverage",
