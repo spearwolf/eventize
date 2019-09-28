@@ -8,8 +8,8 @@ yet another *fantastic* event emitter micro framework for javascript!
 
 - :sparkles: **wildcards** & **priorities** :exclamation:
 - has **typescript types** included :tada:
-- all api-calls and downstream-listener-calls are **100% synchronous** :boom: no async!
 - :rocket: **powerful api** (*partial* similar to [node.js events](https://nodejs.org/api/events.html))
+- all api-calls and downstream-listener-calls are **100% synchronous** :boom: no async!
 - supports all major browsers and Node.js environments
 - very small footsprint ~2.8k gzip'd
 - no runtime dependencies
