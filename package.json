@@ -10,6 +10,9 @@
     "type": "git",
     "url": "https://github.com/spearwolf/eventize.git"
   },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
   "license": "Apache-2.0",
   "main": "dist/eventize.umd.js",
   "module": "src/eventize.js",
