@@ -1,6 +1,6 @@
 /*!
  * =============================================================================
- * @spearwolf/eventize v0.6.8 -- https://github.com/spearwolf/eventize.git
+ * @spearwolf/eventize v0.6.9 -- https://github.com/spearwolf/eventize.git
  * =============================================================================
  *
  * Copyright 2015-2019 Wolfger Schramm <wolfger@spearwolf.de>

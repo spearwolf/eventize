@@ -1,6 +1,6 @@
 {
   "name": "@spearwolf/eventize",
-  "version": "0.6.8",
+  "version": "0.6.9",
   "author": {
     "name": "Wolfger Schramm",
     "email": "wolfger@spearwolf.de",
@@ -38,6 +38,7 @@
     "@babel/core": "^7.6.2",
     "@babel/polyfill": "^7.6.0",
     "@babel/preset-env": "^7.6.2",
+    "core-js": "3",
     "eslint": "^6.5.1",
     "eslint-config-airbnb-base": "^14.0.0",
     "eslint-plugin-import": "^2.18.2",
@@ -57,8 +58,5 @@
       "json",
       "html"
     ]
-  },
-  "dependencies": {
-    "core-js": "3"
   }
 }
