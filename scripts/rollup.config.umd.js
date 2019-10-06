@@ -24,6 +24,7 @@ export default {
           debug: false,
           modules: false,
           useBuiltIns: 'entry',
+          corejs: 3,
           targets: {
             browsers: ['> 2%', 'not dead'],
           },

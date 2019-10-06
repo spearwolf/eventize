@@ -31,3 +31,7 @@ o.on(666, {});
 const a = eventize.create(new Awesome());
 const b = eventize.extend(new Awesome());
 const c = eventize.inject(new Awesome());
+
+if (eventize.is(a) || eventize.is({})) {
+    // awesome
+}

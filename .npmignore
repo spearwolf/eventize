@@ -6,3 +6,5 @@ BACKLOG.md
 yarn.lock
 scripts
 src/__tests__
+src/eventize_check_types.ts
+tsconfig.json
