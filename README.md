@@ -50,7 +50,7 @@ obj.emit(['foo', 'bar'], 'eventize');
 
 ## Installation
 
-Install the latest version with: `npm install --save @spearwolf/eventize`
+Install the latest version with: `npm install --save spearwolf/eventize`
 
 
 # API Reference
