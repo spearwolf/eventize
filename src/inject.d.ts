@@ -1,13 +1,13 @@
 import {Priority, CatchEmAllType} from './constants';
 import {EventListener} from './EventListener';
 
-type FunctionPropertyNames<T> = { [K in keyof T]: T[K] extends Function ? K : never }[keyof T];
+export type FunctionPropertyNames<T> = { [K in keyof T]: T[K] extends Function ? K : never }[keyof T];
 
-type EventNames<T extends Object> = FunctionPropertyNames<T> | Array<FunctionPropertyNames<T>> | CatchEmAllType;
+export type EventNames<T extends Object> = FunctionPropertyNames<T> | Array<FunctionPropertyNames<T>> | CatchEmAllType;
 
-type AnyEventNames = string | Array<string> | CatchEmAllType;
+export type AnyEventNames = string | Array<string> | CatchEmAllType;
 
-type EventListenerType = EventListener | Array<EventListener>;
+export type EventListenerType = EventListener | Array<EventListener>;
 
 export interface EventizeApi {
 

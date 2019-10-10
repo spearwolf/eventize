@@ -28,6 +28,12 @@ eventize.create = (obj) => {
 
 eventize.is = (obj) => !!(obj && obj[NAMESPACE]);
 
+export class Eventize {
+  constructor() {
+    eventize(this);
+  }
+}
+
 Object.assign(eventize, {
   PRIO_MAX,
   PRIO_A,

@@ -1,4 +1,4 @@
-import eventize, { PRIO_A } from '@spearwolf/eventize';
+import eventize, { PRIO_A, Eventize } from '@spearwolf/eventize';
 
 class Awesome {
     doAwesomeThings() {}
@@ -35,3 +35,13 @@ const c = eventize.inject(new Awesome());
 if (eventize.is(a) || eventize.is({})) {
     // awesome
 }
+
+class Plah extends Eventize {
+    constructor() {
+        super();
+        this.retain('foo');
+    }
+    foo() {
+        this.emit('foo');
+    }
+ }

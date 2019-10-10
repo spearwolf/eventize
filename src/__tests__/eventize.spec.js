@@ -1,5 +1,5 @@
 /* eslint-env jest */
-import eventize, { NAMESPACE } from '../eventize';
+import eventize, { NAMESPACE, Eventize } from '../eventize';
 
 const expect2ImplEventizeApi = (obj) => {
   describe('implements the eventizedObject API', () => {
@@ -60,6 +60,20 @@ describe('eventize.create(obj) -> eventizer', () => {
   });
 
   expect2ImplEventizeApi(eventizer);
+});
+
+describe('class extends Eventize', () => {
+  class Foo extends Eventize { }
+  const foo = new Foo();
+
+  it('emit works', () => {
+    const listener = { foo: jest.fn() };
+    foo.on(listener);
+    foo.emit('foo');
+    expect(listener.foo).toBeCalled();
+  });
+
+  expect2ImplEventizeApi(foo);
 });
 
 describe('eventize(eventizer) returns unmodified eventizer', () => {

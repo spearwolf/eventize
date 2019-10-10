@@ -67,6 +67,16 @@ eventize.extend( obj )  // => eventizer (prototype is obj)
 eventize.create( obj )  // => eventizer
 ```
 
+.. or if you like a more class based approach ..
+
+```typescript
+import {Eventize} from '@spearwolf/eventize';
+
+class Foo extends Eventize {
+  // foo has now the eventize superpowers!
+}
+```
+
 
 ## The _eventizer_ API
 
