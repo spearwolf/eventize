@@ -7,6 +7,5 @@ yarn.lock
 scripts
 src/__tests__
 src/eventize_check_types.ts
-src/**/*.js
 tsconfig.json
 doc/images/a-on-b.png
