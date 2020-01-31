@@ -20,4 +20,4 @@ export const NAMESPACE = (() => {
   return Symbol.eventize;
 })();
 
-export const LOG_NAMESPACE = '[@spearwolf/eventize]';
+export const LOG_NAMESPACE = '[eventize]';

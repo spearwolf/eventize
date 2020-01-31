@@ -9,7 +9,7 @@ yet another *fantastic* event emitter micro framework for javascript!
 - :sparkles: **wildcards** & **priorities** :exclamation:
 - has **typescript types** included :tada:
 - :rocket: **powerful api** (*partial* similar to [node.js events](https://nodejs.org/api/events.html))
-- all api-calls and downstream-listener-calls are **100% synchronous** :boom: no async!
+- all api-calls and downstream-listener-calls are **100% synchronous** :boom: no async! :stuck_out_tongue_closed_eyes:
 - supports all major browsers and Node.js environments
 - very small footsprint ~2.8k gzip'd
 - no runtime dependencies
@@ -21,7 +21,7 @@ yet another *fantastic* event emitter micro framework for javascript!
 Attach the _eventizer_ **api** to any javascript object you want.
 
 ```javascript
-import eventize from '@spearwolf/eventize';
+import eventize from 'eventize-js';
 
 const say = hello => world => console.log(hello, world);
 const obj = eventize({});
@@ -50,7 +50,7 @@ obj.emit(['foo', 'bar'], 'eventize');
 
 ## Installation
 
-Install the latest version with: `npm install --save spearwolf/eventize`
+Install the latest version with: `npm install --save eventize-js`
 
 
 # API Reference
@@ -70,7 +70,7 @@ eventize.create( obj )  // => eventizer
 .. or if you like a more class based approach ..
 
 ```typescript
-import {Eventize} from '@spearwolf/eventize';
+import {Eventize} from 'eventize-js';
 
 class Foo extends Eventize {
   // foo has now the eventize superpowers!

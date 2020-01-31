@@ -1,6 +1,6 @@
 {
-  "name": "@spearwolf/eventize",
-  "version": "0.6.11",
+  "name": "eventize-js",
+  "version": "1.0.0",
   "author": {
     "name": "Wolfger Schramm",
     "email": "wolfger@spearwolf.de",
@@ -9,9 +9,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/spearwolf/eventize.git"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com/"
   },
   "license": "Apache-2.0",
   "main": "dist/eventize.umd.js",
@@ -34,22 +31,22 @@
     "test": "run-s --silent lint jest"
   },
   "devDependencies": {
-    "@babel/cli": "^7.6.4",
-    "@babel/core": "^7.6.4",
-    "@babel/polyfill": "^7.6.0",
-    "@babel/preset-env": "^7.6.3",
-    "core-js": "3.3.2",
-    "eslint": "^6.5.1",
+    "@babel/cli": "^7.8.4",
+    "@babel/core": "^7.8.4",
+    "@babel/polyfill": "^7.8.3",
+    "@babel/preset-env": "^7.8.4",
+    "core-js": "3.6.4",
+    "eslint": "^6.8.0",
     "eslint-config-airbnb-base": "^14.0.0",
-    "eslint-plugin-import": "^2.18.2",
-    "eslint-plugin-jest": "^22.19.0",
-    "jest": "^24.9.0",
+    "eslint-plugin-import": "^2.20.0",
+    "eslint-plugin-jest": "^23.6.0",
+    "jest": "^25.1.0",
     "npm-run-all": "^4.1.5",
-    "rimraf": "^3.0.0",
-    "rollup": "^1.24.0",
+    "rimraf": "^3.0.1",
+    "rollup": "^1.31.0",
     "rollup-plugin-babel": "^4.3.3",
-    "rollup-plugin-terser": "^5.1.2",
-    "typescript": "^3.6.4"
+    "rollup-plugin-terser": "^5.2.0",
+    "typescript": "^3.7.5"
   },
   "jest": {
     "coverageDirectory": "<rootDir>/coverage",

@@ -1,4 +1,4 @@
-import eventize, { PRIO_A, Eventize } from '@spearwolf/eventize';
+import eventize, { PRIO_A, Eventize } from 'eventize-js';
 
 class Awesome {
     doAwesomeThings() {}
