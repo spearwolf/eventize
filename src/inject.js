@@ -12,6 +12,20 @@ const removeListener = (obj) => (listener) => {
   listener.callAfterApply = () => obj.off(listener);
 };
 
+const makeUnsubscribe = (host, listeners) => {
+  const unsubscribe = () => host.off(listeners);
+  Object.defineProperties(unsubscribe, Array.isArray(listeners) ? {
+    listeners: {
+      get: () => listeners,
+    },
+  } : {
+    listener: {
+      get: () => listeners,
+    },
+  });
+  return unsubscribe;
+};
+
 export default function injectEventizeApi(obj) {
   if (obj[NAMESPACE]) return obj;
 
@@ -42,7 +56,7 @@ export default function injectEventizeApi(obj) {
     //
     // ----------------------------------------------------------------------------------------
     on(...args) {
-      return subscribeTo(store, keeper, args);
+      return makeUnsubscribe(obj, subscribeTo(store, keeper, args));
     },
     once(...args) {
       const listeners = subscribeTo(store, keeper, args);
@@ -51,7 +65,7 @@ export default function injectEventizeApi(obj) {
       } else {
         removeListener(obj)(listeners);
       }
-      return listeners;
+      return makeUnsubscribe(obj, listeners);
     },
     off(listener, listenerObject) {
       store.remove(listener, listenerObject);

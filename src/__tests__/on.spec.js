@@ -11,7 +11,7 @@ describe('on()', () => {
       const listenerFunc = jest.fn();
       const obj = eventize({});
       let context;
-      const subscriber = obj.on('foo', 7, function () { // eslint-disable-line
+      const unsubscribe = obj.on('foo', 7, function () { // eslint-disable-line
         context = this;
       }, listenerObject);
       obj.on('foo', 0, listenerFunc, listenerObject);
@@ -24,13 +24,13 @@ describe('on()', () => {
         expect(context).toBe(listenerObject);
       });
       it('priority is correct', () => {
-        expect(subscriber.priority).toBe(7);
+        expect(unsubscribe.listener.priority).toBe(7);
       });
       it('eventName is correct', () => {
-        expect(subscriber.eventName).toBe('foo');
+        expect(unsubscribe.listener.eventName).toBe('foo');
       });
       it('isCatchEmAll is correct', () => {
-        expect(subscriber.isCatchEmAll).toBe(false);
+        expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
     });
     describe('on( eventName, priority, listenerFuncName, listenerObject )', () => {
@@ -40,39 +40,39 @@ describe('on()', () => {
         },
       };
       const obj = eventize({});
-      const subscriber = obj.on('foo', 9, 'foo', listenerObject);
+      const unsubscribe = obj.on('foo', 9, 'foo', listenerObject);
       obj.emit('foo', 'bar', 666);
 
       it('emit() calls the listener', () => {
         expect(listenerObject.args).toEqual(['bar', 666]);
       });
       it('priority is correct', () => {
-        expect(subscriber.priority).toBe(9);
+        expect(unsubscribe.listener.priority).toBe(9);
       });
       it('eventName is correct', () => {
-        expect(subscriber.eventName).toBe('foo');
+        expect(unsubscribe.listener.eventName).toBe('foo');
       });
       it('isCatchEmAll is correct', () => {
-        expect(subscriber.isCatchEmAll).toBe(false);
+        expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
     });
     describe('on( eventName, priority, listenerFunc )', () => {
       const listenerFunc = jest.fn();
       const obj = eventize({});
-      const subscriber = obj.on('foo', 11, listenerFunc);
+      const unsubscribe = obj.on('foo', 11, listenerFunc);
       obj.emit('foo', 'plah', 669);
 
       it('emit() calls the listener', () => {
         expect(listenerFunc).toHaveBeenCalledWith('plah', 669);
       });
       it('priority is correct', () => {
-        expect(subscriber.priority).toBe(11);
+        expect(unsubscribe.listener.priority).toBe(11);
       });
       it('eventName is correct', () => {
-        expect(subscriber.eventName).toBe('foo');
+        expect(unsubscribe.listener.eventName).toBe('foo');
       });
       it('isCatchEmAll is correct', () => {
-        expect(subscriber.isCatchEmAll).toBe(false);
+        expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
     });
     describe('on( eventName, priority, object )', () => {
@@ -85,16 +85,16 @@ describe('on()', () => {
         },
       };
       const obj = eventize({});
-      const subscriber = obj.on('foo', 13, listener);
+      const unsubscribe = obj.on('foo', 13, listener);
 
       it('priority is correct', () => {
-        expect(subscriber.priority).toBe(13);
+        expect(unsubscribe.listener.priority).toBe(13);
       });
       it('eventName is correct', () => {
-        expect(subscriber.eventName).toBe('foo');
+        expect(unsubscribe.listener.eventName).toBe('foo');
       });
       it('isCatchEmAll is correct', () => {
-        expect(subscriber.isCatchEmAll).toBe(false);
+        expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
 
       obj.emit('foo', 'plah', 667);
@@ -112,7 +112,7 @@ describe('on()', () => {
       const listenerFunc = jest.fn();
       const obj = eventize({});
       let context;
-      const subscriber = obj.on('foo', function () { // eslint-disable-line
+      const unsubscribe = obj.on('foo', function () { // eslint-disable-line
         context = this;
       }, listenerObject);
       obj.on('foo', listenerFunc, listenerObject);
@@ -125,32 +125,32 @@ describe('on()', () => {
         expect(context).toBe(listenerObject);
       });
       it('priority is correct', () => {
-        expect(subscriber.priority).toBe(PRIO_DEFAULT);
+        expect(unsubscribe.listener.priority).toBe(PRIO_DEFAULT);
       });
       it('eventName is correct', () => {
-        expect(subscriber.eventName).toBe('foo');
+        expect(unsubscribe.listener.eventName).toBe('foo');
       });
       it('isCatchEmAll is correct', () => {
-        expect(subscriber.isCatchEmAll).toBe(false);
+        expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
     });
     describe('on( eventName, listenerFunc )', () => {
       const listenerFunc = jest.fn();
       const obj = eventize({});
-      const subscriber = obj.on('foo', listenerFunc);
+      const unsubscribe = obj.on('foo', listenerFunc);
       obj.emit('foo', 'plah', 669);
 
       it('emit() calls the listener', () => {
         expect(listenerFunc).toHaveBeenCalledWith('plah', 669);
       });
       it('priority is correct', () => {
-        expect(subscriber.priority).toBe(PRIO_DEFAULT);
+        expect(unsubscribe.listener.priority).toBe(PRIO_DEFAULT);
       });
       it('eventName is correct', () => {
-        expect(subscriber.eventName).toBe('foo');
+        expect(unsubscribe.listener.eventName).toBe('foo');
       });
       it('isCatchEmAll is correct', () => {
-        expect(subscriber.isCatchEmAll).toBe(false);
+        expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
     });
   }); // eventName is a string
@@ -161,7 +161,7 @@ describe('on()', () => {
       const listenerFunc = jest.fn();
       const obj = eventize({});
       const context = [];
-      const listeners = obj.on(['foo', 'fu'], 7, function () { // eslint-disable-line
+      const { listeners } = obj.on(['foo', 'fu'], 7, function () { // eslint-disable-line
         context.push(this);
       }, listenerObject);
       obj.on(['foo', 'fu'], 0, listenerFunc, listenerObject);
@@ -197,7 +197,7 @@ describe('on()', () => {
         },
       };
       const obj = eventize({});
-      const listeners = obj.on(['foo', 'fu'], 9, 'foo', listenerObject);
+      const { listeners } = obj.on(['foo', 'fu'], 9, 'foo', listenerObject);
       obj.emit(['foo', 'fu'], 'bar', 666);
 
       it('emit() calls the listener', () => {
@@ -221,7 +221,7 @@ describe('on()', () => {
     describe('on( eventName*, priority, listenerFunc )', () => {
       const listenerFunc = jest.fn();
       const obj = eventize({});
-      const listeners = obj.on(['foo', 'bar'], 11, listenerFunc);
+      const { listeners } = obj.on(['foo', 'bar'], 11, listenerFunc);
       obj.emit(['foo', 'bar'], 'plah', 669);
 
       it('emit() calls the listener', () => {
@@ -246,7 +246,7 @@ describe('on()', () => {
       const listenerFuncBar = jest.fn();
       const obj = eventize({});
 
-      const listeners = obj.on(['foo', 'bar'], 13, {
+      const { listeners } = obj.on(['foo', 'bar'], 13, {
         foo: listenerFuncFoo,
         bar: listenerFuncBar,
       });
@@ -279,7 +279,7 @@ describe('on()', () => {
       const listenerFunc = jest.fn();
       const obj = eventize({});
       const contexts = [];
-      const listeners = obj.on(['foo', 'bar'], function fooBar(...args) {
+      const { listeners } = obj.on(['foo', 'bar'], function fooBar(...args) {
         contexts.push(this);
         listenerFunc(...args);
       }, listenerObject);
@@ -310,7 +310,7 @@ describe('on()', () => {
     describe('on( eventName*, listenerFunc )', () => {
       const listenerFunc = jest.fn();
       const obj = eventize({});
-      const listeners = obj.on(['foo', 'bar'], listenerFunc);
+      const { listeners } = obj.on(['foo', 'bar'], listenerFunc);
 
       obj.emit(['foo', 'bar'], 'plah', 669);
 
@@ -334,7 +334,7 @@ describe('on()', () => {
     describe('on( eventName*, listenerFunc ) supports [ [eventName, PRIO], .. ]', () => {
       const listenerFunc = jest.fn();
       const obj = eventize({});
-      const listeners = obj.on([['foo', 500], ['bar', 1000]], listenerFunc);
+      const { listeners } = obj.on([['foo', 500], ['bar', 1000]], listenerFunc);
 
       obj.emit(['foo', 'bar'], 'plah', 669);
 
@@ -362,7 +362,7 @@ describe('on()', () => {
     const listenerFunc = jest.fn();
     const obj = eventize({});
     let context;
-    const subscriber = obj.on(7, function () { // eslint-disable-line
+    const unsubscribe = obj.on(7, function () { // eslint-disable-line
       context = this;
     }, listenerObject);
     obj.on(listenerFunc, listenerObject);
@@ -375,32 +375,32 @@ describe('on()', () => {
       expect(context).toBe(listenerObject);
     });
     it('priority is correct', () => {
-      expect(subscriber.priority).toBe(7);
+      expect(unsubscribe.listener.priority).toBe(7);
     });
     it('eventName is correct', () => {
-      expect(subscriber.eventName).toBe(EVENT_CATCH_EM_ALL);
+      expect(unsubscribe.listener.eventName).toBe(EVENT_CATCH_EM_ALL);
     });
     it('isCatchEmAll is correct', () => {
-      expect(subscriber.isCatchEmAll).toBe(true);
+      expect(unsubscribe.listener.isCatchEmAll).toBe(true);
     });
   });
   describe('on( priority, listenerFunc ) => object.on( "*", priority, listenerFunc )', () => {
     const listenerFunc = jest.fn();
     const obj = eventize({});
-    const subscriber = obj.on(11, listenerFunc);
+    const unsubscribe = obj.on(11, listenerFunc);
     obj.emit('foo', 'plah', 669);
 
     it('emit() calls the listener', () => {
       expect(listenerFunc).toHaveBeenCalledWith('plah', 669);
     });
     it('priority is correct', () => {
-      expect(subscriber.priority).toBe(11);
+      expect(unsubscribe.listener.priority).toBe(11);
     });
     it('eventName is correct', () => {
-      expect(subscriber.eventName).toBe(EVENT_CATCH_EM_ALL);
+      expect(unsubscribe.listener.eventName).toBe(EVENT_CATCH_EM_ALL);
     });
     it('isCatchEmAll is correct', () => {
-      expect(subscriber.isCatchEmAll).toBe(true);
+      expect(unsubscribe.listener.isCatchEmAll).toBe(true);
     });
   });
 
@@ -409,7 +409,7 @@ describe('on()', () => {
     const listenerFunc = jest.fn();
     const obj = eventize({});
     let context;
-    const subscriber = obj.on(function () { // eslint-disable-line
+    const unsubscribe = obj.on(function () { // eslint-disable-line
       context = this;
     }, listenerObject);
     obj.on(listenerFunc, listenerObject);
@@ -422,71 +422,71 @@ describe('on()', () => {
       expect(context).toBe(listenerObject);
     });
     it('priority is correct', () => {
-      expect(subscriber.priority).toBe(PRIO_DEFAULT);
+      expect(unsubscribe.listener.priority).toBe(PRIO_DEFAULT);
     });
     it('eventName is correct', () => {
-      expect(subscriber.eventName).toBe(EVENT_CATCH_EM_ALL);
+      expect(unsubscribe.listener.eventName).toBe(EVENT_CATCH_EM_ALL);
     });
     it('isCatchEmAll is correct', () => {
-      expect(subscriber.isCatchEmAll).toBe(true);
+      expect(unsubscribe.listener.isCatchEmAll).toBe(true);
     });
   });
   describe('on( listenerFunc ) => object.on( "*", PRIO_DEFAULT, listenerFunc )', () => {
     const listenerFunc = jest.fn();
     const obj = eventize({});
-    const subscriber = obj.on(listenerFunc);
+    const unsubscribe = obj.on(listenerFunc);
     obj.emit('foo', 'plah', 669);
 
     it('emit() calls the listener', () => {
       expect(listenerFunc).toHaveBeenCalledWith('plah', 669);
     });
     it('priority is correct', () => {
-      expect(subscriber.priority).toBe(PRIO_DEFAULT);
+      expect(unsubscribe.listener.priority).toBe(PRIO_DEFAULT);
     });
     it('eventName is correct', () => {
-      expect(subscriber.eventName).toBe(EVENT_CATCH_EM_ALL);
+      expect(unsubscribe.listener.eventName).toBe(EVENT_CATCH_EM_ALL);
     });
     it('isCatchEmAll is correct', () => {
-      expect(subscriber.isCatchEmAll).toBe(true);
+      expect(unsubscribe.listener.isCatchEmAll).toBe(true);
     });
   });
 
   describe('on( priority, object ) => object.on( "*", priority, object )', () => {
     const listenerFunc = jest.fn();
     const obj = eventize({});
-    const subscriber = obj.on(13, { foo: listenerFunc });
+    const unsubscribe = obj.on(13, { foo: listenerFunc });
     obj.emit('foo', 'plah', 667);
 
     it('emit() calls the listener', () => {
       expect(listenerFunc).toHaveBeenCalledWith('plah', 667);
     });
     it('priority is correct', () => {
-      expect(subscriber.priority).toBe(13);
+      expect(unsubscribe.listener.priority).toBe(13);
     });
     it('eventName is correct', () => {
-      expect(subscriber.eventName).toBe(EVENT_CATCH_EM_ALL);
+      expect(unsubscribe.listener.eventName).toBe(EVENT_CATCH_EM_ALL);
     });
     it('isCatchEmAll is correct', () => {
-      expect(subscriber.isCatchEmAll).toBe(true);
+      expect(unsubscribe.listener.isCatchEmAll).toBe(true);
     });
   });
   describe('on( object ) => object.on( "*", PRIO_DEFAULT, object )', () => {
     const listenerFunc = jest.fn();
     const obj = eventize({});
-    const subscriber = obj.on({ foo: listenerFunc });
+    const unsubscribe = obj.on({ foo: listenerFunc });
     obj.emit('foo', 'plah', 667);
 
     it('emit() calls the listener', () => {
       expect(listenerFunc).toHaveBeenCalledWith('plah', 667);
     });
     it('priority is correct', () => {
-      expect(subscriber.priority).toBe(PRIO_DEFAULT);
+      expect(unsubscribe.listener.priority).toBe(PRIO_DEFAULT);
     });
     it('eventName is correct', () => {
-      expect(subscriber.eventName).toBe(EVENT_CATCH_EM_ALL);
+      expect(unsubscribe.listener.eventName).toBe(EVENT_CATCH_EM_ALL);
     });
     it('isCatchEmAll is correct', () => {
-      expect(subscriber.isCatchEmAll).toBe(true);
+      expect(unsubscribe.listener.isCatchEmAll).toBe(true);
     });
   });
 });
