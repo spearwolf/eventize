@@ -7,57 +7,57 @@ export type EventNames<T extends Object> = FunctionPropertyNames<T> | Array<Func
 
 export type AnyEventNames = string | Array<string> | CatchEmAllType;
 
-export type EventListenerType = EventListener | Array<EventListener>;
+export type UnsubscribeFunc = () => void;
 
 export interface EventizeApi {
 
   // .on( eventName*, [ priority, ] listenerFunc [, listenerObject] )
 
-  on<T extends Object>(eventName: EventNames<T>, priority: Priority, listenerFunc: (this: T, ...args: any[]) => void, listenerObject: T): EventListenerType;
-  on(eventName: AnyEventNames, priority: Priority, listenerFunc: (...args: any[]) => void): EventListenerType;
-  on<T extends Object>(eventName: EventNames<T>, listenerFunc: (this: T, ...args: any[]) => void, listenerObject: T): EventListenerType;
-  on(eventName: AnyEventNames, listenerFunc: (...args: any[]) => void): EventListenerType;
+  on<T extends Object>(eventName: EventNames<T>, priority: Priority, listenerFunc: (this: T, ...args: any[]) => void, listenerObject: T): UnsubscribeFunc;
+  on(eventName: AnyEventNames, priority: Priority, listenerFunc: (...args: any[]) => void): UnsubscribeFunc;
+  on<T extends Object>(eventName: EventNames<T>, listenerFunc: (this: T, ...args: any[]) => void, listenerObject: T): UnsubscribeFunc;
+  on(eventName: AnyEventNames, listenerFunc: (...args: any[]) => void): UnsubscribeFunc;
 
-  once<T extends Object>(eventName: EventNames<T>, priority: Priority, listenerFunc: (this: T, ...args: any[]) => void, listenerObject: T): EventListenerType;
-  once(eventName: AnyEventNames, priority: Priority, listenerFunc: (...args: any[]) => void): EventListenerType;
-  once<T extends Object>(eventName: EventNames<T>, listenerFunc: (this: T, ...args: any[]) => void, listenerObject: T): EventListenerType;
-  once(eventName: AnyEventNames, listenerFunc: (...args: any[]) => void): EventListenerType;
+  once<T extends Object>(eventName: EventNames<T>, priority: Priority, listenerFunc: (this: T, ...args: any[]) => void, listenerObject: T): UnsubscribeFunc;
+  once(eventName: AnyEventNames, priority: Priority, listenerFunc: (...args: any[]) => void): UnsubscribeFunc;
+  once<T extends Object>(eventName: EventNames<T>, listenerFunc: (this: T, ...args: any[]) => void, listenerObject: T): UnsubscribeFunc;
+  once(eventName: AnyEventNames, listenerFunc: (...args: any[]) => void): UnsubscribeFunc;
 
   // .on( eventName*, [ priority, ] listenerFuncName, listenerObject )
 
-  on<T extends Object>(eventName: EventNames<T>, priority: Priority, listenerFuncName: FunctionPropertyNames<T>, listenerObject: T): EventListenerType;
-  on<T extends Object>(eventName: EventNames<T>, listenerFuncName: FunctionPropertyNames<T>, listenerObject: T): EventListenerType;
+  on<T extends Object>(eventName: EventNames<T>, priority: Priority, listenerFuncName: FunctionPropertyNames<T>, listenerObject: T): UnsubscribeFunc;
+  on<T extends Object>(eventName: EventNames<T>, listenerFuncName: FunctionPropertyNames<T>, listenerObject: T): UnsubscribeFunc;
 
-  once<T extends Object>(eventName: EventNames<T>, priority: Priority, listenerFuncName: FunctionPropertyNames<T>, listenerObject: T): EventListenerType;
-  once<T extends Object>(eventName: EventNames<T>, listenerFuncName: FunctionPropertyNames<T>, listenerObject: T): EventListenerType;
+  once<T extends Object>(eventName: EventNames<T>, priority: Priority, listenerFuncName: FunctionPropertyNames<T>, listenerObject: T): UnsubscribeFunc;
+  once<T extends Object>(eventName: EventNames<T>, listenerFuncName: FunctionPropertyNames<T>, listenerObject: T): UnsubscribeFunc;
 
   // .on( eventName*, [ priority, ] listenerObject )
 
-  on<T extends Object>(eventName: EventNames<T>, priority: Priority, listenerObject: T): EventListenerType;
-  on<T extends Object>(eventName: EventNames<T>, listenerObject: T): EventListenerType;
+  on<T extends Object>(eventName: EventNames<T>, priority: Priority, listenerObject: T): UnsubscribeFunc;
+  on<T extends Object>(eventName: EventNames<T>, listenerObject: T): UnsubscribeFunc;
 
-  once<T extends Object>(eventName: EventNames<T>, priority: Priority, listenerObject: T): EventListenerType;
-  once<T extends Object>(eventName: EventNames<T>, listenerObject: T): EventListenerType;
+  once<T extends Object>(eventName: EventNames<T>, priority: Priority, listenerObject: T): UnsubscribeFunc;
+  once<T extends Object>(eventName: EventNames<T>, listenerObject: T): UnsubscribeFunc;
 
   // .on( [ priority, ] listenerFunc [, listenerObject] ) => listenerObject.on( '*', listenerFunc )
 
-  on<T extends Object>(priority: Priority, listenerFunc: (this: T, ...args: any[]) => void, listenerObject: T): EventListenerType;
-  on(priority: Priority, listenerFunc: (...args: any[]) => void): EventListenerType;
-  on<T extends Object>(listenerFunc: (this: T,...args: any[]) => void, listenerObject: T): EventListenerType;
-  on(listenerFunc: (...args: any[]) => void): EventListenerType;
+  on<T extends Object>(priority: Priority, listenerFunc: (this: T, ...args: any[]) => void, listenerObject: T): UnsubscribeFunc;
+  on(priority: Priority, listenerFunc: (...args: any[]) => void): UnsubscribeFunc;
+  on<T extends Object>(listenerFunc: (this: T,...args: any[]) => void, listenerObject: T): UnsubscribeFunc;
+  on(listenerFunc: (...args: any[]) => void): UnsubscribeFunc;
 
-  once<T extends Object>(priority: Priority, listenerFunc: (this: T, ...args: any[]) => void, listenerObject: T): EventListenerType;
-  once(priority: Priority, listenerFunc: (...args: any[]) => void): EventListenerType;
-  once<T extends Object>(listenerFunc: (this: T,...args: any[]) => void, listenerObject: T): EventListenerType;
-  once(listenerFunc: (...args: any[]) => void): EventListenerType;
+  once<T extends Object>(priority: Priority, listenerFunc: (this: T, ...args: any[]) => void, listenerObject: T): UnsubscribeFunc;
+  once(priority: Priority, listenerFunc: (...args: any[]) => void): UnsubscribeFunc;
+  once<T extends Object>(listenerFunc: (this: T,...args: any[]) => void, listenerObject: T): UnsubscribeFunc;
+  once(listenerFunc: (...args: any[]) => void): UnsubscribeFunc;
 
   // .on( [ priority, ] listenerObject ) => listenerObject.on( '*', listenerObject )
 
-  on(priority: Priority, listenerObject: Object): EventListenerType;
-  on(listenerObject: Object): EventListenerType;
+  on(priority: Priority, listenerObject: Object): UnsubscribeFunc;
+  on(listenerObject: Object): UnsubscribeFunc;
 
-  once(priority: Priority, listenerObject: Object): EventListenerType;
-  once(listenerObject: Object): EventListenerType;
+  once(priority: Priority, listenerObject: Object): UnsubscribeFunc;
+  once(listenerObject: Object): UnsubscribeFunc;
 
   // .off( listener?, listenerObject? )
 
