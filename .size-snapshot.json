@@ -1,0 +1,35 @@
+{
+  "eventize-js.js": {
+    "bundled": 1140,
+    "minified": 1140,
+    "gzipped": 691,
+    "treeshaked": {
+      "rollup": {
+        "code": 755,
+        "import_statements": 0
+      },
+      "webpack": {
+        "code": 1757
+      }
+    }
+  },
+  "eventize.js": {
+    "bundled": 1140,
+    "minified": 1140,
+    "gzipped": 691,
+    "treeshaked": {
+      "rollup": {
+        "code": 755,
+        "import_statements": 0
+      },
+      "webpack": {
+        "code": 1757
+      }
+    }
+  },
+  "eventize.umd.js": {
+    "bundled": 1366,
+    "minified": 1366,
+    "gzipped": 809
+  }
+}
