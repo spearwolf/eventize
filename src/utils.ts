@@ -1,4 +1,5 @@
-import {EVENT_CATCH_EM_ALL} from './constants';
+/* eslint-disable no-console */
+import {LOG_NAMESPACE, EVENT_CATCH_EM_ALL} from './constants';
 import {EventName} from './types';
 
 export const isCatchEmAll = (eventName: unknown): eventName is string =>
@@ -12,4 +13,50 @@ export const isEventName = (eventName: unknown): eventName is EventName => {
     default:
       return false;
   }
+};
+
+export const hasConsole = typeof console !== 'undefined';
+
+export const warn = hasConsole
+  ? console[console.warn ? 'warn' : 'log'].bind(console, LOG_NAMESPACE)
+  : () => {};
+
+type PropertyKey = string | symbol;
+type PropertyValue = any;
+
+export const definePublicPropertyRO = <T extends Object>(
+  obj: T,
+  name: PropertyKey,
+  value: PropertyValue,
+): T => {
+  Object.defineProperty(obj, name, {
+    value,
+    configurable: true,
+    enumerable: true,
+  });
+  return obj;
+};
+
+export const definePublicPropertiesRO = <T extends Object>(
+  obj: T,
+  attrs: Record<PropertyKey, PropertyValue>,
+): T => {
+  const keys = Object.keys(attrs);
+  const len = keys.length;
+  for (let i = 0; i < len; i += 1) {
+    definePublicPropertyRO(obj, keys[i], attrs[keys[i]]);
+  }
+  return obj;
+};
+
+export const defineHiddenPropertyRO = <T extends Object>(
+  obj: T,
+  name: PropertyKey,
+  value: PropertyValue,
+): T => {
+  Object.defineProperty(obj, name, {
+    value,
+    configurable: true,
+  });
+  return obj;
 };
