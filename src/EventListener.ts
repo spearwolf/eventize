@@ -5,11 +5,10 @@ import {
   LISTENER_IS_OBJ,
 } from './constants';
 
-import {EventName, EventArgs} from './types';
+import {EventName, EventArgs, ListenerObjectType} from './types';
 import {isCatchEmAll, isEventName} from './utils';
 
 type EmitFnType = Function | undefined;
-type ListenerObjectType = Object | null;
 type CallAfterApplyFnType = (() => void) | undefined;
 
 const apply = (context: unknown, func: EmitFnType, args: EventArgs) => {

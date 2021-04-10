@@ -1,7 +1,7 @@
 /*!
 @file eventize-js - undefined
 @author Wolfger Schramm <wolfger@spearwolf.de>
-@version 2.0.0-alpha.1+es2017.20210409
+@version 2.0.0-alpha.1+es2017.20210410
 
 Copyright 2015-2021 Wolfger Schramm
 
