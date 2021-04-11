@@ -68,16 +68,7 @@ export class EventStore {
     }
   }
 
-  remove(
-    listener:
-      | EventListener
-      | Array<EventListener>
-      | EventName
-      | Array<EventName>
-      | null
-      | undefined,
-    listenerObject: ListenerObjectType,
-  ): void {
+  remove(listener: unknown, listenerObject: ListenerObjectType): void {
     if (listenerObject == null && Array.isArray(listener)) {
       listener.forEach(this.remove.bind(this));
     } else if (

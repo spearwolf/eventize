@@ -46,7 +46,7 @@ export class EventListener {
   readonly listener: unknown;
   readonly listenerObject: ListenerObjectType;
   readonly listenerType: number;
-  readonly callAfterApply: CallAfterApplyFnType;
+  callAfterApply: CallAfterApplyFnType;
   isRemoved: boolean;
 
   constructor(
