@@ -6,7 +6,7 @@ import {
 } from './constants';
 
 import {EventName, EventArgs, ListenerObjectType} from './types';
-import {isCatchEmAll, isEventName} from './utils';
+import {isCatchEmAll} from './utils';
 
 type EmitFnType = Function | undefined;
 type CallAfterApplyFnType = (() => void) | undefined;
@@ -71,8 +71,12 @@ export class EventListener {
     listenerObject: ListenerObjectType = null,
   ): boolean {
     if (listener === this) return true;
-    if (typeof listener === 'number' && listener === this.id) return true;
-    if (listenerObject === null && isEventName(listener)) {
+    const typeofListener = typeof listener;
+    if (typeofListener === 'number' && listener === this.id) return true;
+    if (
+      listenerObject === null &&
+      (typeofListener === 'string' || typeofListener === 'symbol')
+    ) {
       if (listener === EVENT_CATCH_EM_ALL) return true;
       if (listener === this.eventName) return true;
       return false;

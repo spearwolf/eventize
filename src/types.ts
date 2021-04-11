@@ -1,5 +1,6 @@
 export type EventName = string | symbol;
 export type AnyEventNames = EventName | Array<EventName>;
+export type OnEventNames = AnyEventNames | Array<[EventName, number]>;
 
 export type EventArgs = Array<any>;
 
@@ -15,20 +16,20 @@ export type SubscribeArgs =
   //
   // .on( eventName*, [ priority, ] listenerFunc [, listenerObject] )
   //
-  | [AnyEventNames, number, ListenerFuncType, ListenerObjectType]
-  | [AnyEventNames, number, ListenerFuncType]
-  | [AnyEventNames, ListenerFuncType, ListenerObjectType]
-  | [AnyEventNames, ListenerFuncType]
+  | [OnEventNames, number, ListenerFuncType, ListenerObjectType]
+  | [OnEventNames, number, ListenerFuncType]
+  | [OnEventNames, ListenerFuncType, ListenerObjectType]
+  | [OnEventNames, ListenerFuncType]
   //
   // .on( eventName*, [ priority, ] listenerFuncName, listenerObject )
   //
-  | [AnyEventNames, number, EventName, ListenerObjectType]
-  | [AnyEventNames, EventName, ListenerObjectType]
+  | [OnEventNames, number, EventName, ListenerObjectType]
+  | [OnEventNames, EventName, ListenerObjectType]
   //
   // .on( eventName*, [ priority, ] listenerObject )
   //
-  | [AnyEventNames, number, ListenerObjectType]
-  | [AnyEventNames, ListenerObjectType]
+  | [OnEventNames, number, ListenerObjectType]
+  | [OnEventNames, ListenerObjectType]
   //
   // .on( [ priority, ] listenerFunc [, listenerObject] )
   //

@@ -4,7 +4,7 @@ import {EventStore} from './EventStore';
 import {EVENT_CATCH_EM_ALL} from './constants';
 import {PRIO_DEFAULT} from './priorities';
 import {EventArgs, EventName, ListenerObjectType} from './types';
-import {hasConsole, isEventName, warn} from './utils';
+import {hasConsole, warn} from './utils';
 
 const registerEventListener = (
   store: EventStore,
@@ -45,7 +45,11 @@ export const subscribeTo = (
     [eventName, priority, listener, listenerObject] = args;
   } else {
     priority = PRIO_DEFAULT;
-    if (isEventName(typeOfFirstArg) || Array.isArray(args[0])) {
+    if (
+      typeOfFirstArg === 'string' ||
+      typeOfFirstArg === 'symbol' ||
+      Array.isArray(args[0])
+    ) {
       [eventName, listener, listenerObject] = args;
     } else {
       eventName = EVENT_CATCH_EM_ALL;

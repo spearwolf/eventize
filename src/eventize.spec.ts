@@ -1,7 +1,7 @@
-/* eslint-env jest */
-import eventize, {NAMESPACE, Eventize} from '../eventize';
+import {NAMESPACE} from './constants';
+import {Eventize, eventize} from './eventize';
 
-const expect2ImplEventizeApi = (obj) => {
+const expect2ImplEventizeApi = (obj: any) => {
   describe('implements the eventizedObject API', () => {
     it('.on()', () => {
       expect(typeof obj.on).toBe('function');
@@ -79,6 +79,7 @@ describe('class extends Eventize', () => {
 describe('eventize(eventizer) returns unmodified eventizer', () => {
   const eventizer = eventize({});
   const magicNumber = Math.random();
+  // @ts-ignore
   eventizer[NAMESPACE].magicNumber = magicNumber;
   const eObj2 = eventize(eventizer);
 
@@ -86,6 +87,7 @@ describe('eventize(eventizer) returns unmodified eventizer', () => {
     expect(eObj2).toBe(eventizer);
   });
   it('magicNumber exists and is the same', () => {
+    // @ts-ignore
     expect(eObj2[NAMESPACE].magicNumber).toBe(magicNumber);
   });
 });

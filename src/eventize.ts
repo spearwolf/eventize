@@ -59,7 +59,8 @@ export interface EventizeFuncApi extends EventizerFunc {
   PRIO_MIN: number;
 }
 
-export default eventize as EventizeFuncApi;
+const eventizedFuncApi = eventize as EventizeFuncApi;
+export {eventizedFuncApi as eventize};
 
 export interface Eventize extends EventizeApi {}
 

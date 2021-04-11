@@ -1,4 +1,4 @@
-import eventize from './eventize';
+import { eventize } from './eventize';
 export default eventize;
 export * from './types';
 export * from './priorities';

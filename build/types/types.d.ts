@@ -1,5 +1,6 @@
 export declare type EventName = string | symbol;
 export declare type AnyEventNames = EventName | Array<EventName>;
+export declare type OnEventNames = AnyEventNames | Array<[EventName, number]>;
 export declare type EventArgs = Array<any>;
 export declare type ListenerType = unknown;
 export declare type ListenerObjectType = Object | null | undefined;
@@ -9,7 +10,7 @@ export declare type UnsubscribeFunc = ((() => void) & {
 }) | ((() => void) & {
     listeners: Array<EventListener>;
 });
-export declare type SubscribeArgs = [AnyEventNames, number, ListenerFuncType, ListenerObjectType] | [AnyEventNames, number, ListenerFuncType] | [AnyEventNames, ListenerFuncType, ListenerObjectType] | [AnyEventNames, ListenerFuncType] | [AnyEventNames, number, EventName, ListenerObjectType] | [AnyEventNames, EventName, ListenerObjectType] | [AnyEventNames, number, ListenerObjectType] | [AnyEventNames, ListenerObjectType] | [number, ListenerFuncType, ListenerObjectType] | [number, ListenerFuncType] | [ListenerFuncType, ListenerObjectType] | [ListenerFuncType] | [number, ListenerObjectType] | [ListenerObjectType];
+export declare type SubscribeArgs = [OnEventNames, number, ListenerFuncType, ListenerObjectType] | [OnEventNames, number, ListenerFuncType] | [OnEventNames, ListenerFuncType, ListenerObjectType] | [OnEventNames, ListenerFuncType] | [OnEventNames, number, EventName, ListenerObjectType] | [OnEventNames, EventName, ListenerObjectType] | [OnEventNames, number, ListenerObjectType] | [OnEventNames, ListenerObjectType] | [number, ListenerFuncType, ListenerObjectType] | [number, ListenerFuncType] | [ListenerFuncType, ListenerObjectType] | [ListenerFuncType] | [number, ListenerObjectType] | [ListenerObjectType];
 export interface EventizeApi {
     on(...args: SubscribeArgs): UnsubscribeFunc;
     once(...args: SubscribeArgs): UnsubscribeFunc;

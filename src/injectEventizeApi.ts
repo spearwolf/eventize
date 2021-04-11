@@ -70,14 +70,14 @@ export function injectEventizeApi<T extends Object>(obj: T): T & EventizeApi {
 
     emit(eventNames: AnyEventNames, ...args: EventArgs): void {
       if (Array.isArray(eventNames)) {
-        eventNames.forEach((event) => {
+        eventNames.forEach((event: EventName) => {
           store.forEach(event, (listener) => listener.apply(event, args));
           keeper.retain(event, args);
         });
       } else if (eventNames !== EVENT_CATCH_EM_ALL) {
-        store.forEach(eventNames, (listener) =>
-          listener.apply(eventNames, args),
-        );
+        store.forEach(eventNames, (listener) => {
+          listener.apply(eventNames, args);
+        });
         keeper.retain(eventNames, args);
       }
     },

@@ -28,6 +28,7 @@ export default {
     sourcemap: true,
     sourcemapFile: path.join(outputDir, `${name}.umd.js.map`),
     format: 'umd',
+    exports: 'named',
   },
   plugins: [
     typescript(),
