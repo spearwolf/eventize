@@ -47,7 +47,7 @@ export interface EventizeApi {
   on(...args: SubscribeArgs): UnsubscribeFunc;
   once(...args: SubscribeArgs): UnsubscribeFunc;
 
-  off(listener: ListenerType, listenerObject?: ListenerObjectType): void;
+  off(listener?: ListenerType, listenerObject?: ListenerObjectType): void;
 
   emit(eventNames: AnyEventNames, ...args: EventArgs): void;
 

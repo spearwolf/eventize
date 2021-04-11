@@ -14,7 +14,7 @@ export declare type SubscribeArgs = [OnEventNames, number, ListenerFuncType, Lis
 export interface EventizeApi {
     on(...args: SubscribeArgs): UnsubscribeFunc;
     once(...args: SubscribeArgs): UnsubscribeFunc;
-    off(listener: ListenerType, listenerObject?: ListenerObjectType): void;
+    off(listener?: ListenerType, listenerObject?: ListenerObjectType): void;
     emit(eventNames: AnyEventNames, ...args: EventArgs): void;
     retain(eventName: EventName): void;
 }

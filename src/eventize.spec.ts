@@ -1,5 +1,6 @@
 import {NAMESPACE} from './constants';
-import {Eventize, eventize} from './eventize';
+
+import eventize, {Eventize} from '.';
 
 const expect2ImplEventizeApi = (obj: any) => {
   describe('implements the eventizedObject API', () => {

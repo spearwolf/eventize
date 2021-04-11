@@ -59,7 +59,7 @@ export function injectEventizeApi<T extends Object>(obj: T): T & EventizeApi {
       return makeUnsubscribe(eventizedObj, listeners);
     },
 
-    off(listener: ListenerType, listenerObject?: ListenerObjectType): void {
+    off(listener?: ListenerType, listenerObject?: ListenerObjectType): void {
       store.remove(listener, listenerObject);
       if (Array.isArray(listener)) {
         keeper.remove(listener.filter((li) => typeof li === 'string'));

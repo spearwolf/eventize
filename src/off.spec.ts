@@ -1,11 +1,12 @@
-/* eslint-env jest */
-import eventize from '../eventize';
+import sinon from 'sinon';
+
+import eventize from '.';
 
 describe('off()', () => {
   describe('by function', () => {
     const obj = eventize({});
-    const listenerFunc = jest.fn();
-    const otherListener = jest.fn();
+    const listenerFunc = sinon.fake();
+    const otherListener = sinon.fake();
 
     obj.on('foo', listenerFunc);
     obj.on('foo', otherListener);
@@ -13,27 +14,27 @@ describe('off()', () => {
     obj.emit('foo', 'bar', 666);
 
     it('emit() calls the listeners', () => {
-      expect(listenerFunc).toHaveBeenCalledWith('bar', 666);
-      expect(otherListener).toHaveBeenCalledWith('bar', 666);
+      expect(listenerFunc.calledWith('bar', 666)).toBeTruthy();
+      expect(otherListener.calledWith('bar', 666)).toBeTruthy();
     });
 
     it('off() removes the listener from the list of subscribers', () => {
-      listenerFunc.mockClear();
-      otherListener.mockClear();
+      listenerFunc.resetHistory();
+      otherListener.resetHistory();
 
       obj.off(listenerFunc);
       obj.emit('foo', 'bar', 666);
 
-      expect(listenerFunc).not.toHaveBeenCalled();
-      expect(otherListener).toHaveBeenCalled();
+      expect(listenerFunc.callCount).toBe(0);
+      expect(otherListener.called).toBeTruthy();
     });
   });
 
   describe('by function and object', () => {
     const obj = eventize({});
     const listenerObject = {};
-    const listenerFunc = jest.fn();
-    const otherListener = jest.fn();
+    const listenerFunc = sinon.fake();
+    const otherListener = sinon.fake();
 
     obj.on('foo', listenerFunc, listenerObject);
     obj.on('foo', otherListener);
@@ -41,26 +42,26 @@ describe('off()', () => {
     obj.emit('foo', 'bar', 666);
 
     it('emit() calls the listeners', () => {
-      expect(listenerFunc).toHaveBeenCalledWith('bar', 666);
-      expect(otherListener).toHaveBeenCalledWith('bar', 666);
+      expect(listenerFunc.calledWith('bar', 666)).toBeTruthy();
+      expect(otherListener.calledWith('bar', 666)).toBeTruthy();
     });
 
     it('off() removes the listener from the list of subscribers', () => {
-      listenerFunc.mockClear();
-      otherListener.mockClear();
+      listenerFunc.resetHistory();
+      otherListener.resetHistory();
 
       obj.off(listenerFunc, listenerObject);
       obj.emit('foo', 'bar', 666);
 
-      expect(listenerFunc).not.toHaveBeenCalled();
-      expect(otherListener).toHaveBeenCalled();
+      expect(listenerFunc.called).toBeFalsy();
+      expect(otherListener.called).toBeTruthy();
     });
   });
 
   describe('by eventName', () => {
     const obj = eventize({});
-    const listenerFunc0 = jest.fn();
-    const listenerFunc1 = jest.fn();
+    const listenerFunc0 = sinon.fake();
+    const listenerFunc1 = sinon.fake();
 
     obj.on('foo', listenerFunc0);
     obj.on('foo', listenerFunc1);
@@ -68,27 +69,27 @@ describe('off()', () => {
     obj.emit('foo', 'bar', 666);
 
     it('emit() calls the listeners', () => {
-      expect(listenerFunc0).toHaveBeenCalledWith('bar', 666);
-      expect(listenerFunc1).toHaveBeenCalledWith('bar', 666);
+      expect(listenerFunc0.calledWith('bar', 666)).toBeTruthy();
+      expect(listenerFunc1.calledWith('bar', 666)).toBeTruthy();
     });
 
     it('off() removes the listeners from the list of subscribers', () => {
-      listenerFunc0.mockClear();
-      listenerFunc1.mockClear();
+      listenerFunc0.resetHistory();
+      listenerFunc1.resetHistory();
 
       obj.off('foo');
       obj.emit('foo', 'bar', 666);
 
-      expect(listenerFunc0).not.toHaveBeenCalled();
-      expect(listenerFunc1).not.toHaveBeenCalled();
+      expect(listenerFunc0.called).toBeFalsy();
+      expect(listenerFunc1.called).toBeFalsy();
     });
   });
 
   describe('by object', () => {
     const obj = eventize({});
     const listener = {
-      foo: jest.fn(),
-      bar: jest.fn(),
+      foo: sinon.fake(),
+      bar: sinon.fake(),
     };
 
     obj.on('foo', listener);
@@ -98,27 +99,27 @@ describe('off()', () => {
     obj.emit('bar', 'foo', 666);
 
     it('emit() calls the listeners', () => {
-      expect(listener.foo).toHaveBeenCalledWith('bar', 666);
-      expect(listener.bar).toHaveBeenCalledWith('foo', 666);
+      expect(listener.foo.calledWith('bar', 666)).toBeTruthy();
+      expect(listener.bar.calledWith('foo', 666)).toBeTruthy();
     });
 
     it('off() removes the listeners from the list of subscribers', () => {
-      listener.foo.mockClear();
-      listener.bar.mockClear();
+      listener.foo.resetHistory();
+      listener.bar.resetHistory();
 
       obj.off(listener);
       obj.emit('foo', 'bar', 666);
       obj.emit('bar', 'foo', 666);
 
-      expect(listener.foo).not.toHaveBeenCalled();
-      expect(listener.bar).not.toHaveBeenCalled();
+      expect(listener.foo.called).toBeFalsy();
+      expect(listener.bar.called).toBeFalsy();
     });
   });
 
   describe('without arguments', () => {
     const obj = eventize({});
-    const listenerFunc0 = jest.fn();
-    const listenerFunc1 = jest.fn();
+    const listenerFunc0 = sinon.fake();
+    const listenerFunc1 = sinon.fake();
 
     obj.on('foo', listenerFunc0);
     obj.on('foo', listenerFunc1);
@@ -126,27 +127,27 @@ describe('off()', () => {
     obj.emit('foo', 'bar', 666);
 
     it('emit() calls the listeners', () => {
-      expect(listenerFunc0).toHaveBeenCalledWith('bar', 666);
-      expect(listenerFunc1).toHaveBeenCalledWith('bar', 666);
+      expect(listenerFunc0.calledWith('bar', 666)).toBeTruthy();
+      expect(listenerFunc1.calledWith('bar', 666)).toBeTruthy();
     });
 
     it('off() removes the listeners from the list of subscribers', () => {
-      listenerFunc0.mockClear();
-      listenerFunc1.mockClear();
+      listenerFunc0.resetHistory();
+      listenerFunc1.resetHistory();
 
       obj.off();
       obj.emit('foo', 'bar', 666);
 
-      expect(listenerFunc0).not.toHaveBeenCalled();
-      expect(listenerFunc1).not.toHaveBeenCalled();
+      expect(listenerFunc0.called).toBeFalsy();
+      expect(listenerFunc1.called).toBeFalsy();
     });
   });
 
   describe('off() inside on()', () => {
     const obj = eventize({});
-    const firstListener = jest.fn();
-    const listenerFunc = jest.fn();
-    const otherListener = jest.fn();
+    const firstListener = sinon.fake();
+    const listenerFunc = sinon.fake();
+    const otherListener = sinon.fake();
 
     obj.on('foo', 3, firstListener);
     obj.once('foo', 2, listenerFunc);
@@ -155,22 +156,22 @@ describe('off()', () => {
     obj.emit('foo', 'bar', 666);
 
     it('emit() calls the listeners', () => {
-      expect(firstListener).toHaveBeenCalledWith('bar', 666);
-      expect(listenerFunc).toHaveBeenCalledWith('bar', 666);
-      expect(otherListener).toHaveBeenCalledWith('bar', 666);
+      expect(firstListener.calledWith('bar', 666)).toBeTruthy();
+      expect(listenerFunc.calledWith('bar', 666)).toBeTruthy();
+      expect(otherListener.calledWith('bar', 666)).toBeTruthy();
     });
 
     it('calling off() inside on() should remove the listeners', () => {
-      firstListener.mockClear();
-      listenerFunc.mockClear();
-      otherListener.mockClear();
+      firstListener.resetHistory();
+      listenerFunc.resetHistory();
+      otherListener.resetHistory();
 
       obj.on('foo', 1, () => obj.off('foo'));
       obj.emit('foo', 'bar', 666);
 
-      expect(firstListener).toHaveBeenCalled();
-      expect(listenerFunc).not.toHaveBeenCalled();
-      expect(otherListener).not.toHaveBeenCalled();
+      expect(firstListener.called).toBeTruthy();
+      expect(listenerFunc.called).toBeFalsy();
+      expect(otherListener.called).toBeFalsy();
     });
   });
 });

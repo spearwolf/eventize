@@ -1,47 +1,48 @@
-/* eslint-env jest */
-import eventize from '../eventize';
+import sinon from 'sinon';
+
+import eventize from '../src.old/eventize';
 
 describe('retain()', () => {
   it('calls the listener function after registration with on()', () => {
     const obj = eventize({});
-    const subscriber = jest.fn();
+    const subscriber = sinon.fake();
 
     obj.retain('foo');
     obj.emit('foo', 'bar', [1, 2, 3]);
 
-    expect(subscriber).not.toHaveBeenCalled();
+    expect(subscriber.called).toBeFalsy();
 
     obj.on('foo', subscriber);
 
-    expect(subscriber).toHaveBeenCalledWith('bar', [1, 2, 3]);
+    expect(subscriber.calledWith('bar', [1, 2, 3])).toBeTruthy();
   });
 
   it('calls the listener object after registration with on()', () => {
     const obj = eventize({});
     const subscriber = {
-      foo: jest.fn(),
+      foo: sinon.fake(),
     };
 
     obj.retain('foo');
     obj.emit('foo', 'bar', [1, 2, 3]);
 
-    expect(subscriber.foo).not.toHaveBeenCalled();
+    expect(subscriber.foo.called).toBeFalsy();
 
     obj.on('foo', subscriber);
 
-    expect(subscriber.foo).toHaveBeenCalledWith('bar', [1, 2, 3]);
+    expect(subscriber.foo.calledWith('bar', [1, 2, 3])).toBeTruthy();
   });
 
   it('calls the catch-em-all listener object', () => {
     const obj = eventize({});
     const subscriber = {
-      foo: jest.fn(),
-      plah: jest.fn(),
-      bar: jest.fn(),
+      foo: sinon.fake(),
+      plah: sinon.fake(),
+      bar: sinon.fake(),
     };
 
     const sub2 = {
-      foo: jest.fn(),
+      foo: sinon.fake(),
     };
 
     obj.on(sub2);
@@ -51,34 +52,34 @@ describe('retain()', () => {
     obj.emit('foo', 'bar', [1, 2, 3]);
     obj.emit('plah', 'foo!');
 
-    expect(subscriber.foo).not.toHaveBeenCalled();
-    expect(subscriber.plah).not.toHaveBeenCalled();
-    expect(sub2.foo).toHaveBeenCalledTimes(1);
+    expect(subscriber.foo.called).toBeFalsy();
+    expect(subscriber.plah.called).toBeFalsy();
+    expect(sub2.foo.callCount).toBe(1);
 
     obj.on(subscriber);
 
-    expect(subscriber.foo).toHaveBeenCalledWith('bar', [1, 2, 3]);
-    expect(subscriber.plah).not.toHaveBeenCalled();
-    expect(sub2.foo).toHaveBeenCalledTimes(1);
+    expect(subscriber.foo.calledWith('bar', [1, 2, 3])).toBeTruthy();
+    expect(subscriber.plah.called).toBeFalsy();
+    expect(sub2.foo.callCount).toBe(1);
   });
 
   it('multiple event signals', () => {
     const obj = eventize({});
     const subscriber = {
-      foo: jest.fn(),
+      foo: sinon.fake(),
     };
 
     obj.retain('foo');
     obj.emit('foo', 'bar', [1, 2, 3]);
 
-    expect(subscriber.foo).not.toHaveBeenCalled();
+    expect(subscriber.foo.called).toBeFalsy();
 
     obj.on('foo', subscriber);
 
-    expect(subscriber.foo).toHaveBeenCalledWith('bar', [1, 2, 3]);
+    expect(subscriber.foo.calledWith('bar', [1, 2, 3])).toBeTruthy();
 
     obj.emit('foo', ['a']);
 
-    expect(subscriber.foo).toHaveBeenCalledWith(['a']);
+    expect(subscriber.foo.calledWith(['a'])).toBeTruthy();
   });
 });
