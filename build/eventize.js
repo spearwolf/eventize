@@ -1,3 +1,4 @@
+
 /*!
 @file eventize-js - undefined
 @author Wolfger Schramm <wolfger@spearwolf.de>
@@ -18,5 +19,413 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 */
-const e="*",t=0,s=1,i=2,r=4,n=Number.POSITIVE_INFINITY,a=1e9,l=1e6,c=1e3,o=0,h=-1e4,f=Number.NEGATIVE_INFINITY,m=(Symbol.eventize||(Symbol.eventize=Symbol("eventize")),Symbol.eventize),y="[eventize]",p=e=>"*"===e,A=e=>{switch(typeof e){case"string":case"symbol":return!0;default:return!1}},u="undefined"!=typeof console,d=u?console[console.warn?"warn":"log"].bind(console,"[eventize]"):()=>{};class v{constructor(){this.events=new Map,this.eventNames=new Set}add(e){Array.isArray(e)?e.forEach((e=>this.eventNames.add(e))):this.eventNames.add(e)}remove(e){Array.isArray(e)?e.forEach((e=>this.eventNames.delete(e))):this.eventNames.delete(e)}retain(e,t){this.eventNames.has(e)&&this.events.set(e,t)}isKnown(e){return this.eventNames.has(e)}emit(e,t){if(p(e))this.eventNames.forEach((e=>this.emit(e,t)));else{const s=this.events.get(e);s&&t.apply(e,s)}}}const E=(e,t,s)=>{"function"==typeof t&&t.apply(e,s)};let b=0;class g{constructor(e,t,s,i=null){this.id=++b,this.eventName=e,this.isCatchEmAll=p(e),this.listener=s,this.listenerObject=i,this.priority=t,this.listenerType=(e=>{switch(typeof e){case"function":return 1;case"string":case"symbol":return 2;case"object":return 4}})(s),this.callAfterApply=void 0,this.isRemoved=!1}isEqual(e,t=null){return e===this||("number"==typeof e&&e===this.id||(null===t&&A(e)?"*"===e||e===this.eventName:this.listener===e&&this.listenerObject===t))}apply(e,t){if(this.isRemoved)return;const{listener:s,listenerObject:i}=this;switch(this.listenerType){case 1:E(i,s,t),this.callAfterApply&&this.callAfterApply();break;case 2:E(i,i[s],t),this.callAfterApply&&this.callAfterApply();break;case 4:{const i=s[e];(this.isCatchEmAll||this.eventName===e)&&("function"==typeof i?i.apply(s,t):((e,t,s)=>{E(t,t.emit,[e].concat(s))})(e,s,t),this.callAfterApply&&this.callAfterApply());break}}}}const L=(e,t)=>e.priority!==t.priority?t.priority-e.priority:e.id-t.id,N=e=>null==e?void 0:e.slice(0),I=(e,t)=>{const s=e.indexOf(t);s>-1&&e.splice(s,1)},O=(e,t,s)=>{const i=e.findIndex((e=>e.isEqual(t,s)));i>-1&&(e[i].isRemoved=!0,e.splice(i,1))},w=e=>{e&&(e.forEach((e=>{e.isRemoved=!0})),e.length=0)};class R{constructor(){this.namedListeners=new Map,this.catchEmAllListeners=[]}add(e){if(e.isCatchEmAll)this.catchEmAllListeners.push(e),this.catchEmAllListeners.sort(L);else{const{eventName:t}=e;let s=this.namedListeners.get(t);s||(s=[],this.namedListeners.set(t,s)),s.push(e),s.sort(L)}}remove(e,t){if(null==t&&Array.isArray(e))e.forEach(this.remove.bind(this));else if(null==e||null==t&&p(e))this.removeAllListeners();else if(null==t&&A(e)){const t=this.namedListeners.get(e);w(t)}else e instanceof g?(e.isRemoved=!0,this.namedListeners.forEach((t=>I(t,e))),I(this.catchEmAllListeners,e)):(this.namedListeners.forEach((s=>O(s,e,t))),O(this.catchEmAllListeners,e,t))}removeAllListeners(){this.namedListeners.forEach((e=>w(e))),this.namedListeners.clear(),w(this.catchEmAllListeners)}forEach(e,t){const s=N(this.catchEmAllListeners),i=N(this.namedListeners.get(e));if("*"!==e&&i&&0!==i.length)if(0===s.length)i.forEach(t);else{const e=i.length,r=s.length;let n=0,a=0;for(;n<e||a<r;){if(n<e){const e=i[n];if(a>=r||e.priority>=s[a].priority){t(e),++n;continue}}a<r&&(t(s[a]),++a)}}else s.forEach(t)}}const j=e=>!(!e||!e[m]),P=(e,t,s)=>{const i=s.length,r=typeof s[0];let n,a,l,c;if(i>=2&&i<=3&&"number"===r?(n="*",[a,l,c]=s):i>=3&&i<=4&&"number"==typeof s[1]?[n,a,l,c]=s:(a=0,A(r)||Array.isArray(s[0])?[n,l,c]=s:(n="*",[l,c]=s)),!l&&u)throw d("called with insufficient arguments!",s),"subscribeTo called with insufficient arguments!";const o=s=>i=>((e,t,s,i,r,n)=>{const a=new g(s,i,r,n);return e.add(a),t.emit(s,a),a})(e,t,i,s,l,c);return Array.isArray(n)?n.map((e=>Array.isArray(e)?o(e[1])(e[0]):o(a)(e))):o(a)(n)},_=e=>t=>{t.callAfterApply=()=>e.off(t)},T=(e,t)=>Object.assign((()=>e.off(t)),Array.isArray(t)?{listeners:t}:{listener:t});function z(e){if(j(e))return e;const t=new R,s=new v;((e,t,s)=>{Object.defineProperty(e,t,{value:s,configurable:!0})})(e,m,{keeper:s,store:t});const i=Object.assign(e,{on:(...e)=>T(i,P(t,s,e)),once(...e){const r=P(t,s,e);return Array.isArray(r)?r.forEach(_(i)):_(i)(r),T(i,r)},off(e,i){t.remove(e,i),Array.isArray(e)?s.remove(e.filter((e=>"string"==typeof e))):A(e)&&s.remove(e)},emit(e,...i){Array.isArray(e)?e.forEach((e=>{t.forEach(e,(t=>t.apply(e,i))),s.retain(e,i)})):"*"!==e&&(t.forEach(e,(t=>t.apply(e,i))),s.retain(e,i))},retain(e){s.add(e)}});return i}function S(e){return z(e)}S.inject=z,S.extend=e=>z(Object.create(e)),S.create=e=>{const t=z({});return t.on("*",0,e),t},S.is=j,Object.assign(S,{PRIO_MAX:n,PRIO_A:1e9,PRIO_B:1e6,PRIO_C:1e3,PRIO_DEFAULT:0,PRIO_LOW:-1e4,PRIO_MIN:f});class k{constructor(){S(this)}}export{e as EVENT_CATCH_EM_ALL,k as Eventize,s as LISTENER_IS_FUNC,i as LISTENER_IS_NAMED_FUNC,r as LISTENER_IS_OBJ,t as LISTENER_UNKNOWN,y as LOG_NAMESPACE,m as NAMESPACE,a as PRIO_A,l as PRIO_B,c as PRIO_C,o as PRIO_DEFAULT,h as PRIO_LOW,n as PRIO_MAX,f as PRIO_MIN};
+const EVENT_CATCH_EM_ALL = '*';
+const LISTENER_IS_FUNC = 1;
+const LISTENER_IS_NAMED_FUNC = 2;
+const LISTENER_IS_OBJ = 4;
+const PRIO_MAX = Number.POSITIVE_INFINITY;
+const PRIO_A = 1000000000;
+const PRIO_B = 1000000;
+const PRIO_C = 1000;
+const PRIO_DEFAULT = 0;
+const PRIO_LOW = -10000;
+const PRIO_MIN = Number.NEGATIVE_INFINITY;
+const NAMESPACE = (() => {
+    // @ts-ignore
+    if (!Symbol.eventize) {
+        // @ts-ignore
+        Symbol.eventize = Symbol('eventize');
+    }
+    // @ts-ignore
+    return Symbol.eventize;
+})();
+const LOG_NAMESPACE = '[eventize]';
+
+/* eslint-disable no-console */
+const isCatchEmAll = (eventName) => eventName === EVENT_CATCH_EM_ALL;
+const isEventName = (eventName) => {
+    switch (typeof eventName) {
+        case 'string':
+        case 'symbol':
+            return true;
+        default:
+            return false;
+    }
+};
+const hasConsole = typeof console !== 'undefined';
+const warn = hasConsole
+    ? console[console.warn ? 'warn' : 'log'].bind(console, LOG_NAMESPACE)
+    : () => { };
+const defineHiddenPropertyRO = (obj, name, value) => {
+    Object.defineProperty(obj, name, {
+        value,
+        configurable: true,
+    });
+    return obj;
+};
+
+class EventKeeper {
+    constructor() {
+        this.events = new Map();
+        this.eventNames = new Set();
+    }
+    add(eventNames) {
+        if (Array.isArray(eventNames)) {
+            eventNames.forEach((name) => this.eventNames.add(name));
+        }
+        else {
+            this.eventNames.add(eventNames);
+        }
+    }
+    remove(eventNames) {
+        if (Array.isArray(eventNames)) {
+            eventNames.forEach((name) => this.eventNames.delete(name));
+        }
+        else {
+            this.eventNames.delete(eventNames);
+        }
+    }
+    retain(eventName, args) {
+        if (this.eventNames.has(eventName)) {
+            this.events.set(eventName, args);
+        }
+    }
+    isKnown(eventName) {
+        return this.eventNames.has(eventName);
+    }
+    emit(eventName, eventListener) {
+        if (!isCatchEmAll(eventName)) {
+            const args = this.events.get(eventName);
+            if (args) {
+                eventListener.apply(eventName, args);
+            }
+        }
+        else {
+            this.eventNames.forEach((name) => this.emit(name, eventListener));
+        }
+    }
+}
+
+const apply = (context, func, args) => {
+    if (typeof func === 'function') {
+        func.apply(context, args);
+    }
+};
+const emit = (eventName, listener, args) => apply(listener, listener.emit, [eventName].concat(args));
+const detectListenerType = (listener) => {
+    switch (typeof listener) {
+        case 'function':
+            return LISTENER_IS_FUNC;
+        case 'string':
+        case 'symbol':
+            return LISTENER_IS_NAMED_FUNC;
+        case 'object':
+            return LISTENER_IS_OBJ;
+    }
+};
+let lastId = 0;
+const createUniqId = () => ++lastId;
+class EventListener {
+    constructor(eventName, priority, listener, listenerObject = null) {
+        this.id = createUniqId();
+        this.eventName = eventName;
+        this.isCatchEmAll = isCatchEmAll(eventName);
+        this.listener = listener;
+        this.listenerObject = listenerObject;
+        this.priority = priority;
+        this.listenerType = detectListenerType(listener);
+        this.callAfterApply = undefined;
+        this.isRemoved = false;
+    }
+    isEqual(listener, listenerObject = null) {
+        if (listener === this)
+            return true;
+        if (typeof listener === 'number' && listener === this.id)
+            return true;
+        if (listenerObject === null && isEventName(listener)) {
+            if (listener === EVENT_CATCH_EM_ALL)
+                return true;
+            if (listener === this.eventName)
+                return true;
+            return false;
+        }
+        return this.listener === listener && this.listenerObject === listenerObject;
+    }
+    apply(eventName, args) {
+        if (this.isRemoved)
+            return;
+        const { listener, listenerObject } = this;
+        switch (this.listenerType) {
+            case LISTENER_IS_FUNC:
+                // @ts-ignore
+                apply(listenerObject, listener, args);
+                if (this.callAfterApply)
+                    this.callAfterApply();
+                break;
+            case LISTENER_IS_NAMED_FUNC:
+                // @ts-ignore
+                apply(listenerObject, listenerObject[listener], args);
+                if (this.callAfterApply)
+                    this.callAfterApply();
+                break;
+            case LISTENER_IS_OBJ: {
+                // @ts-ignore
+                const func = listener[eventName];
+                if (this.isCatchEmAll || this.eventName === eventName) {
+                    if (typeof func === 'function') {
+                        func.apply(listener, args);
+                    }
+                    else {
+                        // @ts-ignore
+                        emit(eventName, listener, args);
+                    }
+                    if (this.callAfterApply)
+                        this.callAfterApply();
+                }
+                break;
+            }
+        }
+    }
+}
+
+const sortByPrioAndId = (a, b) => a.priority !== b.priority ? b.priority - a.priority : a.id - b.id;
+const cloneArray = (arr) => arr === null || arr === void 0 ? void 0 : arr.slice(0);
+const removeListenerItem = (arr, listener) => {
+    const idx = arr.indexOf(listener);
+    if (idx > -1) {
+        arr.splice(idx, 1);
+    }
+};
+const removeListener = (listeners, listener, listenerObject) => {
+    const idx = listeners.findIndex((item) => item.isEqual(listener, listenerObject));
+    if (idx > -1) {
+        listeners[idx].isRemoved = true;
+        listeners.splice(idx, 1);
+    }
+};
+const removeAllListeners = (listeners) => {
+    if (listeners) {
+        listeners.forEach((li) => {
+            li.isRemoved = true;
+        });
+        listeners.length = 0;
+    }
+};
+class EventStore {
+    constructor() {
+        this.namedListeners = new Map();
+        this.catchEmAllListeners = [];
+    }
+    add(eventListener) {
+        if (eventListener.isCatchEmAll) {
+            this.catchEmAllListeners.push(eventListener);
+            this.catchEmAllListeners.sort(sortByPrioAndId);
+        }
+        else {
+            const { eventName } = eventListener;
+            let namedListeners = this.namedListeners.get(eventName);
+            if (!namedListeners) {
+                namedListeners = [];
+                this.namedListeners.set(eventName, namedListeners);
+            }
+            namedListeners.push(eventListener);
+            namedListeners.sort(sortByPrioAndId);
+        }
+    }
+    remove(listener, listenerObject) {
+        if (listenerObject == null && Array.isArray(listener)) {
+            listener.forEach(this.remove.bind(this));
+        }
+        else if (listener == null ||
+            (listenerObject == null && isCatchEmAll(listener))) {
+            this.removeAllListeners();
+        }
+        else if (listenerObject == null && isEventName(listener)) {
+            const listeners = this.namedListeners.get(listener);
+            removeAllListeners(listeners);
+        }
+        else if (listener instanceof EventListener) {
+            listener.isRemoved = true;
+            this.namedListeners.forEach((namedListeners) => removeListenerItem(namedListeners, listener));
+            removeListenerItem(this.catchEmAllListeners, listener);
+        }
+        else {
+            this.namedListeners.forEach((namedListeners) => removeListener(namedListeners, listener, listenerObject));
+            removeListener(this.catchEmAllListeners, listener, listenerObject);
+        }
+    }
+    removeAllListeners() {
+        this.namedListeners.forEach((namedListeners) => removeAllListeners(namedListeners));
+        this.namedListeners.clear();
+        removeAllListeners(this.catchEmAllListeners);
+    }
+    forEach(eventName, fn) {
+        const catchEmAllListeners = cloneArray(this.catchEmAllListeners);
+        const namedListeners = cloneArray(this.namedListeners.get(eventName));
+        if (eventName === EVENT_CATCH_EM_ALL ||
+            !namedListeners ||
+            namedListeners.length === 0) {
+            catchEmAllListeners.forEach(fn);
+        }
+        else if (catchEmAllListeners.length === 0) {
+            namedListeners.forEach(fn);
+        }
+        else {
+            const iLen = namedListeners.length;
+            const jLen = catchEmAllListeners.length;
+            let i = 0;
+            let j = 0;
+            while (i < iLen || j < jLen) {
+                if (i < iLen) {
+                    const cur = namedListeners[i];
+                    if (j >= jLen || cur.priority >= catchEmAllListeners[j].priority) {
+                        fn(cur);
+                        ++i;
+                        continue;
+                    }
+                }
+                if (j < jLen) {
+                    fn(catchEmAllListeners[j]);
+                    ++j;
+                }
+            }
+        }
+    }
+}
+
+const isEventized = (obj) => !!(obj &&
+    // @ts-ignore
+    obj[NAMESPACE]);
+
+const registerEventListener = (store, keeper, eventName, priority, listener, listenerObject) => {
+    const eventListener = new EventListener(eventName, priority, listener, listenerObject);
+    store.add(eventListener);
+    keeper.emit(eventName, eventListener);
+    return eventListener;
+};
+const subscribeTo = (store, keeper, args) => {
+    const len = args.length;
+    const typeOfFirstArg = typeof args[0];
+    let eventName;
+    let priority;
+    let listener;
+    let listenerObject;
+    if (len >= 2 && len <= 3 && typeOfFirstArg === 'number') {
+        eventName = EVENT_CATCH_EM_ALL;
+        [priority, listener, listenerObject] = args;
+    }
+    else if (len >= 3 && len <= 4 && typeof args[1] === 'number') {
+        [eventName, priority, listener, listenerObject] = args;
+    }
+    else {
+        priority = PRIO_DEFAULT;
+        if (isEventName(typeOfFirstArg) || Array.isArray(args[0])) {
+            [eventName, listener, listenerObject] = args;
+        }
+        else {
+            eventName = EVENT_CATCH_EM_ALL;
+            [listener, listenerObject] = args;
+        }
+    }
+    if (!listener && hasConsole) {
+        warn('called with insufficient arguments!', args);
+        throw 'subscribeTo called with insufficient arguments!';
+    }
+    const register = (prio) => (event) => registerEventListener(store, keeper, event, prio, listener, listenerObject);
+    if (Array.isArray(eventName)) {
+        return eventName.map((name) => {
+            if (Array.isArray(name)) {
+                return register(name[1])(name[0]);
+            }
+            return register(priority)(name);
+        });
+    }
+    return register(priority)(eventName);
+};
+
+const unsubscribeAfterApply = (obj) => (listener) => {
+    listener.callAfterApply = () => obj.off(listener);
+};
+const makeUnsubscribe = (host, listeners) => {
+    const unsubscribe = () => host.off(listeners);
+    return Object.assign(unsubscribe, Array.isArray(listeners) ? { listeners } : { listener: listeners });
+};
+function injectEventizeApi(obj) {
+    if (isEventized(obj)) {
+        // it already has the interface - no need to inject it again
+        return obj;
+    }
+    const store = new EventStore();
+    const keeper = new EventKeeper();
+    defineHiddenPropertyRO(obj, NAMESPACE, { keeper, store });
+    const eventizedObj = Object.assign(obj, {
+        on(...args) {
+            return makeUnsubscribe(eventizedObj, subscribeTo(store, keeper, args));
+        },
+        once(...args) {
+            const listeners = subscribeTo(store, keeper, args);
+            if (Array.isArray(listeners)) {
+                listeners.forEach(unsubscribeAfterApply(eventizedObj));
+            }
+            else {
+                unsubscribeAfterApply(eventizedObj)(listeners);
+            }
+            return makeUnsubscribe(eventizedObj, listeners);
+        },
+        off(listener, listenerObject) {
+            store.remove(listener, listenerObject);
+            if (Array.isArray(listener)) {
+                keeper.remove(listener.filter((li) => typeof li === 'string'));
+            }
+            else if (isEventName(listener)) {
+                keeper.remove(listener);
+            }
+        },
+        emit(eventNames, ...args) {
+            if (Array.isArray(eventNames)) {
+                eventNames.forEach((event) => {
+                    store.forEach(event, (listener) => listener.apply(event, args));
+                    keeper.retain(event, args);
+                });
+            }
+            else if (eventNames !== EVENT_CATCH_EM_ALL) {
+                store.forEach(eventNames, (listener) => listener.apply(eventNames, args));
+                keeper.retain(eventNames, args);
+            }
+        },
+        retain(eventName) {
+            keeper.add(eventName);
+        },
+    });
+    return eventizedObj;
+}
+
+function eventize(obj) {
+    return injectEventizeApi(obj);
+}
+eventize.inject = injectEventizeApi;
+eventize.extend = (obj) => injectEventizeApi(Object.create(obj));
+eventize.create = (obj) => {
+    const eventizer = injectEventizeApi({});
+    eventizer.on(EVENT_CATCH_EM_ALL, PRIO_DEFAULT, obj);
+    return eventizer;
+};
+eventize.is = isEventized;
+Object.assign(eventize, {
+    PRIO_MAX,
+    PRIO_A,
+    PRIO_B,
+    PRIO_C,
+    PRIO_DEFAULT,
+    PRIO_LOW,
+    PRIO_MIN,
+});
+class Eventize {
+    constructor() {
+        eventize(this);
+    }
+}
+
+export default eventize;
+export { Eventize, PRIO_A, PRIO_B, PRIO_C, PRIO_DEFAULT, PRIO_LOW, PRIO_MAX, PRIO_MIN, injectEventizeApi, isEventized };
 //# sourceMappingURL=eventize.js.map

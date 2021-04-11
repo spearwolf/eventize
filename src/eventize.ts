@@ -47,7 +47,9 @@ export interface EventizeFuncApi extends EventizerFunc {
   inject: EventizerFunc;
   extend: EventizerFunc;
   create(obj: Object): EventizeApi;
+
   is: EventizeGuard;
+
   PRIO_MAX: number;
   PRIO_A: number;
   PRIO_B: number;
