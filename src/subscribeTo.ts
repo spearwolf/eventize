@@ -57,7 +57,7 @@ export const subscribeTo = (
     throw 'subscribeTo called with insufficient arguments!';
   }
 
-  const register = (prio) => (event) =>
+  const register = (prio: number) => (event: EventName) =>
     registerEventListener(store, keeper, event, prio, listener, listenerObject);
 
   if (Array.isArray(eventName)) {

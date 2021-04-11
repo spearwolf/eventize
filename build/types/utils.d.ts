@@ -1,3 +1,11 @@
 import { EventName } from './types';
 export declare const isCatchEmAll: (eventName: unknown) => eventName is string;
 export declare const isEventName: (eventName: unknown) => eventName is EventName;
+export declare const hasConsole: boolean;
+export declare const warn: (...args: any[]) => void;
+declare type PropertyKey = string | symbol;
+declare type PropertyValue = any;
+export declare const definePublicPropertyRO: <T extends Object>(obj: T, name: PropertyKey, value: PropertyValue) => T;
+export declare const definePublicPropertiesRO: <T extends Object>(obj: T, attrs: Record<PropertyKey, PropertyValue>) => T;
+export declare const defineHiddenPropertyRO: <T extends Object>(obj: T, name: PropertyKey, value: PropertyValue) => T;
+export {};

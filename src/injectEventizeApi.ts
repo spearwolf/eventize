@@ -2,6 +2,7 @@ import {EventKeeper} from './EventKeeper';
 import {EventListener} from './EventListener';
 import {EventStore} from './EventStore';
 import {EVENT_CATCH_EM_ALL, NAMESPACE} from './constants';
+import {isEventized} from './isEventized';
 import {subscribeTo} from './subscribeTo';
 import {
   AnyEventNames,
@@ -33,9 +34,9 @@ const makeUnsubscribe = (
 };
 
 export function injectEventizeApi<T extends Object>(obj: T): T & EventizeApi {
-  // it already has the interface - no need to inject it again
-  if (obj[NAMESPACE] != null) {
-    return obj as T & EventizeApi;
+  if (isEventized(obj)) {
+    // it already has the interface - no need to inject it again
+    return obj;
   }
 
   const store = new EventStore();

@@ -10,5 +10,5 @@ export declare const PRIO_C = 1000;
 export declare const PRIO_DEFAULT = 0;
 export declare const PRIO_LOW = -10000;
 export declare const PRIO_MIN: number;
-export declare const NAMESPACE: any;
+export declare const NAMESPACE: symbol;
 export declare const LOG_NAMESPACE = "[eventize]";

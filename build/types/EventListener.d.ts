@@ -1,5 +1,4 @@
-import { EventName, EventArgs } from './types';
-declare type ListenerObjectType = Object | null;
+import { EventName, EventArgs, ListenerObjectType } from './types';
 declare type CallAfterApplyFnType = (() => void) | undefined;
 export declare class EventListener {
     readonly id: number;
@@ -9,7 +8,7 @@ export declare class EventListener {
     readonly listener: unknown;
     readonly listenerObject: ListenerObjectType;
     readonly listenerType: number;
-    readonly callAfterApply: CallAfterApplyFnType;
+    callAfterApply: CallAfterApplyFnType;
     isRemoved: boolean;
     constructor(eventName: EventName, priority: number | undefined, listener: unknown, listenerObject?: ListenerObjectType);
     isEqual(listener: unknown, listenerObject?: ListenerObjectType): boolean;

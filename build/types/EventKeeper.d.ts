@@ -1,6 +1,6 @@
 import { AnyEventNames, EventArgs, EventName } from './types';
 export declare class EventKeeper {
-    events: Map<EventName, any[]>;
+    events: Map<EventName, EventArgs>;
     eventNames: Set<EventName>;
     add(eventNames: AnyEventNames): void;
     remove(eventNames: AnyEventNames): void;

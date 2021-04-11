@@ -13,7 +13,7 @@ export const PRIO_DEFAULT = 0;
 export const PRIO_LOW = -10000;
 export const PRIO_MIN = Number.NEGATIVE_INFINITY;
 
-export const NAMESPACE = (() => {
+export const NAMESPACE: symbol = (() => {
   // @ts-ignore
   if (!Symbol.eventize) {
     // @ts-ignore
