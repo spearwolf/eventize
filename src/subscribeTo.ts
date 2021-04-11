@@ -1,7 +1,8 @@
 import {EventKeeper} from './EventKeeper';
 import {EventListener} from './EventListener';
 import {EventStore} from './EventStore';
-import {EVENT_CATCH_EM_ALL, PRIO_DEFAULT} from './constants';
+import {EVENT_CATCH_EM_ALL} from './constants';
+import {PRIO_DEFAULT} from './priorities';
 import {EventArgs, EventName, ListenerObjectType} from './types';
 import {hasConsole, isEventName, warn} from './utils';
 

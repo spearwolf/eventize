@@ -1,5 +1,7 @@
+import {EVENT_CATCH_EM_ALL} from './constants';
+import {injectEventizeApi} from './injectEventizeApi';
+import {isEventized, EventizeGuard} from './isEventized';
 import {
-  EVENT_CATCH_EM_ALL,
   PRIO_A,
   PRIO_B,
   PRIO_C,
@@ -7,9 +9,7 @@ import {
   PRIO_LOW,
   PRIO_MAX,
   PRIO_MIN,
-} from './constants';
-import {injectEventizeApi} from './injectEventizeApi';
-import {isEventized, EventizeGuard} from './isEventized';
+} from './priorities';
 import {EventizeApi} from './types';
 
 function eventize<T extends Object>(obj: T): T & EventizeApi {

@@ -14,22 +14,22 @@
     }
   },
   "eventize.js": {
-    "bundled": 14264,
-    "minified": 6547,
-    "gzipped": 2527,
+    "bundled": 5501,
+    "minified": 5471,
+    "gzipped": 2312,
     "treeshaked": {
       "rollup": {
-        "code": 5238,
+        "code": 5236,
         "import_statements": 0
       },
       "webpack": {
-        "code": 6190
+        "code": 6188
       }
     }
   },
   "eventize.umd.js": {
     "bundled": 5744,
     "minified": 5714,
-    "gzipped": 2396
+    "gzipped": 2394
   }
 }
