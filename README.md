@@ -29,11 +29,11 @@ const obj = eventize({});
 
 obj.on('foo', say('hello'));
 
-obj.once(['foo', 'bar'], PRIO_A, {
+obj.once(['foo', 'bar'], Priority.AAA, {
   foo: say('hej'),
 });
 
-obj.on(['foo', 'bar'], PRIO_LOW, say('moin moin'))
+obj.on(['foo', 'bar'], Priority.Low, say('moin moin'))
 
 obj.emit('foo', 'world');
 // => "hej world"
@@ -139,13 +139,13 @@ eventize.is( obj )
 Check if `obj` is an _eventizer_ (object has the _eventizer_ **api** implemented). Returns `true` or `false`
 
 ```
-eventize.PRIO_MAX
-eventize.PRIO_A
-eventize.PRIO_B
-eventize.PRIO_C
-eventize.PRIO_DEFAULT = 0
-eventize.PRIO_LOW
-eventize.PRIO_MIN
+eventize.Priority.Max
+eventize.Priority.AAA
+eventize.Priority.BB
+eventize.Priority.C
+eventize.Priority.Default = 0
+eventize.Priority.Low
+eventize.Priority.Min
 ```
 
 Some predefined priorities. Use it or not. They are defined just for convenience.

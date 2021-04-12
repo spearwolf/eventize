@@ -1,9 +1,8 @@
-/* eslint-env jest */
 import sinon from 'sinon';
 
 import {EVENT_CATCH_EM_ALL} from './constants';
 
-import eventize, {PRIO_DEFAULT} from '.';
+import eventize, {Priority} from '.';
 
 describe('on()', () => {
   describe('eventName is a string', () => {
@@ -152,7 +151,7 @@ describe('on()', () => {
       });
       it('priority is correct', () => {
         // @ts-ignore
-        expect(unsubscribe.listener.priority).toBe(PRIO_DEFAULT);
+        expect(unsubscribe.listener.priority).toBe(Priority.Default);
       });
       it('eventName is correct', () => {
         // @ts-ignore
@@ -174,7 +173,7 @@ describe('on()', () => {
       });
       it('priority is correct', () => {
         // @ts-ignore
-        expect(unsubscribe.listener.priority).toBe(PRIO_DEFAULT);
+        expect(unsubscribe.listener.priority).toBe(Priority.Default);
       });
       it('eventName is correct', () => {
         // @ts-ignore
@@ -343,8 +342,8 @@ describe('on()', () => {
         expect(listenerFunc.calledWith('plah', 669)).toBeTruthy();
       });
       it('priorities are correct', () => {
-        expect(listeners[0].priority).toBe(PRIO_DEFAULT);
-        expect(listeners[1].priority).toBe(PRIO_DEFAULT);
+        expect(listeners[0].priority).toBe(Priority.Default);
+        expect(listeners[1].priority).toBe(Priority.Default);
       });
       it('eventNames are correct', () => {
         expect(listeners[0].eventName).toBe('foo');
@@ -374,8 +373,8 @@ describe('on()', () => {
         expect(listenerFunc.calledWith('plah', 669)).toBeTruthy();
       });
       it('priorities are correct', () => {
-        expect(listeners[0].priority).toBe(PRIO_DEFAULT);
-        expect(listeners[1].priority).toBe(PRIO_DEFAULT);
+        expect(listeners[0].priority).toBe(Priority.Default);
+        expect(listeners[1].priority).toBe(Priority.Default);
       });
       it('eventNames are correct', () => {
         expect(listeners[0].eventName).toBe('foo');
@@ -477,7 +476,7 @@ describe('on()', () => {
     });
   });
 
-  describe('on( listenerFunc, listenerObject ) => object.on( "*", PRIO_DEFAULT, listenerFunc, listenerObject )', () => {
+  describe('on( listenerFunc, listenerObject ) => object.on( "*", Priority.Default, listenerFunc, listenerObject )', () => {
     const listenerObject = {};
     const listenerFunc = sinon.fake();
     const obj = eventize({});
@@ -497,7 +496,7 @@ describe('on()', () => {
     });
     it('priority is correct', () => {
       // @ts-ignore
-      expect(unsubscribe.listener.priority).toBe(PRIO_DEFAULT);
+      expect(unsubscribe.listener.priority).toBe(Priority.Default);
     });
     it('eventName is correct', () => {
       // @ts-ignore
@@ -508,7 +507,7 @@ describe('on()', () => {
       expect(unsubscribe.listener.isCatchEmAll).toBe(true);
     });
   });
-  describe('on( listenerFunc ) => object.on( "*", PRIO_DEFAULT, listenerFunc )', () => {
+  describe('on( listenerFunc ) => object.on( "*", Priority.Default, listenerFunc )', () => {
     const listenerFunc = sinon.fake();
     const obj = eventize({});
     const unsubscribe = obj.on(listenerFunc);
@@ -519,7 +518,7 @@ describe('on()', () => {
     });
     it('priority is correct', () => {
       // @ts-ignore
-      expect(unsubscribe.listener.priority).toBe(PRIO_DEFAULT);
+      expect(unsubscribe.listener.priority).toBe(Priority.Default);
     });
     it('eventName is correct', () => {
       // @ts-ignore
@@ -553,7 +552,7 @@ describe('on()', () => {
       expect(unsubscribe.listener.isCatchEmAll).toBe(true);
     });
   });
-  describe('on( object ) => object.on( "*", PRIO_DEFAULT, object )', () => {
+  describe('on( object ) => object.on( "*", Priority.Default, object )', () => {
     const listenerFunc = sinon.fake();
     const obj = eventize({});
     const unsubscribe = obj.on({foo: listenerFunc});
@@ -564,7 +563,7 @@ describe('on()', () => {
     });
     it('priority is correct', () => {
       // @ts-ignore
-      expect(unsubscribe.listener.priority).toBe(PRIO_DEFAULT);
+      expect(unsubscribe.listener.priority).toBe(Priority.Default);
     });
     it('eventName is correct', () => {
       // @ts-ignore

@@ -62,6 +62,16 @@ export interface EventizeGuard {
   <T extends Object>(obj: T): obj is T & EventizeApi;
 }
 
+export interface EventizePriority {
+  Max: number;
+  AAA: number;
+  BB: number;
+  C: number;
+  Default: number;
+  Low: number;
+  Min: number;
+}
+
 export interface EventizeFuncApi extends EventizerFunc {
   inject: EventizerFunc;
   extend: EventizerFunc;
@@ -69,11 +79,5 @@ export interface EventizeFuncApi extends EventizerFunc {
 
   is: EventizeGuard;
 
-  PRIO_MAX: number;
-  PRIO_A: number;
-  PRIO_B: number;
-  PRIO_C: number;
-  PRIO_DEFAULT: number;
-  PRIO_LOW: number;
-  PRIO_MIN: number;
+  Priority: EventizePriority;
 }

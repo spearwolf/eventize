@@ -1,15 +1,7 @@
+import {Priority} from './Priority';
 import {EVENT_CATCH_EM_ALL} from './constants';
 import {injectEventizeApi} from './injectEventizeApi';
 import {isEventized} from './isEventized';
-import {
-  PRIO_A,
-  PRIO_B,
-  PRIO_C,
-  PRIO_DEFAULT,
-  PRIO_LOW,
-  PRIO_MAX,
-  PRIO_MIN,
-} from './priorities';
 import {EventizeApi, EventizeFuncApi} from './types';
 
 export const eventize: EventizeFuncApi = (() => {
@@ -23,21 +15,14 @@ export const eventize: EventizeFuncApi = (() => {
 
   api.create = (obj: Object): EventizeApi => {
     const eventizer = injectEventizeApi({});
-    eventizer.on(EVENT_CATCH_EM_ALL, PRIO_DEFAULT, obj);
+    eventizer.on(EVENT_CATCH_EM_ALL, Priority.Default, obj);
     return eventizer;
   };
 
   api.is = isEventized;
+  api.Priority = Priority;
 
-  return Object.assign(api, {
-    PRIO_MAX,
-    PRIO_A,
-    PRIO_B,
-    PRIO_C,
-    PRIO_DEFAULT,
-    PRIO_LOW,
-    PRIO_MIN,
-  });
+  return api;
 })();
 
 export interface Eventize extends EventizeApi {}

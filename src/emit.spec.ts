@@ -1,6 +1,6 @@
 import sinon from 'sinon';
 
-import eventize, {PRIO_A, PRIO_LOW} from '.';
+import eventize, {Priority} from '.';
 
 describe('emit()', () => {
   describe('calls the listener with all given args (except the event name)', () => {
@@ -32,11 +32,11 @@ describe('emit()', () => {
     beforeAll(() => {
       obj.on('foo', (hello) => results.push(`hello ${hello}`));
 
-      obj.once(['foo', 'bar'], PRIO_A, {
+      obj.once(['foo', 'bar'], Priority.AAA, {
         foo: (hello: string) => results.push(`hej ${hello}`),
       });
 
-      obj.on(['foo', 'bar'], PRIO_LOW, (hello) =>
+      obj.on(['foo', 'bar'], Priority.Low, (hello) =>
         results.push(`moin moin ${hello}`),
       );
     });

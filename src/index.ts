@@ -4,7 +4,7 @@ export default eventize;
 
 export {Eventize};
 
-export * from './priorities';
+export * from './Priority';
 export * from './isEventized';
 export * from './injectEventizeApi';
 

@@ -1,8 +1,8 @@
 import {EventKeeper} from './EventKeeper';
 import {EventListener} from './EventListener';
 import {EventStore} from './EventStore';
+import {Priority} from './Priority';
 import {EVENT_CATCH_EM_ALL} from './constants';
-import {PRIO_DEFAULT} from './priorities';
 import {EventArgs, EventName, ListenerObjectType} from './types';
 import {hasConsole, warn} from './utils';
 
@@ -44,7 +44,7 @@ export const subscribeTo = (
   } else if (len >= 3 && len <= 4 && typeof args[1] === 'number') {
     [eventName, priority, listener, listenerObject] = args;
   } else {
-    priority = PRIO_DEFAULT;
+    priority = Priority.Default;
     if (
       typeOfFirstArg === 'string' ||
       typeOfFirstArg === 'symbol' ||
