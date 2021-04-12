@@ -1,9 +1,11 @@
-import {eventize} from './eventize';
+import {eventize, Eventize} from './eventize';
 
 export default eventize;
 
-export * from './types';
+export {Eventize};
+
 export * from './priorities';
-export * from './eventize';
 export * from './isEventized';
 export * from './injectEventizeApi';
+
+export * from './types';

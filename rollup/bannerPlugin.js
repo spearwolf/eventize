@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-export default ({name, description, version}) => ({
+export default ({name, repository, version}) => ({
   banner: `/*!
-@file ${name} - ${description}
-@author Wolfger Schramm <wolfger@spearwolf.de>
-@version ${version}
+=============================================================================
+${name} ${version}
+— ${repository.url}
+=============================================================================
 
 Copyright 2015-${new Date().getFullYear()} Wolfger Schramm
 
@@ -18,6 +19,5 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-
 */`,
 });
