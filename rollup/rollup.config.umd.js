@@ -28,6 +28,7 @@ export default {
     sourcemap: true,
     sourcemapFile: path.join(outputDir, `${name}.umd.js.map`),
     format: 'umd',
+    // https://rollupjs.org/guide/en/#outputexports
     exports: 'named',
   },
   plugins: [
