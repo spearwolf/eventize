@@ -14,7 +14,7 @@
   "main": "build/eventize.umd.js",
   "module": "build/eventize.js",
   "exports": "./build/eventize.js",
-  "types": "build/types/eventize.d.ts",
+  "types": "build/types/index.d.ts",
   "homepage": "https://github.com/spearwolf/eventize/",
   "bugs": {
     "url": "https://github.com/spearwolf/eventize/issues"
