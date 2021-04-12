@@ -1,6 +1,6 @@
 import sinon from 'sinon';
 
-import eventize from '../src.old/eventize';
+import eventize from '.';
 
 describe('retain()', () => {
   it('calls the listener function after registration with on()', () => {
