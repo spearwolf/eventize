@@ -1,0 +1,3 @@
+// emitter-emits-named-event-listeners
+
+[Emitter]emits -[named event {bg:wheat}] ->*[listeners]

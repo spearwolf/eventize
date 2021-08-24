@@ -1,23 +1,102 @@
-# eventize.js
-
 > !!! THIS IS THE DEVELOPMENT BRANCH - ALL STUFF HERE IS BY DEFAULT UNSTABLE - SO PLEASE USE IT WITH CARE !!!
+
+# eventize.js
 
 [![npm version](https://img.shields.io/npm/v/eventize-js?style=for-the-badge)](https://www.npmjs.com/package/eventize-js)
 [![Build Status](https://img.shields.io/travis/spearwolf/eventize.svg?style=for-the-badge)](https://travis-ci.org/spearwolf/eventize)
 
-yet another *fantastic* event emitter micro framework for javascript!
+A tiny and clever framework for synchronous event-driven programming in javascript.
+
+yes, read correctly: the emitters call the listeners here _synchronously_ and not _asynchronously_, as is the case with [node.js events](https://nodejs.org/api/events.html), for example
+
+This is perfectly reasonable: sometimes you want to have control over when something happens. e.g., when your code runs inside an [animation frame](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame).
 
 ##### FEATURES
 
-- :sparkles: **wildcards** & **priorities** :exclamation:
+- all **API** calls and downstream-listener-calls are **100% synchronous** :boom: no async! :stuck_out_tongue_closed_eyes:
+- :sparkles: **wildcards** &amp; **priorities** :exclamation:
+- :rocket: **smart api** (*partial* similar to [node.js events](https://nodejs.org/api/events.html))
 - has **typescript types** included :tada:
-- :rocket: **powerful api** (*partial* similar to [node.js events](https://nodejs.org/api/events.html))
-- all api-calls and downstream-listener-calls are **100% synchronous** :boom: no async! :stuck_out_tongue_closed_eyes:
 - supports all major browsers and Node.js environments
 - very small footsprint ~2.8k gzip'd
 - no runtime dependencies
 - apache-2.0 license
 
+## Installation
+
+All you need is to install the package:
+
+```sh
+$ npm install eventize.js
+```
+
+
+## Getting Started
+
+The underlying concept is simple: certain kinds of objects (called "emitters") emit named events that cause function "listeners" to be called.
+
+![Emitter emits named event to listeners](./docs-assets/emitter-emits-named-events-listeners.svg)
+
+##### Emitter
+
+Every object can become an emitter; for this, the object must inject the eventize API.
+
+```js
+import eventize, {Eventize} from 'eventize-js';
+
+const myObj = eventize({});
+
+// or, if you are more familiar with class-based objects
+
+class Foo extends Eventize {
+  // constructor() {
+  //   super();
+  // }
+}
+
+const myOtherObj = new Foo();
+```
+
+##### Listener
+
+Any function can be used as a listener. However, you can also use an object that defines methods that have the exact name of the given event.
+
+```js
+myObj.on('foo', (bar) => {
+  console.log('I am a listener function and you called me with bar=', bar);
+})
+
+myObj.on('foo', {
+  foo(bar, plah) {
+    console.log('I am a method and you called me with bar=', bar, 'and plah=', plah);
+  }
+})
+```
+
+##### Named Events
+
+An emitter can emit any event name; parameters are optional
+
+```js
+myObj.emit('bar');  // well, nothing happens here
+
+myObj.emit('foo', 123, 456);
+// => "I am a listener function and you called me with bar= 123"
+// => "I am a method and you called me with bar= 123 and plah= 456"
+```
+
+If an emitter emits an event to which no listeners are attached, nothing happens.
+
+_Btw._ an event name can be either a _string_ or a _symbol_
+
+
+
+
+---
+
+OLD DOCUMENTATION:
+
+---
 
 ## Getting Started
 
@@ -49,11 +128,6 @@ obj.emit(['foo', 'bar'], 'eventize');
 // => "moin moin eventize"
 
 ```
-
-
-## Installation
-
-Install the latest version with: `npm install --save eventize-js`
 
 
 # API Reference
@@ -151,5 +225,3 @@ eventize.Priority.Min
 ```
 
 Some predefined priorities. Use it or not. They are defined just for convenience.
-
-
