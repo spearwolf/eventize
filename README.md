@@ -28,7 +28,7 @@ This is perfectly reasonable: sometimes you want to have control over when somet
 All you need is to install the package:
 
 ```sh
-$ npm install eventize.js
+$ npm install eventize.js@2.0.0-alpha
 ```
 
 
