@@ -15,7 +15,7 @@ This is perfectly reasonable: sometimes you want to have control over when somet
 
 - all **API** calls and downstream-listener-calls are **100% synchronous** :boom: no async! :stuck_out_tongue_closed_eyes:
 - :sparkles: **wildcards** &amp; **priorities** :exclamation:
-- :rocket: **smart api** (*partial* similar to [node.js events](https://nodejs.org/api/events.html))
+- :rocket: **smart api** (based upon [node.js events](https://nodejs.org/api/events.html))
 - has **typescript types** included :tada:
 - supports all major browsers and Node.js environments
 - very small footsprint ~2.8k gzip'd
