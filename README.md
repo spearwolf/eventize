@@ -112,7 +112,9 @@ Returns the same object, with the eventize API attached, by modifying the origin
 
 ##### extend
 
-`eventize.extend( myObj )` &rarr; `myEventizedObj`
+```js
+eventize.extend( myObj )  // => myEventizedObj
+```
 
 Returns a new object, with the eventize API attached. The original object is not modified here, instead the _prototype_ of the new object is the orignial object.
 
