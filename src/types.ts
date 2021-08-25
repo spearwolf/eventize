@@ -73,8 +73,22 @@ export interface EventizePriority {
 }
 
 export interface EventizeFuncApi extends EventizerFunc {
+  /**
+   * Returns the same object, with the [[EventizeApi]] attached,
+   * by modifying the original object.
+   */
   inject: EventizerFunc;
+
+  /**
+   * Returns a new object, with the [[EventizeApi]] attached.
+   * The original object is not modified here, instead the prototype
+   * of the new object is the orignial object.
+   */
   extend: EventizerFunc;
+
+  /**
+   * @deprecated
+   */
   create(obj: Object): EventizeApi;
 
   is: EventizeGuard;

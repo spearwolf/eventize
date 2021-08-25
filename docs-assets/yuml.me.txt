@@ -1,3 +1,17 @@
 // emitter-emits-named-event-listeners
 
 [Emitter]emits -[named event {bg:wheat}] ->*[listeners]
+
+
+// eventize.inject
+
+[myObj|+foo: string;+bar: number;]-[note: eventize.inject( myObj ) {bg:cornsilk}]
+[note: eventize.inject( myObj ) {bg:cornsilk}]->[myObj*|+foo: string;+bar: number|*.on( .. )*;*.once( .. )*;*.emit( .. )*;*.retain( .. )*;*.off( .. )*]
+
+
+// eventize.extend
+// => top-down
+
+[eventize.extend( myObj ) {bg:cornsilk}]->[*myEventizedObj*]
+[myObj|+foo: string;+bar: number;]^-.-__prototype__[*myEventizedObj*]
+[*myEventizedObj*|.on( .. );.once( .. );.emit( .. );.retain( .. );.off( .. )]

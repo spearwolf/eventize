@@ -91,6 +91,33 @@ If an emitter emits an event to which no listeners are attached, nothing happens
 _Btw._ an event name can be either a _string_ or a _symbol_
 
 
+## API
+
+### How to Emitter
+
+There are several ways to convert any object into an emitter.
+
+Probably the most common method is to simply use `eventize( myObj )`; this corresponds to the _inject_ variant:
+
+##### inject
+
+```ts
+eventize.inject( myObj )  // => myObj
+```
+
+Returns the same object, with the eventize API attached, by modifying the original object.
+
+![eventize.inject](./docs-assets/eventize-inject.svg)
+
+
+##### extend
+
+`eventize.extend( myObj )` &rarr; `myEventizedObj`
+
+Returns a new object, with the eventize API attached. The original object is not modified here, instead the _prototype_ of the new object is the orignial object.
+
+![eventize.extend](./docs-assets/eventize-extend.svg)
+
 
 
 ---
