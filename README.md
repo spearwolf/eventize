@@ -40,7 +40,7 @@ The underlying concept is simple: certain kinds of objects (called "emitters") e
 
 ##### Emitter
 
-Every object can become an emitter; for this, the object must inject the eventize API.
+Every object can become an emitter; for this, the object must inject the [Eventize API](#the-emitter-eventize-api).
 
 ```js
 import eventize, {Eventize} from 'eventize-js';
@@ -169,7 +169,7 @@ This API is called the __Eventize API__ (because "Emitter Eventize API" is a bit
 | `.retain( .. )` | hold the last event until a subscriber gets it |
 | `.emit( .. )` | emit an event |
 
-The individual methods are explained in detail below:
+These methods are explained in detail below:
 
 ### How to listen
 
