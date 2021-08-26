@@ -189,7 +189,7 @@ const unsubscribe = myObj.on('myEventName', (arg1, arg2) => {
 The listener function is called when the named event is emitted.
 The parameters of the listener function are optional and will be filled with the event parameters later (if there are any).
 
-The return value of `on()` is always the inverse of the call &mdash; the unsubscription of the listener.
+The return value of `on()` is always the _inverse of the call_ &mdash; the unsubscription of the listener.
 
 ##### Wildcards
 
