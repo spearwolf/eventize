@@ -19,7 +19,7 @@ This is perfectly reasonable: sometimes you want to have control over when somet
 - :rocket: **smart api** (based upon [node.js events](https://nodejs.org/api/events.html))
 - has **typescript types** included :tada:
 - supports all major browsers and Node.js environments
-- very small footsprint ~2.8k gzip'd
+- very small footsprint ~2.3k gzip'd
 - no runtime dependencies
 - apache-2.0 license
 
@@ -156,7 +156,216 @@ class Foo {
 ```
 
 
+### The ~~Emitter~~ Eventize API
+
+Each emitter object provides an API for subscribing, unsubscribing and emitting events.
+This API is called the __Eventize API__ (because "Emitter Eventize API" is a bit too long and cumbersome).
+
+| method | description |
+|--------|-------------|
+| `.on( .. )` | subscribe to events |
+| `.once( .. )` | subscribe to only the next event |
+| `.off( .. )` | unsubscribe listeners |
+| `.retain( .. )` | hold the last event until a subscriber gets it |
+| `.emit( .. )` | emit an event |
+
+The individual methods are explained in detail below:
+
 ### How to listen
+
+#### `.on( .. )`
+
+The simplest and most direct way is to subscribe to an event using a function:
+
+```js
+import eventize from 'eventize-js'
+
+const myObj = eventize({});
+
+const unsubscribe = myObj.on('myEventName', (arg1, arg2) => {
+  console.log('myEventName, arg1=', arg1, 'arg2=', arg2);
+})
+```
+The listener function is called when the named event is emitted.
+The parameters of the listener function are optional and will be filled with the event parameters later (if there are any).
+
+The return value of `on()` is always the inverse of the call &mdash; the unsubscription of the listener.
+
+##### Wildcards
+
+If not only a specific named event should be reacted to, but _all_ events, the _catch-em-all_ wildcard event `*` can be used:
+
+```js
+myObj.on('*', (...args) => console.log('an event occured, args=', ...args))
+```
+
+If you want, you can simply omit the wildcard event:
+
+```js
+myObj.on((...args) => console.log('an event occured, args=', ...args))
+```
+
+##### Multiple event names
+
+Instead of a wildcard, you can also specify multiple event names:
+
+```js
+myObj.on(['foo', 'bar'], (...args) => console.log('foo or bar occured, args=', ...args))
+```
+
+##### Priorities
+
+Sometimes you also want to control the _order_ in which the listeners are called.
+By default, the listeners are called in the order in which they were subscribed &mdash; in their _priority group_; a priority group is defined by a number, where the default priority group is `0` and large numbers take precedence over small ones.
+
+```js
+myObj.on('foo', () => console.log("I don't care when I am called"));
+myObj.on('foo', -999, () => console.log("I would like to be the last in line"));
+myObj.on(Number.MAX_VALUE, () => console.log("I will be the first"));
+
+myObj.emit('foo');
+// => "I will be the first"
+// => "I don't care when I am called"
+// => "I would like to be the last in line"
+```
+
+
+##### Listener objects
+
+You can also use a listener object instead of a function:
+
+```js
+myObj.on('foo', {
+  foo(...args) {
+    console.log('foo called with args=', ...args);
+  }
+})
+```
+
+This is quite useful in conjunction with wildcards:
+
+```js
+const Init = Symbol('init');  // yes, symbols are used here as event names
+const Render = Symbol('render');
+const Dispose = Symbol('dispose');
+
+myObj.on({
+  [Init]() {
+    // initialize
+  }
+  [Render]() {
+    // show something
+  }
+  [Dispose]() {
+    // dispose resources
+  }
+})
+```
+
+.. or multiple event names:
+
+```js
+myObj.on(['init', 'dispose'], {
+  init() {
+    // initialize
+  }
+  goWild() {
+    // will probably not be called
+  }
+  dispose()) {
+    // dispose resources
+  }
+})
+```
+
+Of course, this also works with priorities:
+
+```js
+myObj.on(1000, {
+  foo() {
+    console.log('foo!');
+  }
+  bar() {
+    console.log('bar!');
+  }
+})
+```
+
+As a last option it is also possible to pass the listener method as _name_ or _function_ to be called in addition to the listener object.
+
+###### Named listener object method
+
+```js
+myObj.on('hello', 'say', {
+  say(hello) {
+    console.log('hello', hello);
+  }
+})
+
+myObj.emit('hello', 'world');
+// => "hello world"
+```
+
+###### Listener function with explicit context
+
+```js
+myObj.on(
+  'hello',
+  function() {
+    console.log('hello', this.receiver);
+  }, {
+    receiver: 'world'
+  });
+
+myObj.emit('hello');
+// => "hello world"
+```
+
+##### Complete on() method signature overview
+
+Finally, here is an overview of all possible call signatures of the `.on( .. )` method:
+
+```
+.on( eventName*, [ priority, ] listenerFunc [, listenerObject] )
+.on( eventName*, [ priority, ] listenerFuncName, listenerObject )
+.on( eventName*, [ priority, ] listenerObject )
+```
+
+Additional shortcuts for the wildcard `*` syntax:
+
+```
+.on( [ priority, ] listenerFunc [, listenerObject] )
+.on( [ priority, ] listenerObject )
+```
+
+###### Legend
+
+| argument | description |
+|----------|-------------|
+| `eventName*` | _eventName_ or _Array<eventName>_ |
+| `eventName` | _string_ or _symbol_ |
+| `listenerFunc` | `function` |
+| `listenerFuncName` | _string_ or _symbol_ |
+| `listenerObject` | _object_ |
+
+
+#### `.once( .. )`
+
+TODO
+
+
+#### `.off( .. )`
+
+TODO
+
+
+### How to emit events
+
+#### `.emit( .. )`
+
+TODO
+
+#### `.retain( .. )`
 
 TODO
 
