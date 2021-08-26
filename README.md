@@ -118,7 +118,7 @@ To create an emitter without modifying the original object, you can use the  _ex
 eventize.extend( myObj )  // => myEventizedObj
 ```
 
-Returns a new object, with the eventize api attached. The original object is not modified here, instead the _prototype_ of the new object is set to the original object.
+Returns a new object, with the [Eventize API](#the-emitter-eventize-api) attached. The original object is not modified here, instead the _prototype_ of the new object is set to the original object.
 
 For this purpose [`Object.create()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/create) is used internally.
 
