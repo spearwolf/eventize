@@ -340,11 +340,11 @@ Additional shortcuts for the wildcard `*` syntax:
 
 ###### Legend
 
-| argument | description |
-|----------|-------------|
-| `eventName*` | _eventName_ or _Array<eventName>_ |
+| argument | type |
+|----------|------|
+| `eventName*` | _eventName_ or _eventName[]_ |
 | `eventName` | _string_ or _symbol_ |
-| `listenerFunc` | `function` |
+| `listenerFunc` | _function_ |
 | `listenerFuncName` | _string_ or _symbol_ |
 | `listenerObject` | _object_ |
 
