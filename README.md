@@ -355,7 +355,17 @@ Additional shortcuts for the wildcard `*` syntax:
 
 #### `.once( .. )`
 
-TODO
+`.once()` does exactly the same as `.on()`. the difference is: after the listener is called, it is automatically unsubscribed, so the listener method is only called exactly _once_.
+
+```js
+myObj.once('hi', () => console.log('hello'));
+
+myObj.emit('hi');
+// => "hello"
+
+myObj.emit('hi');
+// => (nothing happens here)
+```
 
 
 #### `.off( .. )`
