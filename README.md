@@ -46,8 +46,12 @@ Every object can become an emitter; for this, the object must inject the [Eventi
 import eventize, {Eventize} from 'eventize-js';
 
 const myObj = eventize({});
+```
 
-// or, if you are more familiar with class-based objects
+or, if you are more familiar with class-based objects
+
+```js
+import {Eventize} from 'eventize-js';
 
 class Foo extends Eventize {
   // constructor() {
