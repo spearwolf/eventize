@@ -33,8 +33,7 @@ describe('EventStore', () => {
       new EventListener('a', 666, null),
       new EventListener('b', 0, null),
       new EventListener('a', 0, null),
-    ];
-    origListener.forEach(store.add.bind(store));
+    ].map((listener) => store.add(listener));
 
     it('catchEmAllListeners store should be empty', () => {
       expect(store.catchEmAllListeners).toHaveLength(0);
@@ -43,11 +42,11 @@ describe('EventStore', () => {
     it('forEach() calls the listener listener in highest-priority-and-id-comes-first order for all listeners for the given event name', () => {
       const listeners: Array<EventListener> = [];
       store.forEach('a', (listener) => listeners.push(listener));
+      expect(listeners).toHaveLength(3);
       expect(listeners).toEqual([
-        origListener[2],
-        origListener[1],
-        origListener[4],
-        origListener[0],
+        origListener[2], // a, 666
+        origListener[1], // a, 0
+        origListener[0], // a, -7
       ]);
     });
   });
@@ -59,20 +58,19 @@ describe('EventStore', () => {
       new EventListener(EVENT_CATCH_EM_ALL, 0, null),
       new EventListener(EVENT_CATCH_EM_ALL, 666, null),
       new EventListener(EVENT_CATCH_EM_ALL, 0, null),
-    ];
-    origListener.forEach(store.add.bind(store));
+    ].map((listener) => store.add(listener));
 
     it('catchEmAllListeners should not be empty', () => {
-      expect(store.catchEmAllListeners).toHaveLength(4);
+      expect(store.catchEmAllListeners).toHaveLength(3);
     });
 
     it('forEach() calls the listener listener in highest-priority-and-id-comes-first order for all catch-em-all listeners', () => {
       const listeners: Array<EventListener> = [];
       store.forEach('foo', (listener) => listeners.push(listener));
+      expect(listeners).toHaveLength(3);
       expect(listeners).toEqual([
         origListener[2],
         origListener[1],
-        origListener[3],
         origListener[0],
       ]);
     });
@@ -80,7 +78,7 @@ describe('EventStore', () => {
 
   describe('with named and catch-em-all listeners', () => {
     const store = new EventStore();
-    const origListener = [
+    [
       new EventListener('a', -7, '0'),
       new EventListener(EVENT_CATCH_EM_ALL, 100, '1'),
       new EventListener('a', 0, '2'),
@@ -90,12 +88,12 @@ describe('EventStore', () => {
       new EventListener('b', 0, '6'),
       new EventListener(EVENT_CATCH_EM_ALL, -3, '7'),
       new EventListener('a', 0, '8'),
-    ];
-    origListener.forEach(store.add.bind(store));
+    ].forEach((listener) => store.add(listener));
 
     it('forEach() calls the listener in highest-priority-and-id-comes-first order for all listeners', () => {
       const listeners: Array<EventListener> = [];
       store.forEach('a', (listener) => listeners.push(listener));
+      expect(listeners).toHaveLength(8);
       expect(listeners.map((h) => h.listener)).toEqual([
         '4',
         '3',

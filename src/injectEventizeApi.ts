@@ -16,11 +16,10 @@ import {
 } from './types';
 import {defineHiddenPropertyRO, isEventName} from './utils';
 
-const unsubscribeAfterApply = (obj: EventizeApi) => (
-  listener: EventListener,
-) => {
-  listener.callAfterApply = () => obj.off(listener);
-};
+const unsubscribeAfterApply =
+  (obj: EventizeApi) => (listener: EventListener) => {
+    listener.callAfterApply = () => obj.off(listener);
+  };
 
 const makeUnsubscribe = (
   host: EventizeApi,

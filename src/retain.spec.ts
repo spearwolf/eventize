@@ -1,11 +1,11 @@
-import sinon from 'sinon';
+import {fake} from 'sinon';
 
 import eventize from '.';
 
 describe('retain()', () => {
   it('calls the listener function after registration with on()', () => {
     const obj = eventize({});
-    const subscriber = sinon.fake();
+    const subscriber = fake();
 
     obj.retain('foo');
     obj.emit('foo', 'bar', [1, 2, 3]);
@@ -20,7 +20,7 @@ describe('retain()', () => {
   it('calls the listener object after registration with on()', () => {
     const obj = eventize({});
     const subscriber = {
-      foo: sinon.fake(),
+      foo: fake(),
     };
 
     obj.retain('foo');
@@ -35,38 +35,39 @@ describe('retain()', () => {
 
   it('calls the catch-em-all listener object', () => {
     const obj = eventize({});
-    const subscriber = {
-      foo: sinon.fake(),
-      plah: sinon.fake(),
-      bar: sinon.fake(),
+
+    const subscriber0 = {
+      foo: fake(),
+      plah: fake(),
+      bar: fake(),
     };
 
-    const sub2 = {
-      foo: sinon.fake(),
+    const subscriber1 = {
+      foo: fake(),
     };
 
-    obj.on(sub2);
+    obj.on(subscriber1);
 
     obj.retain('foo');
 
     obj.emit('foo', 'bar', [1, 2, 3]);
     obj.emit('plah', 'foo!');
 
-    expect(subscriber.foo.called).toBeFalsy();
-    expect(subscriber.plah.called).toBeFalsy();
-    expect(sub2.foo.callCount).toBe(1);
+    expect(subscriber0.foo.called).toBeFalsy();
+    expect(subscriber0.plah.called).toBeFalsy();
+    expect(subscriber1.foo.callCount).toBe(1);
 
-    obj.on(subscriber);
+    obj.on(subscriber0);
 
-    expect(subscriber.foo.calledWith('bar', [1, 2, 3])).toBeTruthy();
-    expect(subscriber.plah.called).toBeFalsy();
-    expect(sub2.foo.callCount).toBe(1);
+    expect(subscriber0.foo.calledWith('bar', [1, 2, 3])).toBeTruthy();
+    expect(subscriber0.plah.called).toBeFalsy();
+    expect(subscriber1.foo.callCount).toBe(1);
   });
 
   it('multiple event signals', () => {
     const obj = eventize({});
     const subscriber = {
-      foo: sinon.fake(),
+      foo: fake(),
     };
 
     obj.retain('foo');

@@ -48,6 +48,7 @@ export class EventListener {
   readonly listenerType: number;
   callAfterApply: CallAfterApplyFnType;
   isRemoved: boolean;
+  refCount: number;
 
   constructor(
     eventName: EventName,
@@ -64,8 +65,10 @@ export class EventListener {
     this.listenerType = detectListenerType(listener);
     this.callAfterApply = undefined;
     this.isRemoved = false;
+    this.refCount = 1;
   }
 
+  /** In the test for equality, the priority is not considered */
   isEqual(
     listener: unknown,
     listenerObject: ListenerObjectType = null,

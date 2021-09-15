@@ -14,14 +14,10 @@ const registerEventListener = (
   listener: unknown,
   listenerObject: ListenerObjectType,
 ): EventListener => {
-  const eventListener = new EventListener(
-    eventName,
-    priority,
-    listener,
-    listenerObject,
+  const eventListener = store.add(
+    new EventListener(eventName, priority, listener, listenerObject),
   );
-  store.add(eventListener);
-  keeper.emit(eventName, eventListener);
+  keeper.emit(eventName, eventListener); // TODO what if similarListener ?
   return eventListener;
 };
 
