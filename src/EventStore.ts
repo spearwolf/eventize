@@ -9,7 +9,7 @@ import {isCatchEmAll, isEventName} from './utils';
 
 type HasPriorityOrIdType = {priority: number; id: number};
 
-const sortByPrioAndId = (
+const sortByPriorityAndId = (
   a: HasPriorityOrIdType,
   b: HasPriorityOrIdType,
 ): number =>
@@ -17,14 +17,19 @@ const sortByPrioAndId = (
 
 const cloneArray = <T>(arr: Array<T>): Array<T> => arr?.slice(0);
 
-const removeListenerItem = (arr: Array<any>, listener: any) => {
-  const idx = arr.indexOf(listener);
+const removeItemFromArray = (arr: Array<any>, item: any) => {
+  const idx = arr.indexOf(item);
   if (idx > -1) {
     arr.splice(idx, 1);
   }
 };
 
-const removeListener = (
+const isSimilarListenerType = (listenerType: number) =>
+  listenerType === LISTENER_IS_OBJ || listenerType === LISTENER_IS_NAMED_FUNC;
+
+// TODO removeSimilarListener()
+
+const removeListenerFromArray = (
   listeners: Array<EventListener>,
   listener: unknown,
   listenerObject: ListenerObjectType,
@@ -38,41 +43,92 @@ const removeListener = (
   }
 };
 
-const removeAllListeners = (listeners: Array<EventListener>) => {
-  if (listeners) {
-    listeners.forEach((li) => {
-      li.isRemoved = true;
-    });
-    listeners.length = 0;
+const removeSimilarListenersFromArray = (
+  fromArray: Array<EventListener>,
+  eventName: unknown,
+  listenerObject: ListenerObjectType,
+) => {
+  const similarListeners: EventListener[] = [];
+  for (const listener of fromArray) {
+    if (
+      listener.eventName === eventName &&
+      listener.listener === listenerObject
+    ) {
+      similarListeners.push(listener);
+    }
+  }
+  for (const listener of similarListeners) {
+    removeListenerFromArray(fromArray, listener, undefined);
   }
 };
 
-const findSimilarListener = (
-  newListener: EventListener,
-  existingListeners: EventListener[],
-) => {
-  if (
-    newListener.listenerType === LISTENER_IS_OBJ ||
-    newListener.listenerType === LISTENER_IS_NAMED_FUNC
-  ) {
-    return existingListeners.find((listener) => {
-      if (newListener.listenerType === listener.listenerType) {
-        return (
-          newListener.priority === listener.priority &&
-          newListener.eventName === listener.eventName &&
-          newListener.listenerObject === listener.listenerObject &&
-          newListener.listener === listener.listener
-        );
-      }
-      return false;
+const removeAll = (fromArray: Array<EventListener>) => {
+  if (fromArray) {
+    fromArray.forEach((listener) => {
+      listener.isRemoved = true;
+      // listener.refCount = 0;
     });
+    fromArray.length = 0;
+  }
+};
+
+const isSimilar = (
+  a: {
+    listenerType: number;
+    priority: number;
+    eventName: string | symbol;
+    listenerObject: any;
+    listener: any;
+  },
+  b: EventListener,
+) => {
+  if (a.listenerType === b.listenerType) {
+    return (
+      a.priority === b.priority &&
+      a.eventName === b.eventName &&
+      a.listenerObject === b.listenerObject &&
+      a.listener === b.listener
+    );
+  }
+  return false;
+};
+
+const findSimilarListener = (
+  searchFor: EventListener,
+  listeners: EventListener[],
+) => {
+  if (isSimilarListenerType(searchFor.listenerType)) {
+    return listeners.find((listener) => isSimilar(searchFor, listener));
   }
   return undefined;
+};
+
+const insertOrFindSimilarListener = (
+  listener: EventListener,
+  arr: EventListener[],
+): EventListener => {
+  const similarListener = findSimilarListener(listener, arr);
+  if (similarListener) {
+    similarListener.refCount += 1;
+    return similarListener;
+  }
+  arr.push(listener);
+  arr.sort(sortByPriorityAndId);
+  return listener;
 };
 
 export class EventStore {
   readonly namedListeners: Map<EventName, Array<EventListener>>;
   readonly catchEmAllListeners: Array<EventListener>;
+
+  #getListenersForEventName = (eventName: string | symbol): EventListener[] => {
+    let namedListeners = this.namedListeners.get(eventName);
+    if (!namedListeners) {
+      namedListeners = [];
+      this.namedListeners.set(eventName, namedListeners);
+    }
+    return namedListeners;
+  };
 
   constructor() {
     this.namedListeners = new Map();
@@ -83,43 +139,22 @@ export class EventStore {
    * Returns the given listener (newListener), or if there is already a similar listener in the store,
    * the existing one with increased reference count (refCount)
    */
-  add(newListener: EventListener): EventListener {
-    if (newListener.isCatchEmAll) {
-      const similarListener = findSimilarListener(
-        newListener,
-        this.catchEmAllListeners,
-      );
-      if (similarListener) {
-        similarListener.refCount += 1;
-        return similarListener;
-      }
-      this.catchEmAllListeners.push(newListener);
-      this.catchEmAllListeners.sort(sortByPrioAndId);
-    } else {
-      const {eventName} = newListener;
-      let namedListeners = this.namedListeners.get(eventName);
-      if (!namedListeners) {
-        namedListeners = [];
-        this.namedListeners.set(eventName, namedListeners);
-      } else {
-        const similarListener = findSimilarListener(
-          newListener,
-          namedListeners,
-        );
-        if (similarListener) {
-          similarListener.refCount += 1;
-          return similarListener;
-        }
-      }
-      namedListeners.push(newListener);
-      namedListeners.sort(sortByPrioAndId);
-    }
-    return newListener;
+  add(listener: EventListener): EventListener {
+    return insertOrFindSimilarListener(
+      listener,
+      listener.isCatchEmAll
+        ? this.catchEmAllListeners
+        : this.#getListenersForEventName(listener.eventName),
+    );
   }
 
-  remove(listener: unknown, listenerObject: ListenerObjectType): void {
+  remove(
+    listener: unknown,
+    listenerObject: ListenerObjectType,
+    removeSimilar = false,
+  ): void {
     if (listenerObject == null && Array.isArray(listener)) {
-      listener.forEach(this.remove.bind(this));
+      listener.forEach((li) => this.remove(li, null, removeSimilar));
     } else if (
       listener == null ||
       (listenerObject == null && isCatchEmAll(listener))
@@ -127,30 +162,56 @@ export class EventStore {
       this.removeAllListeners();
     } else if (listenerObject == null && isEventName(listener)) {
       const listeners = this.namedListeners.get(listener);
-      removeAllListeners(listeners);
+      removeAll(listeners);
     } else if (listener instanceof EventListener) {
-      listener.refCount -= 1;
-      if (listener.refCount < 1) {
-        listener.isRemoved = true;
-        this.namedListeners.forEach((namedListeners) =>
-          removeListenerItem(namedListeners, listener),
+      if (!listener.isRemoved) {
+        listener.refCount -= 1;
+        if (listener.refCount < 1) {
+          listener.isRemoved = true;
+          this.namedListeners.forEach((namedListeners) =>
+            removeItemFromArray(namedListeners, listener),
+          );
+          removeItemFromArray(this.catchEmAllListeners, listener);
+        }
+      }
+    } else if (isCatchEmAll(listener)) {
+      removeListenerFromArray(
+        this.catchEmAllListeners,
+        listener,
+        listenerObject,
+      );
+    } else if (removeSimilar) {
+      if (isCatchEmAll(listener)) {
+        removeSimilarListenersFromArray(
+          this.catchEmAllListeners,
+          EVENT_CATCH_EM_ALL,
+          listener,
         );
-        removeListenerItem(this.catchEmAllListeners, listener);
+      } else {
+        this.namedListeners.forEach((namedListeners) =>
+          removeSimilarListenersFromArray(
+            namedListeners,
+            listener,
+            listenerObject,
+          ),
+        );
       }
     } else {
       this.namedListeners.forEach((namedListeners) =>
-        removeListener(namedListeners, listener, listenerObject),
+        removeListenerFromArray(namedListeners, listener, listenerObject),
       );
-      removeListener(this.catchEmAllListeners, listener, listenerObject);
+      removeListenerFromArray(
+        this.catchEmAllListeners,
+        listener,
+        listenerObject,
+      );
     }
   }
 
   removeAllListeners(): void {
-    this.namedListeners.forEach((namedListeners) =>
-      removeAllListeners(namedListeners),
-    );
+    this.namedListeners.forEach((namedListeners) => removeAll(namedListeners));
     this.namedListeners.clear();
-    removeAllListeners(this.catchEmAllListeners);
+    removeAll(this.catchEmAllListeners);
   }
 
   forEach(eventName: EventName, fn: (listener: EventListener) => void): void {

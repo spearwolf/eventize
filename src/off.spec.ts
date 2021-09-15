@@ -1,12 +1,12 @@
-import sinon from 'sinon';
+import {fake} from 'sinon';
 
 import eventize from '.';
 
 describe('off()', () => {
   describe('by function', () => {
     const obj = eventize({});
-    const listenerFunc = sinon.fake();
-    const otherListener = sinon.fake();
+    const listenerFunc = fake();
+    const otherListener = fake();
 
     obj.on('foo', listenerFunc);
     obj.on('foo', otherListener);
@@ -33,8 +33,8 @@ describe('off()', () => {
   describe('by function and object', () => {
     const obj = eventize({});
     const listenerObject = {};
-    const listenerFunc = sinon.fake();
-    const otherListener = sinon.fake();
+    const listenerFunc = fake();
+    const otherListener = fake();
 
     obj.on('foo', listenerFunc, listenerObject);
     obj.on('foo', otherListener);
@@ -60,8 +60,8 @@ describe('off()', () => {
 
   describe('by eventName', () => {
     const obj = eventize({});
-    const listenerFunc0 = sinon.fake();
-    const listenerFunc1 = sinon.fake();
+    const listenerFunc0 = fake();
+    const listenerFunc1 = fake();
 
     obj.on('foo', listenerFunc0);
     obj.on('foo', listenerFunc1);
@@ -88,8 +88,8 @@ describe('off()', () => {
   describe('by object', () => {
     const obj = eventize({});
     const listener = {
-      foo: sinon.fake(),
-      bar: sinon.fake(),
+      foo: fake(),
+      bar: fake(),
     };
 
     obj.on('foo', listener);
@@ -118,8 +118,8 @@ describe('off()', () => {
 
   describe('without arguments', () => {
     const obj = eventize({});
-    const listenerFunc0 = sinon.fake();
-    const listenerFunc1 = sinon.fake();
+    const listenerFunc0 = fake();
+    const listenerFunc1 = fake();
 
     obj.on('foo', listenerFunc0);
     obj.on('foo', listenerFunc1);
@@ -145,9 +145,9 @@ describe('off()', () => {
 
   describe('off() inside on()', () => {
     const obj = eventize({});
-    const firstListener = sinon.fake();
-    const listenerFunc = sinon.fake();
-    const otherListener = sinon.fake();
+    const firstListener = fake();
+    const listenerFunc = fake();
+    const otherListener = fake();
 
     obj.on('foo', 3, firstListener);
     obj.once('foo', 2, listenerFunc);

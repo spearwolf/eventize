@@ -59,7 +59,11 @@ export function injectEventizeApi<T extends Object>(obj: T): T & EventizeApi {
     },
 
     off(listener?: ListenerType, listenerObject?: ListenerObjectType): void {
-      store.remove(listener, listenerObject);
+      const listenerType = typeof listener;
+      const forceRemove =
+        listenerObject != null &&
+        (listenerType === 'string' || listenerType === 'symbol');
+      store.remove(listener, listenerObject, forceRemove);
       if (Array.isArray(listener)) {
         keeper.remove(listener.filter((li) => typeof li === 'string'));
       } else if (isEventName(listener)) {
