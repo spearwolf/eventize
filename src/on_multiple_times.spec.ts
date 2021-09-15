@@ -109,6 +109,8 @@ describe('on() multiple times', () => {
 
     signal.on(obj);
     signal.on(obj);
+    signal.on('bar', 'foo', obj);
+    signal.on('bar', '*', obj);
 
     signal.emit('foo');
 
@@ -118,6 +120,9 @@ describe('on() multiple times', () => {
     obj.foo.resetHistory();
 
     signal.emit('foo');
+    expect(obj.foo.callCount).toBe(0);
+
+    signal.emit('bar');
     expect(obj.foo.callCount).toBe(0);
   });
 });

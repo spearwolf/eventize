@@ -51,8 +51,8 @@ const removeSimilarListenersFromArray = (
   const similarListeners: EventListener[] = [];
   for (const listener of fromArray) {
     if (
-      listener.eventName === eventName &&
-      listener.listener === listenerObject
+      (eventName == null && listener.listenerObject === listenerObject) ||
+      (listener.eventName === eventName && listener.listener === listenerObject)
     ) {
       similarListeners.push(listener);
     }
@@ -153,17 +153,35 @@ export class EventStore {
     listenerObject: ListenerObjectType,
     removeSimilar = false,
   ): void {
+    // TODO clean up this messy function!
     if (listenerObject == null && Array.isArray(listener)) {
+      // ---------------------------------------------------------------
+      // off([...])
+      //
       listener.forEach((li) => this.remove(li, null, removeSimilar));
+      // ---------------------------------------------------------------
     } else if (
       listener == null ||
       (listenerObject == null && isCatchEmAll(listener))
     ) {
+      // ---------------------------------------------------------------
+      // off()
+      // off('*')
+      //
       this.removeAllListeners();
+      // ---------------------------------------------------------------
     } else if (listenerObject == null && isEventName(listener)) {
-      const listeners = this.namedListeners.get(listener);
-      removeAll(listeners);
+      // ---------------------------------------------------------------
+      // off('foo')
+      // off(Symbol('foo'))
+      //
+      removeAll(this.namedListeners.get(listener));
+      // ---------------------------------------------------------------
     } else if (listener instanceof EventListener) {
+      // ---------------------------------------------------------------
+      // off(EventListener)
+      // on(...)()
+      //
       if (!listener.isRemoved) {
         listener.refCount -= 1;
         if (listener.refCount < 1) {
@@ -174,20 +192,25 @@ export class EventStore {
           removeItemFromArray(this.catchEmAllListeners, listener);
         }
       }
-    } else if (isCatchEmAll(listener)) {
-      removeListenerFromArray(
-        this.catchEmAllListeners,
-        listener,
-        listenerObject,
-      );
+      // ---------------------------------------------------------------
     } else if (removeSimilar) {
       if (isCatchEmAll(listener)) {
+        // ---------------------------------------------------------------
+        // .off('*', obj)
+        //
+        // TODO propably this will never be called
+        //      so please check if we can remove this code path
         removeSimilarListenersFromArray(
           this.catchEmAllListeners,
           EVENT_CATCH_EM_ALL,
           listener,
         );
+        // ---------------------------------------------------------------
       } else {
+        // ---------------------------------------------------------------
+        // off('foo', obj)
+        // off(Symbol('foo'), obj)
+        //
         this.namedListeners.forEach((namedListeners) =>
           removeSimilarListenersFromArray(
             namedListeners,
@@ -195,16 +218,27 @@ export class EventStore {
             listenerObject,
           ),
         );
+        // ---------------------------------------------------------------
       }
     } else {
-      this.namedListeners.forEach((namedListeners) =>
-        removeListenerFromArray(namedListeners, listener, listenerObject),
-      );
+      // ---------------------------------------------------------------
+      // off(obj)
+      //
+      this.namedListeners.forEach((namedListeners) => {
+        removeListenerFromArray(namedListeners, listener, listenerObject);
+        removeSimilarListenersFromArray(namedListeners, undefined, listener);
+      });
       removeListenerFromArray(
         this.catchEmAllListeners,
         listener,
         listenerObject,
       );
+      removeSimilarListenersFromArray(
+        this.catchEmAllListeners,
+        undefined,
+        listener,
+      );
+      // ---------------------------------------------------------------
     }
   }
 
