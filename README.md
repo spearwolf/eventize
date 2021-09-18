@@ -351,7 +351,7 @@ Additional shortcuts for the wildcard `*` syntax:
 
 #### `.once( .. )`
 
-`.once()` does exactly the same as `.on()`. the difference is: after the listener is called, it is automatically unsubscribed, so the listener method is only called exactly _once_.
+`.once()` does exactly the same as `.on()`. the difference is: after the listener is called, it is automatically unsubscribed, so the listener method is only called exactly _once_. No more and no less &ndash; there is really nothing more to say about _once_.
 
 ```js
 myObj.once('hi', () => console.log('hello'))
@@ -366,7 +366,39 @@ myObj.emit('hi')
 
 #### `.off( .. )`
 
-TODO
+##### The art of unsubscribing
+
+At the beginning we learned that each call to `on()` returns an _unsubscribe function_. You can think of it as `on()` creating a _link_ to the _event listener_.
+If this _unsubscribe function_ is called, the _link_ is taken back again.
+
+So far so good. Now let's assume we write code that should react to a dynamically generated event name with a certain method, e.g.:
+
+```js
+const queue = eventize({})
+
+class Greeter {
+  listenTo(name) {
+    queue.on(name, 'sayHello', this)
+  }
+  
+  sayHello() {
+    // do what must be done
+  }
+}
+
+const greeter = new Greeter()
+greeter.listenTo('suzuka')
+greeter.listenTo('yui')
+greeter.listenTo('moa')
+```
+
+Now, to put our greeter to silence, we would have to call the _unsubscribe function_ returned by `on()` for each call to `listenTo()`. Quite awkward. Here `off()` helps us. Using `off()` we can specifically disable one or more previously established _links_. In this case that would be:
+
+```js
+queue.off(greeter)
+```
+
+... this will cancel all subscriptions from `queue` to `greeter`!
 
 
 ### How to emit events
