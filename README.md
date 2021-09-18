@@ -43,23 +43,19 @@ The underlying concept is simple: certain kinds of objects (called "emitters") e
 Every object can become an emitter; for this, the object must inject the [Eventize API](#the-emitter-eventize-api).
 
 ```js
-import eventize, {Eventize} from 'eventize-js';
+import eventize from 'eventize-js'
 
-const myObj = eventize({});
+const myObj = eventize({})
 ```
 
 or, if you are more familiar with class-based objects
 
 ```js
-import {Eventize} from 'eventize-js';
+import {Eventize} from 'eventize-js'
 
-class Foo extends Eventize {
-  // constructor() {
-  //   super();
-  // }
-}
+class Foo extends Eventize {}
 
-const myOtherObj = new Foo();
+const myOtherObj = new Foo()
 ```
 
 ##### Listener
@@ -68,12 +64,12 @@ Any function can be used as a listener. However, you can also use an object that
 
 ```js
 myObj.on('foo', (bar) => {
-  console.log('I am a listener function and you called me with bar=', bar);
+  console.log('I am a listener function and you called me with bar=', bar)
 })
 
 myObj.on('foo', {
   foo(bar, plah) {
-    console.log('I am a method and you called me with bar=', bar, 'and plah=', plah);
+    console.log('I am a method and you called me with bar=', bar, 'and plah=', plah)
   }
 })
 ```
@@ -83,9 +79,9 @@ myObj.on('foo', {
 An emitter can emit any event name; parameters are optional
 
 ```js
-myObj.emit('bar');  // well, nothing happens here
+myObj.emit('bar')  // well, nothing happens here
 
-myObj.emit('foo', 123, 456);
+myObj.emit('foo', 123, 456)
 // => "I am a listener function and you called me with bar= 123"
 // => "I am a method and you called me with bar= 123 and plah= 456"
 ```
@@ -134,11 +130,11 @@ For this purpose [`Object.create()`](https://developer.mozilla.org/en-US/docs/We
 The class-based approach is essentially the same as the _extend_ method, but differs in its usage:
 
 ```js
-import {Eventize} from 'eventize-js';
+import {Eventize} from 'eventize-js'
 
 class Foo extends Eventize {
   // constructor() {
-  //   super();
+  //   super()
   // }
 }
 ```
@@ -148,13 +144,13 @@ class Foo extends Eventize {
 If you want to create an emitter class-based, but not via inheritance, you can also do this with the eventize method in the constructor, here as a typescript example:
 
 ```ts
-import eventize, {Eventize} from 'eventize-js';
+import eventize, {Eventize} from 'eventize-js'
 
 interface Foo extends Eventize {}
 
 class Foo {
   constructor() {
-    eventize(this);
+    eventize(this)
   }
 }
 ```
@@ -184,10 +180,10 @@ The simplest and most direct way is to subscribe to an event using a function:
 ```js
 import eventize from 'eventize-js'
 
-const myObj = eventize({});
+const myObj = eventize({})
 
 const unsubscribe = myObj.on('myEventName', (arg1, arg2) => {
-  console.log('myEventName, arg1=', arg1, 'arg2=', arg2);
+  console.log('myEventName, arg1=', arg1, 'arg2=', arg2)
 })
 ```
 The listener function is called when the named event is emitted.
@@ -223,11 +219,11 @@ Sometimes you also want to control the _order_ in which the listeners are called
 By default, the listeners are called in the order in which they were subscribed &mdash; in their _priority group_; a priority group is defined by a number, where the default priority group is `0` and large numbers take precedence over small ones.
 
 ```js
-myObj.on('foo', () => console.log("I don't care when I am called"));
-myObj.on('foo', -999, () => console.log("I would like to be the last in line"));
-myObj.on(Number.MAX_VALUE, () => console.log("I will be the first"));
+myObj.on('foo', () => console.log("I don't care when I am called"))
+myObj.on('foo', -999, () => console.log("I would like to be the last in line"))
+myObj.on(Number.MAX_VALUE, () => console.log("I will be the first"))
 
-myObj.emit('foo');
+myObj.emit('foo')
 // => "I will be the first"
 // => "I don't care when I am called"
 // => "I would like to be the last in line"
@@ -241,7 +237,7 @@ You can also use a listener object instead of a function:
 ```js
 myObj.on('foo', {
   foo(...args) {
-    console.log('foo called with args=', ...args);
+    console.log('foo called with args=', ...args)
   }
 })
 ```
@@ -249,9 +245,9 @@ myObj.on('foo', {
 This is quite useful in conjunction with wildcards:
 
 ```js
-const Init = Symbol('init');  // yes, symbols are used here as event names
-const Render = Symbol('render');
-const Dispose = Symbol('dispose');
+const Init = Symbol('init')  // yes, symbols are used here as event names
+const Render = Symbol('render')
+const Dispose = Symbol('dispose')
 
 myObj.on({
   [Init]() {
@@ -287,10 +283,10 @@ Of course, this also works with priorities:
 ```js
 myObj.on(1000, {
   foo() {
-    console.log('foo!');
+    console.log('foo!')
   }
   bar() {
-    console.log('bar!');
+    console.log('bar!')
   }
 })
 ```
@@ -302,11 +298,11 @@ As a last option it is also possible to pass the listener method as _name_ or _f
 ```js
 myObj.on('hello', 'say', {
   say(hello) {
-    console.log('hello', hello);
+    console.log('hello', hello)
   }
 })
 
-myObj.emit('hello', 'world');
+myObj.emit('hello', 'world')
 // => "hello world"
 ```
 
@@ -316,12 +312,12 @@ myObj.emit('hello', 'world');
 myObj.on(
   'hello',
   function() {
-    console.log('hello', this.receiver);
+    console.log('hello', this.receiver)
   }, {
     receiver: 'world'
   });
 
-myObj.emit('hello');
+myObj.emit('hello')
 // => "hello world"
 ```
 
@@ -358,12 +354,12 @@ Additional shortcuts for the wildcard `*` syntax:
 `.once()` does exactly the same as `.on()`. the difference is: after the listener is called, it is automatically unsubscribed, so the listener method is only called exactly _once_.
 
 ```js
-myObj.once('hi', () => console.log('hello'));
+myObj.once('hi', () => console.log('hello'))
 
-myObj.emit('hi');
+myObj.emit('hi')
 // => "hello"
 
-myObj.emit('hi');
+myObj.emit('hi')
 // => (nothing happens here)
 ```
 
