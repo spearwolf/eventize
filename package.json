@@ -1,6 +1,6 @@
 {
   "name": "eventize-js",
-  "version": "2.0.0-beta",
+  "version": "2.0.0-beta.2",
   "author": {
     "name": "Wolfger Schramm",
     "email": "wolfger@spearwolf.de",
@@ -13,7 +13,10 @@
   "license": "Apache-2.0",
   "main": "build/eventize.umd.js",
   "module": "build/eventize.js",
-  "exports": "./build/eventize.js",
+  "exports": {
+    "import": "./build/eventize.js",
+    "require": "./build/eventize.umd.js"
+  },
   "types": "build/types/index.d.ts",
   "homepage": "https://github.com/spearwolf/eventize/",
   "bugs": {
