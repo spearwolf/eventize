@@ -25,12 +25,14 @@ describe('retain()', () => {
 
     obj.retain('foo');
     obj.emit('foo', 'bar', [1, 2, 3]);
+    obj.emit('foo', 'plah', [4, 5, 6]);
 
     expect(subscriber.foo.called).toBeFalsy();
 
     obj.on('foo', subscriber);
 
-    expect(subscriber.foo.calledWith('bar', [1, 2, 3])).toBeTruthy();
+    expect(subscriber.foo.calledWith('plah', [4, 5, 6])).toBeTruthy();
+    expect(subscriber.foo.callCount).toBe(1);
   });
 
   it('calls the catch-em-all listener object', () => {
