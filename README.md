@@ -1,7 +1,4 @@
-# eventize.js
-
-[![npm version](https://img.shields.io/npm/v/eventize-js?style=for-the-badge)](https://www.npmjs.com/package/@spearwolf/eventize)
-[![Build Status](https://img.shields.io/travis/spearwolf/eventize.svg?style=for-the-badge)](https://travis-ci.org/spearwolf/eventize)
+# @spearwolf/eventize
 
 A tiny and clever framework for synchronous event-driven programming in javascript.
 
@@ -41,7 +38,7 @@ The underlying concept is simple: certain kinds of objects (called "emitters") e
 Every object can become an emitter; for this, the object must inject the [Eventize API](#the-emitter-eventize-api).
 
 ```js
-import eventize from 'eventize-js'
+import eventize from '@spearwolf/eventize'
 
 const myObj = eventize({})
 ```
@@ -49,7 +46,7 @@ const myObj = eventize({})
 or, if you are more familiar with class-based objects
 
 ```js
-import {Eventize} from 'eventize-js'
+import {Eventize} from '@spearwolf/eventize'
 
 class Foo extends Eventize {}
 
@@ -128,7 +125,7 @@ For this purpose [`Object.create()`](https://developer.mozilla.org/en-US/docs/We
 The class-based approach is essentially the same as the _extend_ method, but differs in its usage:
 
 ```js
-import {Eventize} from 'eventize-js'
+import {Eventize} from '@spearwolf/eventize'
 
 class Foo extends Eventize {
   // constructor() {
@@ -142,7 +139,7 @@ class Foo extends Eventize {
 If you want to create an emitter class-based, but not via inheritance, you can also do this with the eventize method in the constructor, here as a typescript example:
 
 ```ts
-import eventize, {Eventize} from 'eventize-js'
+import eventize, {Eventize} from '@spearwolf/eventize'
 
 interface Foo extends Eventize {}
 
@@ -176,7 +173,7 @@ These methods are explained in detail below:
 The simplest and most direct way is to subscribe to an event using a function:
 
 ```js
-import eventize from 'eventize-js'
+import eventize from '@spearwolf/eventize'
 
 const myObj = eventize({})
 
@@ -403,10 +400,26 @@ queue.off(greeter)
 
 #### `.emit( .. )`
 
-TODO
+Emitting an event is pretty easy and straight forward:
+
+```js
+myObj.emit('foo', 'bar', 666)
+```
+
+That's it. No return value. All subscribed event listeners are called immediately.
+
+The first argument is the event name. Can be a _string_ or a _symbol_.
+All other parameters are optional and will be passed to the listener.
+
+If you want to emit several events at once - with the same parameters, you can simply specify an array with the desired event names as the first parameter:
+
+```js
+myObj.emit(['foo', 'bar'], 'plah', 666)
+```
+
 
 #### `.retain( .. )`
 
-TODO
+TODO &mdash; see examples from the tests ;)
 
 ... more TODO here ...
