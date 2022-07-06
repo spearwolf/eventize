@@ -1,5 +1,3 @@
-> !!! THIS IS THE DEVELOPMENT BRANCH - ALL STUFF HERE IS BY DEFAULT UNSTABLE - SO PLEASE USE IT WITH CARE !!!
-
 # eventize.js
 
 [![npm version](https://img.shields.io/npm/v/eventize-js?style=for-the-badge)](https://www.npmjs.com/package/eventize-js)
@@ -380,7 +378,7 @@ class Greeter {
   listenTo(name) {
     queue.on(name, 'sayHello', this)
   }
-  
+
   sayHello() {
     // do what must be done
   }
@@ -412,4 +410,3 @@ TODO
 TODO
 
 ... more TODO here ...
-
