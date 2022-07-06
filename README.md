@@ -420,6 +420,11 @@ myObj.emit(['foo', 'bar'], 'plah', 666)
 
 #### `.retain( .. )`
 
-TODO &mdash; see examples from the tests ;)
+##### Emit the last event to new subscribers
 
-... more TODO here ...
+```js
+myObj.retain('foo')
+```
+
+With `retain` the last emitted event is remembered. Every new listener gets the last event, even if it was emitted before subscribing.
+
