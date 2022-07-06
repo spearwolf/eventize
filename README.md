@@ -1,6 +1,6 @@
 # eventize.js
 
-[![npm version](https://img.shields.io/npm/v/eventize-js?style=for-the-badge)](https://www.npmjs.com/package/eventize-js)
+[![npm version](https://img.shields.io/npm/v/eventize-js?style=for-the-badge)](https://www.npmjs.com/package/@spearwolf/eventize)
 [![Build Status](https://img.shields.io/travis/spearwolf/eventize.svg?style=for-the-badge)](https://travis-ci.org/spearwolf/eventize)
 
 A tiny and clever framework for synchronous event-driven programming in javascript.
