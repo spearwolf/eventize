@@ -4,8 +4,6 @@ on:
   push:
     branches: [ "main" ]
 
-env:
-  NODE_AUTH_TOKEN: ${{secrets.NPM_AUTH_TOKEN}}
 
 jobs:
   test:
@@ -44,4 +42,8 @@ jobs:
         name: Build package
 
       - name: Publish package
-        run: "npm run publish:pkg"
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          token: ${{ secrets.NPM_AUTH_TOKEN }}
+          access: public
+          greater-version-only: true
