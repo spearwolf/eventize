@@ -13,3 +13,4 @@ scripts
 tsconfig.json
 *.spec.ts
 *.spec.d.ts
+.github
