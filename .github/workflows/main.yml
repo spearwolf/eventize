@@ -46,4 +46,3 @@ jobs:
         with:
           token: ${{ secrets.NPM_AUTH_TOKEN }}
           access: public
-          greater-version-only: true
