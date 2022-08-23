@@ -44,4 +44,4 @@ jobs:
         name: Build package
 
       - name: Publish package
-        run: "npm publish:pkg"
+        run: "npm run publish:pkg"
