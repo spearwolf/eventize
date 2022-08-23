@@ -6,7 +6,7 @@ const process = require('process');
 const pkgJson = require('../package.json');
 
 function publishPackage() {
-  exec(`npm publish --access public --dry-run`, (error, stdout, stderr) => {
+  exec(`npm publish --access public`, (error, stdout, stderr) => {
     console.error(stderr);
     console.log(stdout);
 
