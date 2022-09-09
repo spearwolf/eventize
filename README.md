@@ -53,6 +53,24 @@ class Foo extends Eventize {}
 const myOtherObj = new Foo()
 ```
 
+for __typescript__ the following variant has also proven itself:
+
+```ts
+import eventize, {Eventize} from '@spearwolf/eventize'
+
+export interface Foo extends Eventize {}
+
+export class Foo {
+  constructor() {
+    eventize(this);
+  }
+  // ...
+}
+
+
+```
+
+
 ##### Listener
 
 Any function can be used as a listener. However, you can also use an object that defines methods that have the exact name of the given event.
