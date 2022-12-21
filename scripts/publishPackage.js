@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable no-console */
 
 const {exec} = require('child_process');
 const process = require('process');
@@ -9,12 +10,7 @@ function publishPackage() {
   exec(`npm publish --access public`, (error, stdout, stderr) => {
     console.error(stderr);
     console.log(stdout);
-
-    if (!error) {
-      process.exit(0);
-    } else {
-      process.exit(error);
-    }
+    process.exit(!error ? 0 : error);
   });
 }
 
@@ -23,15 +19,15 @@ exec(`npm show ${pkgJson.name} versions --json`, (error, stdout, stderr) => {
     const versions = JSON.parse(stdout);
     if (versions.includes(pkgJson.version)) {
       console.log(
-        'skipping publish, version',
+        'skip publishing, version',
         pkgJson.version,
-        'already published',
+        'is already released',
       );
       process.exit(0);
     } else {
       publishPackage();
     }
   } else {
-    console.error(`exec error: ${stderr}`);
+    console.error(`exec() panic: ${stderr}`);
   }
 });
