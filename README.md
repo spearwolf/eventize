@@ -413,6 +413,7 @@ queue.off(greeter)
 
 ... this will cancel all subscriptions from `queue` to `greeter`!
 
+> TODO: add documentation for all supported ways to unsubscribe, see [/src/off.spec.ts](./src/off.spec.ts)
 
 ### How to emit events
 
@@ -446,3 +447,4 @@ myObj.retain('foo')
 
 With `retain` the last emitted event is remembered. Every new listener gets the last event, even if it was emitted before subscribing.
 
+> NOTE: This behavior is similar to the `new ReplaySubject(1)` of _rxjs_. But somehow the method name `retain` seemed more appropriate here.
