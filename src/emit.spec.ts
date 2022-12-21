@@ -1,12 +1,12 @@
-import sinon from 'sinon';
+import {fake} from 'sinon';
 
 import eventize, {Priority} from '.';
 
 describe('emit()', () => {
   describe('calls the listener with all given args (except the event name)', () => {
     const obj = eventize({});
-    const fn1 = sinon.fake();
-    const fn2 = sinon.fake();
+    const fn1 = fake();
+    const fn2 = fake();
 
     beforeAll(() => {
       obj.on('foo', 0, fn1);

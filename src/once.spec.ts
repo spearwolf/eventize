@@ -1,4 +1,4 @@
-import sinon from 'sinon';
+import {fake} from 'sinon';
 
 import eventize from '.';
 
@@ -6,8 +6,8 @@ describe('once()', () => {
   describe('once() before on()', () => {
     const obj = eventize({});
 
-    const listenerFunc = sinon.fake();
-    const otherListener = sinon.fake();
+    const listenerFunc = fake();
+    const otherListener = fake();
 
     beforeAll(() => {
       obj.once('foo', listenerFunc);
