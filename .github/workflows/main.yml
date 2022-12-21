@@ -4,7 +4,6 @@ on:
   push:
     branches: [ "main" ]
 
-
 jobs:
   test:
     name: Run tests
@@ -34,6 +33,7 @@ jobs:
         with:
           node-version: 16
           cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
 
       - run: npm ci
         name: Install dependencies
@@ -41,8 +41,7 @@ jobs:
       - run: npm run build
         name: Build package
 
-      - name: Publish package
-        uses: JS-DevTools/npm-publish@v1
-        with:
-          token: ${{ secrets.NPM_AUTH_TOKEN }}
-          access: public
+      - run: npm publish --access public
+        name: Publish package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_AUTH_TOKEN }}
