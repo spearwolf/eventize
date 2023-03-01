@@ -1,6 +1,6 @@
 {
   "name": "@spearwolf/eventize",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "author": {
     "name": "Wolfger Schramm",
     "email": "wolfger@spearwolf.de",
@@ -23,7 +23,7 @@
     "url": "https://github.com/spearwolf/eventize/issues"
   },
   "engines": {
-    "node": ">=16.19 <17"
+    "node": ">=16.19"
   },
   "scripts": {
     "build:esm": "cross-env NODE_ENV=production rollup -c ./rollup/rollup.config.esm.js",
