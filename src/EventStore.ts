@@ -280,4 +280,12 @@ export class EventStore {
       }
     }
   }
+
+  getSubscriptionCount(): number {
+    let count = this.catchEmAllListeners.length;
+    for (const namedListeners of this.namedListeners.values()) {
+      count += namedListeners.length;
+    }
+    return count;
+  }
 }

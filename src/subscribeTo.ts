@@ -55,7 +55,7 @@ export const subscribeTo = (
 
   if (!listener && hasConsole) {
     warn('called with insufficient arguments!', args);
-    throw 'subscribeTo called with insufficient arguments!';
+    throw 'subscribeTo() called with insufficient arguments!';
   }
 
   const register = (prio: number) => (event: EventName) =>

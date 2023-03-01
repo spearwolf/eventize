@@ -415,6 +415,16 @@ queue.off(greeter)
 
 > TODO: add documentation for all supported ways to unsubscribe, see [/src/off.spec.ts](./src/off.spec.ts)
 
+###### getSubscriptionCount()
+
+A small helper function that returns the number of subscriptions to the object. very useful for e.g. tests
+
+```js
+import {getSubscriptionCount} from '@spearwolf/eventize';
+
+getSubscriptionCount(queue) // => number
+```
+
 ### How to emit events
 
 #### `.emit( .. )`

@@ -16,12 +16,14 @@ describe('EventStore', () => {
       expect(store.namedListeners.get('a')).toBe(undefined);
       store.add(new EventListener('a', 0, null));
       expect(store.namedListeners.get('a')).toHaveLength(1);
+      expect(store.getSubscriptionCount()).toBe(1);
     });
 
     it('adding a catch-em-all listener adds the listener to the catchEmAllListeners array', () => {
       expect(store.catchEmAllListeners).toHaveLength(0);
       store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, null));
       expect(store.catchEmAllListeners).toHaveLength(1);
+      expect(store.getSubscriptionCount()).toBe(1);
     });
   });
 

@@ -1,6 +1,6 @@
 import {fake} from 'sinon';
 
-import eventize from '.';
+import eventize, {getSubscriptionCount} from '.';
 
 describe('on() multiple times', () => {
   it('on(eventName, listenerObject)', () => {
@@ -12,18 +12,25 @@ describe('on() multiple times', () => {
     const unsubscribe1 = obj.on('foo', obj);
     obj.once('foo', obj);
 
+    expect(getSubscriptionCount(obj)).toBe(1);
+
     obj.emit('foo');
 
     expect(obj.foo.callCount).toBe(1);
+    expect(getSubscriptionCount(obj)).toBe(1);
 
     unsubscribe0();
     obj.foo.resetHistory();
+
+    expect(getSubscriptionCount(obj)).toBe(1);
 
     obj.emit('foo');
     expect(obj.foo.callCount).toBe(1);
 
     unsubscribe1();
     obj.foo.resetHistory();
+
+    expect(getSubscriptionCount(obj)).toBe(0);
 
     obj.emit('foo');
     expect(obj.foo.callCount).toBe(0);
@@ -109,8 +116,12 @@ describe('on() multiple times', () => {
 
     signal.on(obj);
     signal.on(obj);
+
     signal.on('bar', 'foo', obj);
+
     signal.on('bar', '*', obj);
+
+    expect(getSubscriptionCount(signal)).toBe(3);
 
     signal.emit('foo');
 
@@ -118,6 +129,8 @@ describe('on() multiple times', () => {
 
     signal.off(obj);
     obj.foo.resetHistory();
+
+    expect(getSubscriptionCount(signal)).toBe(0);
 
     signal.emit('foo');
     expect(obj.foo.callCount).toBe(0);

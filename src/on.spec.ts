@@ -3,7 +3,7 @@ import {fake} from 'sinon';
 
 import {EVENT_CATCH_EM_ALL} from './constants';
 
-import eventize, {Priority} from '.';
+import eventize, {Priority, getSubscriptionCount} from '.';
 
 describe('on()', () => {
   // ---------------------------------------------------------------------------------------------
@@ -25,6 +25,9 @@ describe('on()', () => {
       obj.on('foo', 0, listenerFunc, listenerObject);
       obj.emit('foo', 'bar', 666);
 
+      it('subscription count', () => {
+        expect(getSubscriptionCount(obj)).toBe(2);
+      });
       it('emit() calls the listener', () => {
         expect(listenerFunc.calledWith('bar', 666)).toBeTruthy();
       });
@@ -55,6 +58,9 @@ describe('on()', () => {
       const unsubscribe = obj.on('foo', 9, 'foo', listenerObject);
       obj.emit('foo', 'bar', 666);
 
+      it('subscription count', () => {
+        expect(getSubscriptionCount(obj)).toBe(1);
+      });
       it('emit() calls the listener', () => {
         // @ts-ignore
         expect(listenerObject.args).toEqual(['bar', 666]);
@@ -144,6 +150,9 @@ describe('on()', () => {
       obj.on('foo', listenerFunc, listenerObject);
       obj.emit('foo', 'bar', 666);
 
+      it('subscription count', () => {
+        expect(getSubscriptionCount(obj)).toBe(2);
+      });
       it('emit() calls the listener', () => {
         expect(listenerFunc.calledWith('bar', 666)).toBeTruthy();
       });
