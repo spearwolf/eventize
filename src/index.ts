@@ -2,7 +2,7 @@ import {eventize, Eventize} from './eventize';
 
 export default eventize;
 
-export {Eventize};
+export {Eventize, eventize};
 
 export * from './Priority';
 export * from './isEventized';
