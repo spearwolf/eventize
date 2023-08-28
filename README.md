@@ -1,13 +1,14 @@
 # @spearwolf/eventize
 
+## Introduction 👀
+
 A tiny and clever framework for synchronous event-driven programming in javascript.
 
 yes, read correctly: the emitters call the listeners here _synchronously_ and not _asynchronously_, as is the case with [node.js events](https://nodejs.org/api/events.html), for example
 
 This is perfectly reasonable: sometimes you want to have control over when something happens. e.g., when your code runs inside an [animation frame](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame). Or you want to release resources immediately and instantaneously.
 
-
-##### FEATURES 👀
+### FEATURES
 
 - all **API** calls and downstream-listener-calls are **100% synchronous** :boom: no async! :stuck_out_tongue_closed_eyes:
 - :sparkles: **wildcards** &amp; **priorities** :exclamation:
@@ -35,12 +36,12 @@ The underlying concept is simple: certain kinds of objects (called "emitters") e
 
 ##### Emitter
 
-Every object can become an _emitter_; for this, the object must inject the [Eventize API](#the-emitter-eventize-api).
+Every object can become an _emitter_; for this, the object must inject the [eventize API](#eventize-api).
 
 ```js
 import {eventize} from '@spearwolf/eventize'
 
-const broker = eventize({})
+const ε = eventize({})
 ```
 
 or, if you are more familiar with class-based objects
@@ -50,7 +51,7 @@ import {Eventize} from '@spearwolf/eventize'
 
 class Foo extends Eventize {}
 
-const myObj = new Foo()
+const ε = new Foo()
 ```
 
 for __typescript__ the following _composition over inheritance_ variant has also proven itself:
@@ -70,25 +71,27 @@ export class Foo {
 }
 ```
 
+> 🔎 _emitter_ is a synonym for an _eventized object_ which in itself is a synonym for an object instance that has the _eventize api_ methods attached to it.
+> In this documentation we also use __ε__ as variable name to show that this is an _eventized object_
 
 ##### Listener
 
 Any function can be used as a listener. However, you can also use an object that defines methods that have the exact name of the given event.
 
 ```js
-// myObj is an eventized object
+// ε is an eventized object
 
-myObj.on('foo', (bar) => {
+ε.on('foo', (bar) => {
   console.log('I am a listener function and you called me with bar=', bar)
 })
 
-myObj.on('foo', {
+ε.on('foo', {
   foo(bar, plah) {
     console.log('I am a method and you called me with bar=', bar, 'and plah=', plah)
   }
 })
 
-myObj.on({
+ε.on({
   foo(bar, plah) {
     console.log('foo ->', {bar, plah})
   },
@@ -103,10 +106,10 @@ myObj.on({
 An emitter can emit any event name; parameters are optional
 
 ```js
-myObj.emit('bar')
+ε.emit('bar')
 // => "hej"
 
-myObj.emit('foo', 123, 456)
+ε.emit('foo', 123, 456)
 // => "I am a listener function and you called me with bar= 123"
 // => "I am a method and you called me with bar= 123 and plah= 456"
 // => "foo -> {bar: 123, plah: 456}"
@@ -121,7 +124,7 @@ If an emitter emits an event to which no listeners are attached, nothing happens
 
 ### How to _emitter_
 
-There are several ways to convert any object into an emitter.
+There are several ways to convert any object into an emitter / eventized object.
 
 Probably the most common method is to simply use `eventize( obj )`; this corresponds to the _inject_ variant:
 
@@ -182,9 +185,9 @@ class Foo {
 ```
 
 
-### The ~~emitter~~ eventize API
+### eventize API
 
-Each ~~_emitter_~~ _eventized_ object provides an API for subscribing, unsubscribing and emitting events.
+Each _emitter_ / _eventized_ object provides an API for subscribing, unsubscribing and emitting events.
 This API is called the __eventize API__ (because "Emitter Eventize API" is a bit too long and cumbersome).
 
 | method | description |
@@ -199,25 +202,24 @@ These methods are explained in detail below:
 
 ### How to listen
 
-#### `.on( .. )`
+#### `ε.on( .. )`
 
 The simplest and most direct way is to subscribe to an event using a function:
 
 ```js
 import {eventize} from '@spearwolf/eventize'
 
-const myObj = eventize({})
+const ε = eventize({})
 
 // short version
-myObj.on('foo', (a, b) => {
+ε.on('foo', (a, b) => {
   console.log('foo ->', {a, b});
 });
 
 // extended version
-const unsubscribe =
-  myObj.on('foo', (a, b) => {
-    console.log('foo ->', {a, b});
-  });
+const unsubscribe = ε.on('foo', (a, b) => {
+  console.log('foo ->', {a, b});
+});
 ```
 
 The listener function is called when the named event is emitted.
@@ -230,13 +232,13 @@ The return value of `on()` is always the _inverse of the call_ &mdash; the unsub
 If not only a specific named event should be reacted to, but _all_ events, the _catch-em-all_ wildcard event `*` can be used:
 
 ```js
-myObj.on('*', (...args) => console.log('an event occured, args=', ...args))
+ε.on('*', (...args) => console.log('an event occured, args=', ...args))
 ```
 
 If you want, you can simply omit the wildcard event:
 
 ```js
-myObj.on((...args) => console.log('an event occured, args=', ...args))
+ε.on((...args) => console.log('an event occured, args=', ...args))
 ```
 
 ##### Multiple event names
@@ -244,7 +246,7 @@ myObj.on((...args) => console.log('an event occured, args=', ...args))
 Instead of a wildcard, you can also specify multiple event names:
 
 ```js
-myObj.on(['foo', 'bar'], (...args) => console.log('foo or bar occured, args=', ...args))
+ε.on(['foo', 'bar'], (...args) => console.log('foo or bar occured, args=', ...args))
 ```
 
 ##### Priorities
@@ -253,11 +255,11 @@ Sometimes you also want to control the _order_ in which the listeners are called
 By default, the listeners are called in the order in which they were subscribed &mdash; in their _priority group_; a priority group is defined by a number, where the default priority group is `0` and large numbers take precedence over small ones.
 
 ```js
-myObj.on('foo', () => console.log("I don't care when I am called"))
-myObj.on('foo', -999, () => console.log("I would like to be the last in line"))
-myObj.on(Number.MAX_VALUE, () => console.log("I will be the first"))
+ε.on('foo', () => console.log("I don't care when I am called"))
+ε.on('foo', -999, () => console.log("I would like to be the last in line"))
+ε.on(Number.MAX_VALUE, () => console.log("I will be the first"))
 
-myObj.emit('foo')
+ε.emit('foo')
 // => "I will be the first"
 // => "I don't care when I am called"
 // => "I would like to be the last in line"
@@ -269,7 +271,7 @@ myObj.emit('foo')
 You can also use a listener object instead of a function:
 
 ```js
-myObj.on('foo', {
+ε.on('foo', {
   foo(...args) {
     console.log('foo called with args=', ...args)
   }
@@ -283,7 +285,7 @@ const Init = Symbol('init')  // yes, symbols are used here as event names
 const Render = Symbol('render')
 const Dispose = Symbol('dispose')
 
-myObj.on({
+ε.on({
   [Init]() {
     // initialize
   }
@@ -299,7 +301,7 @@ myObj.on({
 .. or multiple event names:
 
 ```js
-myObj.on(['init', 'dispose'], {
+ε.on(['init', 'dispose'], {
   init() {
     // initialize
   }
@@ -315,7 +317,7 @@ myObj.on(['init', 'dispose'], {
 Of course, this also works with priorities:
 
 ```js
-myObj.on(1000, {
+ε.on(1000, {
   foo() {
     console.log('foo!')
   }
@@ -330,20 +332,20 @@ As a last option it is also possible to pass the listener method as _name_ or _f
 ###### Named listener object method
 
 ```js
-myObj.on('hello', 'say', {
+ε.on('hello', 'say', {
   say(hello) {
     console.log('hello', hello)
   }
 })
 
-myObj.emit('hello', 'world')
+ε.emit('hello', 'world')
 // => "hello world"
 ```
 
 ###### Listener function with explicit context
 
 ```js
-myObj.on(
+ε.on(
   'hello',
   function() {
     console.log('hello', this.receiver)
@@ -351,7 +353,7 @@ myObj.on(
     receiver: 'world'
   });
 
-myObj.emit('hello')
+ε.emit('hello')
 // => "hello world"
 ```
 
@@ -388,12 +390,12 @@ Additional shortcuts for the wildcard `*` syntax:
 `.once()` does exactly the same as `.on()`. the difference is: after the listener is called, it is automatically unsubscribed, so the listener method is only called exactly _once_. No more and no less &ndash; there is really nothing more to say about _once_.
 
 ```js
-myObj.once('hi', () => console.log('hello'))
+ε.once('hi', () => console.log('hello'))
 
-myObj.emit('hi')
+ε.emit('hi')
 // => "hello"
 
-myObj.emit('hi')
+ε.emit('hi')
 // => (nothing happens here)
 ```
 
@@ -453,7 +455,7 @@ getSubscriptionCount(queue) // => number
 Emitting an event is pretty easy and straight forward:
 
 ```js
-myObj.emit('foo', 'bar', 666)
+ε.emit('foo', 'bar', 666)
 ```
 
 That's it. No return value. All subscribed event listeners are called immediately.
@@ -464,7 +466,7 @@ All other parameters are optional and will be passed to the listener.
 If you want to emit several events at once - with the same parameters, you can simply specify an array with the desired event names as the first parameter:
 
 ```js
-myObj.emit(['foo', 'bar'], 'plah', 666)
+ε.emit(['foo', 'bar'], 'plah', 666)
 ```
 
 
@@ -473,7 +475,7 @@ myObj.emit(['foo', 'bar'], 'plah', 666)
 ##### Emit the last event to new subscribers
 
 ```js
-myObj.retain('foo')
+ε.retain('foo')
 ```
 
 With `retain` the last emitted event is remembered. Every new listener gets the last event, even if it was emitted before subscribing.
