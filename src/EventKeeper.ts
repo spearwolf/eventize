@@ -1,4 +1,4 @@
-import {AnyEventNames, EventArgs, EventName} from './types';
+import type {AnyEventNames, EventArgs, EventName} from './types';
 import {isCatchEmAll} from './utils';
 
 export class EventKeeper {

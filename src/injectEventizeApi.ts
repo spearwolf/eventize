@@ -4,7 +4,7 @@ import {EventStore} from './EventStore';
 import {EVENT_CATCH_EM_ALL, NAMESPACE} from './constants';
 import {isEventized} from './isEventized';
 import {subscribeTo} from './subscribeTo';
-import {
+import type {
   AnyEventNames,
   EventArgs,
   EventizeApi,

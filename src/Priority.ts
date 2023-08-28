@@ -1,4 +1,4 @@
-import {EventizePriority} from './types';
+import type {EventizePriority} from './types';
 
 export const Priority: EventizePriority = {
   Max: Number.POSITIVE_INFINITY,

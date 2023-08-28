@@ -7,4 +7,4 @@ export * from './isEventized';
 export * from './injectEventizeApi';
 export * from './getSubscriptionCount';
 
-export * from './types';
+export type * from './types';

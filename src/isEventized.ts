@@ -1,5 +1,5 @@
 import {NAMESPACE} from './constants';
-import {EventizeApi, EventizeGuard} from './types';
+import type {EventizeApi, EventizeGuard} from './types';
 
 export const isEventized: EventizeGuard = <T extends Object>(
   obj: T,
