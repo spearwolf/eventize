@@ -11,8 +11,8 @@ jest.config.ts
 BACKLOG.md
 scripts
 tsconfig.json
-tsconfig.build.json
-tsconfig.spec.json
+tsconfig.*.json
+tsup.config.js
 *.spec.ts
 *.spec.d.ts
 .github

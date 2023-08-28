@@ -1,18 +1,14 @@
 {
-  "include": ["src/**/*.ts"],
+  "include": ["src/*.ts", "src/**/*.ts"],
   "exclude": ["node_modules", "tmp", "build", "dist"],
 
   "compileOnSave": false,
   "compilerOptions": {
     "rootDir": "./src",
     "outDir": "./build/src",
-    "declarationDir": "./dist/types",
-
     "composite": true,
-    "incremental": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "importHelpers": true,

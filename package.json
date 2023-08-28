@@ -11,13 +11,13 @@
     "url": "https://github.com/spearwolf/eventize.git"
   },
   "license": "Apache-2.0",
-  "main": "build/eventize.umd.js",
-  "module": "build/eventize.js",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
   "exports": {
-    "import": "./build/eventize.js",
-    "require": "./build/eventize.umd.js"
+    "import": "./dist/index.mjs",
+    "require": "./dist/index.js"
   },
-  "types": "dist/types/index.d.ts",
+  "types": "types/index.d.ts",
   "homepage": "https://github.com/spearwolf/eventize/",
   "bugs": {
     "url": "https://github.com/spearwolf/eventize/issues"
@@ -26,11 +26,14 @@
     "node": ">=18.16"
   },
   "scripts": {
-    "clean": "rimraf tmp build dist",
-    "clean:all": "npx rimraf node_modules tmp build dist",
-    "compile": "tsc -b tsconfig.build.json",
+    "clean": "rimraf tmp build dist types",
+    "clean:all": "npx rimraf node_modules tmp build dist types",
+    "types": "tsc -b tsconfig.types.json",
+    "bundle": "tsup",
+    "build": "run-s bundle types",
     "test": "cross-env NODE_ENV=test jest",
-    "watch": "cross-env NODE_ENV=test jest --watch"
+    "watch": "cross-env NODE_ENV=test jest --watch",
+    "cbt": "run-s clean build test"
   },
   "devDependencies": {
     "@types/jest": "^29.5.4",
@@ -43,6 +46,7 @@
     "ts-jest": "^29.1.1",
     "ts-node": "^10.9.1",
     "tslib": "^2.6.2",
+    "tsup": "^7.2.0",
     "typescript": "^5.2.2"
   }
 }

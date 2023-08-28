@@ -5,3 +5,4 @@ build
 .size-snapshot.json
 tmp
 dist
+types
