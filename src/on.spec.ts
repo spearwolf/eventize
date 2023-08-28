@@ -3,7 +3,7 @@ import {fake} from 'sinon';
 
 import {EVENT_CATCH_EM_ALL} from './constants';
 
-import eventize, {Priority, getSubscriptionCount} from '.';
+import {eventize, Priority, getSubscriptionCount} from '.';
 
 describe('on()', () => {
   // ---------------------------------------------------------------------------------------------

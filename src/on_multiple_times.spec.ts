@@ -1,6 +1,6 @@
 import {fake} from 'sinon';
 
-import eventize, {getSubscriptionCount} from '.';
+import {eventize, getSubscriptionCount} from '.';
 
 describe('on() multiple times', () => {
   it('on(eventName, listenerObject)', () => {

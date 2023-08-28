@@ -1,6 +1,6 @@
 import {Priority} from './Priority';
 
-import eventize from '.';
+import {eventize} from '.';
 
 describe('eventize()', () => {
   it('has the predefined Priority.Max constant', () => {

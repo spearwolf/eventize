@@ -1,6 +1,6 @@
 import {fake} from 'sinon';
 
-import eventize from '.';
+import {eventize} from '.';
 
 describe('off()', () => {
   describe('by function', () => {

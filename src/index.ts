@@ -1,7 +1,5 @@
 import {eventize, Eventize} from './eventize';
 
-export default eventize;
-
 export {Eventize, eventize};
 
 export * from './Priority';

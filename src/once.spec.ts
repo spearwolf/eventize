@@ -1,6 +1,6 @@
 import {fake} from 'sinon';
 
-import eventize from '.';
+import {eventize} from '.';
 
 describe('once()', () => {
   describe('once() before on()', () => {
