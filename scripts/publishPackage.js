@@ -14,20 +14,29 @@ function publishPackage() {
   });
 }
 
-exec(`npm show ${pkgJson.name} versions --json`, (error, stdout, stderr) => {
-  if (!error) {
-    const versions = JSON.parse(stdout);
-    if (versions.includes(pkgJson.version)) {
-      console.log(
-        'skip publishing, version',
-        pkgJson.version,
-        'is already released',
-      );
-      process.exit(0);
+if (pkgJson.version.endsWith('-dev')) {
+  console.log(
+    'skip publishing, version',
+    pkgJson.version,
+    'is marked as a *development* version',
+  );
+  process.exit(0);
+} else {
+  exec(`npm show ${pkgJson.name} versions --json`, (error, stdout, stderr) => {
+    if (!error) {
+      const versions = JSON.parse(stdout);
+      if (versions.includes(pkgJson.version)) {
+        console.log(
+          'skip publishing, version',
+          pkgJson.version,
+          'is already released',
+        );
+        process.exit(0);
+      } else {
+        publishPackage();
+      }
     } else {
-      publishPackage();
+      console.error(`exec() panic: ${stderr}`);
     }
-  } else {
-    console.error(`exec() panic: ${stderr}`);
-  }
-});
+  });
+}
