@@ -1,5 +1,7 @@
 # @spearwolf/eventize
 
+[![npm version](https://badge.fury.io/js/@spearwolf%2Feventize.svg)](https://badge.fury.io/js/@spearwolf%2Feventize)
+
 ## Introduction 👀
 
 A tiny and clever framework for synchronous event-driven programming in javascript.
