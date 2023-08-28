@@ -184,6 +184,7 @@ class Foo {
 }
 ```
 
+---
 
 ### eventize API
 
@@ -201,6 +202,8 @@ This API is called the __eventize API__ (because "Emitter Eventize API" is a bit
 These methods are explained in detail below:
 
 ### How to listen
+
+---
 
 #### `ε.on( .. )`
 
@@ -384,8 +387,9 @@ Additional shortcuts for the wildcard `*` syntax:
 | `listenerFuncName` | _string_ or _symbol_ |
 | `listenerObject` | _object_ |
 
+---
 
-#### `.once( .. )`
+#### `ε.once( .. )`
 
 `.once()` does exactly the same as `.on()`. the difference is: after the listener is called, it is automatically unsubscribed, so the listener method is only called exactly _once_. No more and no less &ndash; there is really nothing more to say about _once_.
 
@@ -399,8 +403,9 @@ Additional shortcuts for the wildcard `*` syntax:
 // => (nothing happens here)
 ```
 
+---
 
-#### `.off( .. )`
+#### `ε.off( .. )`
 
 ##### The art of unsubscribing
 
@@ -450,7 +455,9 @@ getSubscriptionCount(queue) // => number
 
 ### How to emit events
 
-#### `.emit( .. )`
+---
+
+#### `ε.emit( .. )`
 
 Emitting an event is pretty easy and straight forward:
 
@@ -469,8 +476,9 @@ If you want to emit several events at once - with the same parameters, you can s
 ε.emit(['foo', 'bar'], 'plah', 666)
 ```
 
+---
 
-#### `.retain( .. )`
+#### `ε.retain( .. )`
 
 ##### Emit the last event to new subscribers
 
