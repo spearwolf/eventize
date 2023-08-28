@@ -7,7 +7,7 @@ yes, read correctly: the emitters call the listeners here _synchronously_ and no
 This is perfectly reasonable: sometimes you want to have control over when something happens. e.g., when your code runs inside an [animation frame](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame). Or you want to release resources immediately and instantaneously.
 
 
-##### FEATURES
+##### FEATURES 👀
 
 - all **API** calls and downstream-listener-calls are **100% synchronous** :boom: no async! :stuck_out_tongue_closed_eyes:
 - :sparkles: **wildcards** &amp; **priorities** :exclamation:
@@ -18,7 +18,7 @@ This is perfectly reasonable: sometimes you want to have control over when somet
 - no runtime dependencies
 - Apache-2.0 license
 
-## Installation
+## ⚙️ Installation
 
 All you need is to install the package:
 
@@ -27,7 +27,7 @@ $ npm install @spearwolf/eventize
 ```
 
 
-## Getting Started
+## 📖 Getting Started
 
 The underlying concept is simple: certain kinds of objects (called "emitters") emit named events that cause function "listeners" to be called.
 
@@ -104,7 +104,7 @@ If an emitter emits an event to which no listeners are attached, nothing happens
 _Btw._ an event name can be either a _string_ or a _symbol_
 
 
-## API
+## 📚 API
 
 ### How to Emitter
 
