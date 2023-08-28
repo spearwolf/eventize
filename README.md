@@ -23,7 +23,7 @@ This is perfectly reasonable: sometimes you want to have control over when somet
 All you need is to install the package:
 
 ```sh
-$ npm install @spearwolf/eventize
+$ npm i @spearwolf/eventize
 ```
 
 
@@ -35,12 +35,12 @@ The underlying concept is simple: certain kinds of objects (called "emitters") e
 
 ##### Emitter
 
-Every object can become an emitter; for this, the object must inject the [Eventize API](#the-emitter-eventize-api).
+Every object can become an _emitter_; for this, the object must inject the [Eventize API](#the-emitter-eventize-api).
 
 ```js
-import eventize from '@spearwolf/eventize'
+import {eventize} from '@spearwolf/eventize'
 
-const myObj = eventize({})
+const broker = eventize({})
 ```
 
 or, if you are more familiar with class-based objects
@@ -50,24 +50,24 @@ import {Eventize} from '@spearwolf/eventize'
 
 class Foo extends Eventize {}
 
-const myOtherObj = new Foo()
+const myObj = new Foo()
 ```
 
-for __typescript__ the following variant has also proven itself:
+for __typescript__ the following _composition over inheritance_ variant has also proven itself:
 
 ```ts
-import eventize, {Eventize} from '@spearwolf/eventize'
+import {eventize, type Eventize} from '@spearwolf/eventize'
 
 export interface Foo extends Eventize {}
 
 export class Foo {
+
   constructor() {
     eventize(this);
   }
+
   // ...
 }
-
-
 ```
 
 
@@ -76,6 +76,8 @@ export class Foo {
 Any function can be used as a listener. However, you can also use an object that defines methods that have the exact name of the given event.
 
 ```js
+// myObj is an eventized object
+
 myObj.on('foo', (bar) => {
   console.log('I am a listener function and you called me with bar=', bar)
 })
@@ -85,6 +87,15 @@ myObj.on('foo', {
     console.log('I am a method and you called me with bar=', bar, 'and plah=', plah)
   }
 })
+
+myObj.on({
+  foo(bar, plah) {
+    console.log('foo ->', {bar, plah})
+  },
+  bar() {
+    console.log('hej')
+  }
+})
 ```
 
 ##### Named Events
@@ -92,25 +103,27 @@ myObj.on('foo', {
 An emitter can emit any event name; parameters are optional
 
 ```js
-myObj.emit('bar')  // well, nothing happens here
+myObj.emit('bar')
+// => "hej"
 
 myObj.emit('foo', 123, 456)
 // => "I am a listener function and you called me with bar= 123"
 // => "I am a method and you called me with bar= 123 and plah= 456"
+// => "foo -> {bar: 123, plah: 456}"
 ```
 
 If an emitter emits an event to which no listeners are attached, nothing happens.
 
-_Btw._ an event name can be either a _string_ or a _symbol_
+> 🔎 an event name can be either a _string_ or a _symbol_
 
 
 ## 📚 API
 
-### How to Emitter
+### How to _emitter_
 
 There are several ways to convert any object into an emitter.
 
-Probably the most common method is to simply use `eventize( myObj )`; this corresponds to the _inject_ variant:
+Probably the most common method is to simply use `eventize( obj )`; this corresponds to the _inject_ variant:
 
 #### inject
 
@@ -133,7 +146,7 @@ eventize.extend( myObj )  // => myEventizedObj
 
 Returns a new object, with the [Eventize API](#the-emitter-eventize-api) attached. The original object is not modified here, instead the _prototype_ of the new object is set to the original object.
 
-For this purpose [`Object.create()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/create) is used internally.
+> 🔎 For this purpose [`Object.create()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/create) is used internally
 
 ![eventize.extend](./docs-assets/eventize-extend.svg)
 
@@ -157,7 +170,7 @@ class Foo extends Eventize {
 If you want to create an emitter class-based, but not via inheritance, you can also do this with the eventize method in the constructor, here as a typescript example:
 
 ```ts
-import eventize, {Eventize} from '@spearwolf/eventize'
+import {eventize, Eventize} from '@spearwolf/eventize'
 
 interface Foo extends Eventize {}
 
@@ -169,10 +182,10 @@ class Foo {
 ```
 
 
-### The ~~Emitter~~ Eventize API
+### The ~~emitter~~ eventize API
 
-Each emitter object provides an API for subscribing, unsubscribing and emitting events.
-This API is called the __Eventize API__ (because "Emitter Eventize API" is a bit too long and cumbersome).
+Each ~~_emitter_~~ _eventized_ object provides an API for subscribing, unsubscribing and emitting events.
+This API is called the __eventize API__ (because "Emitter Eventize API" is a bit too long and cumbersome).
 
 | method | description |
 |--------|-------------|
@@ -191,14 +204,22 @@ These methods are explained in detail below:
 The simplest and most direct way is to subscribe to an event using a function:
 
 ```js
-import eventize from '@spearwolf/eventize'
+import {eventize} from '@spearwolf/eventize'
 
 const myObj = eventize({})
 
-const unsubscribe = myObj.on('myEventName', (arg1, arg2) => {
-  console.log('myEventName, arg1=', arg1, 'arg2=', arg2)
-})
+// short version
+myObj.on('foo', (a, b) => {
+  console.log('foo ->', {a, b});
+});
+
+// extended version
+const unsubscribe =
+  myObj.on('foo', (a, b) => {
+    console.log('foo ->', {a, b});
+  });
 ```
+
 The listener function is called when the named event is emitted.
 The parameters of the listener function are optional and will be filled with the event parameters later (if there are any).
 
