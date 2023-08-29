@@ -441,9 +441,21 @@ Now, to put our greeter to silence, we would have to call the _unsubscribe funct
 queue.off(greeter)
 ```
 
-... this will cancel all subscriptions from `queue` to `greeter`!
+... this will cancel _all_ subscriptions from `queue` to `greeter`!
 
-> TODO: add documentation for all supported ways to unsubscribe, see [/src/off.spec.ts](./src/off.spec.ts)
+##### All kinds of `.off()` parameters in the summary
+
+`.off()` supports a number of variants that save you from having to cache the unsubscribe functions:
+
+| `.off()` parameter | description |
+|-|-|
+| `ε.off(function)` | unsubscribe by function |
+| `ε.off(function, object)` | unsubscribe by function and object context |
+| `ε.off(eventName)` | unsubscribe by event name |
+| `ε.off(object)` | unsubscribe by object |
+| `ε.off()` | unsubscribe all listeners attached to ε |
+
+> 🔎 for those who still have unanswered questions, we recommend a look at the detailed test cases [./src/off.spec.ts](./src/off.spec.ts)
 
 ###### getSubscriptionCount()
 
@@ -452,7 +464,7 @@ A small helper function that returns the number of subscriptions to the object. 
 ```js
 import {getSubscriptionCount} from '@spearwolf/eventize';
 
-getSubscriptionCount(queue) // => number
+getSubscriptionCount(ε) // => number of active subscriptions
 ```
 
 ### How to emit events
