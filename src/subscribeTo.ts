@@ -3,7 +3,7 @@ import {EventListener} from './EventListener';
 import {EventStore} from './EventStore';
 import {Priority} from './Priority';
 import {EVENT_CATCH_EM_ALL} from './constants';
-import {EventArgs, EventName, ListenerObjectType} from './types';
+import type {EventArgs, EventName, ListenerObjectType} from './types';
 import {hasConsole, warn} from './utils';
 
 const registerEventListener = (

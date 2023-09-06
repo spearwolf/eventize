@@ -2,7 +2,7 @@ import {Priority} from './Priority';
 import {EVENT_CATCH_EM_ALL} from './constants';
 import {injectEventizeApi} from './injectEventizeApi';
 import {isEventized} from './isEventized';
-import {EventizeApi, EventizeFuncApi} from './types';
+import type {EventizeApi, EventizeFuncApi} from './types';
 
 export const eventize: EventizeFuncApi = (() => {
   const api = <T extends Object>(obj: T): T & EventizeApi =>

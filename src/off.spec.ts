@@ -1,6 +1,6 @@
 import {fake} from 'sinon';
 
-import eventize from '.';
+import {eventize} from '.';
 
 describe('off()', () => {
   describe('by function', () => {
@@ -59,119 +59,160 @@ describe('off()', () => {
   });
 
   describe('by eventName', () => {
-    const obj = eventize({});
-    const listenerFunc0 = fake();
-    const listenerFunc1 = fake();
+    const ε = eventize({});
 
-    obj.on('foo', listenerFunc0);
-    obj.on('foo', listenerFunc1);
+    const fn0 = fake();
+    const fn1 = fake();
+    const fn2 = fake();
 
-    obj.emit('foo', 'bar', 666);
+    ε.on('foo', fn0);
+    ε.on('foo', fn1);
+    ε.on({foo: fn2});
+
+    ε.emit('foo', 'bar', 666);
 
     it('emit() calls the listeners', () => {
-      expect(listenerFunc0.calledWith('bar', 666)).toBeTruthy();
-      expect(listenerFunc1.calledWith('bar', 666)).toBeTruthy();
+      expect(fn0.calledWith('bar', 666)).toBeTruthy();
+      expect(fn1.calledWith('bar', 666)).toBeTruthy();
+      expect(fn2.calledWith('bar', 666)).toBeTruthy();
     });
 
     it('off() removes the listeners from the list of subscribers', () => {
-      listenerFunc0.resetHistory();
-      listenerFunc1.resetHistory();
+      fn0.resetHistory();
+      fn1.resetHistory();
 
-      obj.off('foo');
-      obj.emit('foo', 'bar', 666);
+      ε.off('foo');
+      ε.emit('foo', 'bar', 666);
 
-      expect(listenerFunc0.called).toBeFalsy();
-      expect(listenerFunc1.called).toBeFalsy();
+      expect(fn0.called).toBeFalsy();
+      expect(fn1.called).toBeFalsy();
+      expect(fn2.called).toBeTruthy();
     });
   });
 
   describe('by object', () => {
-    const obj = eventize({});
-    const listener = {
+    const ε = eventize({});
+
+    const objA = {
       foo: fake(),
       bar: fake(),
     };
 
-    obj.on('foo', listener);
-    obj.on('bar', listener);
+    const objB = {
+      foo: fake(),
+      bar: fake(),
+    };
 
-    obj.emit('foo', 'bar', 666);
-    obj.emit('bar', 'foo', 666);
+    ε.on('foo', objA);
+    ε.on('bar', objA);
+    ε.on(objB);
+
+    ε.emit('foo', 'bar', 666);
+    ε.emit('bar', 'foo', 666);
 
     it('emit() calls the listeners', () => {
-      expect(listener.foo.calledWith('bar', 666)).toBeTruthy();
-      expect(listener.bar.calledWith('foo', 666)).toBeTruthy();
+      expect(objA.foo.calledWith('bar', 666)).toBeTruthy();
+      expect(objA.bar.calledWith('foo', 666)).toBeTruthy();
+      expect(objB.foo.calledWith('bar', 666)).toBeTruthy();
+      expect(objB.bar.calledWith('foo', 666)).toBeTruthy();
     });
 
     it('off() removes the listeners from the list of subscribers', () => {
-      listener.foo.resetHistory();
-      listener.bar.resetHistory();
+      objA.foo.resetHistory();
+      objA.bar.resetHistory();
+      objB.foo.resetHistory();
+      objB.bar.resetHistory();
 
-      obj.off(listener);
-      obj.emit('foo', 'bar', 666);
-      obj.emit('bar', 'foo', 666);
+      ε.off(objA);
 
-      expect(listener.foo.called).toBeFalsy();
-      expect(listener.bar.called).toBeFalsy();
+      ε.emit('foo', 'bar', 666);
+      ε.emit('bar', 'foo', 666);
+
+      expect(objA.foo.called).toBeFalsy();
+      expect(objA.bar.called).toBeFalsy();
+      expect(objB.foo.called).toBeTruthy();
+      expect(objB.bar.called).toBeTruthy();
+
+      objA.foo.resetHistory();
+      objA.bar.resetHistory();
+      objB.foo.resetHistory();
+      objB.bar.resetHistory();
+
+      ε.off(objB);
+
+      ε.emit('foo', 'bar', 666);
+      ε.emit('bar', 'foo', 666);
+
+      expect(objA.foo.called).toBeFalsy();
+      expect(objA.bar.called).toBeFalsy();
+      expect(objB.foo.called).toBeFalsy();
+      expect(objB.bar.called).toBeFalsy();
     });
   });
 
   describe('without arguments', () => {
-    const obj = eventize({});
-    const listenerFunc0 = fake();
-    const listenerFunc1 = fake();
+    const ε = eventize({});
 
-    obj.on('foo', listenerFunc0);
-    obj.on('foo', listenerFunc1);
+    const fn0 = fake();
+    const fn1 = fake();
+    const fn2 = fake();
 
-    obj.emit('foo', 'bar', 666);
+    ε.on('foo', fn0);
+    ε.on('foo', fn1);
+    ε.on({foo: fn2});
+
+    ε.emit('foo', 'bar', 666);
 
     it('emit() calls the listeners', () => {
-      expect(listenerFunc0.calledWith('bar', 666)).toBeTruthy();
-      expect(listenerFunc1.calledWith('bar', 666)).toBeTruthy();
+      expect(fn0.calledWith('bar', 666)).toBeTruthy();
+      expect(fn1.calledWith('bar', 666)).toBeTruthy();
+      expect(fn2.calledWith('bar', 666)).toBeTruthy();
     });
 
     it('off() removes the listeners from the list of subscribers', () => {
-      listenerFunc0.resetHistory();
-      listenerFunc1.resetHistory();
+      fn0.resetHistory();
+      fn1.resetHistory();
+      fn2.resetHistory();
 
-      obj.off();
-      obj.emit('foo', 'bar', 666);
+      ε.off();
+      ε.emit('foo', 'bar', 666);
 
-      expect(listenerFunc0.called).toBeFalsy();
-      expect(listenerFunc1.called).toBeFalsy();
+      expect(fn0.called).toBeFalsy();
+      expect(fn1.called).toBeFalsy();
+      expect(fn2.called).toBeFalsy();
     });
   });
 
   describe('off() inside on()', () => {
-    const obj = eventize({});
-    const firstListener = fake();
-    const listenerFunc = fake();
-    const otherListener = fake();
+    const ε = eventize({});
 
-    obj.on('foo', 3, firstListener);
-    obj.once('foo', 2, listenerFunc);
-    obj.on('foo', otherListener);
+    const fn0 = fake();
+    const fn1 = fake();
+    const fn2 = fake();
 
-    obj.emit('foo', 'bar', 666);
+    ε.on('foo', 3, fn0);
+    ε.once('foo', 2, fn1);
+    ε.on('foo', fn2);
+
+    ε.emit('foo', 'bar', 666);
 
     it('emit() calls the listeners', () => {
-      expect(firstListener.calledWith('bar', 666)).toBeTruthy();
-      expect(listenerFunc.calledWith('bar', 666)).toBeTruthy();
-      expect(otherListener.calledWith('bar', 666)).toBeTruthy();
+      expect(fn0.calledWith('bar', 666)).toBeTruthy();
+      expect(fn1.calledWith('bar', 666)).toBeTruthy();
+      expect(fn2.calledWith('bar', 666)).toBeTruthy();
     });
 
     it('calling off() inside on() should remove the listeners', () => {
-      firstListener.resetHistory();
-      listenerFunc.resetHistory();
-      otherListener.resetHistory();
+      fn0.resetHistory();
+      fn1.resetHistory();
+      fn2.resetHistory();
 
-      obj.on('foo', 1, () => obj.off('foo'));
-      obj.emit('foo', 'bar', 666);
+      ε.on('foo', 1, () => ε.off('foo'));
+      ε.emit('foo', 'bar', 666);
 
-      expect(firstListener.called).toBeTruthy();
-      expect(listenerFunc.called).toBeFalsy();
-      expect(otherListener.called).toBeFalsy();
+      expect(fn0.called).toBeTruthy();
+      expect(fn1.called).toBeFalsy();
+      expect(fn2.called).toBeFalsy();
     });
   });
 });

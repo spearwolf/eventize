@@ -4,7 +4,7 @@ import {
   LISTENER_IS_NAMED_FUNC,
   LISTENER_IS_OBJ,
 } from './constants';
-import {EventName, ListenerObjectType} from './types';
+import type {EventName, ListenerObjectType} from './types';
 import {isCatchEmAll, isEventName} from './utils';
 
 type HasPriorityOrIdType = {priority: number; id: number};

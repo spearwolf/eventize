@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 import {LOG_NAMESPACE, EVENT_CATCH_EM_ALL} from './constants';
-import {EventName} from './types';
+import type {EventName} from './types';
 
 export const isCatchEmAll = (eventName: unknown): eventName is string =>
   eventName === EVENT_CATCH_EM_ALL;

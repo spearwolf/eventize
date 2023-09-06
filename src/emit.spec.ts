@@ -1,6 +1,6 @@
 import {fake} from 'sinon';
 
-import eventize, {Priority} from '.';
+import {eventize, Priority} from '.';
 
 describe('emit()', () => {
   describe('calls the listener with all given args (except the event name)', () => {

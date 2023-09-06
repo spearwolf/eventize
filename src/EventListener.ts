@@ -5,7 +5,7 @@ import {
   LISTENER_IS_OBJ,
 } from './constants';
 
-import {EventName, EventArgs, ListenerObjectType} from './types';
+import type {EventName, EventArgs, ListenerObjectType} from './types';
 import {isCatchEmAll} from './utils';
 
 type EmitFnType = Function | undefined;

@@ -3,3 +3,6 @@ coverage
 .babelCache
 build
 .size-snapshot.json
+tmp
+dist
+types
