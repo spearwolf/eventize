@@ -35,6 +35,7 @@
     "bundle": "run-s tsup banner:esm banner:cjs",
     "build": "run-s bundle types",
     "prepack": "run-s clean bundle types",
+    "publish:pkg": "node scripts/publishPackage.js",
     "test": "cross-env NODE_ENV=test jest",
     "watch": "cross-env NODE_ENV=test jest --watch",
     "cbt": "run-s clean build test"
