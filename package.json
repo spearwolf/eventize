@@ -11,11 +11,11 @@
     "url": "https://github.com/spearwolf/eventize.git"
   },
   "license": "Apache-2.0",
-  "main": "dist/index.js",
-  "module": "dist/index.mjs",
+  "main": "dist/eventize.js",
+  "module": "dist/eventize.mjs",
   "exports": {
-    "import": "./dist/index.mjs",
-    "require": "./dist/index.js"
+    "import": "./dist/eventize.mjs",
+    "require": "./dist/eventize.js"
   },
   "types": "types/index.d.ts",
   "homepage": "https://github.com/spearwolf/eventize/",
@@ -29,7 +29,10 @@
     "clean": "rimraf tmp build dist types",
     "clean:all": "npx rimraf node_modules tmp build dist types",
     "types": "tsc -b tsconfig.types.json",
-    "bundle": "tsup",
+    "tsup": "tsup",
+    "banner:esm": "node scripts/prependBanner.mjs esm build/index.mjs dist/eventize.mjs",
+    "banner:cjs": "node scripts/prependBanner.mjs cjs build/index.js dist/eventize.js",
+    "bundle": "run-s tsup banner:esm banner:cjs",
     "build": "run-s bundle types",
     "test": "cross-env NODE_ENV=test jest",
     "watch": "cross-env NODE_ENV=test jest --watch",
