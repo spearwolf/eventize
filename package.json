@@ -1,6 +1,6 @@
 {
   "name": "@spearwolf/eventize",
-  "version": "3.0.0-dev",
+  "version": "3.0.0",
   "author": {
     "name": "Wolfger Schramm",
     "email": "wolfger@spearwolf.de",
@@ -34,6 +34,7 @@
     "banner:cjs": "node scripts/prependBanner.mjs cjs build/index.js dist/eventize.js",
     "bundle": "run-s tsup banner:esm banner:cjs",
     "build": "run-s bundle types",
+    "prepack": "run-s clean bundle types",
     "test": "cross-env NODE_ENV=test jest",
     "watch": "cross-env NODE_ENV=test jest --watch",
     "cbt": "run-s clean build test"
