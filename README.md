@@ -4,35 +4,44 @@
 
 ## Introduction 👀
 
-A tiny and clever framework for synchronous event-driven programming in javascript.
+A tiny and clever framework for synchronous event-driven programming in Javascript.
 
-yes, read correctly: the emitters call the listeners here _synchronously_ and not _asynchronously_, as is the case with [node.js events](https://nodejs.org/api/events.html), for example
+Yes, you read that right: the emitters here call the listeners _synchronously_ and not _asynchronously_ like in [node.js events](https://nodejs.org/api/events.html) for example.
 
-This is perfectly reasonable: sometimes you want to have control over when something happens. e.g., when your code runs inside an [animation frame](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame). Or you want to release resources immediately and instantaneously.
+This is perfectly reasonable: sometimes you want to have control over when something happens, e.g. when your code runs inside an [animation frame](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame). Or you might want to free resources immediately and instantly.
+
 
 ### FEATURES
 
-- all **API** calls and downstream-listener-calls are **100% synchronous** :boom: no async! :stuck_out_tongue_closed_eyes:
+- all **API** calls and downstream listener calls are **100% synchronous** :boom: no async! :stuck_out_tongue_closed_eyes:
 - :sparkles: **wildcards** &amp; **priorities** :exclamation:
-- :rocket: **smart api** (based upon [node.js events](https://nodejs.org/api/events.html) but in a pretty extended way)
-- has **typescript types** included (well, in fact, it is written in typescript) :tada:
-- supports all major browsers and Node.js environments
-- very small footsprint ~2.3k gzip'd
+- :rocket: **smart api** (based on [node.js events](https://nodejs.org/api/events.html), but in a rather extended way)
+- includes **typescript types** (well, actually it is written in typescript) :tada:
+- supports all major browsers and node.js environments
+- very small footprint ~3k gzip'd
 - no runtime dependencies
-- Apache-2.0 license
+- Apache 2.0 licence
+
 
 ## ⚙️ Installation
 
-All you need is to install the package:
+All you need to do is install the package:
 
 ```sh
 $ npm i @spearwolf/eventize
 ```
 
+The package exports the library in _esm_ format (using `import` and `export` syntax) and also in _commonjs_ format (using `require`).
+It is compiled with the `esnext` typescript target, so there are no downgrades to older javascript syntax and features.
+
+The typescript type definitions are also included in the package.
+
+| 🔎 Since version 3.x there is also a [CHANGELOG](./CHANGELOG.md)
+
 
 ## 📖 Getting Started
 
-The underlying concept is simple: certain kinds of objects (called "emitters") emit named events that cause function "listeners" to be called.
+The underlying concept is simple: certain types of objects (called "emitters") emit named events that cause function "listeners" to be called.
 
 ![Emitter emits named event to listeners](./docs-assets/emitter-emits-named-events-listeners.svg)
 
