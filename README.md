@@ -1,6 +1,6 @@
 # @spearwolf/eventize
 
-[![npm version](https://badge.fury.io/js/@spearwolf%2Feventize.svg)](https://badge.fury.io/js/@spearwolf%2Feventize)
+![npm (scoped)](https://img.shields.io/npm/v/%40spearwolf/eventize)
 
 ## Introduction 👀
 
