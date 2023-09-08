@@ -1,6 +1,9 @@
 # @spearwolf/eventize
 
 ![npm (scoped)](https://img.shields.io/npm/v/%40spearwolf/eventize)
+![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/spearwolf/eventize/main.yml)
+![GitHub](https://img.shields.io/github/license/spearwolf/eventize)
+
 
 ## Introduction 👀
 
