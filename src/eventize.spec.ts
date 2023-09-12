@@ -57,7 +57,7 @@ describe('eventize.create(obj) -> eventizer', () => {
 
   it('forwards all events to the original object given as argument', () => {
     eventizer.emit('foo');
-    expect(obj.foo).toBeCalled();
+    expect(obj.foo).toHaveBeenCalled();
   });
 
   expect2ImplEventizeApi(eventizer);
@@ -71,7 +71,7 @@ describe('class extends Eventize', () => {
     const listener = {foo: jest.fn()};
     foo.on(listener);
     foo.emit('foo');
-    expect(listener.foo).toBeCalled();
+    expect(listener.foo).toHaveBeenCalled();
   });
 
   expect2ImplEventizeApi(foo);

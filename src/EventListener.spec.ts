@@ -26,7 +26,8 @@ describe('EventListener', () => {
       const listener = new EventListener(EVENT_CATCH_EM_ALL, 0, obj);
       expect(listener.listenerType).toBe(LISTENER_IS_OBJ);
       listener.apply('foo', [null, 'plah!', 666]);
-      expect(obj.foo).toHaveBeenCalledWith(null, 'plah!', 666);
+      // expect(obj.foo).toHaveBeenCalledWith(null, 'plah!', 666);
+      expect(obj.foo.mock.calls[0]).toEqual([null, 'plah!', 666]);
       expect(obj.emit).not.toHaveBeenCalled();
     });
 
@@ -38,7 +39,8 @@ describe('EventListener', () => {
       const listener = new EventListener(EVENT_CATCH_EM_ALL, 0, obj);
       expect(listener.listenerType).toBe(LISTENER_IS_OBJ);
       listener.apply(bar, [null, 'plah!', 666]);
-      expect(obj[bar]).toHaveBeenCalledWith(null, 'plah!', 666);
+      // expect(obj[bar]).toHaveBeenCalledWith(null, 'plah!', 666);
+      expect(obj[bar].mock.calls[0]).toEqual([null, 'plah!', 666]);
       expect(obj.emit).not.toHaveBeenCalled();
     });
 
@@ -47,7 +49,8 @@ describe('EventListener', () => {
       const listener = new EventListener(EVENT_CATCH_EM_ALL, 0, obj);
       expect(listener.listenerType).toBe(LISTENER_IS_OBJ);
       listener.apply('bar', [null, 'plah!', 666]);
-      expect(obj.emit).toHaveBeenCalledWith('bar', null, 'plah!', 666);
+      // expect(obj.emit).toHaveBeenCalledWith('bar', null, 'plah!', 666);
+      expect(obj.emit.mock.calls[0]).toEqual(['bar', null, 'plah!', 666]);
     });
   });
 
@@ -56,13 +59,15 @@ describe('EventListener', () => {
       const fn = jest.fn();
       const listener = new EventListener('foo', 0, fn);
       listener.apply('foo', [null, 'plah!', 666]);
-      expect(fn).toHaveBeenCalledWith(null, 'plah!', 666);
+      // expect(fn).toHaveBeenCalledWith(null, 'plah!', 666);
+      expect(fn.mock.calls[0]).toEqual([null, 'plah!', 666]);
     });
     it('apply() calls the listener function (symbol)', () => {
       const fn = jest.fn();
       const listener = new EventListener(bar, 0, fn);
       listener.apply(bar, [null, 'plah!', 666]);
-      expect(fn).toHaveBeenCalledWith(null, 'plah!', 666);
+      // expect(fn).toHaveBeenCalledWith(null, 'plah!', 666);
+      expect(fn.mock.calls[0]).toEqual([null, 'plah!', 666]);
     });
   });
 });
