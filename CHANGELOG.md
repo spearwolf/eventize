@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## `v3.0.1`
+
+- Mark npm package as side effects free
+
 ## `v3.0.0`
 
 ### Npm Package
