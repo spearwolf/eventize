@@ -1,6 +1,6 @@
 {
   "name": "@spearwolf/eventize",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "author": {
     "name": "Wolfger Schramm",
     "email": "wolfger@spearwolf.de",
@@ -17,6 +17,7 @@
     "import": "./dist/eventize.mjs",
     "require": "./dist/eventize.js"
   },
+  "sideEffects": false,
   "types": "types/index.d.ts",
   "homepage": "https://github.com/spearwolf/eventize/",
   "bugs": {
