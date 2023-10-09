@@ -6,3 +6,4 @@ build
 tmp
 dist
 types
+lib

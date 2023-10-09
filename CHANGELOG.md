@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## `v3.0.2`
+
+- Fix exported type definitions
+- Clean up the build system internally (using `tsup`)
+
 ## `v3.0.1`
 
 - Mark npm package as side effects free

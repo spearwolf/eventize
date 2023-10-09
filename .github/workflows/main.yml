@@ -21,6 +21,9 @@ jobs:
 
       - run: npm test
         name: Run tests
+          
+      - run: npm run checkPkgTypes
+        name: Check package type definitions
 
   deploy:
     name: Deploy package

@@ -8,7 +8,7 @@ export default {
   clearMocks: true,
 
   // An array of file extensions your modules use
-  moduleFileExtensions: ['js', 'json', 'ts'],
+  moduleFileExtensions: ['js', 'ts'],
 
   // Activates notifications for test results
   notify: false,
@@ -30,6 +30,6 @@ export default {
 
   // A map from regular expressions to paths to transformers
   transform: {
-    '^.+\\.[tj]s$': ['ts-jest', {tsconfig: './tsconfig.spec.json'}],
+    '^.+\\.[tj]s$': ['ts-jest', {tsconfig: './tsconfig.json'}],
   }
 };
