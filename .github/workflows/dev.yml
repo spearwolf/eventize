@@ -14,16 +14,15 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: 18
-          cache: 'npm'
 
       - run: npm ci
         name: Install dependencies
 
-      - run: npm run bundle
-        name: Build javascript bundle
-
-      - run: npm run types
-        name: Run typescript types
-
       - run: npm test
         name: Run tests
+
+      - run: npm run build
+        name: Run build
+          
+      - run: npm run checkPkgTypes
+        name: Check package type definitions
