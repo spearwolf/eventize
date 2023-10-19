@@ -211,6 +211,7 @@ This API is called the __eventize API__ (because "emitter eventize API" is a bit
 | `.off( .. )` | unsubscribe listeners |
 | `.retain( .. )` | hold the last event until it is received by a subscriber |
 | `.emit( .. )` | emit an event |
+| `.emitAsync( .. )` | emits an event and waits for all promises returned by the subscribers |
 
 These methods are described in detail below:
 
@@ -501,6 +502,28 @@ If you want to send multiple events at once - with the same parameters - you can
 ε.emit(['foo', 'bar'], 'plah', 666)
 ```
 
+
+---
+
+#### `ε.emitAsync( .. )`
+
+_since v3.1.*_
+
+```js
+const results = await ε.emit('foo', 'bar', 666);
+```
+
+Emits an event and waits for all promises returned by the subscribers.
+
+Unlike the normal `emit()`, here it is taken into account whether the subscribers return _something_.
+If so, then all results are treated as promises and only when all have been resolved are the results
+returned as an array.
+
+Anything that is not `null` or `undefined` is considered a return value.
+
+If there are no return values, then simply `undefined` is returned.
+
+
 ---
 
 #### `ε.retain( .. )`
@@ -514,3 +537,5 @@ If you want to send multiple events at once - with the same parameters - you can
 With `retain` the last transmitted event is stored. Any new listener will get the last event, even if it was sent before they subscribed.
 
 > NOTE: This behaviour is similar to the `new ReplaySubject(1)` of _rxjs_. But somehow the method name `retain` seemed more appropriate here.
+
+

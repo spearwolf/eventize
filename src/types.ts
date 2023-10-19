@@ -50,6 +50,7 @@ export interface EventizeApi {
   off(listener?: ListenerType, listenerObject?: ListenerObjectType): void;
 
   emit(eventNames: AnyEventNames, ...args: EventArgs): void;
+  emitAsync(eventNames: AnyEventNames, ...args: EventArgs): Promise<any>;
 
   retain(eventName: EventName): void;
 }

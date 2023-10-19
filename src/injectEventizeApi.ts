@@ -43,6 +43,20 @@ export function injectEventizeApi<T extends Object>(obj: T): T & EventizeApi {
 
   defineHiddenPropertyRO(obj, NAMESPACE, {keeper, store});
 
+  const _emit = (eventNames: AnyEventNames, args: EventArgs, returnValue?: (val: unknown) => void) => {
+    if (Array.isArray(eventNames)) {
+      eventNames.forEach((event: EventName) => {
+        store.forEach(event, (listener) => listener.apply(event, args, returnValue));
+        keeper.retain(event, args);
+      });
+    } else if (eventNames !== EVENT_CATCH_EM_ALL) {
+      store.forEach(eventNames, (listener) => {
+        listener.apply(eventNames, args, returnValue);
+      });
+      keeper.retain(eventNames, args);
+    }
+  };
+
   const eventizedObj = Object.assign(obj, {
     on(...args: SubscribeArgs): UnsubscribeFunc {
       return makeUnsubscribe(eventizedObj, subscribeTo(store, keeper, args));
@@ -72,17 +86,16 @@ export function injectEventizeApi<T extends Object>(obj: T): T & EventizeApi {
     },
 
     emit(eventNames: AnyEventNames, ...args: EventArgs): void {
-      if (Array.isArray(eventNames)) {
-        eventNames.forEach((event: EventName) => {
-          store.forEach(event, (listener) => listener.apply(event, args));
-          keeper.retain(event, args);
-        });
-      } else if (eventNames !== EVENT_CATCH_EM_ALL) {
-        store.forEach(eventNames, (listener) => {
-          listener.apply(eventNames, args);
-        });
-        keeper.retain(eventNames, args);
-      }
+      _emit(eventNames, args);
+    },
+
+    emitAsync(eventNames: AnyEventNames, ...args: EventArgs): Promise<any> {
+      let values: any[] = [];
+      _emit(eventNames, args, (val: unknown) => {
+        values.push(val);
+      });
+      values = values.map((val: any) => Array.isArray(val) ? Promise.all(val) : Promise.resolve(val));
+      return values.length > 0 ? Promise.all(values) : Promise.resolve();
     },
 
     retain(eventName: EventName): void {

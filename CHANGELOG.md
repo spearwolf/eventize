@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## `v3.1.0`
+
+- introduce `.emitAsync()`
+
 ## `v3.0.2`
 
 - Fix exported type definitions

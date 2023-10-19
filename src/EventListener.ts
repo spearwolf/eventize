@@ -10,10 +10,14 @@ import {isCatchEmAll} from './utils';
 
 type EmitFnType = Function | undefined;
 type CallAfterApplyFnType = (() => void) | undefined;
+type ReturnValue = (retVal: any) => void;
 
-const apply = (context: unknown, func: EmitFnType, args: EventArgs) => {
+const apply = (context: unknown, func: EmitFnType, args: EventArgs, returnValue?: ReturnValue) => {
   if (typeof func === 'function') {
-    func.apply(context, args);
+    const retVal = func.apply(context, args);
+    if (retVal != null) {
+      returnValue?.(retVal);
+    }
   }
 };
 
@@ -21,7 +25,8 @@ const emit = (
   eventName: EventName,
   listener: {emit: EmitFnType},
   args: EventArgs,
-) => apply(listener, listener.emit, [eventName].concat(args));
+  returnValue?: ReturnValue,
+) => apply(listener, listener.emit, [eventName].concat(args), returnValue);
 
 const detectListenerType = (listener: unknown) => {
   switch (typeof listener) {
@@ -87,7 +92,7 @@ export class EventListener {
     return this.listener === listener && this.listenerObject === listenerObject;
   }
 
-  apply(eventName: EventName, args?: EventArgs): void {
+  apply(eventName: EventName, args?: EventArgs, returnValue?: ReturnValue): void {
     if (this.isRemoved) return;
 
     const {listener, listenerObject} = this;
@@ -95,13 +100,13 @@ export class EventListener {
     switch (this.listenerType) {
       case LISTENER_IS_FUNC:
         // @ts-ignore
-        apply(listenerObject, listener, args);
+        apply(listenerObject, listener, args, returnValue);
         if (this.callAfterApply) this.callAfterApply();
         break;
 
       case LISTENER_IS_NAMED_FUNC:
         // @ts-ignore
-        apply(listenerObject, listenerObject[listener], args);
+        apply(listenerObject, listenerObject[listener], args, returnValue);
         if (this.callAfterApply) this.callAfterApply();
         break;
 
@@ -110,10 +115,13 @@ export class EventListener {
         const func = listener[eventName];
         if (this.isCatchEmAll || this.eventName === eventName) {
           if (typeof func === 'function') {
-            func.apply(listener, args);
+            const retVal = func.apply(listener, args);
+            if (retVal != null) {
+              returnValue?.(retVal);
+            }
           } else {
             // @ts-ignore
-            emit(eventName, listener, args);
+            emit(eventName, listener, args, returnValue);
           }
           if (this.callAfterApply) this.callAfterApply();
         }
