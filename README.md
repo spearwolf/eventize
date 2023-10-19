@@ -527,6 +527,8 @@ Anything that is not `null` or `undefined` is considered a return value.
 
 If there are no return values, then simply `undefined` is returned.
 
+All arguments that are allowed in `emit()` are supported.
+
 
 ---
 
