@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## `v3.1.1`
+
+- `eventize()` can now create a `{}` by itself if no custom object is given
+
 ## `v3.1.0`
 
 - introduce `.emitAsync()`

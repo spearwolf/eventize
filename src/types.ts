@@ -56,7 +56,7 @@ export interface EventizeApi {
 }
 
 export interface EventizerFunc {
-  <T extends Object>(obj: T): T & EventizeApi;
+  <T extends Object>(obj?: T): T & EventizeApi;
 }
 
 export interface EventizeGuard {

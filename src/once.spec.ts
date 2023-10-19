@@ -1,10 +1,10 @@
 import {fake} from 'sinon';
 
-import {eventize} from '.';
+import {eventize} from './index';
 
 describe('once()', () => {
   describe('once() before on()', () => {
-    const obj = eventize({});
+    const obj = eventize();
 
     const listenerFunc = fake();
     const otherListener = fake();

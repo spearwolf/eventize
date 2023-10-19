@@ -1,10 +1,10 @@
 import {fake} from 'sinon';
 
-import {eventize} from '.';
+import {eventize} from './index';
 
 describe('off()', () => {
   describe('by function', () => {
-    const obj = eventize({});
+    const obj = eventize();
     const listenerFunc = fake();
     const otherListener = fake();
 
@@ -31,7 +31,7 @@ describe('off()', () => {
   });
 
   describe('by function and object', () => {
-    const obj = eventize({});
+    const obj = eventize();
     const listenerObject = {};
     const listenerFunc = fake();
     const otherListener = fake();
@@ -59,7 +59,7 @@ describe('off()', () => {
   });
 
   describe('by eventName', () => {
-    const ε = eventize({});
+    const ε = eventize();
 
     const fn0 = fake();
     const fn1 = fake();
@@ -91,7 +91,7 @@ describe('off()', () => {
   });
 
   describe('by object', () => {
-    const ε = eventize({});
+    const ε = eventize();
 
     const objA = {
       foo: fake(),
@@ -151,7 +151,7 @@ describe('off()', () => {
   });
 
   describe('without arguments', () => {
-    const ε = eventize({});
+    const ε = eventize();
 
     const fn0 = fake();
     const fn1 = fake();
@@ -184,7 +184,7 @@ describe('off()', () => {
   });
 
   describe('off() inside on()', () => {
-    const ε = eventize({});
+    const ε = eventize();
 
     const fn0 = fake();
     const fn1 = fake();

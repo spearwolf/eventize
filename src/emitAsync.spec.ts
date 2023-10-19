@@ -1,9 +1,8 @@
-// @ts-ignore
-import {eventize, Priority} from '.';
+import {eventize, Priority} from './index';
 
 describe('emitAsync()', () => {
   it('should work as expected', async () => {
-    const o = eventize({});
+    const o = eventize();
 
     o.on('foo', () => 123);
     o.on('foo', (): Object => null);
@@ -20,7 +19,7 @@ describe('emitAsync()', () => {
   });
 
   it('should work as expected even if there is no subscriber', async () => {
-    const o = eventize({});
+    const o = eventize();
 
     const results = await o.emitAsync('foo');
 

@@ -1,6 +1,6 @@
 import {fake} from 'sinon';
 
-import {eventize, getSubscriptionCount} from '.';
+import {eventize, getSubscriptionCount} from './index';
 
 describe('on() multiple times', () => {
   it('on(eventName, listenerObject)', () => {
@@ -112,7 +112,7 @@ describe('on() multiple times', () => {
       foo: fake(),
     };
 
-    const signal = eventize({});
+    const signal = eventize();
 
     signal.on(obj);
     signal.on(obj);

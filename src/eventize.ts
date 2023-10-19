@@ -5,7 +5,7 @@ import {isEventized} from './isEventized';
 import type {EventizeApi, EventizeFuncApi} from './types';
 
 export const eventize: EventizeFuncApi = (() => {
-  const api = <T extends Object>(obj: T): T & EventizeApi =>
+  const api = <T extends Object>(obj: T = {} as T): T & EventizeApi =>
     injectEventizeApi(obj);
 
   api.inject = injectEventizeApi;

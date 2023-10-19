@@ -1,10 +1,10 @@
 import {fake} from 'sinon';
 
-import {eventize, Priority} from '.';
+import {eventize, Priority} from './index';
 
 describe('emit()', () => {
   describe('calls the listener with all given args (except the event name)', () => {
-    const obj = eventize({});
+    const obj = eventize();
     const fn1 = fake();
     const fn2 = fake();
 
@@ -26,7 +26,7 @@ describe('emit()', () => {
   });
 
   describe('getting started example', () => {
-    const obj = eventize({});
+    const obj = eventize();
     const results: Array<string> = [];
 
     beforeAll(() => {

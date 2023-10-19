@@ -17,7 +17,7 @@ const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 
 const [, , buildType] = process.argv;
 
-const version = makeVersionWithBuild(buildType || 'esm')(packageJson.version);
+const version = makeVersionWithBuild(buildType || 'build')(packageJson.version);
 const banner = makeBanner({
   ...packageJson,
   version,

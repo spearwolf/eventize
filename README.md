@@ -58,6 +58,8 @@ import {eventize} from '@spearwolf/eventize'
 const ε = eventize({})
 ```
 
+> 🔎 if you don't want to specify an object, just leave it out and `{}` will be created for you: `const ε = eventize()` 
+
 or, if you are more familiar with class-based objects, you can use
 
 ```js
@@ -66,6 +68,8 @@ import {Eventize} from '@spearwolf/eventize'
 class Foo extends Eventize {}
 
 const ε = new Foo()
+
+// ε is now an object with eventize superpowers 🚀
 ```
 
 For __typescript__, the following _composition over inheritance_ variant has also worked well:
@@ -226,7 +230,7 @@ The simplest and most direct way is to use a function to subscribe to an event:
 ```js
 import {eventize} from '@spearwolf/eventize'
 
-const ε = eventize({})
+const ε = eventize()
 
 // short version
 ε.on('foo', (a, b) => {
@@ -429,7 +433,7 @@ When this _unsubscribe function_ is called, the _link_ is removed.
 So far, so good. Now let's say we write code that should respond to a dynamically generated event name with a particular method, e.g:
 
 ```js
-const queue = eventize({})
+const queue = eventize()
 
 class Greeter {
   listenTo(name) {

@@ -1,6 +1,6 @@
 import {NAMESPACE} from './constants';
 
-import {eventize, Eventize} from '.';
+import {eventize, Eventize} from './index';
 
 const expect2ImplEventizeApi = (obj: any) => {
   describe('implements the eventizedObject API', () => {
@@ -78,7 +78,7 @@ describe('class extends Eventize', () => {
 });
 
 describe('eventize(eventizer) returns unmodified eventizer', () => {
-  const eventizer = eventize({});
+  const eventizer = eventize();
   const magicNumber = Math.random();
   // @ts-ignore
   eventizer[NAMESPACE].magicNumber = magicNumber;

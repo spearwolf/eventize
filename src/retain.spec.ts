@@ -1,10 +1,10 @@
 import {fake} from 'sinon';
 
-import {eventize} from '.';
+import {eventize} from './index';
 
 describe('retain()', () => {
   it('calls the listener function after registration with on()', () => {
-    const obj = eventize({});
+    const obj = eventize();
     const subscriber = fake();
 
     obj.retain('foo');
@@ -18,7 +18,7 @@ describe('retain()', () => {
   });
 
   it('calls the listener object after registration with on()', () => {
-    const obj = eventize({});
+    const obj = eventize();
     const subscriber = {
       foo: fake(),
     };
@@ -36,7 +36,7 @@ describe('retain()', () => {
   });
 
   it('calls the catch-em-all listener object', () => {
-    const obj = eventize({});
+    const obj = eventize();
 
     const subscriber0 = {
       foo: fake(),
@@ -67,7 +67,7 @@ describe('retain()', () => {
   });
 
   it('multiple event signals', () => {
-    const obj = eventize({});
+    const obj = eventize();
     const subscriber = {
       foo: fake(),
     };

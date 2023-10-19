@@ -1,9 +1,9 @@
 /* eslint-env jest */
-import {eventize} from '.';
+import {eventize} from './index';
 
 describe('eventize.is()', () => {
   it('returns true when obj has the eventized api attached', () => {
-    const obj = eventize({});
+    const obj = eventize();
     expect(eventize.is(obj)).toBe(true);
   });
 
