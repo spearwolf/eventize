@@ -35,11 +35,11 @@ $ npm i @spearwolf/eventize
 ```
 
 The package exports the library in _esm_ format (using `import` and `export` syntax) and also in _commonjs_ format (using `require`).
-It is compiled with the `esnext` typescript target, so there are no downgrades to older javascript syntax and features.
+It is compiled with `ES2021` as target, so there are no downgrades to older javascript syntax and features.
 
 The typescript type definitions are also included in the package.
 
-| 🔎 Since version 3.x there is also a [CHANGELOG](./CHANGELOG.md)
+| 🔎 Since version 3.0.0 there is also a [CHANGELOG](./CHANGELOG.md)
 
 
 ## 📖 Getting Started
