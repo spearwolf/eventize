@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## `v3.1.2`
+
+- The `src/` folder no longer ends up in the npm package by mistake!
+
 ## `v3.1.1`
 
 - `eventize()` can now create a `{}` by itself if no custom object is given

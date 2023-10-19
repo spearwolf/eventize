@@ -18,3 +18,5 @@ tsup.config.js
 .github
 build
 dist
+src
+docs-assets/yuml.me.txt
