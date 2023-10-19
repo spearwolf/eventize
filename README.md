@@ -510,7 +510,7 @@ If you want to send multiple events at once - with the same parameters - you can
 _since v3.1.*_
 
 ```js
-const results = await ε.emit('foo', 'bar', 666);
+const results = await ε.emitAsync('load');
 ```
 
 Emits an event and waits for all promises returned by the subscribers.
