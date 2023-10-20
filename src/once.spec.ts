@@ -31,3 +31,19 @@ describe('once()', () => {
     });
   });
 });
+
+describe('onceAsync()', () => {
+  it('should work as expected', () => {
+    const obj = eventize();
+
+    const sub = fake();
+
+    const promise = obj.onceAsync('foo', sub);
+
+    obj.emit('foo', 'bar', 666);
+
+    expect(sub.callCount).toBe(1);
+    expect(promise).resolves.toBeUndefined();
+  });
+});
+

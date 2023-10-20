@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## `v3.2.0`
+
+- introduce `.onceAsync()`
+
 ## `v3.1.2`
 
 - The `src/` folder no longer ends up in the npm package by mistake!

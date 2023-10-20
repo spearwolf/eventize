@@ -82,7 +82,6 @@ export function injectEventizeApi<T extends Object>(obj: T): T & EventizeApi {
     onceAsync(...args: SubscribeArgs): Promise<void> {
       return new Promise((resolve) => {
         _once(args, resolve);
-        // TODO timeout -> unsubscribe
       });
     },
 
