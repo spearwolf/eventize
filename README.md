@@ -211,7 +211,8 @@ This API is called the __eventize API__ (because "emitter eventize API" is a bit
 | method | description |
 |--------|-------------|
 | `.on( .. )` | subscribe to events |
-| `.once( .. )` | subscribe to only the next event |
+| `.once( .. )` | subscribe only to the next event |
+| `.onceAsync( .. )` | the async version of subscribe only to the next event |
 | `.off( .. )` | unsubscribe listeners |
 | `.retain( .. )` | hold the last event until it is received by a subscriber |
 | `.emit( .. )` | emit an event |
