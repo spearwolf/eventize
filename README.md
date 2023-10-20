@@ -423,6 +423,22 @@ Additional shortcuts for the wildcard `*` syntax:
 
 ---
 
+#### `ε.onceAsync( .. )`
+
+_since v3.2.*_
+
+The arguments are the same as for `.once()` but here a `Promise<void>` is returned which is not fulfilled until the next event is triggered.
+
+```js
+// at this point please do nothing, just wait
+await ε.onceAsync('loaded', () => console.log('all stuff loaded successfully.'))
+
+// a little later, somewhere else in the program
+ε.emit('loaded')
+```
+
+---
+
 #### `ε.off( .. )`
 
 ##### The art of unsubscribing
