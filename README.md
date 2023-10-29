@@ -215,6 +215,7 @@ This API is called the __eventize API__ (because "emitter eventize API" is a bit
 | `.onceAsync( .. )` | the async version of subscribe only to the next event |
 | `.off( .. )` | unsubscribe listeners |
 | `.retain( .. )` | hold the last event until it is received by a subscriber |
+| `.retainClear( .. )` | clear the last event |
 | `.emit( .. )` | emit an event |
 | `.emitAsync( .. )` | emits an event and waits for all promises returned by the subscribers |
 
@@ -573,4 +574,4 @@ _since v3.3.*_
 ε.retainClear('foo')
 ```
 
-With `retainClear()` the _retain_ mode for the event is kept, but if there is already an event that is stored, it will now be cleared.
+With `retainClear()` the _retain mode_ for the event is kept, but if there is already an event that is stored, it will now be cleared.
