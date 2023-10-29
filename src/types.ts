@@ -46,7 +46,7 @@ export type SubscribeArgs =
 export interface EventizeApi {
   on(...args: SubscribeArgs): UnsubscribeFunc;
   once(...args: SubscribeArgs): UnsubscribeFunc;
-  onceAsync(...args: SubscribeArgs): Promise<void>;
+  onceAsync(eventNames: AnyEventNames): Promise<void>;
 
   off(listener?: ListenerType, listenerObject?: ListenerObjectType): void;
 
@@ -54,6 +54,7 @@ export interface EventizeApi {
   emitAsync(eventNames: AnyEventNames, ...args: EventArgs): Promise<any>;
 
   retain(eventName: EventName): void;
+  retainClear(eventName: EventName): void;
 }
 
 export interface EventizerFunc {

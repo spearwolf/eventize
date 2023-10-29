@@ -424,15 +424,15 @@ Additional shortcuts for the wildcard `*` syntax:
 
 ---
 
-#### `ε.onceAsync( .. )`
+#### `ε.onceAsync( eventName | eventName[] )`
 
-_since v3.2.*_
+_since v3.3.*_
 
-The arguments are the same as for `.once()` but here a `Promise<void>` is returned which is not fulfilled until the next event is triggered.
+This creates a promise that will be fulfilled if one of the given events is emitted.
 
 ```js
 // at this point please do nothing, just wait
-await ε.onceAsync('loaded', () => console.log('all stuff loaded successfully.'))
+await ε.onceAsync('loaded')
 
 // a little later, somewhere else in the program
 ε.emit('loaded')
@@ -549,7 +549,7 @@ All arguments that are allowed in `emit()` are supported.
 
 ---
 
-#### `ε.retain( .. )`
+#### `ε.retain( eventName | eventName[] )`
 
 ##### Emit the last event to new subscribers
 
@@ -561,4 +561,16 @@ With `retain` the last transmitted event is stored. Any new listener will get th
 
 > NOTE: This behaviour is similar to the `new ReplaySubject(1)` of _rxjs_. But somehow the method name `retain` seemed more appropriate here.
 
+---
 
+#### `ε.retainClear( eventName | eventName[] )`
+
+##### Clear the last event
+
+_since v3.3.*_
+
+```js
+ε.retainClear('foo')
+```
+
+With `retainClear()` the _retain_ mode for the event is kept, but if there is already an event that is stored, it will now be cleared.

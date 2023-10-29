@@ -7,14 +7,16 @@ import {subscribeTo} from './subscribeTo';
 import type {
   AnyEventNames,
   EventArgs,
-  EventizeApi,
   EventName,
-  ListenerType,
+  EventizeApi,
   ListenerObjectType,
+  ListenerType,
   SubscribeArgs,
   UnsubscribeFunc,
 } from './types';
 import {defineHiddenPropertyRO, isEventName} from './utils';
+
+const VoidFn = (): void => undefined;
 
 const afterApply =
   (obj: EventizeApi, callback?: () => void) => (listener: EventListener) => {
@@ -46,7 +48,10 @@ export function injectEventizeApi<T extends Object>(obj: T): T & EventizeApi {
 
   defineHiddenPropertyRO(obj, NAMESPACE, {keeper, store});
 
-  const _once = (args: SubscribeArgs, afterApplyHook?: () => void): UnsubscribeFunc => {
+  const _once = (
+    args: SubscribeArgs,
+    afterApplyHook?: () => void,
+  ): UnsubscribeFunc => {
     const listeners = subscribeTo(store, keeper, args);
     if (Array.isArray(listeners)) {
       listeners.forEach(afterApply(eventizedObj, afterApplyHook));
@@ -56,10 +61,16 @@ export function injectEventizeApi<T extends Object>(obj: T): T & EventizeApi {
     return makeUnsubscribe(eventizedObj, listeners);
   };
 
-  const _emit = (eventNames: AnyEventNames, args: EventArgs, returnValue?: (val: unknown) => void) => {
+  const _emit = (
+    eventNames: AnyEventNames,
+    args: EventArgs,
+    returnValue?: (val: unknown) => void,
+  ) => {
     if (Array.isArray(eventNames)) {
       eventNames.forEach((event: EventName) => {
-        store.forEach(event, (listener) => listener.apply(event, args, returnValue));
+        store.forEach(event, (listener) =>
+          listener.apply(event, args, returnValue),
+        );
         keeper.retain(event, args);
       });
     } else if (eventNames !== EVENT_CATCH_EM_ALL) {
@@ -79,9 +90,9 @@ export function injectEventizeApi<T extends Object>(obj: T): T & EventizeApi {
       return _once(args);
     },
 
-    onceAsync(...args: SubscribeArgs): Promise<void> {
+    onceAsync(eventNames: AnyEventNames): Promise<void> {
       return new Promise((resolve) => {
-        _once(args, resolve);
+        _once([eventNames, VoidFn], resolve);
       });
     },
 
@@ -107,12 +118,18 @@ export function injectEventizeApi<T extends Object>(obj: T): T & EventizeApi {
       _emit(eventNames, args, (val: unknown) => {
         values.push(val);
       });
-      values = values.map((val: any) => Array.isArray(val) ? Promise.all(val) : Promise.resolve(val));
+      values = values.map((val: any) =>
+        Array.isArray(val) ? Promise.all(val) : Promise.resolve(val),
+      );
       return values.length > 0 ? Promise.all(values) : Promise.resolve();
     },
 
     retain(eventName: EventName): void {
       keeper.add(eventName);
+    },
+
+    retainClear(eventName: EventName): void {
+      keeper.clear(eventName);
     },
   });
 

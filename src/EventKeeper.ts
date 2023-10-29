@@ -19,6 +19,15 @@ export class EventKeeper {
     } else {
       this.eventNames.delete(eventNames);
     }
+    this.clear(eventNames);
+  }
+
+  clear(eventNames: AnyEventNames): void {
+    if (Array.isArray(eventNames)) {
+      eventNames.forEach((name) => this.events.delete(name));
+    } else {
+      this.events.delete(eventNames);
+    }
   }
 
   retain(eventName: EventName, args: EventArgs): void {

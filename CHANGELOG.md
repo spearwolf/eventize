@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## `v3.3.0`
+
+- with `.onceAsync()` only the event names are accepted as parameters, no callback functions anymore (this makes no sense)
+- introduce the `.retainClear()` method: clear a saved event
+
 ## `v3.2.0`
 
 - introduce `.onceAsync()`
