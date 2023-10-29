@@ -30,17 +30,32 @@ describe('once()', () => {
       expect(otherListener.callCount).toBe(2);
     });
   });
-});
 
-describe('onceAsync()', () => {
-  it('should work as expected', () => {
-    const obj = eventize();
+  it('called with multiple event names', () => {
+    const e = eventize();
 
-    const promise = obj.onceAsync('foo');
+    const sub = fake();
 
-    obj.emit('foo', 'bar', 666);
+    e.once(['foo', 'bar'], sub);
 
-    expect(promise).resolves.toBeUndefined();
+    e.emit('foo');
+
+    expect(sub.callCount).toBe(1);
+    sub.resetHistory();
+
+    e.emit('bar');
+
+    expect(sub.callCount).toBe(0);
+
+    e.once(['foo', 'bar'], sub);
+
+    e.emit('bar');
+
+    expect(sub.callCount).toBe(1);
+    sub.resetHistory();
+
+    e.emit('foo');
+
+    expect(sub.callCount).toBe(0);
   });
 });
-

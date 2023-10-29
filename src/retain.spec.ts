@@ -128,4 +128,17 @@ describe('retain()', () => {
     expect(sub2.calledWith('plah')).toBeTruthy();
     expect(sub2.callCount).toBe(1);
   });
+
+  it('together with once()', () => {
+    const e = eventize();
+
+    const sub = fake();
+
+    e.retain('foo');
+    e.emit('foo');
+
+    e.once('foo', sub);
+
+    expect(sub.called).toBeTruthy();
+  });
 });

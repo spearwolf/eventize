@@ -413,6 +413,8 @@ Additional shortcuts for the wildcard `*` syntax:
 
 `.once()` does exactly the same as `.on()`, with the difference that the listener is automatically unsubscribed after being called, so the listener method is called exactly _once_. No more and no less &ndash; there is really nothing more to say about _once_.
 
+| 🔎 if called with multiple event names, the first called event wins
+
 ```js
 ε.once('hi', () => console.log('hello'))
 

@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## `v3.4.0`
+
+- fix `.once()` behavior with multiple event names
+- fix `.onceAsync()`
+
 ## `v3.3.0`
 
 - with `.onceAsync()` only the event names are accepted as parameters, no callback functions anymore (this makes no sense)

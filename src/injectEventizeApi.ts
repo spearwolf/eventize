@@ -16,15 +16,11 @@ import type {
 } from './types';
 import {defineHiddenPropertyRO, isEventName} from './utils';
 
-const VoidFn = (): void => undefined;
-
-const afterApply =
-  (obj: EventizeApi, callback?: () => void) => (listener: EventListener) => {
-    listener.callAfterApply = () => {
-      obj.off(listener);
-      callback?.();
-    };
+const afterApply = (callback?: () => void) => (listener: EventListener) => {
+  listener.callAfterApply = () => {
+    callback?.();
   };
+};
 
 const makeUnsubscribe = (
   host: EventizeApi,
@@ -48,17 +44,22 @@ export function injectEventizeApi<T extends Object>(obj: T): T & EventizeApi {
 
   defineHiddenPropertyRO(obj, NAMESPACE, {keeper, store});
 
-  const _once = (
-    args: SubscribeArgs,
-    afterApplyHook?: () => void,
-  ): UnsubscribeFunc => {
+  const _once = (args: SubscribeArgs): UnsubscribeFunc => {
     const listeners = subscribeTo(store, keeper, args);
+    const unsubscribeFn = makeUnsubscribe(eventizedObj, listeners);
+    let unsubscribeCalled = false;
+    const unsubscribe = () => {
+      if (!unsubscribeCalled) {
+        unsubscribeFn();
+        unsubscribeCalled = true;
+      }
+    };
     if (Array.isArray(listeners)) {
-      listeners.forEach(afterApply(eventizedObj, afterApplyHook));
+      listeners.forEach(afterApply(unsubscribe));
     } else {
-      afterApply(eventizedObj, afterApplyHook)(listeners);
+      afterApply(unsubscribe)(listeners);
     }
-    return makeUnsubscribe(eventizedObj, listeners);
+    return unsubscribe as UnsubscribeFunc;
   };
 
   const _emit = (
@@ -92,7 +93,7 @@ export function injectEventizeApi<T extends Object>(obj: T): T & EventizeApi {
 
     onceAsync(eventNames: AnyEventNames): Promise<void> {
       return new Promise((resolve) => {
-        _once([eventNames, VoidFn], resolve);
+        _once([eventNames, resolve]);
       });
     },
 
