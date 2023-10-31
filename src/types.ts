@@ -53,8 +53,8 @@ export interface EventizeApi {
   emit(eventNames: AnyEventNames, ...args: EventArgs): void;
   emitAsync(eventNames: AnyEventNames, ...args: EventArgs): Promise<any>;
 
-  retain(eventName: EventName): void;
-  retainClear(eventName: EventName): void;
+  retain(eventNames: AnyEventNames): void;
+  retainClear(eventNames: AnyEventNames): void;
 }
 
 export interface EventizerFunc {

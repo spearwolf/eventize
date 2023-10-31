@@ -72,7 +72,7 @@ describe('EventKeeper', () => {
     keeper.retain('foo', [1, 2, 3]);
 
     const emitter = {apply: jest.fn()};
-    keeper.emit('foo', emitter);
+    EventKeeper.publish(keeper.emit('foo', emitter));
 
     expect(emitter.apply).not.toHaveBeenCalled();
   });
@@ -85,9 +85,8 @@ describe('EventKeeper', () => {
     keeper.retain('foo', [1, 2, 3]);
 
     const emitter = {apply: jest.fn()};
-    keeper.emit('foo', emitter);
+    EventKeeper.publish(keeper.emit('foo', emitter));
 
-    // expect(emitter.apply).toHaveBeenCalledWith('foo', [1, 2, 3]);
     expect(emitter.apply.mock.calls[0]).toEqual(['foo', [1, 2, 3]]);
   });
 });

@@ -1,4 +1,4 @@
-import {EventKeeper} from './EventKeeper';
+import {EventKeeper, KeeperEvent} from './EventKeeper';
 import {EventListener} from './EventListener';
 import {EventStore} from './EventStore';
 import {Priority} from './Priority';
@@ -13,18 +13,20 @@ const registerEventListener = (
   priority: number,
   listener: unknown,
   listenerObject: ListenerObjectType,
+  retainedEvents: KeeperEvent[],
 ): EventListener => {
-  const eventListener = store.add(
+  const el = store.add(
     new EventListener(eventName, priority, listener, listenerObject),
   );
-  keeper.emit(eventName, eventListener); // TODO what if similarListener ?
-  return eventListener;
+  keeper.emit(eventName, el, retainedEvents); // TODO what if similarListener ?
+  return el;
 };
 
-export const subscribeTo = (
+const _subscribeTo = (
   store: EventStore,
   keeper: EventKeeper,
   args: EventArgs,
+  retainedEvents: KeeperEvent[],
 ): EventListener | Array<EventListener> => {
   const len = args.length;
   const typeOfFirstArg = typeof args[0];
@@ -59,7 +61,15 @@ export const subscribeTo = (
   }
 
   const register = (prio: number) => (event: EventName) =>
-    registerEventListener(store, keeper, event, prio, listener, listenerObject);
+    registerEventListener(
+      store,
+      keeper,
+      event,
+      prio,
+      listener,
+      listenerObject,
+      retainedEvents,
+    );
 
   if (Array.isArray(eventName)) {
     return eventName.map((name) => {
@@ -70,4 +80,15 @@ export const subscribeTo = (
     });
   }
   return register(priority)(eventName);
+};
+
+export const subscribeTo = (
+  store: EventStore,
+  keeper: EventKeeper,
+  args: EventArgs,
+): EventListener | Array<EventListener> => {
+  const retainedEvents: KeeperEvent[] = [];
+  const listener = _subscribeTo(store, keeper, args, retainedEvents);
+  EventKeeper.publish(retainedEvents);
+  return listener;
 };

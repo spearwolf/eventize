@@ -1,8 +1,24 @@
 import type {AnyEventNames, EventArgs, EventName} from './types';
 import {isCatchEmAll} from './utils';
 
+type KeeperEventItem = {
+  order: number;
+  args: EventArgs;
+};
+
+export type KeeperEvent = {
+  order: number;
+  emit: () => void;
+};
+
+let nextOrderId = 0;
+
 export class EventKeeper {
-  events = new Map<EventName, EventArgs>();
+  static publish(events: KeeperEvent[]): void {
+    events.sort((a, b) => a.order - b.order).forEach((event) => event.emit());
+  }
+
+  events = new Map<EventName, KeeperEventItem>();
   eventNames = new Set<EventName>();
 
   add(eventNames: AnyEventNames): void {
@@ -32,7 +48,7 @@ export class EventKeeper {
 
   retain(eventName: EventName, args: EventArgs): void {
     if (this.eventNames.has(eventName)) {
-      this.events.set(eventName, args);
+      this.events.set(eventName, {args, order: nextOrderId++});
     }
   }
 
@@ -43,14 +59,21 @@ export class EventKeeper {
   emit(
     eventName: EventName,
     eventListener: {apply: (eventName: EventName, args?: EventArgs) => void},
-  ): void {
+    sortedEvents: KeeperEvent[] = [],
+  ): KeeperEvent[] {
     if (!isCatchEmAll(eventName)) {
-      const args = this.events.get(eventName);
-      if (args) {
-        eventListener.apply(eventName, args);
+      if (this.events.has(eventName)) {
+        const {order, args} = this.events.get(eventName);
+        sortedEvents.push({
+          order,
+          emit: () => eventListener.apply(eventName, args),
+        });
       }
     } else {
-      this.eventNames.forEach((name) => this.emit(name, eventListener));
+      this.eventNames.forEach((name) =>
+        this.emit(name, eventListener, sortedEvents),
+      );
     }
+    return sortedEvents;
   }
 }

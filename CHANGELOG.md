@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## `v3.4.1`
+
+- retained events always maintain their original order in which they were published!
+- the methods `.retain()` and `.retainClear()` now also optionally allow the specification of multiple events
+
 ## `v3.4.0`
 
 - fix `.once()` behavior with multiple event names

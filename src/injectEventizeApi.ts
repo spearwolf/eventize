@@ -125,12 +125,12 @@ export function injectEventizeApi<T extends Object>(obj: T): T & EventizeApi {
       return values.length > 0 ? Promise.all(values) : Promise.resolve();
     },
 
-    retain(eventName: EventName): void {
-      keeper.add(eventName);
+    retain(eventNames: AnyEventNames): void {
+      keeper.add(eventNames);
     },
 
-    retainClear(eventName: EventName): void {
-      keeper.clear(eventName);
+    retainClear(eventNames: AnyEventNames): void {
+      keeper.clear(eventNames);
     },
   });
 

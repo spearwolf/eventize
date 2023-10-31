@@ -1,4 +1,4 @@
-import {fake} from 'sinon';
+import {fake, replace} from 'sinon';
 
 import {eventize} from './index';
 
@@ -140,5 +140,42 @@ describe('retain()', () => {
     e.once('foo', sub);
 
     expect(sub.called).toBeTruthy();
+  });
+
+  it('retain the original event order', () => {
+    const e = eventize();
+
+    const publishedEvents: string[] = [];
+
+    const subscriber = {
+      foo: () => publishedEvents.push('foo'),
+      bar: () => publishedEvents.push('bar'),
+      plah: () => publishedEvents.push('plah'),
+      xyz: () => publishedEvents.push('xyz'),
+    };
+
+    const foo = replace(subscriber, 'foo', fake(subscriber.foo));
+    const bar = replace(subscriber, 'bar', fake(subscriber.bar));
+    const plah = replace(subscriber, 'plah', fake(subscriber.plah));
+    const xyz = replace(subscriber, 'xyz', fake(subscriber.xyz));
+
+    e.retain(['foo', 'bar', 'plah', 'xyz']);
+
+    e.emit('plah');
+    e.emit('foo');
+    e.emit('xyz');
+    e.emit('bar');
+
+    e.retainClear('xyz');
+    e.emit('xyz');
+
+    e.on(subscriber);
+
+    expect(foo.called).toBeTruthy();
+    expect(bar.called).toBeTruthy();
+    expect(plah.called).toBeTruthy();
+    expect(xyz.called).toBeTruthy();
+
+    expect(publishedEvents).toEqual(['plah', 'foo', 'bar', 'xyz']);
   });
 });
