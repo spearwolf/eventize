@@ -9,18 +9,17 @@
 
 A tiny and clever framework for synchronous event-driven programming in Javascript.
 
-Yes, you read that right: the emitters here call the listeners _synchronously_ and not _asynchronously_ like in [node.js events](https://nodejs.org/api/events.html) for example.
+Yes, you read that right: the event emitters here call the subscribers _synchronously_ and not _asynchronously_ like in [node.js events](https://nodejs.org/api/events.html) for example.
 
 This is perfectly reasonable: sometimes you want to have control over when something happens, e.g. when your code runs inside an [animation frame](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame). Or you might want to free resources immediately and instantly.
 
 
 ### FEATURES
 
-- all **API** calls and downstream listener calls are **100% synchronous** :boom: no async! :stuck_out_tongue_closed_eyes:
-- :sparkles: **wildcards** &amp; **priorities** :exclamation:
-- :rocket: **smart api** (based on [node.js events](https://nodejs.org/api/events.html), but in a rather extended way)
+- :rocket: **smart api** with focus on developer experience
+- :sparkles: **wildcards** &amp;❗**priorities**❕
 - includes **typescript types** (well, actually it is written in typescript) :tada:
-- supports all major browsers and node.js environments
+- supports all major browsers and node.js environments, targeting `ES2021`
 - very small footprint ~3k gzip'd
 - no runtime dependencies
 - Apache 2.0 licence
