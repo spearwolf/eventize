@@ -34,28 +34,27 @@ describe('once()', () => {
   it('called with multiple event names', () => {
     const e = eventize();
 
-    const sub = fake();
+    const sub = jest.fn();
 
+    // ---
     e.once(['foo', 'bar'], sub);
 
-    e.emit('foo');
-
-    expect(sub.callCount).toBe(1);
-    sub.resetHistory();
+    e.emit('foo', 42);
+    expect(sub).toBeCalledWith(42);
+    sub.mockClear();
 
     e.emit('bar');
+    expect(sub).not.toHaveBeenCalled(); // is no longer called because 'foo' has already been called back
 
-    expect(sub.callCount).toBe(0);
-
+    // ---
     e.once(['foo', 'bar'], sub);
 
-    e.emit('bar');
-
-    expect(sub.callCount).toBe(1);
-    sub.resetHistory();
+    e.emit('bar', 666);
+    expect(sub).toBeCalledTimes(1);
+    expect(sub).toBeCalledWith(666);
+    sub.mockClear();
 
     e.emit('foo');
-
-    expect(sub.callCount).toBe(0);
+    expect(sub).not.toHaveBeenCalled();
   });
 });
