@@ -6,7 +6,7 @@ export default defineConfig({
   format: ['cjs', 'esm'],
   outDir: 'lib',
   banner: {js: banner},
-  target: 'es2021',
+  target: 'es2022',
   dts: true,
   splitting: false,
   sourcemap: true,

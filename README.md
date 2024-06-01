@@ -19,7 +19,7 @@ This is perfectly reasonable: sometimes you want to have control over when somet
 - :rocket: **smart api** with focus on developer experience
 - :sparkles: **wildcards** &amp;❗**priorities**❕
 - includes **typescript types** (well, actually it is written in typescript) :tada:
-- supports all major browsers and node.js environments, targeting `ES2021`
+- supports all major browsers and node.js environments, targeting `ES2022`
 - very small footprint ~3k gzip'd
 - no runtime dependencies
 - Apache 2.0 licence
