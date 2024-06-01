@@ -91,7 +91,9 @@ export function injectEventizeApi<T extends Object>(obj: T): T & EventizeApi {
       return _once(args);
     },
 
-    onceAsync(eventNames: AnyEventNames): Promise<void> {
+    onceAsync<ReturnType = void>(
+      eventNames: AnyEventNames,
+    ): Promise<ReturnType> {
       return new Promise((resolve) => {
         _once([eventNames, resolve]);
       });

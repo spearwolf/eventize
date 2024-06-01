@@ -28,6 +28,6 @@ describe('onceAsync()', () => {
     e.retain('foo');
     e.emit('foo', 1001);
 
-    expect(await e.onceAsync(['bar', 'foo'])).toBe(1001);
+    expect(await e.onceAsync<number>(['bar', 'foo'])).toBe(1001);
   });
 });

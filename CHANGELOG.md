@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## `v3.4.2` (2024-06-01)
+
+- extend the signature of `.onceAsync()` so that the type of the promise return value can be specified optionally
+
 ## `v3.4.1`
 
 - retained events always maintain their original order in which they were published!
