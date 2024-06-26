@@ -56,6 +56,38 @@ describe('off()', () => {
       expect(listenerFunc.called).toBeFalsy();
       expect(otherListener.called).toBeTruthy();
     });
+
+    it('off by object context', () => {
+      const broker = eventize();
+
+      const a = {foo: fake()};
+      const b = {foo: fake(), bar: fake()};
+
+      broker.on('foo', a);
+      broker.on(['foo', 'bar'], b);
+
+      broker.emit('foo', 'bar', 666);
+      broker.emit('bar', 'plah!');
+      broker.emit('plah', 'wtf?');
+
+      expect(a.foo.calledWith('bar', 666)).toBeTruthy();
+      expect(b.foo.calledWith('bar', 666)).toBeTruthy();
+      expect(b.bar.calledWith('plah!')).toBeTruthy();
+
+      a.foo.resetHistory();
+      b.foo.resetHistory();
+      b.bar.resetHistory();
+
+      broker.off(b);
+
+      broker.emit('foo', 'bar', 666);
+      broker.emit('bar', 'plah!');
+      broker.emit('plah', 'wtf?');
+
+      expect(a.foo.calledWith('bar', 666)).toBeTruthy();
+      expect(b.foo.called).toBeFalsy();
+      expect(b.bar.called).toBeFalsy();
+    });
   });
 
   describe('by eventName', () => {

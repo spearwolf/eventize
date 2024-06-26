@@ -3,7 +3,7 @@
 ## `v3.4.2` (2024-06-01)
 
 - extend the signature of `.onceAsync()` so that the type of the promise return value can be specified optionally
-- ugprade build package dependencies
+- upgrade build package dependencies
 - upgrade the javascript target version to ES2022 (was ES2021)
 
 ## `v3.4.1`
