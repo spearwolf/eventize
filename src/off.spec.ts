@@ -62,31 +62,49 @@ describe('off()', () => {
 
       const a = {foo: fake()};
       const b = {foo: fake(), bar: fake()};
+      const c = {onFoo: fake(), onBar: fake()};
 
       broker.on('foo', a);
+
       broker.on(['foo', 'bar'], b);
+
+      broker.on('foo', 'onFoo', c);
+      broker.on('bar', 'onBar', c);
 
       broker.emit('foo', 'bar', 666);
       broker.emit('bar', 'plah!');
       broker.emit('plah', 'wtf?');
 
       expect(a.foo.calledWith('bar', 666)).toBeTruthy();
+
       expect(b.foo.calledWith('bar', 666)).toBeTruthy();
       expect(b.bar.calledWith('plah!')).toBeTruthy();
 
+      expect(c.onFoo.calledWith('bar', 666)).toBeTruthy();
+      expect(c.onBar.calledWith('plah!')).toBeTruthy();
+
       a.foo.resetHistory();
+
       b.foo.resetHistory();
       b.bar.resetHistory();
 
+      c.onFoo.resetHistory();
+      c.onBar.resetHistory();
+
       broker.off(b);
+      broker.off(c);
 
       broker.emit('foo', 'bar', 666);
       broker.emit('bar', 'plah!');
       broker.emit('plah', 'wtf?');
 
       expect(a.foo.calledWith('bar', 666)).toBeTruthy();
+
       expect(b.foo.called).toBeFalsy();
       expect(b.bar.called).toBeFalsy();
+
+      expect(c.onFoo.called).toBeFalsy();
+      expect(c.onBar.called).toBeFalsy();
     });
   });
 
