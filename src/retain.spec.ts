@@ -1,10 +1,10 @@
 import {fake, replace} from 'sinon';
 
-import {eventize} from './index';
+import {Eventize, eventize} from './index';
 
 describe('retain()', () => {
   it('calls the listener function after registration with on()', () => {
-    const obj = eventize();
+    const obj = new (class extends Eventize {})();
     const subscriber = fake();
 
     obj.retain('foo');
@@ -18,7 +18,7 @@ describe('retain()', () => {
   });
 
   it('calls the listener object after registration with on()', () => {
-    const obj = eventize();
+    const obj = new (class extends Eventize {})();
     const subscriber = {
       foo: fake(),
     };
@@ -36,7 +36,7 @@ describe('retain()', () => {
   });
 
   it('calls the catch-em-all listener object', () => {
-    const obj = eventize();
+    const obj = new (class extends Eventize {})();
 
     const subscriber0 = {
       foo: fake(),
@@ -67,7 +67,7 @@ describe('retain()', () => {
   });
 
   it('multiple event signals', () => {
-    const obj = eventize();
+    const obj = new (class extends Eventize {})();
     const subscriber = {
       foo: fake(),
     };
@@ -87,7 +87,7 @@ describe('retain()', () => {
   });
 
   it('the retained value is passed on to all new subscribers', () => {
-    const e = eventize();
+    const e = eventize.inject();
 
     const sub0 = fake();
     const sub1 = fake();
@@ -130,7 +130,7 @@ describe('retain()', () => {
   });
 
   it('together with once()', () => {
-    const e = eventize();
+    const e = eventize.inject();
 
     const sub = fake();
 
@@ -143,7 +143,7 @@ describe('retain()', () => {
   });
 
   it('retain the original event order', () => {
-    const e = eventize();
+    const e = eventize.inject();
 
     const publishedEvents: string[] = [];
 

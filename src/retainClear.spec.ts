@@ -1,10 +1,10 @@
 import {fake} from 'sinon';
 
-import {eventize} from './index';
+import {Eventize} from './index';
 
 describe('retainClear()', () => {
   it('should work as expected', () => {
-    const e = eventize();
+    const e = new (class extends Eventize {})();
 
     const sub0 = fake();
     const sub1 = fake();

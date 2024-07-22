@@ -1,6 +1,6 @@
 import {fake} from 'sinon';
 
-import {eventize} from './index';
+import {emit, eventize, on, once} from './index';
 
 describe('once()', () => {
   describe('once() before on()', () => {
@@ -10,12 +10,12 @@ describe('once()', () => {
     const otherListener = fake();
 
     beforeAll(() => {
-      obj.once('foo', listenerFunc);
-      obj.on('foo', otherListener);
+      once(obj, 'foo', listenerFunc);
+      on(obj, 'foo', otherListener);
     });
 
     it('emit() calls the listeners', () => {
-      obj.emit('foo', 'bar', 666);
+      emit(obj, 'foo', 'bar', 666);
 
       expect(listenerFunc.callCount).toBe(1);
       expect(otherListener.callCount).toBe(1);
@@ -24,7 +24,7 @@ describe('once()', () => {
     });
 
     it('after the first call to emit() the listener is removed from the list of subscribers', () => {
-      obj.emit('foo', 'bar', 666);
+      emit(obj, 'foo', 'bar', 666);
 
       expect(listenerFunc.callCount).toBe(1);
       expect(otherListener.callCount).toBe(2);
@@ -37,24 +37,24 @@ describe('once()', () => {
     const sub = jest.fn();
 
     // ---
-    e.once(['foo', 'bar'], sub);
+    once(e, ['foo', 'bar'], sub);
 
-    e.emit('foo', 42);
+    emit(e, 'foo', 42);
     expect(sub).toBeCalledWith(42);
     sub.mockClear();
 
-    e.emit('bar');
+    emit(e, 'bar');
     expect(sub).not.toHaveBeenCalled(); // is no longer called because 'foo' has already been called back
 
     // ---
-    e.once(['foo', 'bar'], sub);
+    once(e, ['foo', 'bar'], sub);
 
-    e.emit('bar', 666);
+    emit(e, 'bar', 666);
     expect(sub).toBeCalledTimes(1);
     expect(sub).toBeCalledWith(666);
     sub.mockClear();
 
-    e.emit('foo');
+    emit(e, 'foo');
     expect(sub).not.toHaveBeenCalled();
   });
 });

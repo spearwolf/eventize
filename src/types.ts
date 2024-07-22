@@ -88,4 +88,5 @@ export interface EventizePriority {
 
 export interface EventizerFuncAPI extends EventizerFunc {
   is: EventizeGuard;
+  inject: <T extends object>(obj?: T) => T & EventizeApi;
 }

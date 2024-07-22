@@ -1,12 +1,12 @@
-import {eventize} from './index';
+import {emit, eventize, onceAsync, retain} from './index';
 
 describe('onceAsync()', () => {
   it('should work as expected', async () => {
     const ε = eventize();
 
-    const p = ε.onceAsync('foo');
+    const p = onceAsync(ε, 'foo');
 
-    ε.emit('foo', 42);
+    emit(ε, 'foo', 42);
 
     await p;
 
@@ -16,18 +16,18 @@ describe('onceAsync()', () => {
   it('with retain', async () => {
     const e = eventize();
 
-    e.retain('foo');
-    e.emit('foo', 666);
+    retain(e, 'foo');
+    emit(e, 'foo', 666);
 
-    expect(await e.onceAsync('foo')).toBe(666);
+    expect(await onceAsync(e, 'foo')).toBe(666);
   });
 
   it('with multiple event names', async () => {
     const e = eventize();
 
-    e.retain('foo');
-    e.emit('foo', 1001);
+    retain(e, 'foo');
+    emit(e, 'foo', 1001);
 
-    expect(await e.onceAsync<number>(['bar', 'foo'])).toBe(1001);
+    expect(await onceAsync<number>(e, ['bar', 'foo'])).toBe(1001);
   });
 });

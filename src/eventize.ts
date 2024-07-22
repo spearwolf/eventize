@@ -24,7 +24,7 @@ export const eventize: EventizerFuncAPI = (() => {
   const e = <T extends object>(obj: T = {} as T): T & EventizedObject =>
     asEventized(obj);
 
-  e.inject = <T extends object>(obj: T): T & EventizeApi => {
+  e.inject = <T extends object>(obj: T = {} as T): T & EventizeApi => {
     obj = asEventized(obj);
 
     Object.assign(obj, {

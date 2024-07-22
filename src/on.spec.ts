@@ -3,7 +3,7 @@ import {fake} from 'sinon';
 
 import {EVENT_CATCH_EM_ALL} from './constants';
 
-import {eventize, Priority, getSubscriptionCount} from './index';
+import {eventize, Priority, getSubscriptionCount, on, emit} from './index';
 
 describe('on()', () => {
   // ---------------------------------------------------------------------------------------------
@@ -13,7 +13,8 @@ describe('on()', () => {
       const listenerFunc = fake();
       const obj = eventize();
       let context: Object;
-      const unsubscribe = obj.on(
+      const unsubscribe = on(
+        obj,
         'foo',
         7,
         function () {
@@ -22,8 +23,8 @@ describe('on()', () => {
         },
         listenerObject,
       );
-      obj.on('foo', 0, listenerFunc, listenerObject);
-      obj.emit('foo', 'bar', 666);
+      on(obj, 'foo', 0, listenerFunc, listenerObject);
+      emit(obj, 'foo', 'bar', 666);
 
       it('subscription count', () => {
         expect(getSubscriptionCount(obj)).toBe(2);
@@ -54,7 +55,7 @@ describe('on()', () => {
           this.args = args;
         },
       };
-      const obj = eventize();
+      const obj = eventize.inject();
       const unsubscribe = obj.on('foo', 9, 'foo', listenerObject);
       obj.emit('foo', 'bar', 666);
 
@@ -80,7 +81,7 @@ describe('on()', () => {
     });
     describe('on( eventName, priority, listenerFunc )', () => {
       const listenerFunc = fake();
-      const obj = eventize();
+      const obj = eventize.inject();
       const unsubscribe = obj.on('foo', 11, listenerFunc);
       obj.emit('foo', 'plah', 669);
 
@@ -109,7 +110,7 @@ describe('on()', () => {
           listenerFunc(...args);
         },
       };
-      const obj = eventize();
+      const obj = eventize.inject();
       const unsubscribe = obj.on('foo', 13, listener);
 
       it('priority is correct', () => {
@@ -137,7 +138,7 @@ describe('on()', () => {
     describe('on( eventName, listenerFunc, listenerObject )', () => {
       const listenerObject = {};
       const listenerFunc = fake();
-      const obj = eventize();
+      const obj = eventize.inject();
       let context: Object;
       const unsubscribe = obj.on(
         'foo',
@@ -174,7 +175,7 @@ describe('on()', () => {
     });
     describe('on( eventName, listenerFunc )', () => {
       const listenerFunc = fake();
-      const obj = eventize();
+      const obj = eventize.inject();
       const unsubscribe = obj.on('foo', listenerFunc);
       obj.emit('foo', 'plah', 669);
 
@@ -201,7 +202,7 @@ describe('on()', () => {
     describe('on( eventName, priority, listenerFunc, listenerObject )', () => {
       const listenerObject = {};
       const listenerFunc = fake();
-      const obj = eventize();
+      const obj = eventize.inject();
       let context: Object;
       const unsubscribe = obj.on(
         Foo,
@@ -241,7 +242,7 @@ describe('on()', () => {
           this.args = args;
         },
       };
-      const obj = eventize();
+      const obj = eventize.inject();
       const unsubscribe = obj.on(Foo, 9, 'foo', listenerObject);
       obj.emit(Foo, 'bar', 666);
 
@@ -264,7 +265,7 @@ describe('on()', () => {
     });
     describe('on( eventName, priority, listenerFunc )', () => {
       const listenerFunc = fake();
-      const obj = eventize();
+      const obj = eventize.inject();
       const unsubscribe = obj.on(Foo, 11, listenerFunc);
       obj.emit(Foo, 'plah', 669);
 
@@ -293,7 +294,7 @@ describe('on()', () => {
           listenerFunc(...args);
         },
       };
-      const obj = eventize();
+      const obj = eventize.inject();
       const unsubscribe = obj.on(Foo, 13, listener);
 
       it('priority is correct', () => {
@@ -321,7 +322,7 @@ describe('on()', () => {
     describe('on( eventName, listenerFunc, listenerObject )', () => {
       const listenerObject = {};
       const listenerFunc = fake();
-      const obj = eventize();
+      const obj = eventize.inject();
       let context: Object;
       const unsubscribe = obj.on(
         Foo,
@@ -355,7 +356,7 @@ describe('on()', () => {
     });
     describe('on( eventName, listenerFunc )', () => {
       const listenerFunc = fake();
-      const obj = eventize();
+      const obj = eventize.inject();
       const unsubscribe = obj.on(Foo, listenerFunc);
       obj.emit(Foo, 'plah', 669);
 
@@ -381,7 +382,7 @@ describe('on()', () => {
     describe('on( eventNameArray, priority, listenerFunc, listenerObject )', () => {
       const listenerObject = {};
       const listenerFunc = fake();
-      const obj = eventize();
+      const obj = eventize.inject();
       const context: Array<Object> = [];
       // @ts-ignore
       const {listeners} = obj.on(
@@ -427,7 +428,7 @@ describe('on()', () => {
           mockFunc(...args);
         },
       };
-      const obj = eventize();
+      const obj = eventize.inject();
       // @ts-ignore
       const {listeners} = obj.on(['foo', 'fu'], 9, 'foo', listenerObject);
       obj.emit(['foo', 'fu'], 'bar', 666);
@@ -454,7 +455,7 @@ describe('on()', () => {
     });
     describe('on( eventName*, priority, listenerFunc )', () => {
       const listenerFunc = fake();
-      const obj = eventize();
+      const obj = eventize.inject();
       // @ts-ignore
       const {listeners} = obj.on(['foo', 'bar'], 11, listenerFunc);
       obj.emit(['foo', 'bar'], 'plah', 669);
@@ -479,7 +480,7 @@ describe('on()', () => {
     describe('on( eventName*, priority, object )', () => {
       const listenerFuncFoo = fake();
       const listenerFuncBar = fake();
-      const obj = eventize();
+      const obj = eventize.inject();
 
       // @ts-ignore
       const {listeners} = obj.on(['foo', 'bar'], 13, {
@@ -512,7 +513,7 @@ describe('on()', () => {
     describe('on( eventName*, listenerFunc, listenerObject )', () => {
       const listenerObject = {};
       const listenerFunc = fake();
-      const obj = eventize();
+      const obj = eventize.inject();
       const contexts: Object = [];
       // @ts-ignore
       const {listeners} = obj.on(
@@ -552,7 +553,7 @@ describe('on()', () => {
     });
     describe('on( eventName*, listenerFunc )', () => {
       const listenerFunc = fake();
-      const obj = eventize();
+      const obj = eventize.inject();
       // @ts-ignore
       const {listeners} = obj.on(['foo', 'bar'], listenerFunc);
 
@@ -577,7 +578,7 @@ describe('on()', () => {
     });
     describe('on( eventName*, listenerFunc ) supports [ [eventName, PRIO], .. ]', () => {
       const listenerFunc = fake();
-      const obj = eventize();
+      const obj = eventize.inject();
       // @ts-ignore
       const {listeners} = obj.on(
         [
@@ -611,7 +612,7 @@ describe('on()', () => {
   describe('on( priority, listenerFunc, listenerObject ) => object.on( "*", priority, listenerFunc, listenerObject )', () => {
     const listenerObject = {};
     const listenerFunc = fake();
-    const obj = eventize();
+    const obj = eventize.inject();
     let context: Object;
     const unsubscribe = obj.on(
       7,
@@ -645,7 +646,7 @@ describe('on()', () => {
   });
   describe('on( priority, listenerFunc ) => object.on( "*", priority, listenerFunc )', () => {
     const listenerFunc = fake();
-    const obj = eventize();
+    const obj = eventize.inject();
     const unsubscribe = obj.on(11, listenerFunc);
     obj.emit('foo', 'plah', 669);
 
@@ -668,7 +669,7 @@ describe('on()', () => {
   describe('on( listenerFunc, listenerObject ) => object.on( "*", Priority.Default, listenerFunc, listenerObject )', () => {
     const listenerObject = {};
     const listenerFunc = fake();
-    const obj = eventize();
+    const obj = eventize.inject();
     let context: Object;
     const unsubscribe = obj.on(function () {
       // @ts-ignore
@@ -698,7 +699,7 @@ describe('on()', () => {
   });
   describe('on( listenerFunc ) => object.on( "*", Priority.Default, listenerFunc )', () => {
     const listenerFunc = fake();
-    const obj = eventize();
+    const obj = eventize.inject();
     const unsubscribe = obj.on(listenerFunc);
     obj.emit('foo', 'plah', 669);
 
@@ -720,7 +721,7 @@ describe('on()', () => {
   });
   describe('on( priority, object ) => object.on( "*", priority, object )', () => {
     const listenerFunc = fake();
-    const obj = eventize();
+    const obj = eventize.inject();
     const unsubscribe = obj.on(13, {foo: listenerFunc});
     obj.emit('foo', 'plah', 667);
 
@@ -742,7 +743,7 @@ describe('on()', () => {
   });
   describe('on( object ) => object.on( "*", Priority.Default, object )', () => {
     const listenerFunc = fake();
-    const obj = eventize();
+    const obj = eventize.inject();
     const unsubscribe = obj.on({foo: listenerFunc});
     obj.emit('foo', 'plah', 667);
 
