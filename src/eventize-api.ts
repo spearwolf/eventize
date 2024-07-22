@@ -1,7 +1,7 @@
 import {EventListener} from './EventListener';
-import {asEventized} from './asEventized.js';
+import {asEventized} from './asEventized';
 import {EVENT_CATCH_EM_ALL, NAMESPACE} from './constants';
-import {isEventized} from './isEventized.js';
+import {isEventized} from './isEventized';
 import {subscribeTo} from './subscribeTo';
 import type {
   AnyEventNames,

@@ -8,7 +8,7 @@ import {
   onceAsync,
   retain,
   retainClear,
-} from './eventize-api.js';
+} from './eventize-api';
 import {isEventized} from './isEventized';
 import type {
   AnyEventNames,
