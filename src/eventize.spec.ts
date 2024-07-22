@@ -1,23 +1,7 @@
 import {NAMESPACE} from './constants';
+import {expect2ImplEventizeApi} from './expect2ImplEventizeApi';
 
 import {eventize, Eventize} from './index';
-
-const expect2ImplEventizeApi = (obj: any) => {
-  describe('implements the eventizedObject API', () => {
-    it('.on()', () => {
-      expect(typeof obj.on).toBe('function');
-    });
-    it('.once()', () => {
-      expect(typeof obj.once).toBe('function');
-    });
-    it('.off()', () => {
-      expect(typeof obj.off).toBe('function');
-    });
-    it('.emit()', () => {
-      expect(typeof obj.emit).toBe('function');
-    });
-  });
-};
 
 describe('class extends Eventize', () => {
   class Foo extends Eventize {}

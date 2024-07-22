@@ -34,7 +34,7 @@ $ npm i @spearwolf/eventize
 ```
 
 The package exports the library in _esm_ format (using `import` and `export` syntax) and also in _commonjs_ format (using `require`).
-It is compiled with `ES2021` as target, so there are no downgrades to older javascript syntax and features.
+It is compiled with `ES2022` as target, so there are no downgrades to older javascript syntax and features.
 
 The typescript type definitions are also included in the package.
 
@@ -49,15 +49,21 @@ The underlying concept is simple: certain types of objects (called "emitters") e
 
 ##### Emitter
 
-Any object can become an _emitter_; to do so, the object must inject the [eventize API](#eventize-api).
+> 🔎 _Emitter_ is a synonym for an _eventized object_, which in turn is a synonym for an object instance that has the _eventize superpowers_ attached to it!
+> In this documentation we also use __ε__ as a variable name to indicate that it is an _eventized object_.
+
+
+Any object can become an _emitter_; to do so, the object must be _upgraded_:
 
 ```js
 import {eventize} from '@spearwolf/eventize'
 
-const ε = eventize({})
+// !!! THIS IS THE RECOMMENDED AND MOST DIRECT APPROACH TO CREATE AN EVENTIZED OBJECT !!!
+
+const eventizedObj = eventize(obj)
 ```
 
-> 🔎 if you don't want to specify an object, just leave it out and `{}` will be created for you: `const ε = eventize()` 
+> 🔎 If you don't want to specify an object, just leave it out and `{}` will be created for you: `const ε = eventize()` 
 
 or, if you are more familiar with class-based objects, you can use
 
@@ -79,19 +85,25 @@ import {eventize, type Eventize} from '@spearwolf/eventize'
 export interface Foo extends Eventize {}
 
 export class Foo {
-
   constructor() {
-    eventize(this);
+    eventize.inject(this);
   }
-
-  // ...
 }
 ```
 
-> 🔎 _emitter_ is a synonym for an _eventized object_, which in turn is a synonym for an object instance that has the _eventize api_ methods attached to it.
-> In this documentation we also use __ε__ as a variable name to indicate that it is an _eventized object_.
+Since version 4.0.0 there is the _functional_ eventize API, so it is now possible to use `eventize()` in the constructor without any additions:
 
-##### Listener
+```ts
+import {eventize} from '@spearwolf/eventize'
+
+export class Foo {
+  constructor() {
+    eventize(this);
+  }
+}
+```
+
+##### Listener or Subscriptions
 
 Any function can be used as a listener. However, you can also use an object that defines methods with the exact name of the given event.
 
@@ -141,11 +153,72 @@ If an emitter emits an event to which no listeners are attached, nothing happens
 
 ### How to _emitter_
 
+#### EventizedObject vs. EventizeApi
+
+To give an object the eventize superpowers, it needs to be initialized once. for this purpose, there is the `eventize` function. The result is an `EventizedObject`.
+To use the eventize API, the functions are available as named exports. The API currently includes the following functions:
+
+| function | description |
+|--------|-------------|
+| on | subscribe to events |
+| once | subscribe to the next event only |
+| onceAsync | the async version of subscribe only to the next event |
+| emit | dispatch an event |
+| emitAsync | dispatch an event and wait for any promises returned by subscribers |
+| off | unsubscribe |
+| retain | hold the last event until it is received by a subscriber |
+| retainClear | clear the last event |
+
+###### Example
+
+```typescript
+import {eventize, on, emit} from '@spearwolf/eventize';
+
+const obj = eventize();
+
+on(obj, 'foo', () => console.log('foo called'));
+
+emit(obj, 'foo');  // => call foo subscriber
+```
+
+###### EventizeApi
+
+If the `Eventize` base class or `eventize.inject()` is used instead of `eventize()`, an eventized object is also returned, but here additionally with the EventizeApi attached as as methods:
+
+```typescript
+import {Eventize, on, emit} from '@spearwolf/eventize';
+
+class Foo extends Eventize {}
+const obj = new Foo();
+
+obj.on('foo', () => console.log('foo called'));
+
+obj.emit('foo');  // => call foo subscriber
+
+emit(obj, 'foo');  // => call foo subscriber
+```
+
+###### EventizedObject vs EventizeApi Overview Matrix
+
 There are several ways to convert any object into an emitter / eventized object.
 
-Probably the most common method is to simply use `eventize( obj )`; this corresponds to the _inject_ variant:
+| Method | is EventizedObject | has EventizeApi injected |
+|--------|--------------------|--------------------------|
+| `eventize(obj)` | ✅ | ❌ |
+| `eventize.inject(obj)` | ✅ | ✅ |
+| `class extends Eventize {}` | ✅ | ✅ |
 
-#### inject
+#### eventize
+
+The easiest way to create an eventized object is to use the `eventize` function. The result is an object with eventize superpowers, which can be accessed using the eventize API functions:
+
+```ts
+eventize( myObj )  // => myObj
+```
+
+#### eventize.inject
+
+Alternatively, it is possible to create an eventized object which has the complete eventize api injected as methods at the same time
 
 ```ts
 eventize.inject( myObj )  // => myObj
@@ -154,20 +227,6 @@ eventize.inject( myObj )  // => myObj
 Returns the same object, with the eventize api attached, by modifying the original object.
 
 ![eventize.inject](./docs-assets/eventize-inject.svg)
-
-You can use the _extend_ variant to create an emitter without modifying the original object:
-
-#### extend
-
-```js
-eventize.extend( myObj )  // => myEventizedObj
-```
-
-Returns a new object, with the [Eventize API](#the-emitter-eventize-api) attached. The original object is not modified here, instead the _prototype_ of the new object is set to the original object.
-
-> 🔎 For this purpose [`Object.create()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/create) is used internally
-
-![eventize.extend](./docs-assets/eventize-extend.svg)
 
 
 #### Class-based inheritance
@@ -195,36 +254,55 @@ interface Foo extends Eventize {}
 
 class Foo {
   constructor() {
-    eventize(this)
+    eventize.inject(this)
   }
 }
 ```
 
 ---
 
-### eventize API
+### Eventize API
 
 Each _emitter_ / _eventized_ object provides an API for subscribing, unsubscribing and emitting events.
 This API is called the __eventize API__ (because "emitter eventize API" is a bit too long and cumbersome).
 
 | method | description |
 |--------|-------------|
-| `.on( .. )` | subscribe to events |
-| `.once( .. )` | subscribe only to the next event |
-| `.onceAsync( .. )` | the async version of subscribe only to the next event |
-| `.off( .. )` | unsubscribe listeners |
-| `.retain( .. )` | hold the last event until it is received by a subscriber |
-| `.retainClear( .. )` | clear the last event |
-| `.emit( .. )` | emit an event |
-| `.emitAsync( .. )` | emits an event and waits for all promises returned by the subscribers |
+| `on( .. )` | subscribe to events |
+| `once( .. )` | subscribe only to the next event |
+| `onceAsync( .. )` | the async version of subscribe only to the next event |
+| `off( .. )` | unsubscribe |
+| `retain( .. )` | hold the last event until it is received by a subscriber |
+| `retainClear( .. )` | clear the last event |
+| `emit( .. )` | dispatch an event |
+| `emitAsync( .. )` | dispatch an event and waits for all promises returned by the subscribers |
 
-These methods are described in detail below:
+All methods can be used in the _functional_ variant:
+
+```js
+on(obj, ...)
+emit(obj, ...)
+// ..
+```
+
+the objects that have been injected with the eventize api also offer the api as methods:
+
+```js
+obj.on(...)
+obj.emit(...)
+// ..
+```
+
+These API methods are described in detail below:
 
 ### How to listen
 
 ---
 
-#### `ε.on( .. )`
+#### on
+
+> `on(ε, .. )`
+> `ε.on( .. )`
 
 The simplest and most direct way is to use a function to subscribe to an event:
 
@@ -408,9 +486,12 @@ Additional shortcuts for the wildcard `*` syntax:
 
 ---
 
-#### `ε.once( .. )`
+#### once
 
-`.once()` does exactly the same as `.on()`, with the difference that the listener is automatically unsubscribed after being called, so the listener method is called exactly _once_. No more and no less &ndash; there is really nothing more to say about _once_.
+> `once(ε, .. )`
+> `ε.once( .. )`
+
+`once()` does exactly the same as `on()`, with the difference that the listener is automatically unsubscribed after being called, so the listener method is called exactly _once_. No more and no less &ndash; there is really nothing more to say about _once_.
 
 | 🔎 if called with multiple event names, the first called event wins
 
@@ -426,7 +507,10 @@ Additional shortcuts for the wildcard `*` syntax:
 
 ---
 
-#### `ε.onceAsync( eventName | eventName[] )`
+#### onceAsync
+
+> `onceAsync(ε, eventName | eventName[] )`
+> `ε.onceAsync( eventName | eventName[] )`
 
 _since v3.3.*_
 
@@ -442,7 +526,10 @@ await ε.onceAsync('loaded')
 
 ---
 
-#### `ε.off( .. )`
+#### off
+
+> `off(ε, .. )`
+> `ε.off( .. )`
 
 ##### The art of unsubscribing
 
@@ -506,7 +593,10 @@ getSubscriptionCount(ε) // => number of active subscriptions
 
 ---
 
-#### `ε.emit( .. )`
+#### emit
+
+> `emit(ε, .. )`
+> `ε.emit( .. )`
 
 Creating an event is fairly simple and straightforward:
 
@@ -528,7 +618,10 @@ If you want to send multiple events at once - with the same parameters - you can
 
 ---
 
-#### `ε.emitAsync( .. )`
+#### emitAsync
+
+> `emitAsync(ε, .. )`
+> `ε.emitAsync( .. )`
 
 _since v3.1.*_
 
@@ -551,7 +644,10 @@ All arguments that are allowed in `emit()` are supported.
 
 ---
 
-#### `ε.retain( eventName | eventName[] )`
+#### retain
+
+> `retain(ε, eventName | eventName[] )`
+> `ε.retain( eventName | eventName[] )`
 
 ##### Emit the last event to new subscribers
 
@@ -565,7 +661,10 @@ With `retain` the last transmitted event is stored. Any new listener will get th
 
 ---
 
-#### `ε.retainClear( eventName | eventName[] )`
+#### retainClear
+
+> `retainClear(ε, eventName | eventName[] )`
+> `ε.retainClear( eventName | eventName[] )`
 
 ##### Clear the last event
 

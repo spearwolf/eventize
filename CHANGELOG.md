@@ -1,5 +1,62 @@
 # CHANGELOG
 
+## `v4.0.0` (2024-07-22)
+
+**!! BREAKING CHANGES !!**
+
+_Introduction of the new functional API_
+
+Previously, the Eventize API methods were assigned to the object as methods after calling `eventize(obj)`
+This behavior has changed in 4.0.0: all eventize methods are now available as library exports in the functional variant:
+
+```js
+import {
+  on,
+  once,
+  onceAsync,
+  off,
+  emit,
+  emitAsync,
+  retain,
+  retainClear
+} from '@spearwolf/eventize';
+```
+
+| before | after |
+|--------|-------|
+| `obj.on(..)` | `on(obj, ...)` |
+| `obj.once(..)` | `once(obj, ...)` |
+| `obj.emit(..)` | `emit(obj, ...)` |
+| `obj.off(..)` | `off(obj, ...)` |
+| ... | ... |
+
+There is still the option to inject the Eventize API as methods to the object (but this is no longer the default) by using:
+
+- `eventize.inject(obj)` &rarr; _eventizedObj with eventize-api methods_
+  - the `eventize.extend()` method has been removed, however 
+- `new (class extends Eventize {})()`
+  - the base class `Eventize` is still available and works in the same way as before
+  
+If you are using the syntax from the _composition via inheritance_ example, you should now be using `eventize.inject` directly:
+
+```typescript
+import {eventize, type Eventize} from '@spearwolf/eventize'
+
+export interface Foo extends Eventize {}
+
+export class Foo {
+  constructor() {
+    eventize.inject(this);
+  }
+}
+```
+
+Other API Changes
+
+- The _default export_ is still the `eventize()` function, but the `Priority` object is no longer assigned here
+  - `Priority` is still available as a named export (only)
+
+
 ## `v3.4.2` (2024-06-01)
 
 - extend the signature of `.onceAsync()` so that the type of the promise return value can be specified optionally

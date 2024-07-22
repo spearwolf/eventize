@@ -90,7 +90,7 @@ export const onceAsync = <ReturnType = void>(
 };
 
 export const off = (
-  eventizedObj: EventizedObject,
+  eventizedObj: object,
   listener?: ListenerType,
   listenerObject?: ListenerObjectType,
 ): void => {
@@ -111,7 +111,7 @@ export const off = (
 };
 
 export const emit = (
-  eventizedObj: EventizedObject,
+  eventizedObj: object,
   eventNames: AnyEventNames,
   ...args: EventArgs
 ): void => {
@@ -122,7 +122,7 @@ export const emit = (
 };
 
 export const emitAsync = (
-  eventizedObj: EventizedObject,
+  eventizedObj: object,
   eventNames: AnyEventNames,
   ...args: EventArgs
 ): Promise<any> => {
@@ -146,7 +146,7 @@ export const retain = (obj: object, eventNames: AnyEventNames): void => {
 };
 
 export const retainClear = (
-  eventizedObj: EventizedObject,
+  eventizedObj: object,
   eventNames: AnyEventNames,
 ): void => {
   if (!isEventized(eventizedObj)) {
