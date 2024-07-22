@@ -121,7 +121,7 @@ export class EventStore {
   readonly namedListeners: Map<EventName, Array<EventListener>>;
   readonly catchEmAllListeners: Array<EventListener>;
 
-  #getListenersForEventName = (eventName: string | symbol): EventListener[] => {
+  getListenersForEventName = (eventName: string | symbol): EventListener[] => {
     let namedListeners = this.namedListeners.get(eventName);
     if (!namedListeners) {
       namedListeners = [];
@@ -144,7 +144,7 @@ export class EventStore {
       listener,
       listener.isCatchEmAll
         ? this.catchEmAllListeners
-        : this.#getListenersForEventName(listener.eventName),
+        : this.getListenersForEventName(listener.eventName),
     );
   }
 
@@ -198,7 +198,7 @@ export class EventStore {
         // ---------------------------------------------------------------
         // .off('*', obj)
         //
-        // TODO propably this will never be called
+        // TODO probably this will never be called
         //      so please check if we can remove this code path
         removeSimilarListenersFromArray(
           this.catchEmAllListeners,
