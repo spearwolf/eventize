@@ -1,28 +1,64 @@
-import {Priority} from './Priority';
-import {EVENT_CATCH_EM_ALL} from './constants';
-import {injectEventizeApi} from './injectEventizeApi';
+import {asEventized} from './asEventized';
+import {
+  emit,
+  emitAsync,
+  off,
+  on,
+  once,
+  onceAsync,
+  retain,
+  retainClear,
+} from './eventize-api.js';
 import {isEventized} from './isEventized';
-import type {EventizeApi, EventizeFuncApi} from './types';
+import type {
+  AnyEventNames,
+  EventArgs,
+  EventizeApi,
+  EventizedObject,
+  EventizerFuncAPI,
+  SubscribeArgs,
+  UnsubscribeFunc,
+} from './types';
 
-export const eventize: EventizeFuncApi = (() => {
-  const api = <T extends Object>(obj: T = {} as T): T & EventizeApi =>
-    injectEventizeApi(obj);
+export const eventize: EventizerFuncAPI = (() => {
+  const e = <T extends object>(obj: T = {} as T): T & EventizedObject =>
+    asEventized(obj);
 
-  api.inject = injectEventizeApi;
+  e.inject = <T extends object>(obj: T): T & EventizeApi => {
+    obj = asEventized(obj);
 
-  api.extend = <T extends Object>(obj: T): T & EventizeApi =>
-    injectEventizeApi(Object.create(obj));
+    Object.assign(obj, {
+      on: (...args: SubscribeArgs): UnsubscribeFunc => on(obj, ...args),
 
-  api.create = (obj: Object): EventizeApi => {
-    const eventizer = injectEventizeApi({});
-    eventizer.on(EVENT_CATCH_EM_ALL, Priority.Default, obj);
-    return eventizer;
+      once: (...args: SubscribeArgs): UnsubscribeFunc => once(obj, ...args),
+
+      onceAsync: <ReturnType = void>(
+        eventNames: AnyEventNames,
+      ): Promise<ReturnType> => onceAsync(obj, eventNames),
+
+      off: (listener?: unknown, listenerObject?: object): void =>
+        off(obj as EventizedObject, listener, listenerObject),
+
+      emit: (eventNames: AnyEventNames, ...args: EventArgs): void =>
+        emit(obj as EventizedObject, eventNames, ...args),
+
+      emitAsync: (
+        eventNames: AnyEventNames,
+        ...args: EventArgs
+      ): Promise<any> => emitAsync(obj as EventizedObject, eventNames, ...args),
+
+      retain: (eventNames: AnyEventNames): void => retain(obj, eventNames),
+
+      retainClear: (eventNames: AnyEventNames): void =>
+        retainClear(obj as EventizedObject, eventNames),
+    });
+
+    return obj as T & EventizeApi;
   };
 
-  api.is = isEventized;
-  api.Priority = Priority;
+  e.is = isEventized;
 
-  return api;
+  return e;
 })();
 
 export interface Eventize extends EventizeApi {}
@@ -30,5 +66,37 @@ export interface Eventize extends EventizeApi {}
 export class Eventize {
   constructor() {
     eventize(this);
+  }
+
+  on(...args: SubscribeArgs): UnsubscribeFunc {
+    return on(this, ...args);
+  }
+
+  once(...args: SubscribeArgs): UnsubscribeFunc {
+    return once(this, ...args);
+  }
+
+  onceAsync<ReturnType = void>(eventNames: AnyEventNames): Promise<ReturnType> {
+    return onceAsync(this, eventNames);
+  }
+
+  off(listener?: unknown, listenerObject?: object): void {
+    off(this, listener, listenerObject);
+  }
+
+  emit(eventNames: AnyEventNames, ...args: EventArgs): void {
+    emit(this, eventNames, ...args);
+  }
+
+  emitAsync(eventNames: AnyEventNames, ...args: EventArgs): Promise<any> {
+    return emitAsync(this, eventNames, ...args);
+  }
+
+  retain(eventNames: AnyEventNames): void {
+    retain(this, eventNames);
+  }
+
+  retainClear(eventNames: AnyEventNames): void {
+    retainClear(this, eventNames);
   }
 }

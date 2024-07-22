@@ -1,6 +1,6 @@
 import {fake} from 'sinon';
 
-import {eventize, getSubscriptionCount} from './index';
+import {emit, eventize, getSubscriptionCount, off, on, once} from './index';
 
 describe('on() multiple times', () => {
   it('on(eventName, listenerObject)', () => {
@@ -8,13 +8,13 @@ describe('on() multiple times', () => {
       foo: fake(),
     });
 
-    const unsubscribe0 = obj.on('foo', obj);
-    const unsubscribe1 = obj.on('foo', obj);
-    obj.once('foo', obj);
+    const unsubscribe0 = on(obj, 'foo', obj);
+    const unsubscribe1 = on(obj, 'foo', obj);
+    once(obj, 'foo', obj);
 
     expect(getSubscriptionCount(obj)).toBe(1);
 
-    obj.emit('foo');
+    emit(obj, 'foo');
 
     expect(obj.foo.callCount).toBe(1);
     expect(getSubscriptionCount(obj)).toBe(1);
@@ -24,7 +24,7 @@ describe('on() multiple times', () => {
 
     expect(getSubscriptionCount(obj)).toBe(1);
 
-    obj.emit('foo');
+    emit(obj, 'foo');
     expect(obj.foo.callCount).toBe(1);
 
     unsubscribe1();
@@ -32,7 +32,7 @@ describe('on() multiple times', () => {
 
     expect(getSubscriptionCount(obj)).toBe(0);
 
-    obj.emit('foo');
+    emit(obj, 'foo');
     expect(obj.foo.callCount).toBe(0);
   });
 
@@ -41,24 +41,24 @@ describe('on() multiple times', () => {
       foo: fake(),
     });
 
-    const unsubscribe0 = obj.on('bar', 'foo', obj);
-    const unsubscribe1 = obj.on('bar', 'foo', obj);
-    obj.once('bar', 'foo', obj);
+    const unsubscribe0 = on(obj, 'bar', 'foo', obj);
+    const unsubscribe1 = on(obj, 'bar', 'foo', obj);
+    once(obj, 'bar', 'foo', obj);
 
-    obj.emit('bar');
+    emit(obj, 'bar');
 
     expect(obj.foo.callCount).toBe(1);
 
     unsubscribe0();
     obj.foo.resetHistory();
 
-    obj.emit('bar');
+    emit(obj, 'bar');
     expect(obj.foo.callCount).toBe(1);
 
     unsubscribe1();
     obj.foo.resetHistory();
 
-    obj.emit('bar');
+    emit(obj, 'bar');
     expect(obj.foo.callCount).toBe(0);
   });
 
@@ -67,17 +67,17 @@ describe('on() multiple times', () => {
       foo: fake(),
     });
 
-    obj.on('foo', obj);
-    obj.on('foo', obj);
+    on(obj, 'foo', obj);
+    on(obj, 'foo', obj);
 
-    obj.emit('foo');
+    emit(obj, 'foo');
 
     expect(obj.foo.callCount).toBe(1);
 
-    obj.off('foo', obj);
+    off(obj, 'foo', obj);
     obj.foo.resetHistory();
 
-    obj.emit('foo');
+    emit(obj, 'foo');
     expect(obj.foo.callCount).toBe(0);
   });
 
@@ -86,24 +86,24 @@ describe('on() multiple times', () => {
       foo: fake(),
     });
 
-    const unsubscribe0 = obj.on(obj);
-    const unsubscribe1 = obj.on(obj);
-    obj.once(obj);
+    const unsubscribe0 = on(obj, obj);
+    const unsubscribe1 = on(obj, obj);
+    once(obj, obj);
 
-    obj.emit('foo');
+    emit(obj, 'foo');
 
     expect(obj.foo.callCount).toBe(1);
 
     unsubscribe0();
     obj.foo.resetHistory();
 
-    obj.emit('foo');
+    emit(obj, 'foo');
     expect(obj.foo.callCount).toBe(1);
 
     unsubscribe1();
     obj.foo.resetHistory();
 
-    obj.emit('foo');
+    emit(obj, 'foo');
     expect(obj.foo.callCount).toBe(0);
   });
 
@@ -114,28 +114,28 @@ describe('on() multiple times', () => {
 
     const signal = eventize();
 
-    signal.on(obj);
-    signal.on(obj);
+    on(signal, obj);
+    on(signal, obj);
 
-    signal.on('bar', 'foo', obj);
+    on(signal, 'bar', 'foo', obj);
 
-    signal.on('bar', '*', obj);
+    on(signal, 'bar', '*', obj);
 
     expect(getSubscriptionCount(signal)).toBe(3);
 
-    signal.emit('foo');
+    emit(signal, 'foo');
 
     expect(obj.foo.callCount).toBe(1);
 
-    signal.off(obj);
+    off(signal, obj);
     obj.foo.resetHistory();
 
     expect(getSubscriptionCount(signal)).toBe(0);
 
-    signal.emit('foo');
+    emit(signal, 'foo');
     expect(obj.foo.callCount).toBe(0);
 
-    signal.emit('bar');
+    emit(signal, 'bar');
     expect(obj.foo.callCount).toBe(0);
   });
 });

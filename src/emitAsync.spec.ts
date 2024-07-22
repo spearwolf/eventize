@@ -1,19 +1,19 @@
-import {eventize, Priority} from './index';
+import {emitAsync, eventize, on, Priority} from './index';
 
 describe('emitAsync()', () => {
   it('should work as expected', async () => {
     const o = eventize();
 
-    o.on('foo', () => 123);
-    o.on('foo', (): Object => null);
-    o.on('foo', () => 'abc');
-    o.on('foo', (): unknown => undefined);
-    o.on('foo', () => Promise.resolve('xyz'));
-    o.on('foo', () => '');
-    o.on('foo', Priority.AAA, () => false);
-    o.on('foo', () => [1, Promise.resolve(2), '3']);
+    on(o, 'foo', () => 123);
+    on(o, 'foo', (): object => null);
+    on(o, 'foo', () => 'abc');
+    on(o, 'foo', (): unknown => undefined);
+    on(o, 'foo', () => Promise.resolve('xyz'));
+    on(o, 'foo', () => '');
+    on(o, 'foo', Priority.AAA, () => false);
+    on(o, 'foo', () => [1, Promise.resolve(2), '3']);
 
-    const results = await o.emitAsync('foo');
+    const results = await emitAsync(o, 'foo');
 
     expect(results).toEqual([false, 123, 'abc', 'xyz', '', [1, 2, '3']]);
   });
@@ -21,7 +21,7 @@ describe('emitAsync()', () => {
   it('should work as expected even if there is no subscriber', async () => {
     const o = eventize();
 
-    const results = await o.emitAsync('foo');
+    const results = await emitAsync(o, 'foo');
 
     expect(results).toEqual(undefined);
   });

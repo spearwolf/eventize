@@ -1,3 +1,14 @@
+import type {EventKeeper} from './EventKeeper.js';
+import type {EventStore} from './EventStore.js';
+import type {NAMESPACE} from './constants.js';
+
+export interface EventizedObject {
+  [NAMESPACE]: {
+    keeper: EventKeeper;
+    store: EventStore;
+  };
+}
+
 export type EventName = string | symbol;
 export type AnyEventNames = EventName | Array<EventName>;
 export type OnEventNames = AnyEventNames | Array<[EventName, number]>;
@@ -5,7 +16,7 @@ export type OnEventNames = AnyEventNames | Array<[EventName, number]>;
 export type EventArgs = Array<any>;
 
 export type ListenerType = unknown;
-export type ListenerObjectType = Object | null | undefined;
+export type ListenerObjectType = object | null | undefined;
 export type ListenerFuncType = (...args: EventArgs) => void;
 
 export type UnsubscribeFunc =
@@ -43,7 +54,7 @@ export type SubscribeArgs =
   | [number, ListenerObjectType]
   | [ListenerObjectType];
 
-export interface EventizeApi {
+export interface EventizeApi extends EventizedObject {
   on(...args: SubscribeArgs): UnsubscribeFunc;
   once(...args: SubscribeArgs): UnsubscribeFunc;
   onceAsync<ReturnType = void>(eventNames: AnyEventNames): Promise<ReturnType>;
@@ -58,11 +69,11 @@ export interface EventizeApi {
 }
 
 export interface EventizerFunc {
-  <T extends Object>(obj?: T): T & EventizeApi;
+  <T extends object>(obj?: T): T & EventizedObject;
 }
 
 export interface EventizeGuard {
-  <T extends Object>(obj: T): obj is T & EventizeApi;
+  <T extends object>(obj: T): obj is T & EventizedObject;
 }
 
 export interface EventizePriority {
@@ -75,26 +86,6 @@ export interface EventizePriority {
   Min: number;
 }
 
-export interface EventizeFuncApi extends EventizerFunc {
-  /**
-   * Returns the same object, with the [[EventizeApi]] attached,
-   * by modifying the original object.
-   */
-  inject: EventizerFunc;
-
-  /**
-   * Returns a new object, with the [[EventizeApi]] attached.
-   * The original object is not modified here, instead the prototype
-   * of the new object is the orignial object.
-   */
-  extend: EventizerFunc;
-
-  /**
-   * @deprecated
-   */
-  create(obj: Object): EventizeApi;
-
+export interface EventizerFuncAPI extends EventizerFunc {
   is: EventizeGuard;
-
-  Priority: EventizePriority;
 }

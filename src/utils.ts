@@ -24,7 +24,7 @@ export const warn = hasConsole
 type PropertyKey = string | symbol;
 type PropertyValue = any;
 
-export const definePublicPropertyRO = <T extends Object>(
+export const definePublicPropertyRO = <T extends object>(
   obj: T,
   name: PropertyKey,
   value: PropertyValue,
@@ -37,7 +37,7 @@ export const definePublicPropertyRO = <T extends Object>(
   return obj;
 };
 
-export const definePublicPropertiesRO = <T extends Object>(
+export const definePublicPropertiesRO = <T extends object>(
   obj: T,
   attrs: Record<PropertyKey, PropertyValue>,
 ): T => {
@@ -49,7 +49,7 @@ export const definePublicPropertiesRO = <T extends Object>(
   return obj;
 };
 
-export const defineHiddenPropertyRO = <T extends Object>(
+export const defineHiddenPropertyRO = <T extends object>(
   obj: T,
   name: PropertyKey,
   value: PropertyValue,

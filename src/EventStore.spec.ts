@@ -12,7 +12,7 @@ describe('EventStore', () => {
       store = new EventStore();
     });
 
-    it('adding a named listener addds the listener to namedListeners store', () => {
+    it('adding a named listener adds the listener to namedListeners store', () => {
       expect(store.namedListeners.get('a')).toBe(undefined);
       store.add(new EventListener('a', 0, null));
       expect(store.namedListeners.get('a')).toHaveLength(1);

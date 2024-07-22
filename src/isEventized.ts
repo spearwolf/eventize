@@ -1,9 +1,9 @@
 import {NAMESPACE} from './constants';
-import type {EventizeApi, EventizeGuard} from './types';
+import type {EventizeGuard, EventizedObject} from './types';
 
-export const isEventized: EventizeGuard = <T extends Object>(
+export const isEventized: EventizeGuard = <T extends object>(
   obj: T,
-): obj is T & EventizeApi =>
+): obj is T & EventizedObject =>
   Boolean(
     obj &&
       // @ts-ignore

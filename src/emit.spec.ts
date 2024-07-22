@@ -1,6 +1,6 @@
 import {fake} from 'sinon';
 
-import {eventize, Priority} from './index';
+import {emit, eventize, off, on, once, Priority} from './index';
 
 describe('emit()', () => {
   describe('calls the listener with all given args (except the event name)', () => {
@@ -9,9 +9,9 @@ describe('emit()', () => {
     const fn2 = fake();
 
     beforeAll(() => {
-      obj.on('foo', 0, fn1);
-      obj.on('*', fn2);
-      obj.emit('foo', 'bar', 666);
+      on(obj, 'foo', 0, fn1);
+      on(obj, '*', fn2);
+      emit(obj, 'foo', 'bar', 666);
     });
 
     it('named event listener', () => {
@@ -30,19 +30,19 @@ describe('emit()', () => {
     const results: Array<string> = [];
 
     beforeAll(() => {
-      obj.on('foo', (hello) => results.push(`hello ${hello}`));
+      on(obj, 'foo', (hello) => results.push(`hello ${hello}`));
 
-      obj.once(['foo', 'bar'], Priority.AAA, {
+      once(obj, ['foo', 'bar'], Priority.AAA, {
         foo: (hello: string) => results.push(`hej ${hello}`),
       });
 
-      obj.on(['foo', 'bar'], Priority.Low, (hello) =>
+      on(obj, ['foo', 'bar'], Priority.Low, (hello) =>
         results.push(`moin moin ${hello}`),
       );
     });
 
     it('first emit()', () => {
-      obj.emit('foo', 'world');
+      emit(obj, 'foo', 'world');
 
       expect(results).toEqual(['hej world', 'hello world', 'moin moin world']);
     });
@@ -50,8 +50,8 @@ describe('emit()', () => {
     it('second emit()', () => {
       results.length = 0;
 
-      obj.on('foo', () => obj.off('foo'));
-      obj.emit(['foo', 'bar'], 'eventize');
+      on(obj, 'foo', () => off(obj, 'foo'));
+      emit(obj, ['foo', 'bar'], 'eventize');
 
       expect(results).toEqual(['hello eventize', 'moin moin eventize']);
     });
