@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## `v4.0.1` (2024-08-04)
+
+- use `Symbol.for('eventize')`
+
 ## `v4.0.0` (2024-07-22)
 
 **!! BREAKING CHANGES !!**
