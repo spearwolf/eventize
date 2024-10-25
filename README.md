@@ -1,13 +1,16 @@
 # @spearwolf/eventize
 
+A tiny and clever framework for synchronous event-driven programming in Javascript.
+
+![eventize hero image](hero.webp)
+<small><em>Image created in response to a request from spearwolf, using OpenAI's DALL-E, guided by ChatGPT.</em></small>
+
 ![npm (scoped)](https://img.shields.io/npm/v/%40spearwolf/eventize)
 ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/spearwolf/eventize/main.yml)
 ![GitHub](https://img.shields.io/github/license/spearwolf/eventize)
 
 
 ## Introduction 👀
-
-A tiny and clever framework for synchronous event-driven programming in Javascript.
 
 Yes, you read that right: the event emitters here call the subscribers _synchronously_ and not _asynchronously_ like in [node.js events](https://nodejs.org/api/events.html) for example.
 
@@ -38,7 +41,8 @@ It is compiled with `ES2022` as target, so there are no downgrades to older java
 
 The typescript type definitions are also included in the package.
 
-| 🔎 Since version 3.0.0 there is also a [CHANGELOG](./CHANGELOG.md)
+> [!NOTE]
+>  Since version 3.0.0 there is also a [CHANGELOG](./CHANGELOG.md)
 
 
 ## 📖 Getting Started
@@ -49,7 +53,8 @@ The underlying concept is simple: certain types of objects (called "emitters") e
 
 ##### Emitter
 
-> 🔎 _Emitter_ is a synonym for an _eventized object_, which in turn is a synonym for an object instance that has the _eventize superpowers_ attached to it!
+> [!NOTE]
+> _Emitter_ is a synonym for an _eventized object_, which in turn is a synonym for an object instance that has the _eventize superpowers_ attached to it!
 > In this documentation we also use __ε__ as a variable name to indicate that it is an _eventized object_.
 
 
@@ -63,7 +68,8 @@ import {eventize} from '@spearwolf/eventize'
 const eventizedObj = eventize(obj)
 ```
 
-> 🔎 If you don't want to specify an object, just leave it out and `{}` will be created for you: `const ε = eventize()` 
+> [!NOTE]
+> If you don't want to specify an object, just leave it out and `{}` will be created for you: `const ε = eventize()` 
 
 or, if you are more familiar with class-based objects, you can use
 
@@ -493,7 +499,8 @@ Additional shortcuts for the wildcard `*` syntax:
 
 `once()` does exactly the same as `on()`, with the difference that the listener is automatically unsubscribed after being called, so the listener method is called exactly _once_. No more and no less &ndash; there is really nothing more to say about _once_.
 
-| 🔎 if called with multiple event names, the first called event wins
+> [!NOTE]
+> if called with multiple event names, the first called event wins
 
 ```js
 ε.once('hi', () => console.log('hello'))
