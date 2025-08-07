@@ -38,7 +38,7 @@
     "lint": "eslint",
     "format:check": "prettier --check 'src/**/*.{ts,js,json,md}'",
     "format:write": "prettier --write 'src/**/*.{ts,js,json,md}'",
-    "cbt": "run-s -sn clean build test"
+    "cbt": "run-s -sn clean build checkPkgTypes test lint format:check"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",

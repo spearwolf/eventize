@@ -2,9 +2,12 @@
 
 ## `v4.0.2` (2025-08-07)
 
+_very minor quality of life improvements_
+
 - polish some types (api should remain compatible)
+- add duck-typing test for emit
 - migrate eslint configs to latest flat-style
-- upgrade dev dependencies
+- upgrade build dependencies
 
 ## `v4.0.1` (2024-08-04)
 
