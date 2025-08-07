@@ -56,4 +56,12 @@ describe('emit()', () => {
       expect(results).toEqual(['hello eventize', 'moin moin eventize']);
     });
   });
+
+  describe('duck typing', () => {
+    it('should throw error if target object is not eventized', () => {
+      expect(() => {
+        emit({}, 'foo', 'bar', 666);
+      }).toThrow();
+    });
+  });
 });
