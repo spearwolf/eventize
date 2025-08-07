@@ -40,7 +40,7 @@ describe('once()', () => {
     once(e, ['foo', 'bar'], sub);
 
     emit(e, 'foo', 42);
-    expect(sub).toBeCalledWith(42);
+    expect(sub).toHaveBeenCalledWith(42);
     sub.mockClear();
 
     emit(e, 'bar');
@@ -50,8 +50,8 @@ describe('once()', () => {
     once(e, ['foo', 'bar'], sub);
 
     emit(e, 'bar', 666);
-    expect(sub).toBeCalledTimes(1);
-    expect(sub).toBeCalledWith(666);
+    expect(sub).toHaveBeenCalledTimes(1);
+    expect(sub).toHaveBeenCalledWith(666);
     sub.mockClear();
 
     emit(e, 'foo');
