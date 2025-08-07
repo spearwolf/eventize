@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## `v4.0.2` (2025-08-07)
+
+- upgrade dependencies
+
 ## `v4.0.1` (2024-08-04)
 
 - use `Symbol.for('eventize')`
