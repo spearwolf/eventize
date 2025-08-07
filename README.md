@@ -1,45 +1,36 @@
 # @spearwolf/eventize
 
-A tiny and clever framework for synchronous event-driven programming in Javascript.
-
-![eventize hero image](hero.webp)
-<small><em>Image created in response to a request from spearwolf, using OpenAI's DALL-E, guided by ChatGPT.</em></small>
+A tiny, clever, and dependency-free library for synchronous event-driven programming in JavaScript and TypeScript.
 
 ![npm (scoped)](https://img.shields.io/npm/v/%40spearwolf/eventize)
 ![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/spearwolf/eventize/main.yml)
 ![GitHub](https://img.shields.io/github/license/spearwolf/eventize)
 
-
 ## Introduction 👀
 
-Yes, you read that right: the event emitters here call the subscribers _synchronously_ and not _asynchronously_ like in [node.js events](https://nodejs.org/api/events.html) for example.
+`@spearwolf/eventize` provides a powerful and intuitive API for building event-based systems. This library invokes event listeners *synchronously*. This design choice gives you precise control over your execution flow, which is critical in scenarios like game loops (`requestAnimationFrame`), real-time applications, or any situation where immediate, predictable execution is necessary.
 
-This is perfectly reasonable: sometimes you want to have control over when something happens, e.g. when your code runs inside an [animation frame](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame). Or you might want to free resources immediately and instantly.
+Written entirely in TypeScript and targeting modern `ES2022`, it offers a robust, type-safe developer experience without sacrificing performance or adding bloat.
 
+### Features
 
-### FEATURES
-
-- :rocket: **smart api** with focus on developer experience
-- :sparkles: **wildcards** &amp;❗**priorities**❕
-- includes **typescript types** (well, actually it is written in typescript) :tada:
-- supports all major browsers and node.js environments, targeting `ES2022`
-- very small footprint ~3k gzip'd
-- no runtime dependencies
-- Apache 2.0 licence
+-   🚀 **Developer-Focused API**: Clean, modern, and functional.
+-   ✨ **Wildcards & Priorities**: Subscribe to all events and control listener execution order.
+-   🔷 **Full TypeScript Support**: Leverage strong typing for more reliable code.
+-   📦 **Zero Runtime Dependencies**: Lightweight with a minimal footprint (~3k gzipped).
+-   ESM & CommonJS Support.
+-   Apache 2.0 Licensed.
 
 
 ## ⚙️ Installation
 
-All you need to do is install the package:
+Install the package using your favorite package manager:
 
 ```sh
 $ npm i @spearwolf/eventize
 ```
 
-The package exports the library in _esm_ format (using `import` and `export` syntax) and also in _commonjs_ format (using `require`).
-It is compiled with `ES2022` as target, so there are no downgrades to older javascript syntax and features.
-
-The typescript type definitions are also included in the package.
+The library is distributed in both ES Module (`import`) and CommonJS (`require`) formats.
 
 > [!NOTE]
 >  Since version 3.0.0 there is also a [CHANGELOG](./CHANGELOG.md)
@@ -47,7 +38,7 @@ The typescript type definitions are also included in the package.
 
 ## 📖 Getting Started
 
-The underlying concept is simple: certain types of objects (called "emitters") emit named events that cause function "listeners" to be called.
+The core idea is simple: an object, called an **emitter**, can be "eventized" to emit named events. Other parts of your application, called **listeners**, can subscribe to these events and will be executed immediately when the event is emitted.
 
 ![Emitter emits named event to listeners](./docs-assets/emitter-emits-named-events-listeners.svg)
 
