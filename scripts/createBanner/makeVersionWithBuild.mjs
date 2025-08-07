@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-
 export function makeVersionWithBuild(build) {
   const today = new Date();
   let month = today.getUTCMonth() + 1;

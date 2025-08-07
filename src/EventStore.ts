@@ -194,7 +194,7 @@ export class EventStore {
       }
       // ---------------------------------------------------------------
     } else if (removeSimilar) {
-      if (isCatchEmAll(listener)) {
+      if (isCatchEmAll(listener) && typeof listener == 'object') {
         // ---------------------------------------------------------------
         // .off('*', obj)
         //
@@ -226,18 +226,22 @@ export class EventStore {
       //
       this.namedListeners.forEach((namedListeners) => {
         removeListenerFromArray(namedListeners, listener, listenerObject);
-        removeSimilarListenersFromArray(namedListeners, undefined, listener);
+        if (typeof listener === 'object') {
+          removeSimilarListenersFromArray(namedListeners, undefined, listener);
+        }
       });
       removeListenerFromArray(
         this.catchEmAllListeners,
         listener,
         listenerObject,
       );
-      removeSimilarListenersFromArray(
-        this.catchEmAllListeners,
-        undefined,
-        listener,
-      );
+      if (typeof listener === 'object') {
+        removeSimilarListenersFromArray(
+          this.catchEmAllListeners,
+          undefined,
+          listener,
+        );
+      }
       // ---------------------------------------------------------------
     }
   }

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-this-alias */
 import {fake} from 'sinon';
 
 import {EVENT_CATCH_EM_ALL} from './constants';
@@ -12,7 +11,7 @@ describe('on()', () => {
       const listenerObject = {};
       const listenerFunc = fake();
       const obj = eventize();
-      let context: Object;
+      let context: object;
       const unsubscribe = on(
         obj,
         'foo',
@@ -103,7 +102,7 @@ describe('on()', () => {
     });
     describe('on( eventName, priority, object )', () => {
       const listenerFunc = fake();
-      let listenerContext: Object;
+      let listenerContext: object;
       const listener = {
         foo(...args: Array<any>) {
           listenerContext = this;
@@ -139,7 +138,7 @@ describe('on()', () => {
       const listenerObject = {};
       const listenerFunc = fake();
       const obj = eventize.inject();
-      let context: Object;
+      let context: object;
       const unsubscribe = obj.on(
         'foo',
         function () {
@@ -203,7 +202,7 @@ describe('on()', () => {
       const listenerObject = {};
       const listenerFunc = fake();
       const obj = eventize.inject();
-      let context: Object;
+      let context: object;
       const unsubscribe = obj.on(
         Foo,
         7,
@@ -287,7 +286,7 @@ describe('on()', () => {
     });
     describe('on( eventName, priority, object )', () => {
       const listenerFunc = fake();
-      let listenerContext: Object;
+      let listenerContext: object;
       const listener = {
         [Foo](...args: Array<any>) {
           listenerContext = this;
@@ -323,7 +322,7 @@ describe('on()', () => {
       const listenerObject = {};
       const listenerFunc = fake();
       const obj = eventize.inject();
-      let context: Object;
+      let context: object;
       const unsubscribe = obj.on(
         Foo,
         function () {
@@ -383,7 +382,7 @@ describe('on()', () => {
       const listenerObject = {};
       const listenerFunc = fake();
       const obj = eventize.inject();
-      const context: Array<Object> = [];
+      const context: Array<object> = [];
       // @ts-ignore
       const {listeners} = obj.on(
         ['foo', 'fu'],
@@ -514,7 +513,7 @@ describe('on()', () => {
       const listenerObject = {};
       const listenerFunc = fake();
       const obj = eventize.inject();
-      const contexts: Object = [];
+      const contexts: object = [];
       // @ts-ignore
       const {listeners} = obj.on(
         ['foo', 'bar'],
@@ -613,7 +612,7 @@ describe('on()', () => {
     const listenerObject = {};
     const listenerFunc = fake();
     const obj = eventize.inject();
-    let context: Object;
+    let context: object;
     const unsubscribe = obj.on(
       7,
       function () {
@@ -670,7 +669,7 @@ describe('on()', () => {
     const listenerObject = {};
     const listenerFunc = fake();
     const obj = eventize.inject();
-    let context: Object;
+    let context: object;
     const unsubscribe = obj.on(function () {
       // @ts-ignore
       context = this;

@@ -2,7 +2,9 @@
 
 ## `v4.0.2` (2025-08-07)
 
-- upgrade dependencies
+- polish some types (api should remain compatible)
+- migrate eslint configs to latest flat-style
+- upgrade dev dependencies
 
 ## `v4.0.1` (2024-08-04)
 

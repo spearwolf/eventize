@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/* eslint-disable no-console */
 
 const {exec} = require('child_process');
 const process = require('process');

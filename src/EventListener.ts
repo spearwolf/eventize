@@ -12,7 +12,12 @@ type EmitFnType = Function | undefined;
 type CallAfterApplyFnType = (() => void) | undefined;
 type ReturnValue = (retVal: any) => void;
 
-const apply = (context: unknown, func: EmitFnType, args: EventArgs, returnValue?: ReturnValue) => {
+const apply = (
+  context: unknown,
+  func: EmitFnType,
+  args: EventArgs,
+  returnValue?: ReturnValue,
+) => {
   if (typeof func === 'function') {
     const retVal = func.apply(context, args);
     if (retVal != null) {
@@ -92,7 +97,11 @@ export class EventListener {
     return this.listener === listener && this.listenerObject === listenerObject;
   }
 
-  apply(eventName: EventName, args?: EventArgs, returnValue?: ReturnValue): void {
+  apply(
+    eventName: EventName,
+    args?: EventArgs,
+    returnValue?: ReturnValue,
+  ): void {
     if (this.isRemoved) return;
 
     const {listener, listenerObject} = this;

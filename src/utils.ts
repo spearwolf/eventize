@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import {LOG_NAMESPACE, EVENT_CATCH_EM_ALL} from './constants';
 import type {EventName} from './types';
 

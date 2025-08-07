@@ -25,6 +25,7 @@ const makeUnsubscribe = (
   host: EventizedObject,
   listeners: EventListener | Array<EventListener>,
 ): UnsubscribeFunc => {
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
   const unsubscribe = () => off(host, listeners);
   return Object.assign(
     unsubscribe,

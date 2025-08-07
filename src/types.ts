@@ -16,7 +16,7 @@ export type OnEventNames = AnyEventNames | Array<[EventName, number]>;
 export type EventArgs = Array<any>;
 
 export type ListenerType = unknown;
-export type ListenerObjectType = Object | null | undefined;
+export type ListenerObjectType = object | null | undefined;
 export type ListenerFuncType = (...args: EventArgs) => void;
 
 export type UnsubscribeFunc =
