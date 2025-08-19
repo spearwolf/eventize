@@ -488,9 +488,16 @@ console.log(isEventized(obj2)); // => false
 Returns the total number of active subscriptions on an emitter. Useful for debugging or testing.
 
 ```javascript
+import { eventize, on, off, getSubscriptionCount } from '@spearwolf/eventize';
+
 const ε = eventize();
+
 on(ε, 'foo', () => {});
 on(ε, 'bar', () => {});
 
 console.log(getSubscriptionCount(ε)); // => 2
+
+off(ε);
+
+console.log(getSubscriptionCount(ε)); // => 0
 ```
