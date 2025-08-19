@@ -27,7 +27,7 @@ Written entirely in TypeScript and targeting modern `ES2022`, it offers a robust
 Install the package using your favorite package manager:
 
 ```sh
-$ npm i @spearwolf/eventize
+$ npm install @spearwolf/eventize
 ```
 
 The library is distributed in both ES Module (`import`) and CommonJS (`require`) formats.
@@ -65,7 +65,10 @@ emit(bus, 'data', 'Hello World!', 42);
 
 ### Emitters
 
-An emitter is any object that has been enhanced with event capabilities. The recommended way to create one is with the `eventize()` function. We often use `ε` (epsilon) as a variable name to denote an eventized object.
+An emitter is any object that has been enhanced with event capabilities. The recommended way to create one is with the `eventize()` function.
+
+> [!TIP]
+> We often use `ε` (epsilon) as a variable name to denote an _eventized_ object.
 
 ```javascript
 import { eventize } from '@spearwolf/eventize';
@@ -83,24 +86,32 @@ eventize(myApp); // myApp is now an emitter
 A listener can be a simple function or a method on an object. It's the code that runs in response to an event.
 
 ```js
-ε.on('foo', (bar) => {
-  console.log('I am a listener function and you called me with bar=', bar)
+on(ε, 'foo', (a) => {
+  console.log('(1) Hello', a)
 })
 
-ε.on('foo', {
-  foo(bar, plah) {
-    console.log('I am a method and you called me with bar=', bar, 'and plah=', plah)
+on(ε, 'foo', {
+  foo(a, b) {
+    console.log('(2)', b, a)
   }
 })
 
-ε.on({
-  foo(bar, plah) {
-    console.log('foo ->', {bar, plah})
+on(ε, {
+  foo(a, b) {
+    console.log('(3) Hi', a)
   },
   bar() {
-    console.log('hej')
+    console.log('(4) hej')
   }
 })
+
+emit(ε, 'foo', 'eventize', 'Greetings from')
+// => "(1) Hello eventize"
+// => "(2) Greetings from eventize"
+// => "(3) Hi eventize"
+
+emit(ε, 'bar')
+// => "(4) hej"
 ```
 
 ### Events
@@ -120,7 +131,7 @@ emit(ε, 'hello', 'hi', 'hej', 'hallo');
 
 ## 📚 API Reference
 
-The API is designed to be used functionally, with named exports like `on(emitter, ...)` and `emit(emitter, ...)`. For class-based patterns, you can also inject the API methods directly onto an object.
+The API is designed to be used functionally, with named exports like `on(ε, ...)` and `emit(ε, ...)`. For class-based patterns, you can also inject the API methods directly onto an object.
 
 | API | Description |
 |--------|-------------|
@@ -137,7 +148,7 @@ The API is designed to be used functionally, with named exports like `on(emitter
 
 There are three main ways to create an emitter.
 
-| Method                      | Is `EventizedObject`? | Has API Methods Injected? | Recommended For                               |
+| Method                      | Is a `EventizedObject`? | Has API Methods Injected? | Recommended For                               |
 | --------------------------- | --------------------- | ------------------------- | --------------------------------------------- |
 | `eventize(obj)`             | ✅                    | ❌                        | Functional programming, general use.          |
 | `eventize.inject(obj)`      | ✅                    | ✅                        | Object-oriented or class-based composition.   |
@@ -150,11 +161,11 @@ This is the primary and recommended approach. It prepares an object to be used w
 ```typescript
 import { eventize, on, emit } from '@spearwolf/eventize';
 
-const obj = eventize(); // Creates an emitter from {}
+const ε = eventize(); // Creates an emitter from {}
 
-on(obj, 'foo', () => console.log('foo called'));
+on(ε, 'foo', () => console.log('foo called'));
 
-emit(obj, 'foo'); // => "foo called"
+emit(ε, 'foo'); // => "foo called"
 ```
 
 #### `eventize.inject(obj)`
@@ -165,7 +176,7 @@ This modifies the object, attaching the entire API as methods.
 import { eventize } from '@spearwolf/eventize';
 
 const myApp = { name: 'MyApp' };
-const obj = eventize.inject(myApp); // Creates and injects into myApp
+const obj = eventize.inject(myApp); // Creates and injects the API into myApp
 
 obj.on('foo', () => console.log('foo called'));
 
@@ -180,6 +191,7 @@ For traditional object-oriented programming, you can extend the `Eventize` base 
 import { Eventize } from '@spearwolf/eventize';
 
 class MyEmitter extends Eventize {}
+
 const obj = new MyEmitter();
 
 obj.on('foo', () => console.log('foo called'));
@@ -214,8 +226,8 @@ Subscribes a listener to one or more events. It returns an `unsubscribe` functio
 **Signatures:**
 
 ```typescript
-on(emitter, eventName(s), [priority], listener, [context])
-on(emitter, [priority], listener, [context]) // Wildcard subscription
+on(ε, eventName(s), [priority], listener, [context])
+on(ε, [priority], listener, [context]) // Wildcard subscription
 ```
 
 **Example (Simple Listener):**
@@ -238,6 +250,7 @@ Subscribe to several events with one call by passing an array of names.
 ```javascript
 const ε = eventize();
 const listener = (val) => console.log(val);
+
 on(ε, ['foo', 'bar'], listener);
 
 emit(ε, 'foo', 1); // => 1
@@ -250,6 +263,7 @@ Listen to *all* events emitted by an object using the `*` wildcard or by omittin
 
 ```javascript
 const ε = eventize();
+
 const wildcardListener = (eventName, ...args) => {
   console.log(`Event '${eventName}' fired with:`, args);
 };
