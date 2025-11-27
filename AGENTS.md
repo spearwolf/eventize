@@ -41,7 +41,9 @@
     - Every new feature or bug fix **MUST** have a corresponding test case in a `*.spec.ts` file.
     - Ensure all tests pass using `npm run test`.
 - **Documentation:**
-    - **CHANGELOG:** For every new feature, API change, or significant bug fix, add an entry to `CHANGELOG.md`.
+    - **CHANGELOG:**
+        - For every new feature, API change, or significant bug fix, add an entry to `CHANGELOG.md`.
+        - If the publicly exported API changes, please add migration notes and tips in a separate section.
     - **README:** Update `README.md` if the public API or usage patterns change.
     - Use clear, concise English for all documentation.
 
