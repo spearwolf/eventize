@@ -1,38 +1,53 @@
 # Project Overview
 
-This project is a TypeScript library designed to facilitate event-driven programming by providing a robust event emitter system.
-It allows developers to create, manage, and listen to events in a structured manner.
-It Utilizes modern TypeScript features to ensure type safety and enhance developer experience.
+`@spearwolf/eventize` is a lightweight, dependency-free TypeScript library for synchronous event-driven programming. It allows objects to be "eventized" (enhanced with event emitter capabilities) and supports features like wildcards, priorities, and full TypeScript type safety.
 
-More features:
-- Developer-Focused API: Clean, modern, and functional.
-- Wildcards & Priorities: Subscribe to all events and control listener execution order.
-- Full TypeScript Support: Leverage strong typing for more reliable code.
+# Tech Stack
+
+- **Language:** TypeScript (Target: ES2022)
+- **Testing:** Jest
+- **Linting/Formatting:** ESLint, Prettier
+- **Build Tool:** tsup
 
 # Source Code Structure
 
-- `src/`: Main source directory.
-- `lib/`: Build output directory. Never read from or write to this directory directly.
-- `docs-assets/`: Old documentation assets (to be migrated). Ignore for now.
-- `docs-assets/`: Old documentation assets (to be migrated). Ignore for now.
-- `scripts/`: Various build scripts. Ignore for now.
+- **`src/`**: The main source code directory. All development happens here.
+    - `index.ts`: The main entry point exporting the public API.
+    - `eventize.ts`: Contains the `eventize` function and factory logic.
+    - `eventize-api.ts`: Implements the core event API functions (`on`, `off`, `emit`, etc.).
+    - `types.ts`: TypeScript type definitions.
+    - `*.spec.ts`: Jest test files, located alongside the source files they test.
+- **`lib/`**: Build output directory. **DO NOT READ OR WRITE** to this directory.
+- **`scripts/`**: Build and maintenance scripts. Generally, you won't need to modify these.
+- **`docs-assets/`**: Assets for documentation.
 
-# Development
+# Development Workflow
 
-- **Install:** `npm install`
-- **Build:** `npm run build`
-- **Run tests:** `npm run test`
-- **Check lintings:** `npm run lint`
-- **Check formattings:** `npm run format:check`
-- **Clean, build and run all tests:** `npm run cbt` This is useful to ensure that everything is in order.
+1.  **Install Dependencies:** `npm install`
+2.  **Build:** `npm run build`
+3.  **Test:** `npm run test` (or `npm run watch` for development)
+4.  **Lint & Format:** `npm run lint` and `npm run format:check`
+5.  **Verify All:** `npm run cbt` (Clean, Build, Test) - Run this before finishing a task to ensure integrity.
 
-# Documentation Standards
+# Coding Guidelines
 
-- **Language:** Always use English when creating or updating documentation.
-- **Style:** Use simple, clear, and concise sentences. Follow standard technical documentation practices.
-- **Goal:** Convey concepts clearly and distinctly. Avoid personal interpretations or ambiguous language.
+- **Language:** Use TypeScript for all source code.
+- **Style:**
+    - Follow the existing functional programming style.
+    - Use `const` and arrow functions where appropriate.
+    - Ensure strict type safety; avoid `any` unless absolutely necessary.
+- **Imports:** Keep imports sorted. Re-sort them if you modify a file.
+- **Testing:**
+    - Every new feature or bug fix **MUST** have a corresponding test case in a `*.spec.ts` file.
+    - Ensure all tests pass using `npm run test`.
+- **Documentation:**
+    - **CHANGELOG:** For every new feature, API change, or significant bug fix, add an entry to `CHANGELOG.md`.
+    - **README:** Update `README.md` if the public API or usage patterns change.
+    - Use clear, concise English for all documentation.
 
-# Coding Standards
+# Agent Instructions
 
-- **Imports:** Whenever a change is made to a JavaScript or TypeScript source file, the imports must be re-sorted.
-- Whenever the behavior of the library has been modified or new methods need to be exported as a public API, the changes must be documented in CHANGELOG.md. If necessary, include helpful tips for any migration that may be required.
+- **Context:** Start by reading `README.md` to understand the library's purpose and usage.
+- **Navigation:** Use `src/` to understand the implementation. `index.ts` is a good starting point to see what is exported.
+- **Modification:** When implementing features, modify files in `src/`. **Never** modify files in `lib/`.
+- **Verification:** Always run `npm run cbt` after making changes to ensure the build, linting, and tests are all passing.
