@@ -359,28 +359,210 @@ setTimeout(() => emit(ε, 'loaded', { content: '...' }), 100);
 
 #### `off(emitter, ...args)`
 
-Removes listeners. This is useful for complex cleanup scenarios where you don't have a reference to the original `unsubscribe` function.
+Removes listeners from an emitter. This is the counterpart to `on()` and is useful for cleanup scenarios where you don't have a reference to the original `unsubscribe` function returned by `on()`.
 
-| Signature                      | Description                                      |
-| ------------------------------ | ------------------------------------------------ |
-| `off(emitter, listenerFunc)`   | Unsubscribes a specific listener function.       |
-| `off(emitter, listenerObject)` | Unsubscribes all listeners on an object.         |
-| `off(emitter, eventName)`      | Unsubscribes all listeners for a specific event. |
-| `off(emitter)`                 | Unsubscribes **all** listeners from the emitter. |
+**Signatures:**
 
-**Example:**
+| Signature                                | Description                                                              |
+| ---------------------------------------- | ------------------------------------------------------------------------ |
+| `off(emitter)`                           | Unsubscribes **all** listeners from the emitter.                         |
+| `off(emitter, '*')`                      | Same as above—unsubscribes all listeners (named and wildcard).           |
+| `off(emitter, eventName)`                | Unsubscribes all listeners for a specific event (string or symbol).      |
+| `off(emitter, [eventName1, eventName2])` | Unsubscribes all listeners for multiple events.                          |
+| `off(emitter, listenerFunc)`             | Unsubscribes a specific listener function from all events.               |
+| `off(emitter, listenerFunc, context)`    | Unsubscribes a listener function with a specific context.                |
+| `off(emitter, listenerObject)`           | Unsubscribes all listeners associated with an object.                    |
+| `off(emitter, eventName, listenerObject)`| Unsubscribes a listener object from a specific event only.               |
+
+> [!NOTE]
+> Calling `off()` on a non-eventized object will throw an error: `"object is not eventized"`.
+
+**Using the Unsubscribe Function:**
+
+The recommended way to unsubscribe is to use the function returned by `on()`:
 
 ```javascript
 const ε = eventize();
-const service = { onFoo: () => {} };
-on(ε, 'foo', service);
-on(ε, 'bar', () => {});
+const listener = (val) => console.log(val);
 
-// Unsubscribe all listeners associated with the 'service' object
+const unsubscribe = on(ε, 'my-event', listener);
+emit(ε, 'my-event', 'Hello!'); // => "Hello!"
+
+// Remove the listener using the returned function
+unsubscribe();
+emit(ε, 'my-event', 'Silent?'); // (nothing happens)
+```
+
+Calling the unsubscribe function multiple times is safe—subsequent calls are no-ops.
+
+**Removing All Listeners:**
+
+```javascript
+const ε = eventize();
+
+on(ε, 'foo', () => console.log('foo'));
+on(ε, 'bar', () => console.log('bar'));
+on(ε, (eventName) => console.log('wildcard:', eventName));
+
+// Remove ALL listeners from the emitter
+off(ε);
+// or equivalently:
+off(ε, '*');
+
+emit(ε, 'foo'); // (nothing happens)
+emit(ε, 'bar'); // (nothing happens)
+```
+
+**Removing Listeners by Event Name:**
+
+```javascript
+const ε = eventize();
+
+on(ε, 'foo', () => console.log('foo listener 1'));
+on(ε, 'foo', () => console.log('foo listener 2'));
+on(ε, 'bar', () => console.log('bar listener'));
+
+// Remove only 'foo' listeners
+off(ε, 'foo');
+
+emit(ε, 'foo'); // (nothing happens)
+emit(ε, 'bar'); // => "bar listener"
+```
+
+You can also remove listeners for multiple events at once:
+
+```javascript
+off(ε, ['foo', 'bar']); // Remove listeners for both 'foo' and 'bar'
+```
+
+**Removing Listeners by Symbol Event Name:**
+
+```javascript
+const ε = eventize();
+const MyEvent = Symbol('MyEvent');
+
+on(ε, MyEvent, () => console.log('symbol event'));
+
+off(ε, MyEvent); // Remove listeners for the symbol event
+```
+
+**Removing a Specific Listener Function:**
+
+```javascript
+const ε = eventize();
+const listener = () => console.log('I will be removed');
+const other = () => console.log('I will stay');
+
+on(ε, 'foo', listener);
+on(ε, 'foo', other);
+on(ε, 'bar', listener); // Same listener on different event
+
+// Remove 'listener' from ALL events it was subscribed to
+off(ε, listener);
+
+emit(ε, 'foo'); // => "I will stay"
+emit(ε, 'bar'); // (nothing happens)
+```
+
+**Removing Listener Objects:**
+
+When you subscribe an object as a listener, you can remove all its subscriptions at once:
+
+```javascript
+const ε = eventize();
+const service = {
+  onFoo() { console.log('foo'); },
+  onBar() { console.log('bar'); }
+};
+
+on(ε, 'foo', 'onFoo', service);
+on(ε, 'bar', 'onBar', service);
+
+// Remove all listeners associated with 'service'
 off(ε, service);
 
-// Unsubscribe all listeners for the 'bar' event
-off(ε, 'bar');
+emit(ε, 'foo'); // (nothing happens)
+emit(ε, 'bar'); // (nothing happens)
+```
+
+**Removing an Object from a Specific Event:**
+
+```javascript
+const ε = eventize();
+const objA = { foo: () => console.log('A:foo'), bar: () => console.log('A:bar') };
+const objB = { foo: () => console.log('B:foo') };
+
+on(ε, 'foo', objA);
+on(ε, 'bar', objA);
+on(ε, 'foo', objB);
+
+// Remove objA only from 'foo', keeping its 'bar' subscription
+off(ε, 'foo', objA);
+
+emit(ε, 'foo'); // => "B:foo"
+emit(ε, 'bar'); // => "A:bar"
+```
+
+**Interaction with `retain()`:**
+
+When you call `off()` with an event name, it also clears any retained events for that event:
+
+```javascript
+const ε = eventize();
+
+retain(ε, 'status');
+emit(ε, 'status', 'loading');
+
+// New listener receives retained event
+on(ε, 'status', (s) => console.log('Listener 1:', s));
+// => "Listener 1: loading"
+
+// Remove all 'status' listeners AND clear retained event
+off(ε, 'status');
+
+// New listener does NOT receive the retained event
+on(ε, 'status', (s) => console.log('Listener 2:', s));
+// (nothing happens until next emit)
+```
+
+**Behavior During Emit:**
+
+If `off()` is called during an `emit()` cycle (e.g., inside a listener), listeners that have already been scheduled to run will still execute:
+
+```javascript
+const ε = eventize();
+
+on(ε, 'test', 10, () => console.log('High priority'));
+on(ε, 'test', 5, () => {
+  console.log('Medium priority');
+  off(ε, 'test'); // Remove all 'test' listeners
+});
+on(ε, 'test', 0, () => console.log('Low priority'));
+
+emit(ε, 'test');
+// => "High priority"
+// => "Medium priority"
+// (Low priority is NOT called because off() removed it before it could run)
+```
+
+**Reference Counting:**
+
+When the same listener object is subscribed multiple times to the same event with the same configuration, the library uses reference counting. You need to unsubscribe the same number of times:
+
+```javascript
+const ε = eventize();
+const listener = { foo: () => console.log('foo') };
+
+const unsub1 = on(ε, 'foo', listener);
+const unsub2 = on(ε, 'foo', listener); // Same listener, increases refCount
+
+emit(ε, 'foo'); // => "foo" (called only once due to deduplication)
+
+unsub1(); // Decreases refCount
+emit(ε, 'foo'); // => "foo" (still active)
+
+unsub2(); // Removes listener completely
+emit(ε, 'foo'); // (nothing happens)
 ```
 
 ---
