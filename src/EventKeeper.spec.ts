@@ -205,10 +205,10 @@ describe('EventKeeper', () => {
     keeper.retain('second', ['2']);
     keeper.retain('third', ['3']);
 
-    const order: string[] = [];
+    const order: EventName[] = [];
     const emitter = {
       apply: jest.fn((eventName: EventName) => {
-        order.push(String(eventName));
+        order.push(eventName);
       }),
     };
 

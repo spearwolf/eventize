@@ -521,7 +521,7 @@ console.log(result); // => { ready: true }
 **Important Notes:**
 - Events emitted **before** calling `retain()` are not stored.
 - Calling `retain()` multiple times for the same event is safe (idempotent).
-- Retained events do NOT replay to wildcard listeners that are already subscribed; they replay when a **new** listener subscribes.
+- Retained events replay to **new** listeners upon subscription, including new wildcard (`*`) listeners subscribing to retained events.
 
 ---
 
