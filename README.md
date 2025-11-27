@@ -429,7 +429,18 @@ console.log(results); // => ["Data from source 1", "Simple data"]
 
 Tells an emitter to "hold onto" the last-emitted event and its data. When a new listener subscribes, it will immediately be called with the retained event data. This is similar to a `ReplaySubject(1)` in RxJS.
 
+**Key Behaviors:**
+- Calling `retain()` on a non-eventized object will automatically eventize it.
+- Only the **last** emitted event is retained (subsequent emissions overwrite the previous value).
+- Retained events are delivered to new subscribers immediately upon subscription.
+- Retained events maintain their original emission order when multiple events are retained.
+- Works with both string and symbol event names.
+
+**Basic Usage:**
+
 ```javascript
+import { eventize, retain, emit, on } from '@spearwolf/eventize';
+
 const ε = eventize();
 
 // Retain the last 'status' event
@@ -448,21 +459,151 @@ on(ε, 'status', (currentStatus) => {
 emit(ε, 'status', 'running'); // => "Status is: running"
 ```
 
-#### `retainClear(emitter, eventName | eventName[])`
-
-Clears a retained event. The `retain` behavior remains active for future events, but the currently stored event is discarded.
+**Retaining Multiple Events:**
 
 ```javascript
-//... continuing from the retain() example
+const ε = eventize();
+
+// Retain multiple events at once
+retain(ε, ['config', 'user', 'theme']);
+
+emit(ε, 'config', { debug: true });
+emit(ε, 'user', { name: 'Alice' });
+emit(ε, 'theme', 'dark');
+
+// New subscriber receives all retained events in emission order
+on(ε, {
+  config(cfg) { console.log('Config:', cfg); },
+  user(u) { console.log('User:', u); },
+  theme(t) { console.log('Theme:', t); }
+});
+// => "Config: { debug: true }"
+// => "User: { name: 'Alice' }"
+// => "Theme: dark"
+```
+
+**Using with Symbol Event Names:**
+
+```javascript
+const ε = eventize();
+const AUTH_STATE = Symbol('authState');
+
+retain(ε, AUTH_STATE);
+emit(ε, AUTH_STATE, { authenticated: true, user: 'admin' });
+
+on(ε, AUTH_STATE, (state) => {
+  console.log('Auth state:', state);
+});
+// => "Auth state: { authenticated: true, user: 'admin' }"
+```
+
+**Using with `once()` and `onceAsync()`:**
+
+Retained events work with `once()` and `onceAsync()`, triggering the listener immediately if a retained value exists.
+
+```javascript
+const ε = eventize();
+
+retain(ε, 'initialized');
+emit(ε, 'initialized', { ready: true });
+
+// The once listener fires immediately with the retained value
+once(ε, 'initialized', (data) => {
+  console.log('Initialized:', data);
+});
+// => "Initialized: { ready: true }"
+
+// Works with async/await too
+const result = await onceAsync(ε, 'initialized');
+console.log(result); // => { ready: true }
+```
+
+**Important Notes:**
+- Events emitted **before** calling `retain()` are not stored.
+- Calling `retain()` multiple times for the same event is safe (idempotent).
+- Retained events replay to **new** listeners upon subscription, including new wildcard (`*`) listeners subscribing to retained events.
+
+---
+
+#### `retainClear(emitter, eventName | eventName[])`
+
+Clears a retained event. The `retain` behavior remains active for future events, but the currently stored event is discarded. New listeners will not receive the cleared event, but future emissions will be retained.
+
+**Key Behaviors:**
+- Does NOT disable the retain behavior—only clears the currently stored value.
+- Throws an error if called on a non-eventized object.
+- Works with both string and symbol event names.
+- Can clear multiple events at once by passing an array.
+- Clearing a non-existent or already-cleared event is safe (no-op).
+
+**Basic Usage:**
+
+```javascript
+import { eventize, retain, retainClear, emit, on } from '@spearwolf/eventize';
+
+const ε = eventize();
+
+retain(ε, 'status');
+emit(ε, 'status', 'loading');
+
+// First subscriber receives the retained value
+on(ε, 'status', (s) => console.log('Subscriber 1:', s));
+// => "Subscriber 1: loading"
+
+// Clear the retained event
 retainClear(ε, 'status');
 
-// A new listener will NOT be fired immediately
-on(ε, 'status', (s) => console.log('New listener:', s)); // (nothing happens)
+// New subscriber does NOT receive anything immediately
+on(ε, 'status', (s) => console.log('Subscriber 2:', s));
+// (nothing happens)
 
-// But the next emit will be retained for future listeners
-emit(ε, 'status', 'finished');
-// => "Status is: finished"
-// => "New listener: finished"
+// New emissions are still retained
+emit(ε, 'status', 'complete');
+// => "Subscriber 1: complete"
+// => "Subscriber 2: complete"
+
+// Another new subscriber receives the newly retained value
+on(ε, 'status', (s) => console.log('Subscriber 3:', s));
+// => "Subscriber 3: complete"
+```
+
+**Clearing Multiple Events:**
+
+```javascript
+const ε = eventize();
+
+retain(ε, ['event1', 'event2', 'event3']);
+
+emit(ε, 'event1', 'data1');
+emit(ε, 'event2', 'data2');
+emit(ε, 'event3', 'data3');
+
+// Clear multiple events at once
+retainClear(ε, ['event1', 'event2']);
+
+// event1 and event2 are cleared, but event3 remains
+on(ε, {
+  event1() { console.log('event1'); },  // Not called
+  event2() { console.log('event2'); },  // Not called
+  event3() { console.log('event3'); }   // => "event3"
+});
+```
+
+**Error Handling:**
+
+```javascript
+const plainObj = {};
+
+// This will throw an error
+try {
+  retainClear(plainObj, 'foo');
+} catch (e) {
+  console.error(e.message); // => "object is not eventized"
+}
+
+// Use eventize() first, or use retain() which auto-eventizes
+const ε = eventize(plainObj);
+retainClear(ε, 'foo'); // Now this works
 ```
 
 ---

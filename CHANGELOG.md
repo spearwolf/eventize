@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## Unreleased
+
+_Documentation and testing improvements_
+
+- Expanded documentation for `retain()` and `retainClear()` API functions in README with comprehensive examples
+- Added extensive test coverage for `retain()` and `retainClear()` covering all code paths:
+  - Symbol event names support
+  - Array of event names support
+  - Error handling for non-eventized objects
+  - Interaction with `once()` and `onceAsync()`
+  - Wildcard listener behavior
+  - Edge cases (empty args, complex args, multiple calls)
+- Added comprehensive tests for `EventKeeper` class internal methods
+
 ## `v4.0.2` (2025-08-07)
 
 _very minor quality of life improvements_
