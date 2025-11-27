@@ -484,7 +484,8 @@ describe('off()', () => {
 
       emit(ε, 'foo', 'test');
 
-      expect(wildcardFn.callCount).toBeGreaterThanOrEqual(1);
+      // Wildcard listener is called exactly once per emit
+      expect(wildcardFn.callCount).toBe(1);
       expect(namedFn.called).toBeTruthy();
 
       wildcardFn.resetHistory();

@@ -471,12 +471,13 @@ When you subscribe an object as a listener, you can remove all its subscriptions
 ```javascript
 const ε = eventize();
 const service = {
-  onFoo() { console.log('foo'); },
-  onBar() { console.log('bar'); }
+  foo() { console.log('foo'); },
+  bar() { console.log('bar'); }
 };
 
-on(ε, 'foo', 'onFoo', service);
-on(ε, 'bar', 'onBar', service);
+// Subscribe the service object to events (methods are matched by event name)
+on(ε, 'foo', service);
+on(ε, 'bar', service);
 
 // Remove all listeners associated with 'service'
 off(ε, service);
@@ -547,7 +548,13 @@ emit(ε, 'test');
 
 **Reference Counting:**
 
-When the same listener object is subscribed multiple times to the same event with the same configuration, the library uses reference counting. You need to unsubscribe the same number of times:
+When the same listener object is subscribed multiple times to the same event, the library uses reference counting to avoid duplicate calls. Listeners are considered identical when they have:
+- The same event name
+- The same priority
+- The same listener (function or object)
+- The same listener context object
+
+You need to unsubscribe the same number of times as you subscribed:
 
 ```javascript
 const ε = eventize();
