@@ -47,5 +47,5 @@ All three call into the same `on`/`emit`/`off` functions; don't duplicate logic 
 - Tests live next to sources as `*.spec.ts` (Jest config restricts `testMatch` to `src/**`).
 - `lib/` is generated; never edit. `npm run clean` wipes it.
 - ESM-style relative imports use bare paths (no `.js`) — `tsup` handles output extensions.
-- Update `CHANGELOG.md` for any public API change; add migration notes if it's breaking.
+- Document every source change that affects the public API or runtime behavior in `CHANGELOG.md` (add migration notes if it's breaking). When the change alters documented behavior or examples, update `README.md` as well. Pure internal refactors that leave API and behavior untouched don't need either.
 - The package ships both CJS and ESM (`lib/index.js` / `lib/index.mjs`) plus `.d.ts`. `npm run checkPkgTypes` (via `attw`) verifies the dual-format types resolve correctly — failures here usually mean an `exports` map or `.d.ts` mismatch.
