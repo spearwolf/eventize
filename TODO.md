@@ -11,14 +11,6 @@ Legende: 🔴 Bug · 🟡 API-Hygiene · 🟢 DX/Doku · 🔵 Refactor · ⚡ Pe
 
 Niedriges Risiko, keine Breaking Changes, sollte kurzfristig erledigt werden.
 
-### 🔴 9. Test: Re-entrancy (sub/unsub während emit)
-**Datei:** neu `src/emit-reentrancy.spec.ts`
-**Problem:** `EventStore.forEach` cloned die Listener-Arrays via `cloneArray` — offensichtlich um Re-entrancy abzufangen. Aber kein expliziter Test verifiziert das Verhalten:
-- Listener A unsubscribed während Emit Listener B → B muss noch aufgerufen werden.
-- Listener A subscribed neuen Listener C während Emit → C darf für das laufende Emit **nicht** mehr aufgerufen werden.
-- Listener A ruft `off(ε)` (alle weg) → bereits geclonete Liste läuft durch.
-**Fix:** Specs für mindestens diese drei Szenarien.
-
 ### 🔴 10. Test: `once` mit retained event + Array von Eventnamen
 **Datei:** `src/onceAsync.spec.ts` oder `src/once.spec.ts`
 **Problem:** Bei `retain(ε, 'foo'); emit(ε, 'foo', x); once(ε, ['foo', 'bar'], fn)` läuft `subscribeTo` **vor** dem Anhängen von `callAfterApply` durch `once`. Wenn der retained Replay den Listener feuert, ist `unsubscribe` noch nicht angehängt — vermuteter Edge-Case.
