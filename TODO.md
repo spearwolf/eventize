@@ -11,12 +11,6 @@ Legende: 🔴 Bug · 🟡 API-Hygiene · 🟢 DX/Doku · 🔵 Refactor · ⚡ Pe
 
 Niedriges Risiko, keine Breaking Changes, sollte kurzfristig erledigt werden.
 
-### 🔴 1. Bare-string `throw` durch `Error` ersetzen
-**Datei:** `src/subscribeTo.ts:60`
-**Problem:** `throw 'subscribeTo() called with insufficient arguments!'` wirft einen String. Stack-Trace fehlt, `instanceof Error` schlägt fehl, Bug-Tracker und Logger werten das nicht korrekt aus.
-**Fix:** `throw new Error('subscribeTo() called with insufficient arguments')`.
-**Test:** Spec ergänzen, der `expect(() => on(ε)).toThrow(Error)` (nicht nur `.toThrow()`) prüft.
-
 ### 🟡 2. `EVENT_CATCH_EM_ALL` über `index.ts` re-exportieren
 **Datei:** `src/index.ts`, `src/constants.ts`
 **Problem:** Die Konstante `'*'` ist als `EVENT_CATCH_EM_ALL` in `constants.ts` definiert, aber nicht im public Bundle. Nutzer müssen den Magic-String `'*'` verwenden oder via deep-import auf interne Pfade zugreifen.

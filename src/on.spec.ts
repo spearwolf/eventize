@@ -762,4 +762,18 @@ describe('on()', () => {
       expect(unsubscribe.listener.isCatchEmAll).toBe(true);
     });
   });
+
+  // ---------------------------------------------------------------------------------------------
+  describe('insufficient arguments', () => {
+    it('throws an Error instance (not a bare string)', () => {
+      const obj = eventize();
+      // @ts-expect-error - intentionally calling with insufficient args
+      expect(() => on(obj)).toThrow(Error);
+    });
+    it('error message mentions insufficient arguments', () => {
+      const obj = eventize();
+      // @ts-expect-error - intentionally calling with insufficient args
+      expect(() => on(obj)).toThrow(/insufficient arguments/);
+    });
+  });
 });

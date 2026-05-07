@@ -55,9 +55,11 @@ const _subscribeTo = (
     }
   }
 
-  if (!listener && hasConsole) {
-    warn('called with insufficient arguments!', args);
-    throw 'subscribeTo() called with insufficient arguments!';
+  if (!listener) {
+    if (hasConsole) {
+      warn('called with insufficient arguments!', args);
+    }
+    throw new Error('subscribeTo() called with insufficient arguments');
   }
 
   const register = (prio: number) => (event: EventName) =>
