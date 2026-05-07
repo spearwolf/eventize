@@ -194,32 +194,18 @@ export class EventStore {
       }
       // ---------------------------------------------------------------
     } else if (removeSimilar) {
-      if (isCatchEmAll(listener) && typeof listener == 'object') {
-        // ---------------------------------------------------------------
-        // .off('*', obj)
-        //
-        // TODO probably this will never be called
-        //      so please check if we can remove this code path
+      // ---------------------------------------------------------------
+      // off('foo', obj)
+      // off(Symbol('foo'), obj)
+      //
+      this.namedListeners.forEach((namedListeners) =>
         removeSimilarListenersFromArray(
-          this.catchEmAllListeners,
-          EVENT_CATCH_EM_ALL,
+          namedListeners,
           listener,
-        );
-        // ---------------------------------------------------------------
-      } else {
-        // ---------------------------------------------------------------
-        // off('foo', obj)
-        // off(Symbol('foo'), obj)
-        //
-        this.namedListeners.forEach((namedListeners) =>
-          removeSimilarListenersFromArray(
-            namedListeners,
-            listener,
-            listenerObject,
-          ),
-        );
-        // ---------------------------------------------------------------
-      }
+          listenerObject,
+        ),
+      );
+      // ---------------------------------------------------------------
     } else {
       // ---------------------------------------------------------------
       // off(obj)
