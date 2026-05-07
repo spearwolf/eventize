@@ -27,12 +27,6 @@ Niedriges Risiko, keine Breaking Changes, sollte kurzfristig erledigt werden.
 **Problem:** `UnsubscribeFunc` hat eine `listener: EventListener` / `listeners: EventListener[]` Property, aber `EventListener` ist nicht aus dem Public-Modul re-exportiert. Nutzer können den Typ nicht referenzieren — in den eigenen Specs steht deshalb `// @ts-ignore` (siehe `on.spec.ts`).
 **Fix:** `EventListener` als type-only export bereitstellen (Klasse selbst muss nicht zwingend public sein — Type-Export reicht).
 
-### 🔴 4. Toten Code entfernen
-**Stellen:**
-- `src/constants.ts`: `LISTENER_UNKNOWN = 0` wird nirgends benutzt.
-- `src/EventStore.ts:197-208`: Branch `if (isCatchEmAll(listener) && typeof listener == 'object')` ist permanent unerreichbar (`isCatchEmAll` prüft `=== '*'`, das ist ein String). Die Autorenschaft markiert es selbst mit `// TODO probably this will never be called`.
-**Fix:** Branch entfernen, `LISTENER_UNKNOWN` löschen. Tests laufen lassen, dass nichts kaputtgeht.
-
 ### 🔴 5. Memory-Leak in `EventStore.namedListeners` schließen
 **Datei:** `src/EventStore.ts`
 **Problem:** `namedListeners.get(eventName)` erzeugt für jeden eindeutigen Eventnamen einen Map-Eintrag. Wird der letzte Listener für diesen Namen entfernt (`removeAll` oder `removeItemFromArray`), bleibt das leere Array in der Map liegen. Bei dynamischen Eventnamen (z.B. UUIDs) wächst die Map unbegrenzt.

@@ -48,4 +48,5 @@ All three call into the same `on`/`emit`/`off` functions; don't duplicate logic 
 - `lib/` is generated; never edit. `npm run clean` wipes it.
 - ESM-style relative imports use bare paths (no `.js`) — `tsup` handles output extensions.
 - Document every source change that affects the public API or runtime behavior in `CHANGELOG.md` (add migration notes if it's breaking). When the change alters documented behavior or examples, update `README.md` as well. Pure internal refactors that leave API and behavior untouched don't need either.
+- When a task from `TODO.md` is completed, record it in both `CHANGELOG.md` (under `## Unreleased`) and `TODO.md` (mark the item as done, e.g. `~~strikethrough~~` or a ✅ note). If the task was fully resolved exactly as described — including any tests, docs, or follow-ups it lists — remove the entry from `TODO.md` entirely. Partial work stays in `TODO.md` with a note describing what's left.
 - The package ships both CJS and ESM (`lib/index.js` / `lib/index.mjs`) plus `.d.ts`. `npm run checkPkgTypes` (via `attw`) verifies the dual-format types resolve correctly — failures here usually mean an `exports` map or `.d.ts` mismatch.

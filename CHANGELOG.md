@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-_Documentation and testing improvements_
+_Documentation, testing, and internal cleanup_
 
+- Removed dead code in `EventStore` and `constants`: dropped unused `LISTENER_UNKNOWN` constant and the unreachable `isCatchEmAll(listener) && typeof listener == 'object'` branch in `EventStore.remove`. Internal refactor only — no API or behavior change.
 - Expanded documentation for `retain()` and `retainClear()` API functions in README with comprehensive examples
 - Added extensive test coverage for `retain()` and `retainClear()` covering all code paths:
   - Symbol event names support
