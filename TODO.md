@@ -11,16 +11,6 @@ Legende: 🔴 Bug · 🟡 API-Hygiene · 🟢 DX/Doku · 🔵 Refactor · ⚡ Pe
 
 Niedriges Risiko, keine Breaking Changes, sollte kurzfristig erledigt werden.
 
-### 🟡 2. `EVENT_CATCH_EM_ALL` über `index.ts` re-exportieren
-**Datei:** `src/index.ts`, `src/constants.ts`
-**Problem:** Die Konstante `'*'` ist als `EVENT_CATCH_EM_ALL` in `constants.ts` definiert, aber nicht im public Bundle. Nutzer müssen den Magic-String `'*'` verwenden oder via deep-import auf interne Pfade zugreifen.
-**Fix:** `export {EVENT_CATCH_EM_ALL} from './constants';` in `index.ts`.
-
-### 🟡 3. `EventListener`-Typ exportieren
-**Dateien:** `src/index.ts`, `src/types.ts`
-**Problem:** `UnsubscribeFunc` hat eine `listener: EventListener` / `listeners: EventListener[]` Property, aber `EventListener` ist nicht aus dem Public-Modul re-exportiert. Nutzer können den Typ nicht referenzieren — in den eigenen Specs steht deshalb `// @ts-ignore` (siehe `on.spec.ts`).
-**Fix:** `EventListener` als type-only export bereitstellen (Klasse selbst muss nicht zwingend public sein — Type-Export reicht).
-
 ### 🟢 6. README: `refCount`-Verhalten dokumentieren
 **Datei:** `README.md`
 **Problem:** Doppeltes `on(ε, 'foo', listener)` mit identischem Listener+Object führt zu **einem** Eintrag mit refCount=2, nicht zu zwei separaten Listenern. Verifiziert in `on_multiple_times.spec.ts`, aber im README mit keinem Wort erwähnt. Wird Nutzer überraschen.
