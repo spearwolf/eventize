@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+
+## `v4.0.3` (2026-05-07)
+
 _Documentation, testing, and internal cleanup_
 
 - **API:** `EVENT_CATCH_EM_ALL` (the `'*'` wildcard event name) is now re-exported from the package root. Users no longer need to use the magic string `'*'` or reach into deep import paths.
@@ -77,10 +80,10 @@ import {
 There is still the option to inject the Eventize API as methods to the object (but this is no longer the default) by using:
 
 - `eventize.inject(obj)` &rarr; _eventizedObj with eventize-api methods_
-  - the `eventize.extend()` method has been removed, however 
+  - the `eventize.extend()` method has been removed, however
 - `new (class extends Eventize {})()`
   - the base class `Eventize` is still available and works in the same way as before
-  
+
 If you are using the syntax from the _composition via inheritance_ example, you should now be using `eventize.inject` directly:
 
 ```typescript
