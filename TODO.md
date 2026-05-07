@@ -7,17 +7,6 @@ Legende: 🔴 Bug · 🟡 API-Hygiene · 🟢 DX/Doku · 🔵 Refactor · ⚡ Pe
 
 ---
 
-## Patch-Release (geplant für `v4.0.3`)
-
-Niedriges Risiko, keine Breaking Changes, sollte kurzfristig erledigt werden.
-
-### 🔴 10. Test: `once` mit retained event + Array von Eventnamen
-**Datei:** `src/onceAsync.spec.ts` oder `src/once.spec.ts`
-**Problem:** Bei `retain(ε, 'foo'); emit(ε, 'foo', x); once(ε, ['foo', 'bar'], fn)` läuft `subscribeTo` **vor** dem Anhängen von `callAfterApply` durch `once`. Wenn der retained Replay den Listener feuert, ist `unsubscribe` noch nicht angehängt — vermuteter Edge-Case.
-**Fix:** Spec, der nach dem retained-Replay `getSubscriptionCount(ε)` als 0 erwartet (analog zu Live-Emit). Falls der Test fehlschlägt: in `once()` zuerst `afterApply` registrieren, dann `EventKeeper.publish` flushen — siehe Aufgabe 17.
-
----
-
 ## Minor-Release (geplant für `v4.1.0`)
 
 Kann breaking-frei eingeführt werden. Verbessert Konsistenz und DX deutlich.
@@ -59,12 +48,6 @@ plus eine Implementation-Signature, die intern alles akzeptiert.
 - `removeByEventListener(el)` (für unsubscribe-Funktion)
 - `removeAll()` (für `off(ε)` und `off(ε, '*')`)
 und einen schlanken Dispatcher davor. Vorhandene Specs müssen weiterhin grün bleiben.
-
-### 🔴 17. `once` + retain: Reihenfolge fixen
-**Datei:** `src/eventize-api.ts:64-82`
-**Abhängig von:** Aufgabe 10 (zuerst Test schreiben)
-**Problem:** `subscribeTo` triggert `EventKeeper.publish` direkt — bei `once` mit retained Event läuft der Listener, bevor `callAfterApply` angehängt ist.
-**Fix:** In `once()` zuerst `_subscribeTo` ohne automatischen Publish aufrufen, `callAfterApply` setzen, dann `EventKeeper.publish` manuell flushen. Erfordert eine kleine API-Änderung an `subscribeTo` (z.B. zwei-stufiger Aufruf oder Callback-Parameter).
 
 ### ⚡ 18. Sortierte Insertion statt `arr.sort()` bei `add`
 **Datei:** `src/EventStore.ts`

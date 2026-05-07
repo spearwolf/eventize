@@ -1,6 +1,6 @@
 import {fake} from 'sinon';
 
-import {emit, eventize, on, once} from './index';
+import {emit, eventize, getSubscriptionCount, on, once, retain} from './index';
 
 describe('once()', () => {
   describe('once() before on()', () => {
@@ -56,5 +56,35 @@ describe('once()', () => {
 
     emit(e, 'foo');
     expect(sub).not.toHaveBeenCalled();
+  });
+
+  describe('with retained event', () => {
+    it('unsubscribes after retained replay (single event name)', () => {
+      const e = eventize();
+
+      retain(e, 'foo');
+      emit(e, 'foo', 42);
+
+      const sub = jest.fn();
+      once(e, 'foo', sub);
+
+      expect(sub).toHaveBeenCalledTimes(1);
+      expect(sub).toHaveBeenCalledWith(42);
+      expect(getSubscriptionCount(e)).toBe(0);
+    });
+
+    it('unsubscribes after retained replay (array of event names)', () => {
+      const e = eventize();
+
+      retain(e, 'foo');
+      emit(e, 'foo', 42);
+
+      const sub = jest.fn();
+      once(e, ['foo', 'bar'], sub);
+
+      expect(sub).toHaveBeenCalledTimes(1);
+      expect(sub).toHaveBeenCalledWith(42);
+      expect(getSubscriptionCount(e)).toBe(0);
+    });
   });
 });

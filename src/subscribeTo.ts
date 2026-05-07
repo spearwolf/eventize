@@ -94,3 +94,19 @@ export const subscribeTo = (
   EventKeeper.publish(retainedEvents);
   return listener;
 };
+
+export const subscribeToDeferred = (
+  store: EventStore,
+  keeper: EventKeeper,
+  args: EventArgs,
+): {
+  listeners: EventListener | Array<EventListener>;
+  publishRetained: () => void;
+} => {
+  const retainedEvents: KeeperEvent[] = [];
+  const listeners = _subscribeTo(store, keeper, args, retainedEvents);
+  return {
+    listeners,
+    publishRetained: () => EventKeeper.publish(retainedEvents),
+  };
+};

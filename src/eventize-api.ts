@@ -2,7 +2,7 @@ import {EventListener} from './EventListener';
 import {asEventized} from './asEventized';
 import {EVENT_CATCH_EM_ALL, NAMESPACE} from './constants';
 import {isEventized} from './isEventized';
-import {subscribeTo} from './subscribeTo';
+import {subscribeTo, subscribeToDeferred} from './subscribeTo';
 import type {
   AnyEventNames,
   EventArgs,
@@ -64,7 +64,7 @@ export const on = (obj: object, ...args: SubscribeArgs): UnsubscribeFunc => {
 export const once = (obj: object, ...args: SubscribeArgs): UnsubscribeFunc => {
   const eventizedObj = asEventized(obj);
   const {store, keeper} = eventizedObj[NAMESPACE];
-  const listeners = subscribeTo(store, keeper, args);
+  const {listeners, publishRetained} = subscribeToDeferred(store, keeper, args);
   const unsubscribeFn = makeUnsubscribe(eventizedObj, listeners);
   let unsubscribeCalled = false;
   const unsubscribe = () => {
@@ -78,6 +78,7 @@ export const once = (obj: object, ...args: SubscribeArgs): UnsubscribeFunc => {
   } else {
     afterApply(unsubscribe)(listeners);
   }
+  publishRetained();
   return unsubscribe as UnsubscribeFunc;
 };
 
