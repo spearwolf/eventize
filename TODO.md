@@ -39,16 +39,6 @@ Niedriges Risiko, keine Breaking Changes, sollte kurzfristig erledigt werden.
 **Problem:** Bei `retain(ε, 'foo'); emit(ε, 'foo', x); once(ε, ['foo', 'bar'], fn)` läuft `subscribeTo` **vor** dem Anhängen von `callAfterApply` durch `once`. Wenn der retained Replay den Listener feuert, ist `unsubscribe` noch nicht angehängt — vermuteter Edge-Case.
 **Fix:** Spec, der nach dem retained-Replay `getSubscriptionCount(ε)` als 0 erwartet (analog zu Live-Emit). Falls der Test fehlschlägt: in `once()` zuerst `afterApply` registrieren, dann `EventKeeper.publish` flushen — siehe Aufgabe 17.
 
-### 🔵 11. `@ts-ignore` durch `@ts-expect-error` ersetzen
-**Dateien:** `src/EventListener.ts:111,117,123,132`, `src/isEventized.ts:9`
-**Problem:** `@ts-ignore` schluckt Fehler still, auch wenn der Cast irgendwann korrekt würde — das Ignore verrottet.
-**Fix:** Auf `@ts-expect-error` umstellen, jede Annotation mit kurzem Begründungs-Kommentar (warum dynamic dispatch hier nötig ist).
-**Bonus:** `isEventized` lässt sich ganz ohne ignore schreiben:
-```ts
-export const isEventized = <T extends object>(obj: T): obj is T & EventizedObject =>
-  Boolean(obj && (obj as Record<symbol, unknown>)[NAMESPACE]);
-```
-
 ### 🟢 12. Test: `getSubscriptionCount` mit eigenem Spec
 **Datei:** neu `src/getSubscriptionCount.spec.ts`
 **Problem:** Aktuell nur indirekt über andere Specs getestet. Edge Cases fehlen: `getSubscriptionCount({})` (nicht-eventized → 0), nach `off(ε)` ohne Listener, mit Wildcard-Listenern.

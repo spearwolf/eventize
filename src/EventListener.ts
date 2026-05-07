@@ -108,19 +108,19 @@ export class EventListener {
 
     switch (this.listenerType) {
       case LISTENER_IS_FUNC:
-        // @ts-ignore
+        // @ts-expect-error listenerType discriminant guarantees `listener` is a callable; TS can't infer that from a numeric tag.
         apply(listenerObject, listener, args, returnValue);
         if (this.callAfterApply) this.callAfterApply();
         break;
 
       case LISTENER_IS_NAMED_FUNC:
-        // @ts-ignore
+        // @ts-expect-error listenerType discriminant guarantees `listener` is a string/symbol method key on `listenerObject`.
         apply(listenerObject, listenerObject[listener], args, returnValue);
         if (this.callAfterApply) this.callAfterApply();
         break;
 
       case LISTENER_IS_OBJ: {
-        // @ts-ignore
+        // @ts-expect-error listenerType discriminant guarantees `listener` is an indexable object whose own keys are event names.
         const func = listener[eventName];
         if (this.isCatchEmAll || this.eventName === eventName) {
           if (typeof func === 'function') {
@@ -129,7 +129,7 @@ export class EventListener {
               returnValue?.(retVal);
             }
           } else {
-            // @ts-ignore
+            // @ts-expect-error listenerType discriminant guarantees `listener` is an object that may expose an `emit` method.
             emit(eventName, listener, args, returnValue);
           }
           if (this.callAfterApply) this.callAfterApply();
