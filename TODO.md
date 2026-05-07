@@ -11,21 +11,6 @@ Legende: 🔴 Bug · 🟡 API-Hygiene · 🟢 DX/Doku · 🔵 Refactor · ⚡ Pe
 
 Niedriges Risiko, keine Breaking Changes, sollte kurzfristig erledigt werden.
 
-### 🟢 6. README: `refCount`-Verhalten dokumentieren
-**Datei:** `README.md`
-**Problem:** Doppeltes `on(ε, 'foo', listener)` mit identischem Listener+Object führt zu **einem** Eintrag mit refCount=2, nicht zu zwei separaten Listenern. Verifiziert in `on_multiple_times.spec.ts`, aber im README mit keinem Wort erwähnt. Wird Nutzer überraschen.
-**Fix:** Kurze Sektion "De-duplication" unter `on()` mit Beispiel.
-
-### 🟢 7. README: Verhalten bei werfenden Listenern dokumentieren
-**Datei:** `README.md`
-**Problem:** Wenn ein Listener während `emit` eine Exception wirft, propagiert sie nach oben und nachfolgende Listener im selben Emit werden **nicht** mehr aufgerufen. Aktuell weder dokumentiert noch getestet.
-**Fix:** Sektion "Error handling in listeners" mit Beispiel und Empfehlung (try/catch im Listener selbst). Gleichzeitig → Aufgabe 8.
-
-### 🔴 8. Test: Verhalten bei werfendem Listener
-**Datei:** neu `src/emit-throwing-listener.spec.ts`
-**Problem:** Kein expliziter Test, was passiert, wenn ein Listener wirft.
-**Fix:** Spec, der zwei Listener registriert (erster wirft, zweiter zählt) und prüft, dass die Exception sichtbar wird und der zweite Listener (laut aktueller Semantik) nicht mehr läuft. Wenn das Verhalten geändert werden soll → eigene Aufgabe (siehe Major).
-
 ### 🔴 9. Test: Re-entrancy (sub/unsub während emit)
 **Datei:** neu `src/emit-reentrancy.spec.ts`
 **Problem:** `EventStore.forEach` cloned die Listener-Arrays via `cloneArray` — offensichtlich um Re-entrancy abzufangen. Aber kein expliziter Test verifiziert das Verhalten:

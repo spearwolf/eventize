@@ -328,6 +328,27 @@ emit(ε, 'onSave', {user: 'test'}); // => "Saving: { user: 'test' }"
 emit(ε, 'onDelete', 123); // => "Deleting: 123"
 ```
 
+##### De-duplication (Listener Objects)
+
+Subscribing the **same listener-object** twice for the same event does _not_ register two listeners — eventize collapses the second call into the existing entry and increments an internal reference count. The listener still fires only once per `emit()`.
+
+```javascript
+const ε = eventize();
+const listener = {foo: () => console.log('foo')};
+
+on(ε, 'foo', listener);
+on(ε, 'foo', listener); // same (event, priority, listener, context) → refCount = 2
+
+emit(ε, 'foo'); // => "foo"  (called once, not twice)
+```
+
+The match key is the tuple `(eventName, priority, listener, listenerContext)`. Two subscriptions are considered the same only when all four match.
+
+> [!IMPORTANT]
+> De-duplication applies **only to listener-object forms** — `on(ε, eventName, listenerObject)` and the explicit method-name form `on(ε, eventName, 'methodName', listenerObject)`. Plain function listeners are **not** deduplicated: registering the same function twice produces two independent listeners that will both run.
+>
+> Each unsubscribe decrements the count; the listener is removed only when the count reaches zero. See the **Reference Counting** section under `off()` below for details and a comparison with the function form.
+
 ---
 
 #### `once(emitter, ...args)`
@@ -648,6 +669,52 @@ on(ε, 'load', () => null); // This will be ignored
 const results = await emitAsync(ε, 'load');
 console.log(results); // => ["Data from source 1", "Simple data"]
 ```
+
+---
+
+### Error Handling in Listeners
+
+Listeners are dispatched **synchronously**. If a listener throws, the exception propagates out of the `emit()` call (or out of the synchronous portion of `emitAsync()`) — eventize does **not** catch it for you.
+
+Consequences worth knowing:
+
+- **Dispatch is aborted.** Any listeners that haven't run yet for the same `emit()` will _not_ be called. Listeners that already ran are unaffected.
+- **The throwing listener stays subscribed.** It is not auto-removed; the next `emit()` will call it again.
+- **`retain()` is not updated for that emit.** The retained value is written _after_ all listeners run, so a thrown exception leaves the previously retained value (if any) untouched.
+
+```javascript
+const ε = eventize();
+const calls = [];
+
+on(ε, 'foo', () => calls.push('first'));
+on(ε, 'foo', () => {
+  throw new Error('boom');
+});
+on(ε, 'foo', () => calls.push('third')); // not reached
+
+try {
+  emit(ε, 'foo');
+} catch (err) {
+  console.error(err.message); // => "boom"
+}
+
+console.log(calls); // => ["first"]
+```
+
+**Recommendation:** if a single listener's failure should not stop dispatch to the others, wrap that listener's body in `try/catch` yourself. Eventize deliberately keeps no global error handler so that error policy stays explicit at each subscription site.
+
+```javascript
+on(ε, 'foo', (...args) => {
+  try {
+    riskyWork(...args);
+  } catch (err) {
+    reportError(err);
+  }
+});
+```
+
+> [!NOTE]
+> `emitAsync()` aggregates listener return values into a single `Promise.all`. A listener returning a **rejected promise** will reject the awaited result, but other listeners — being dispatched synchronously — have already run by then. A listener that throws synchronously, however, still aborts dispatch in the same way as with `emit()`.
 
 ---
 
