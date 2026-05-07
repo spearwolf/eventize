@@ -8,19 +8,18 @@ A tiny, clever, and dependency-free library for synchronous event-driven program
 
 ## Introduction 👀
 
-`@spearwolf/eventize` provides a powerful and intuitive API for building event-based systems. This library invokes event listeners *synchronously*. This design choice gives you precise control over your execution flow, which is critical in scenarios like game loops (`requestAnimationFrame`), real-time applications, or any situation where immediate, predictable execution is necessary.
+`@spearwolf/eventize` provides a powerful and intuitive API for building event-based systems. This library invokes event listeners _synchronously_. This design choice gives you precise control over your execution flow, which is critical in scenarios like game loops (`requestAnimationFrame`), real-time applications, or any situation where immediate, predictable execution is necessary.
 
 Written entirely in TypeScript and targeting modern `ES2022`, it offers a robust, type-safe developer experience without sacrificing performance or adding bloat.
 
 ### Features
 
--   🚀 **Developer-Focused API**: Clean, modern, and functional.
--   ✨ **Wildcards & Priorities**: Subscribe to all events and control listener execution order.
--   🔷 **Full TypeScript Support**: Leverage strong typing for more reliable code.
--   📦 **Zero Runtime Dependencies**: Lightweight with a minimal footprint (&lt;5k gzipped).
--   ESM & CommonJS Support.
--   Apache 2.0 Licensed.
-
+- 🚀 **Developer-Focused API**: Clean, modern, and functional.
+- ✨ **Wildcards & Priorities**: Subscribe to all events and control listener execution order.
+- 🔷 **Full TypeScript Support**: Leverage strong typing for more reliable code.
+- 📦 **Zero Runtime Dependencies**: Lightweight with a minimal footprint (&lt;5k gzipped).
+- ESM & CommonJS Support.
+- Apache 2.0 Licensed.
 
 ## ⚙️ Installation
 
@@ -33,8 +32,7 @@ $ npm install @spearwolf/eventize
 The library is distributed in both ES Module (`import`) and CommonJS (`require`) formats.
 
 > [!NOTE]
->  Since version 3.0.0 there is also a [CHANGELOG](./CHANGELOG.md)
-
+> Since version 3.0.0 there is also a [CHANGELOG](./CHANGELOG.md)
 
 ## 📖 Getting Started
 
@@ -45,7 +43,7 @@ The core idea is simple: an object, called an **emitter**, can be "eventized" to
 Here is a basic example:
 
 ```javascript
-import { eventize, on, emit } from '@spearwolf/eventize';
+import {eventize, on, emit} from '@spearwolf/eventize';
 
 // 1. Create an eventized object (the emitter)
 const bus = eventize({});
@@ -71,13 +69,13 @@ An emitter is any object that has been enhanced with event capabilities. The rec
 > We often use `ε` (epsilon) as a variable name to denote an _eventized_ object.
 
 ```javascript
-import { eventize } from '@spearwolf/eventize';
+import {eventize} from '@spearwolf/eventize';
 
 // Create an emitter from a new empty object
 const ε = eventize();
 
 // Enhance an existing object
-const myApp = { name: 'MyApp' };
+const myApp = {name: 'MyApp'};
 eventize(myApp); // myApp is now an emitter
 ```
 
@@ -87,30 +85,30 @@ A listener can be a simple function or a method on an object. It's the code that
 
 ```js
 on(ε, 'foo', (a) => {
-  console.log('(1) Hello', a)
-})
+  console.log('(1) Hello', a);
+});
 
 on(ε, 'foo', {
   foo(a, b) {
-    console.log('(2)', b, a)
-  }
-})
+    console.log('(2)', b, a);
+  },
+});
 
 on(ε, {
   foo(a, b) {
-    console.log('(3) Hi', a)
+    console.log('(3) Hi', a);
   },
   bar() {
-    console.log('(4) hej')
-  }
-})
+    console.log('(4) hej');
+  },
+});
 
-emit(ε, 'foo', 'eventize', 'Greetings from')
+emit(ε, 'foo', 'eventize', 'Greetings from');
 // => "(1) Hello eventize"
 // => "(2) Greetings from eventize"
 // => "(3) Hi eventize"
 
-emit(ε, 'bar')
+emit(ε, 'bar');
 // => "(4) hej"
 ```
 
@@ -123,7 +121,7 @@ Events are identified by a name, which can be a `string` or a `symbol`. When an 
 emit(ε, 'user-login');
 
 // Emit an event with data
-emit(ε, 'update', { id: 1, payload: 'new data' });
+emit(ε, 'update', {id: 1, payload: 'new data'});
 
 // Emit an event with multiple arguments
 emit(ε, 'hello', 'hi', 'hej', 'hallo');
@@ -133,33 +131,33 @@ emit(ε, 'hello', 'hi', 'hej', 'hallo');
 
 The API is designed to be used functionally, with named exports like `on(ε, ...)` and `emit(ε, ...)`. For class-based patterns, you can also inject the API methods directly onto an object.
 
-| API | Description |
-|--------|-------------|
-| `on` | subscribe to events |
-| `once` | subscribe to the next event only |
-| `onceAsync` | the async version of subscribe only to the next event |
-| `emit` | dispatch an event |
-| `emitAsync` | dispatch an event and wait for any promises returned by subscribers |
-| `off` | unsubscribe |
-| `retain` | hold the last event until it is received by a subscriber |
-| `retainClear` | clear the last event |
+| API           | Description                                                         |
+| ------------- | ------------------------------------------------------------------- |
+| `on`          | subscribe to events                                                 |
+| `once`        | subscribe to the next event only                                    |
+| `onceAsync`   | the async version of subscribe only to the next event               |
+| `emit`        | dispatch an event                                                   |
+| `emitAsync`   | dispatch an event and wait for any promises returned by subscribers |
+| `off`         | unsubscribe                                                         |
+| `retain`      | hold the last event until it is received by a subscriber            |
+| `retainClear` | clear the last event                                                |
 
 ### Creating Emitters
 
 There are three main ways to create an emitter.
 
-| Method                      | Is a `EventizedObject`? | Has API Methods Injected? | Recommended For                               |
-| --------------------------- | --------------------- | ------------------------- | --------------------------------------------- |
-| `eventize(obj)`             | ✅                    | ❌                        | Functional programming, general use.          |
-| `eventize.inject(obj)`      | ✅                    | ✅                        | Object-oriented or class-based composition.   |
-| `class extends Eventize {}` | ✅                    | ✅                        | Class-based inheritance.                      |
+| Method                      | Is a `EventizedObject`? | Has API Methods Injected? | Recommended For                             |
+| --------------------------- | ----------------------- | ------------------------- | ------------------------------------------- |
+| `eventize(obj)`             | ✅                      | ❌                        | Functional programming, general use.        |
+| `eventize.inject(obj)`      | ✅                      | ✅                        | Object-oriented or class-based composition. |
+| `class extends Eventize {}` | ✅                      | ✅                        | Class-based inheritance.                    |
 
 #### `eventize(obj)`
 
 This is the primary and recommended approach. It prepares an object to be used with the functional API.
 
 ```typescript
-import { eventize, on, emit } from '@spearwolf/eventize';
+import {eventize, on, emit} from '@spearwolf/eventize';
 
 const ε = eventize(); // Creates an emitter from {}
 
@@ -173,9 +171,9 @@ emit(ε, 'foo'); // => "foo called"
 This modifies the object, attaching the entire API as methods.
 
 ```typescript
-import { eventize } from '@spearwolf/eventize';
+import {eventize} from '@spearwolf/eventize';
 
-const myApp = { name: 'MyApp' };
+const myApp = {name: 'MyApp'};
 const obj = eventize.inject(myApp); // Creates and injects the API into myApp
 
 obj.on('foo', () => console.log('foo called'));
@@ -188,7 +186,7 @@ obj.emit('foo'); // => "foo called"
 For traditional object-oriented programming, you can extend the `Eventize` base class.
 
 ```typescript
-import { Eventize } from '@spearwolf/eventize';
+import {Eventize} from '@spearwolf/eventize';
 
 class MyEmitter extends Eventize {}
 
@@ -204,13 +202,13 @@ obj.emit('foo'); // => "foo called"
 If you want to create an class-based emitter object, but not via inheritance, you can also use the eventize.inject method inside the constructor, here as a typescript example:
 
 ```ts
-import {eventize, Eventize} from '@spearwolf/eventize'
+import {eventize, Eventize} from '@spearwolf/eventize';
 
 interface Foo extends Eventize {}
 
 class Foo {
   constructor() {
-    eventize.inject(this)
+    eventize.inject(this);
   }
 }
 ```
@@ -226,8 +224,8 @@ Subscribes a listener to one or more events. It returns an `unsubscribe` functio
 **Signatures:**
 
 ```typescript
-on(ε, eventName(s), [priority], listener, [context])
-on(ε, [priority], listener, [context]) // Wildcard subscription
+on(ε, eventName(s), [priority], listener, [context]);
+on(ε, [priority], listener, [context]); // Wildcard subscription
 ```
 
 **Example (Simple Listener):**
@@ -259,27 +257,41 @@ emit(ε, 'bar', 2); // => 2
 
 ##### Wildcards (`*`)
 
-Listen to *all* events emitted by an object using the `*` wildcard or by omitting the event name entirely.
+Listen to _all_ events emitted by an object using the `*` wildcard or by omitting the event name entirely.
 
 ```javascript
 const ε = eventize();
 
-const wildcardListener = (eventName, ...args) => {
-  console.log(`Event '${eventName}' fired with:`, args);
+const wildcardListener = (...args) => {
+  console.log('event fired with args:', args);
 };
 
 on(ε, '*', wildcardListener); // or just on(ε, wildcardListener)
 
-emit(ε, 'foo', 1, 2); // => Event 'foo' fired with: [1, 2]
-emit(ε, 'bar', 'A');  // => Event 'bar' fired with: ['A']
+emit(ε, 'foo', 1, 2); // => event fired with args: [1, 2]
+emit(ε, 'bar', 'A'); // => event fired with args: ['A']
 ```
+
+> [!IMPORTANT]
+> A function-form wildcard listener receives **only the `emit()` arguments**. The event name is _not_ passed in. If you need to know which event fired, register a listener-object with an `.emit()` method instead — eventize will fall back to it for events without a matching named method, and pass `eventName` as the first argument:
+>
+> ```javascript
+> on(ε, {
+>   emit(eventName, ...args) {
+>     console.log(`Event '${eventName}' fired with:`, args);
+>   },
+> });
+>
+> emit(ε, 'foo', 1, 2); // => Event 'foo' fired with: [1, 2]
+> emit(ε, 'bar', 'A'); // => Event 'bar' fired with: ['A']
+> ```
 
 ##### Priorities
 
 Control the execution order of listeners. Listeners with higher priority numbers run first. The default priority is `0`.
 
 ```javascript
-import { eventize, on, emit, Priority } from '@spearwolf/eventize';
+import {eventize, on, emit, Priority} from '@spearwolf/eventize';
 
 const ε = eventize();
 const calls = [];
@@ -291,6 +303,7 @@ on(ε, 'test', Priority.AAA, () => calls.push('High')); // Runs sooner
 emit(ε, 'test');
 console.log(calls); // => ["High", "Default", "Low"]
 ```
+
 `Priority` provides several predefined levels: `Max`, `AAA`, `BB`, `C`, `Default`, `Low`, `Min`.
 
 ##### Listener Objects
@@ -300,15 +313,19 @@ You can subscribe an object whose method names match the event names.
 ```javascript
 const ε = eventize();
 const service = {
-  onSave(data) { console.log('Saving:', data); },
-  onDelete(id) { console.log('Deleting:', id); }
+  onSave(data) {
+    console.log('Saving:', data);
+  },
+  onDelete(id) {
+    console.log('Deleting:', id);
+  },
 };
 
 // Subscribe the entire object. Methods will be matched to event names.
 on(ε, service);
 
-emit(ε, 'onSave', { user: 'test' }); // => "Saving: { user: 'test' }"
-emit(ε, 'onDelete', 123);          // => "Deleting: 123"
+emit(ε, 'onSave', {user: 'test'}); // => "Saving: { user: 'test' }"
+emit(ε, 'onDelete', 123); // => "Deleting: 123"
 ```
 
 ---
@@ -328,7 +345,7 @@ emit(ε, 'my-event'); // (nothing happens)
 ```
 
 > [!NOTE]
-> If `once()` is used with multiple event names, the listener is removed after the *first* of those events is triggered.
+> If `once()` is used with multiple event names, the listener is removed after the _first_ of those events is triggered.
 
 ---
 
@@ -348,7 +365,7 @@ async function waitForLoad() {
 waitForLoad();
 
 // Somewhere else in the application...
-setTimeout(() => emit(ε, 'loaded', { content: '...' }), 100);
+setTimeout(() => emit(ε, 'loaded', {content: '...'}), 100);
 // => Waiting for data...
 // => Data loaded: { content: '...' }
 ```
@@ -363,16 +380,16 @@ Removes listeners from an emitter. This is the counterpart to `on()` and is usef
 
 **Signatures:**
 
-| Signature                                | Description                                                              |
-| ---------------------------------------- | ------------------------------------------------------------------------ |
-| `off(emitter)`                           | Unsubscribes **all** listeners from the emitter.                         |
-| `off(emitter, '*')`                      | Same as above—unsubscribes all listeners (named and wildcard).           |
-| `off(emitter, eventName)`                | Unsubscribes all listeners for a specific event (string or symbol).      |
-| `off(emitter, [eventName1, eventName2])` | Unsubscribes all listeners for multiple events.                          |
-| `off(emitter, listenerFunc)`             | Unsubscribes a specific listener function from all events.               |
-| `off(emitter, listenerFunc, context)`    | Unsubscribes a listener function with a specific context.                |
-| `off(emitter, listenerObject)`           | Unsubscribes all listeners associated with an object.                    |
-| `off(emitter, eventName, listenerObject)`| Unsubscribes a listener object from a specific event only.               |
+| Signature                                 | Description                                                         |
+| ----------------------------------------- | ------------------------------------------------------------------- |
+| `off(emitter)`                            | Unsubscribes **all** listeners from the emitter.                    |
+| `off(emitter, '*')`                       | Same as above—unsubscribes all listeners (named and wildcard).      |
+| `off(emitter, eventName)`                 | Unsubscribes all listeners for a specific event (string or symbol). |
+| `off(emitter, [eventName1, eventName2])`  | Unsubscribes all listeners for multiple events.                     |
+| `off(emitter, listenerFunc)`              | Unsubscribes a specific listener function from all events.          |
+| `off(emitter, listenerFunc, context)`     | Unsubscribes a listener function with a specific context.           |
+| `off(emitter, listenerObject)`            | Unsubscribes all listeners associated with an object.               |
+| `off(emitter, eventName, listenerObject)` | Unsubscribes a listener object from a specific event only.          |
 
 > [!NOTE]
 > Calling `off()` on a non-eventized object will throw an error: `"object is not eventized"`.
@@ -471,8 +488,12 @@ When you subscribe an object as a listener, you can remove all its subscriptions
 ```javascript
 const ε = eventize();
 const service = {
-  foo() { console.log('foo'); },
-  bar() { console.log('bar'); }
+  foo() {
+    console.log('foo');
+  },
+  bar() {
+    console.log('bar');
+  },
 };
 
 // Subscribe the service object to events (methods are matched by event name)
@@ -490,8 +511,8 @@ emit(ε, 'bar'); // (nothing happens)
 
 ```javascript
 const ε = eventize();
-const objA = { foo: () => console.log('A:foo'), bar: () => console.log('A:bar') };
-const objB = { foo: () => console.log('B:foo') };
+const objA = {foo: () => console.log('A:foo'), bar: () => console.log('A:bar')};
+const objB = {foo: () => console.log('B:foo')};
 
 on(ε, 'foo', objA);
 on(ε, 'bar', objA);
@@ -548,28 +569,46 @@ emit(ε, 'test');
 
 **Reference Counting:**
 
-When the same listener object is subscribed multiple times to the same event, the library uses reference counting to avoid duplicate calls. Listeners are considered identical when they have:
-- The same event name
-- The same priority
-- The same listener (function or object)
-- The same listener context object
+When the _same_ listener-object subscription is registered more than once, eventize collapses the duplicates into a single entry with an internal reference count instead of storing two separate listeners. Each subsequent `on()` increments the count; each unsubscribe decrements it. The listener is only really removed when the count drops to zero.
 
-You need to unsubscribe the same number of times as you subscribed:
+> [!IMPORTANT]
+> Reference counting **only applies to listener-object forms**:
+>
+> - `on(ε, eventName, listenerObject)` — listener is an object whose method matches the event name
+> - `on(ε, eventName, 'methodName', listenerObject)` — explicit method-name lookup on a listener object
+>
+> Plain function listeners (`on(ε, 'foo', fn)` or `on(ε, 'foo', fn, ctx)`) are **not** deduplicated — registering the same function twice produces two independent listeners that will both be invoked on `emit()`.
+>
+> Two listener-object subscriptions are considered identical when their event name, priority, listener (the object), and listener context all match.
 
 ```javascript
 const ε = eventize();
-const listener = { foo: () => console.log('foo') };
+const listener = {foo: () => console.log('foo')};
 
 const unsub1 = on(ε, 'foo', listener);
-const unsub2 = on(ε, 'foo', listener); // Same listener, increases refCount
+const unsub2 = on(ε, 'foo', listener); // Same listener-object, increases refCount
 
-emit(ε, 'foo'); // => "foo" (called only once due to deduplication)
+emit(ε, 'foo'); // => "foo" (called only once — single underlying listener)
 
-unsub1(); // Decreases refCount
+unsub1(); // Decreases refCount to 1
 emit(ε, 'foo'); // => "foo" (still active)
 
-unsub2(); // Removes listener completely
+unsub2(); // refCount drops to 0 → listener is removed
 emit(ε, 'foo'); // (nothing happens)
+```
+
+Compare with the function form, where each `on()` creates an independent registration:
+
+```javascript
+const ε = eventize();
+const fn = () => console.log('fn');
+
+on(ε, 'foo', fn);
+on(ε, 'foo', fn); // Same function — but a SECOND, separate listener
+
+emit(ε, 'foo');
+// => "fn"
+// => "fn"  ← called twice
 ```
 
 ---
@@ -584,11 +623,11 @@ Dispatches an event synchronously, immediately invoking all subscribed listeners
 const ε = eventize();
 on(ε, 'update', (id, data) => console.log(`Item ${id}:`, data));
 
-emit(ε, 'update', 42, { status: 'complete' });
+emit(ε, 'update', 42, {status: 'complete'});
 // => "Item 42: { status: 'complete' }"
 
 // Emit multiple events at once
-emit(ε, ['update', 'log'], 100, { status: 'multi-event' });
+emit(ε, ['update', 'log'], 100, {status: 'multi-event'});
 ```
 
 ---
@@ -619,6 +658,7 @@ console.log(results); // => ["Data from source 1", "Simple data"]
 Tells an emitter to "hold onto" the last-emitted event and its data. When a new listener subscribes, it will immediately be called with the retained event data. This is similar to a `ReplaySubject(1)` in RxJS.
 
 **Key Behaviors:**
+
 - Calling `retain()` on a non-eventized object will automatically eventize it.
 - Only the **last** emitted event is retained (subsequent emissions overwrite the previous value).
 - Retained events are delivered to new subscribers immediately upon subscription.
@@ -628,7 +668,7 @@ Tells an emitter to "hold onto" the last-emitted event and its data. When a new 
 **Basic Usage:**
 
 ```javascript
-import { eventize, retain, emit, on } from '@spearwolf/eventize';
+import {eventize, retain, emit, on} from '@spearwolf/eventize';
 
 const ε = eventize();
 
@@ -656,15 +696,21 @@ const ε = eventize();
 // Retain multiple events at once
 retain(ε, ['config', 'user', 'theme']);
 
-emit(ε, 'config', { debug: true });
-emit(ε, 'user', { name: 'Alice' });
+emit(ε, 'config', {debug: true});
+emit(ε, 'user', {name: 'Alice'});
 emit(ε, 'theme', 'dark');
 
 // New subscriber receives all retained events in emission order
 on(ε, {
-  config(cfg) { console.log('Config:', cfg); },
-  user(u) { console.log('User:', u); },
-  theme(t) { console.log('Theme:', t); }
+  config(cfg) {
+    console.log('Config:', cfg);
+  },
+  user(u) {
+    console.log('User:', u);
+  },
+  theme(t) {
+    console.log('Theme:', t);
+  },
 });
 // => "Config: { debug: true }"
 // => "User: { name: 'Alice' }"
@@ -678,7 +724,7 @@ const ε = eventize();
 const AUTH_STATE = Symbol('authState');
 
 retain(ε, AUTH_STATE);
-emit(ε, AUTH_STATE, { authenticated: true, user: 'admin' });
+emit(ε, AUTH_STATE, {authenticated: true, user: 'admin'});
 
 on(ε, AUTH_STATE, (state) => {
   console.log('Auth state:', state);
@@ -694,7 +740,7 @@ Retained events work with `once()` and `onceAsync()`, triggering the listener im
 const ε = eventize();
 
 retain(ε, 'initialized');
-emit(ε, 'initialized', { ready: true });
+emit(ε, 'initialized', {ready: true});
 
 // The once listener fires immediately with the retained value
 once(ε, 'initialized', (data) => {
@@ -708,6 +754,7 @@ console.log(result); // => { ready: true }
 ```
 
 **Important Notes:**
+
 - Events emitted **before** calling `retain()` are not stored.
 - Calling `retain()` multiple times for the same event is safe (idempotent).
 - Retained events replay to **new** listeners upon subscription, including new wildcard (`*`) listeners subscribing to retained events.
@@ -719,6 +766,7 @@ console.log(result); // => { ready: true }
 Clears a retained event. The `retain` behavior remains active for future events, but the currently stored event is discarded. New listeners will not receive the cleared event, but future emissions will be retained.
 
 **Key Behaviors:**
+
 - Does NOT disable the retain behavior—only clears the currently stored value.
 - Throws an error if called on a non-eventized object.
 - Works with both string and symbol event names.
@@ -728,7 +776,7 @@ Clears a retained event. The `retain` behavior remains active for future events,
 **Basic Usage:**
 
 ```javascript
-import { eventize, retain, retainClear, emit, on } from '@spearwolf/eventize';
+import {eventize, retain, retainClear, emit, on} from '@spearwolf/eventize';
 
 const ε = eventize();
 
@@ -772,9 +820,15 @@ retainClear(ε, ['event1', 'event2']);
 
 // event1 and event2 are cleared, but event3 remains
 on(ε, {
-  event1() { console.log('event1'); },  // Not called
-  event2() { console.log('event2'); },  // Not called
-  event3() { console.log('event3'); }   // => "event3"
+  event1() {
+    console.log('event1');
+  }, // Not called
+  event2() {
+    console.log('event2');
+  }, // Not called
+  event3() {
+    console.log('event3');
+  }, // => "event3"
 });
 ```
 
@@ -804,7 +858,7 @@ retainClear(ε, 'foo'); // Now this works
 A type guard that returns `true` if an object has been processed by `eventize()`.
 
 ```javascript
-import { eventize, isEventized } from '@spearwolf/eventize';
+import {eventize, isEventized} from '@spearwolf/eventize';
 
 const obj1 = eventize();
 const obj2 = {};
@@ -815,19 +869,50 @@ console.log(isEventized(obj2)); // => false
 
 #### `getSubscriptionCount(emitter)`
 
-Returns the total number of active subscriptions on an emitter. Useful for debugging or testing.
+Returns the total number of active subscriptions on an emitter (named listeners + wildcard listeners). Useful for debugging, testing, or verifying that cleanup actually happened.
 
 ```javascript
-import { eventize, on, off, getSubscriptionCount } from '@spearwolf/eventize';
+import {eventize, on, off, getSubscriptionCount} from '@spearwolf/eventize';
 
 const ε = eventize();
 
 on(ε, 'foo', () => {});
 on(ε, 'bar', () => {});
+on(ε, '*', () => {}); // wildcard listeners are counted too
 
-console.log(getSubscriptionCount(ε)); // => 2
+console.log(getSubscriptionCount(ε)); // => 3
 
 off(ε);
 
 console.log(getSubscriptionCount(ε)); // => 0
 ```
+
+**Edge cases worth knowing:**
+
+- Calling it on a **non-eventized** object returns `0` — it does not throw, unlike `emit()` / `off()` / `retainClear()`. This makes it safe to call on any input you might receive.
+
+  ```javascript
+  getSubscriptionCount({}); // => 0
+  getSubscriptionCount([]); // => 0
+  getSubscriptionCount(new Date()); // => 0
+  ```
+
+- A **wildcard listener-object** counts as a _single_ subscription, no matter how many event-named methods it exposes. Dispatch happens at `emit()` time by looking up `listener[eventName]`.
+
+  ```javascript
+  const ε = eventize();
+  on(ε, {foo() {}, bar() {}, baz() {}});
+  getSubscriptionCount(ε); // => 1, not 3
+  ```
+
+- Subscriptions that share an underlying entry through reference counting (see _Reference Counting_ under `off()`) count as **one** subscription, not as the number of `on()` calls:
+
+  ```javascript
+  const ε = eventize();
+  const listener = {foo() {}};
+  on(ε, 'foo', listener);
+  on(ε, 'foo', listener); // refCount=2 on the same entry
+  getSubscriptionCount(ε); // => 1
+  ```
+
+- A `once()` listener counts as a normal subscription until it fires; afterwards the count drops by one.
