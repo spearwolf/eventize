@@ -78,6 +78,66 @@ describe('EventStore', () => {
     });
   });
 
+  describe('namedListeners memory cleanup', () => {
+    it('removing the last listener for an event name deletes the map entry (off via EventListener)', () => {
+      const store = new EventStore();
+      const listener = store.add(new EventListener('foo', 0, () => {}));
+      expect(store.namedListeners.has('foo')).toBe(true);
+
+      store.remove(listener, null);
+
+      expect(store.namedListeners.has('foo')).toBe(false);
+      expect(store.namedListeners.size).toBe(0);
+    });
+
+    it('removing all listeners for an event name deletes the map entry (off by name)', () => {
+      const store = new EventStore();
+      store.add(new EventListener('foo', 0, () => {}));
+      store.add(new EventListener('foo', 0, () => {}));
+      expect(store.namedListeners.has('foo')).toBe(true);
+
+      store.remove('foo', null);
+
+      expect(store.namedListeners.has('foo')).toBe(false);
+      expect(store.namedListeners.size).toBe(0);
+    });
+
+    it('removing by listener function cleans empty map entries (off by fn)', () => {
+      const store = new EventStore();
+      const fn = () => {};
+      store.add(new EventListener('foo', 0, fn));
+      store.add(new EventListener('bar', 0, () => {}));
+
+      store.remove(fn, null);
+
+      expect(store.namedListeners.has('foo')).toBe(false);
+      expect(store.namedListeners.has('bar')).toBe(true);
+      expect(store.namedListeners.size).toBe(1);
+    });
+
+    it('removing similar listeners cleans empty map entries (off by name+obj)', () => {
+      const store = new EventStore();
+      const obj = {};
+      store.add(new EventListener('foo', 0, obj));
+
+      store.remove('foo', obj, true);
+
+      expect(store.namedListeners.has('foo')).toBe(false);
+      expect(store.namedListeners.size).toBe(0);
+    });
+
+    it('does not leak with many unique event names (1000 add/remove cycles)', () => {
+      const store = new EventStore();
+      for (let i = 0; i < 1000; i++) {
+        const name = `event-${i}`;
+        const listener = store.add(new EventListener(name, 0, () => {}));
+        store.remove(listener, null);
+      }
+      expect(store.namedListeners.size).toBe(0);
+      expect(store.getSubscriptionCount()).toBe(0);
+    });
+  });
+
   describe('with named and catch-em-all listeners', () => {
     const store = new EventStore();
     [

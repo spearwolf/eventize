@@ -27,12 +27,6 @@ Niedriges Risiko, keine Breaking Changes, sollte kurzfristig erledigt werden.
 **Problem:** `UnsubscribeFunc` hat eine `listener: EventListener` / `listeners: EventListener[]` Property, aber `EventListener` ist nicht aus dem Public-Modul re-exportiert. Nutzer können den Typ nicht referenzieren — in den eigenen Specs steht deshalb `// @ts-ignore` (siehe `on.spec.ts`).
 **Fix:** `EventListener` als type-only export bereitstellen (Klasse selbst muss nicht zwingend public sein — Type-Export reicht).
 
-### 🔴 5. Memory-Leak in `EventStore.namedListeners` schließen
-**Datei:** `src/EventStore.ts`
-**Problem:** `namedListeners.get(eventName)` erzeugt für jeden eindeutigen Eventnamen einen Map-Eintrag. Wird der letzte Listener für diesen Namen entfernt (`removeAll` oder `removeItemFromArray`), bleibt das leere Array in der Map liegen. Bei dynamischen Eventnamen (z.B. UUIDs) wächst die Map unbegrenzt.
-**Fix:** Nach jedem Remove prüfen, ob die Liste leer ist — wenn ja `this.namedListeners.delete(name)`. Auch in `removeAll` (Zeile 65) berücksichtigen, wenn diese aus `namedListeners` aufgerufen wird.
-**Test:** Spec, der 1000 mal `on(ε, uniqueName, fn)` + `off(ε, fn)` ausführt und dann `(ε[NAMESPACE].store as any).namedListeners.size` als 0 erwartet.
-
 ### 🟢 6. README: `refCount`-Verhalten dokumentieren
 **Datei:** `README.md`
 **Problem:** Doppeltes `on(ε, 'foo', listener)` mit identischem Listener+Object führt zu **einem** Eintrag mit refCount=2, nicht zu zwei separaten Listenern. Verifiziert in `on_multiple_times.spec.ts`, aber im README mit keinem Wort erwähnt. Wird Nutzer überraschen.

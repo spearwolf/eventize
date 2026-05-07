@@ -176,6 +176,7 @@ export class EventStore {
       // off(Symbol('foo'))
       //
       removeAll(this.namedListeners.get(listener));
+      this.namedListeners.delete(listener);
       // ---------------------------------------------------------------
     } else if (listener instanceof EventListener) {
       // ---------------------------------------------------------------
@@ -186,9 +187,12 @@ export class EventStore {
         listener.refCount -= 1;
         if (listener.refCount < 1) {
           listener.isRemoved = true;
-          this.namedListeners.forEach((namedListeners) =>
-            removeItemFromArray(namedListeners, listener),
-          );
+          this.namedListeners.forEach((namedListeners, name) => {
+            removeItemFromArray(namedListeners, listener);
+            if (namedListeners.length === 0) {
+              this.namedListeners.delete(name);
+            }
+          });
           removeItemFromArray(this.catchEmAllListeners, listener);
         }
       }
@@ -198,22 +202,28 @@ export class EventStore {
       // off('foo', obj)
       // off(Symbol('foo'), obj)
       //
-      this.namedListeners.forEach((namedListeners) =>
+      this.namedListeners.forEach((namedListeners, name) => {
         removeSimilarListenersFromArray(
           namedListeners,
           listener,
           listenerObject,
-        ),
-      );
+        );
+        if (namedListeners.length === 0) {
+          this.namedListeners.delete(name);
+        }
+      });
       // ---------------------------------------------------------------
     } else {
       // ---------------------------------------------------------------
       // off(obj)
       //
-      this.namedListeners.forEach((namedListeners) => {
+      this.namedListeners.forEach((namedListeners, name) => {
         removeListenerFromArray(namedListeners, listener, listenerObject);
         if (typeof listener === 'object') {
           removeSimilarListenersFromArray(namedListeners, undefined, listener);
+        }
+        if (namedListeners.length === 0) {
+          this.namedListeners.delete(name);
         }
       });
       removeListenerFromArray(
