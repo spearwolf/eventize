@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## `v4.3.0` (2026-05-08)
+
 - **Behavior change:** `off()` no longer throws `"object is not eventized"` when called on a non-eventized object (or on `null`/`undefined`). It now silently does nothing in that case, so cleanup paths can call `off(maybeEmitter, …)` without first checking `isEventized()`. The other strict-mode functions (`emit`, `emitAsync`, `retainClear`, `unretain`) still throw.
 - **Behavior change:** Reverted the `emit()` recursion guard added in v4.2.0. Re-emitting the same `(emitter, eventName)` from inside a listener (directly or via a forwarding chain `A → B → A`) no longer throws `"emit() recursion detected …"` — the guard turned out to forbid legitimate re-emission patterns. Forwarding cycles will recurse until the stack overflows; callers are responsible for breaking cycles. The internal per-emitter re-entrancy `WeakMap` was removed.
 - **Docs:** README _Auto-eventize vs. strict mode_ table and `off()` note updated to reflect the permissive behavior; forwarding caveat and `emit()` note now warn that cycles are caller-managed; `skills/using-eventize/SKILL.md` quirks #1 and #5 likewise updated.
@@ -30,7 +32,6 @@
 - **Refactor:** Split `EventStore.remove` into four single-purpose private methods (`removeByEventName`, `removeByEventListener`, `removeByEventNameAndListenerObject`, `removeByListener`). Pure internal cleanup.
 - **Refactor:** Moved test helper `expect2ImplEventizeApi` to `src/__test-utils__/`. Test-only file, not bundled.
 - **Docs:** README — new _Auto-eventize vs. strict mode_ section explaining why `on`/`once`/`onceAsync`/`retain` auto-eventize plain objects while `emit`/`emitAsync`/`off`/`retainClear` throw on them.
-
 
 ## `v4.0.3` (2026-05-07)
 
