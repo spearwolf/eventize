@@ -4,7 +4,7 @@ import {
   LISTENER_IS_NAMED_FUNC,
   LISTENER_IS_OBJ,
 } from './constants';
-import type {EventName, ListenerObjectType} from './types';
+import type {EventName} from './types';
 import {isCatchEmAll, isEventName} from './utils';
 
 type HasPriorityOrIdType = {priority: number; id: number};
@@ -49,7 +49,7 @@ const isSimilarListenerType = (listenerType: number) =>
 const removeListenerFromArray = (
   listeners: Array<EventListener>,
   listener: unknown,
-  listenerObject: ListenerObjectType,
+  listenerObject: unknown,
 ) => {
   const idx = listeners.findIndex((item) =>
     item.isEqual(listener, listenerObject),
@@ -63,7 +63,7 @@ const removeListenerFromArray = (
 const removeSimilarListenersFromArray = (
   fromArray: Array<EventListener>,
   eventName: unknown,
-  listenerObject: ListenerObjectType,
+  listenerObject: unknown,
 ) => {
   const similarListeners: EventListener[] = [];
   for (const listener of fromArray) {
@@ -166,7 +166,7 @@ export class EventStore {
 
   remove(
     listener: unknown,
-    listenerObject: ListenerObjectType,
+    listenerObject: unknown,
     removeSimilar = false,
   ): void {
     // off([...])
@@ -230,7 +230,7 @@ export class EventStore {
 
   private removeByEventNameAndListenerObject(
     eventName: EventName,
-    listenerObject: ListenerObjectType,
+    listenerObject: unknown,
   ): void {
     this.namedListeners.forEach((namedListeners, name) => {
       removeSimilarListenersFromArray(
@@ -244,10 +244,7 @@ export class EventStore {
     });
   }
 
-  private removeByListener(
-    listener: unknown,
-    listenerObject: ListenerObjectType,
-  ): void {
+  private removeByListener(listener: unknown, listenerObject: unknown): void {
     const isObjectListener = typeof listener === 'object';
     this.namedListeners.forEach((namedListeners, name) => {
       removeListenerFromArray(namedListeners, listener, listenerObject);

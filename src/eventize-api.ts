@@ -16,7 +16,6 @@ import type {
   ListenerFor,
   ListenerFuncType,
   ListenerObjectType,
-  ListenerType,
   NonTypedEmitter,
   OnEventNames,
   SubscribeArgs,
@@ -364,22 +363,15 @@ export function onceAsync<ReturnType = void>(
 }
 
 // ---------------------------------------------------------------------------
-// off() — typed overload (event name from the map) + loose fallback.
+// off() — fully permissive: accepts any object and any listener / listener
+// object shape, mirroring the runtime which silently no-ops on anything it
+// doesn't recognize. Typed event maps deliberately do NOT narrow the args
+// here — cleanup paths often hand off arbitrary values.
 // ---------------------------------------------------------------------------
-export function off<TEvents extends EventMap>(
-  obj: EventizedObject<TEvents>,
-  eventName: EventKeysOf<TEvents> | Array<EventKeysOf<TEvents>>,
-): void;
-export function off<T extends object>(
-  obj: NonTypedEmitter<T>,
-  listener?: ListenerType,
-  listenerObject?: ListenerObjectType,
-): void;
-// implementation
 export function off(
-  eventizedObj: object,
-  listener?: ListenerType,
-  listenerObject?: ListenerObjectType,
+  eventizedObj: unknown,
+  listener?: unknown,
+  listenerObject?: unknown,
 ): void {
   if (!isEventized(eventizedObj)) {
     return;

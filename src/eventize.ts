@@ -32,9 +32,9 @@ import type {
 const on = _on as (obj: object, ...args: SubscribeArgs) => UnsubscribeFunc;
 const once = _once as (obj: object, ...args: SubscribeArgs) => UnsubscribeFunc;
 const offLoose = off as (
-  obj: object,
+  obj: unknown,
   listener?: unknown,
-  listenerObject?: object,
+  listenerObject?: unknown,
 ) => void;
 const emitLoose = emit as (
   obj: object,
@@ -86,7 +86,7 @@ export const eventize: EventizerFuncAPI = (() => {
         eventNames: AnyEventNames,
       ): Promise<ReturnType> => onceAsyncLoose<ReturnType>(obj, eventNames),
 
-      off: (listener?: unknown, listenerObject?: object): void =>
+      off: (listener?: unknown, listenerObject?: unknown): void =>
         offLoose(obj, listener, listenerObject),
 
       emit: (eventNames: AnyEventNames, ...args: EventArgs): void =>
@@ -134,7 +134,7 @@ export class Eventize<TEvents extends EventMap = DefaultEventMap> {
     return onceAsyncLoose<ReturnType>(this, eventNames);
   }
 
-  off(listener?: unknown, listenerObject?: object): void {
+  off(listener?: unknown, listenerObject?: unknown): void {
     offLoose(this, listener, listenerObject);
   }
 

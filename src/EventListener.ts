@@ -79,10 +79,7 @@ export class EventListener {
   }
 
   /** In the test for equality, the priority is not considered */
-  isEqual(
-    listener: unknown,
-    listenerObject: ListenerObjectType = null,
-  ): boolean {
+  isEqual(listener: unknown, listenerObject: unknown = null): boolean {
     if (listener === this) return true;
     const typeofListener = typeof listener;
     if (typeofListener === 'number' && listener === this.id) return true;

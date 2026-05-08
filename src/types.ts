@@ -237,7 +237,7 @@ export interface EventizeApi<TEvents extends EventMap = DefaultEventMap>
   ): Promise<TEvents[K] extends [infer A, ...any[]] ? A : void>;
   onceAsync<ReturnType = void>(eventNames: AnyEventNames): Promise<ReturnType>;
 
-  off(listener?: ListenerType, listenerObject?: ListenerObjectType): void;
+  off(listener?: unknown, listenerObject?: unknown): void;
 
   // typed emit — strict event name and argument tuple; symbol always allowed
   emit<K extends EventKeysOf<TEvents> | symbol>(
@@ -273,7 +273,7 @@ export interface EventizerFunc {
 }
 
 export interface EventizeGuard {
-  <T extends object>(obj: T): obj is T & EventizedObject;
+  (obj: unknown): obj is EventizedObject;
 }
 
 export interface EventizePriority {
