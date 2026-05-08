@@ -41,25 +41,60 @@ const makeUnsubscribe = (
   ) as UnsubscribeFunc;
 };
 
+// Per-(emitter, eventName) re-entrancy lock. A listener that forwards an
+// event back to an emitter already higher up the dispatch stack — directly
+// or via a chain of eventized objects — would otherwise recurse without
+// bound. We track which (emitter, eventName) pairs are currently dispatching
+// and throw on the second entry. Different events on the same emitter, or
+// the same event on different emitters, do not collide.
+const activeEmits = new WeakMap<EventizedObject, Set<EventName>>();
+
+const _emitOne = (
+  eventizedObj: EventizedObject,
+  eventName: EventName,
+  args: EventArgs,
+  returnValue?: (val: unknown) => void,
+) => {
+  if (eventName === EVENT_CATCH_EM_ALL) {
+    throw new Error(
+      "emit() must be called with a concrete event name — '*' is reserved for subscribing to all events and cannot be emitted",
+    );
+  }
+  let active = activeEmits.get(eventizedObj);
+  if (active?.has(eventName)) {
+    throw new Error(
+      `emit() recursion detected for event '${String(eventName)}' — likely a forwarding cycle between eventized objects`,
+    );
+  }
+  if (!active) {
+    active = new Set();
+    activeEmits.set(eventizedObj, active);
+  }
+  active.add(eventName);
+  try {
+    const {store, keeper} = eventizedObj[NAMESPACE];
+    store.forEach(eventName, (listener) =>
+      listener.apply(eventName, args, returnValue),
+    );
+    keeper.retain(eventName, args);
+  } finally {
+    active.delete(eventName);
+    if (active.size === 0) activeEmits.delete(eventizedObj);
+  }
+};
+
 const _emit = (
   eventizedObj: EventizedObject,
   eventNames: AnyEventNames,
   args: EventArgs,
   returnValue?: (val: unknown) => void,
 ) => {
-  const {store, keeper} = eventizedObj[NAMESPACE];
   if (Array.isArray(eventNames)) {
-    eventNames.forEach((event: EventName) => {
-      store.forEach(event, (listener) =>
-        listener.apply(event, args, returnValue),
-      );
-      keeper.retain(event, args);
-    });
-  } else if (eventNames !== EVENT_CATCH_EM_ALL) {
-    store.forEach(eventNames, (listener) => {
-      listener.apply(eventNames, args, returnValue);
-    });
-    keeper.retain(eventNames, args);
+    eventNames.forEach((event: EventName) =>
+      _emitOne(eventizedObj, event, args, returnValue),
+    );
+  } else {
+    _emitOne(eventizedObj, eventNames, args, returnValue);
   }
 };
 

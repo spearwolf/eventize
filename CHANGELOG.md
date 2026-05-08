@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## Unreleased
+
+- **Behavior change:** `emit(ε, '*', …)` and `emit(ε, ['*'], …)` now **throw** `"emit() must be called with a concrete event name …"`. Previously the scalar form was a silent no-op and the array form quietly dispatched to catch-all listeners — an asymmetry that masked typos. The `'*'` symbol is reserved for subscribing to all events. In a multi-event array (`emit(ε, ['foo', '*'], …)`), events listed before `'*'` still dispatch before the throw, consistent with mid-dispatch error semantics.
+- **Behavior change:** `emit()` now throws `"emit() recursion detected for event '<name>' — likely a forwarding cycle between eventized objects"` when the same `(emitter, eventName)` pair is re-entered during dispatch. This catches forwarding loops between eventized objects (`A → B → A`) and direct same-event self-recursion that would previously cause unbounded growth of the JS call stack. Re-emitting a _different_ event from inside a listener, or emitting the same event serially after a previous dispatch finishes, are unaffected.
+- **Docs:** README — new _Forwarding events between emitters_ subsection documenting the long-supported but previously undocumented pattern of subscribing one eventized object as a catch-all listener of another (works for `eventize.inject()` / `class extends Eventize`, silently does nothing for plain `eventize(obj)`), with a callout for the loop-detection behavior.
+- **Docs:** README — clarified that the listener-object `.emit()` fallback also fires for **named** subscriptions (`on(ε, 'foo', {emit(name, ...a) {…}})`), not only for catch-all/wildcard ones; named methods on the listener still win over `.emit()` when both are present.
+- **Docs:** README — `emit()` section calls out the wildcard-throw and recursion-detection behaviors.
+- **Tests:** New `src/wildcard-emit.spec.ts` adds end-to-end coverage (15 specs) for: `emit('*')` / `emit(['*'])` / `emit(['foo', '*'])` throwing, the `.emit()` fallback for both catch-all and named subscriptions through the public API, eventized-to-eventized forwarding for `inject` / `class extends Eventize` / plain `eventize`, and loop detection (`A→B→A`, direct self-recursion, lock release after a thrown listener).
+
 ## `v4.1.0` (2026-05-08)
 
 - **API:** New `unretain(emitter, eventName | eventName[])` — inverse of `retain()`: drops the stored value **and** removes the retain policy, so future emits are not retained again. Available in all three API shapes. Throws `"object is not eventized"` on plain objects (strict-mode convention).

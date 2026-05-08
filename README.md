@@ -320,6 +320,33 @@ emit(ε, 'bar', 'A'); // => event fired with args: ['A']
 > emit(ε, 'bar', 'A'); // => Event 'bar' fired with: ['A']
 > ```
 
+> [!NOTE]
+> The `.emit()` fallback also applies to **named** subscriptions. `on(ε, 'foo', listenerObj)` will call `listenerObj.emit('foo', ...args)` when `listenerObj.foo` is not a function. A matching named method always wins over `.emit()` if both are present.
+
+##### Forwarding events between emitters
+
+Because the `.emit()` fallback matches the signature of the `emit` method that `eventize.inject()` (and `class extends Eventize`) install, you can subscribe one eventized object directly as a catch-all listener of another to **forward all events**:
+
+```javascript
+import {eventize, emit, on} from '@spearwolf/eventize';
+
+const upstream = eventize.inject();
+const downstream = eventize.inject();
+
+on(downstream, 'data', (x) => console.log('downstream got', x));
+
+// Forward every event from upstream to downstream:
+on(upstream, downstream);
+
+emit(upstream, 'data', 42); // => downstream got 42
+```
+
+Caveats:
+
+- The target must have an `.emit(eventName, ...args)` method. `eventize.inject(obj)` and `class extends Eventize` install one; **plain `eventize(obj)` does not** — forwarding to such a target silently does nothing.
+- A target method whose name matches the event takes precedence over `.emit()` (see the note above).
+- Forwarding cycles (`A → B → A`) are detected at runtime: eventize keeps a per-`(emitter, eventName)` re-entrancy lock during dispatch and throws `"emit() recursion detected …"` if the same pair is re-entered. Re-emitting a _different_ event from a listener stays allowed.
+
 ##### Priorities
 
 Control the execution order of listeners. Listeners with higher priority numbers run first. The default priority is `0`.
@@ -684,6 +711,11 @@ emit(ε, 'update', 42, {status: 'complete'});
 // Emit multiple events at once
 emit(ε, ['update', 'log'], 100, {status: 'multi-event'});
 ```
+
+> [!IMPORTANT]
+> `'*'` is reserved for **subscribing** to all events and cannot be emitted. Calling `emit(ε, '*', …)` or `emit(ε, ['*'], …)` throws — emit a concrete event name instead. (In an array form, events listed before the `'*'` element still dispatch before the throw, consistent with mid-dispatch error semantics.)
+>
+> Calling `emit()` from inside a listener is fine — but re-emitting the **same** event on the **same** emitter that is already mid-dispatch (directly or via a forwarding chain) throws `"emit() recursion detected …"`. Different events on the same emitter are unaffected.
 
 ---
 
