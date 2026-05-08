@@ -33,11 +33,6 @@ Kann breaking-frei eingeführt werden. Verbessert Konsistenz und DX deutlich.
 **Abhängig von:** Aufgabe 2
 **Fix:** In allen Beispielen, die `'*'` zeigen, optional auf `EVENT_CATCH_EM_ALL` verweisen.
 
-### 🔵 21. `expect2ImplEventizeApi` nach `__test-utils__/` verschieben
-**Datei:** `src/expect2ImplEventizeApi.ts`
-**Problem:** Test-Helper liegt im Production-Source-Verzeichnis. Wird nicht exportiert (gut), aber wirkt wie API.
-**Fix:** Verschieben nach `src/__test-utils__/expect2ImplEventizeApi.ts` oder direkt in die zwei nutzenden Specs inlinen (es ist nur 28 Zeilen).
-
 ### 🔵 22. Globale Counter überdenken
 **Dateien:** `src/EventListener.ts:48`, `src/EventKeeper.ts:14`
 **Problem:** Modul-globaler `lastId` und `nextOrderId`. In der Praxis OK (Number-Overflow erst nach >9 Billionen Events), aber unhygienisch.

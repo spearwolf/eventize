@@ -1,4 +1,4 @@
-import {expect2ImplEventizeApi} from './expect2ImplEventizeApi';
+import {expect2ImplEventizeApi} from './__test-utils__/expect2ImplEventizeApi';
 
 import {emit, eventize, Eventize, on} from './index';
 

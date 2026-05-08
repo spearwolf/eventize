@@ -1,5 +1,5 @@
 import {NAMESPACE} from './constants';
-import {expect2ImplEventizeApi} from './expect2ImplEventizeApi';
+import {expect2ImplEventizeApi} from './__test-utils__/expect2ImplEventizeApi';
 
 import {eventize, Eventize} from './index';
 
