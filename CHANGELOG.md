@@ -1,5 +1,9 @@
 # CHANGELOG
 
+## `v4.2.1` (2026-05-08)
+
+- **Chore**: Skip AGENTS.md, CLAUDE.md and eslint.config.mjs from npm package (these are docs and tooling files, not source code or types)
+
 ## `v4.2.0` (2026-05-08)
 
 - **Behavior change:** `emit(ε, '*', …)` (scalar and array form) now throws — `'*'` is subscribe-only. Events before `'*'` in a multi-event array still dispatch before the throw.

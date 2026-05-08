@@ -21,3 +21,6 @@ build
 dist
 src
 docs-assets
+AGENTS.md
+CLAUDE.md
+eslint.config.mjs

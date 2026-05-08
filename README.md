@@ -17,7 +17,7 @@ Written entirely in TypeScript and targeting modern `ES2022`, it offers a robust
 - 🚀 **Developer-Focused API**: Clean, modern, and functional.
 - ✨ **Wildcards & Priorities**: Subscribe to all events and control listener execution order.
 - 🔷 **Full TypeScript Support**: Optional generic event maps narrow `emit`, `on`, retained-event names and listener arguments — without losing first-class duck-typing for code that doesn't opt in.
-- 📦 **Zero Runtime Dependencies**: Lightweight with a minimal footprint (~6 kB gzipped runtime, ~65 kB npm package).
+- 📦 **Zero Runtime Dependencies**: Lightweight with a minimal footprint (~6 kB gzipped).
 - ESM & CommonJS Support.
 - Apache 2.0 Licensed.
 
