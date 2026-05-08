@@ -48,11 +48,6 @@ export const Priority = {
 ```
 In v5: alte Namen deprecated markieren. In v6: entfernen.
 
-### 🔵 25. `EventKeeper.emit` umbenennen
-**Datei:** `src/EventKeeper.ts`
-**Problem:** Methodenname `emit` ist irreführend — die Methode "replayed" retained events an einen neuen Listener, sie emittet nichts neues.
-**Fix:** Umbenennen in `replayTo(listener)` o.ä. Intern, nicht breaking für Public-API-Nutzer (Klasse ist nicht exportiert).
-
 ### 🟢 27. Listener-Exception-Handling überdenken
 **Abhängig von:** Aufgabe 7, 8
 **Problem:** Ein wirfender Listener bricht heute alle nachfolgenden Listener im selben Emit. Alternative: alle Listener trotzdem ausführen, Errors sammeln, am Ende werfen (`AggregateError`) oder per optionalem Hook (`onListenerError`).

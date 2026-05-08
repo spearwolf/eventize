@@ -18,7 +18,7 @@ const registerEventListener = (
   const el = store.add(
     new EventListener(eventName, priority, listener, listenerObject),
   );
-  keeper.emit(eventName, el, retainedEvents); // TODO what if similarListener ?
+  keeper.replayTo(eventName, el, retainedEvents); // TODO what if similarListener ?
   return el;
 };
 

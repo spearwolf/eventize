@@ -73,12 +73,12 @@ describe('EventKeeper', () => {
     keeper.retain('foo', [1, 2, 3]);
 
     const emitter = {apply: jest.fn()};
-    EventKeeper.publish(keeper.emit('foo', emitter));
+    EventKeeper.publish(keeper.replayTo('foo', emitter));
 
     expect(emitter.apply).not.toHaveBeenCalled();
   });
 
-  it('emit (a known and retained event) should emit the event with retained arguments', () => {
+  it('replayTo (a known and retained event) should replay the event with retained arguments', () => {
     const keeper = new EventKeeper();
     keeper.add('foo');
     expect(keeper.isKnown('foo')).toBe(true);
@@ -86,7 +86,7 @@ describe('EventKeeper', () => {
     keeper.retain('foo', [1, 2, 3]);
 
     const emitter = {apply: jest.fn()};
-    EventKeeper.publish(keeper.emit('foo', emitter));
+    EventKeeper.publish(keeper.replayTo('foo', emitter));
 
     expect(emitter.apply.mock.calls[0]).toEqual(['foo', [1, 2, 3]]);
   });
@@ -150,13 +150,13 @@ describe('EventKeeper', () => {
     keeper.retain('foo', ['third']);
 
     const emitter = {apply: jest.fn()};
-    EventKeeper.publish(keeper.emit('foo', emitter));
+    EventKeeper.publish(keeper.replayTo('foo', emitter));
 
     expect(emitter.apply).toHaveBeenCalledTimes(1);
     expect(emitter.apply.mock.calls[0]).toEqual(['foo', ['third']]);
   });
 
-  it('emit with wildcard (*) publishes all retained events', () => {
+  it('replayTo with wildcard (*) publishes all retained events', () => {
     const keeper = new EventKeeper();
     keeper.add(['foo', 'bar', 'baz']);
 
@@ -165,7 +165,7 @@ describe('EventKeeper', () => {
     keeper.retain('baz', ['bazData']);
 
     const emitter = {apply: jest.fn()};
-    EventKeeper.publish(keeper.emit('*', emitter));
+    EventKeeper.publish(keeper.replayTo('*', emitter));
 
     expect(emitter.apply).toHaveBeenCalledTimes(3);
     const calls = emitter.apply.mock.calls.map((c) => c[0]);
@@ -174,23 +174,23 @@ describe('EventKeeper', () => {
     expect(calls).toContain('baz');
   });
 
-  it('emit returns empty array for unknown event', () => {
+  it('replayTo returns empty array for unknown event', () => {
     const keeper = new EventKeeper();
     const emitter = {apply: jest.fn()};
 
-    const result = keeper.emit('unknown', emitter);
+    const result = keeper.replayTo('unknown', emitter);
 
     expect(result).toEqual([]);
     expect(emitter.apply).not.toHaveBeenCalled();
   });
 
-  it('emit returns empty array for known but not retained event', () => {
+  it('replayTo returns empty array for known but not retained event', () => {
     const keeper = new EventKeeper();
     keeper.add('foo');
     // Not calling retain
 
     const emitter = {apply: jest.fn()};
-    const result = keeper.emit('foo', emitter);
+    const result = keeper.replayTo('foo', emitter);
 
     expect(result).toEqual([]);
     expect(emitter.apply).not.toHaveBeenCalled();
@@ -212,20 +212,20 @@ describe('EventKeeper', () => {
       }),
     };
 
-    EventKeeper.publish(keeper.emit('*', emitter));
+    EventKeeper.publish(keeper.replayTo('*', emitter));
 
     expect(order).toEqual(['first', 'second', 'third']);
   });
 
-  it('emit accumulates to provided sortedEvents array', () => {
+  it('replayTo accumulates to provided sortedEvents array', () => {
     const keeper = new EventKeeper();
     keeper.add('foo');
     keeper.retain('foo', ['data']);
 
-    const existingEvents = [{order: 0, emit: jest.fn()}];
+    const existingEvents = [{order: 0, replay: jest.fn()}];
     const emitter = {apply: jest.fn()};
 
-    const result = keeper.emit('foo', emitter, existingEvents);
+    const result = keeper.replayTo('foo', emitter, existingEvents);
 
     expect(result.length).toBe(2);
     expect(result[0]).toBe(existingEvents[0]);
@@ -237,7 +237,7 @@ describe('EventKeeper', () => {
     keeper.retain('foo', []);
 
     const emitter = {apply: jest.fn()};
-    EventKeeper.publish(keeper.emit('foo', emitter));
+    EventKeeper.publish(keeper.replayTo('foo', emitter));
 
     expect(emitter.apply).toHaveBeenCalledWith('foo', []);
   });

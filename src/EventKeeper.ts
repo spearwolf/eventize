@@ -8,14 +8,14 @@ type KeeperEventItem = {
 
 export type KeeperEvent = {
   order: number;
-  emit: () => void;
+  replay: () => void;
 };
 
 let nextOrderId = 0;
 
 export class EventKeeper {
   static publish(events: KeeperEvent[]): void {
-    events.sort((a, b) => a.order - b.order).forEach((event) => event.emit());
+    events.sort((a, b) => a.order - b.order).forEach((event) => event.replay());
   }
 
   events = new Map<EventName, KeeperEventItem>();
@@ -56,7 +56,7 @@ export class EventKeeper {
     return this.eventNames.has(eventName);
   }
 
-  emit(
+  replayTo(
     eventName: EventName,
     eventListener: {apply: (eventName: EventName, args?: EventArgs) => void},
     sortedEvents: KeeperEvent[] = [],
@@ -66,12 +66,12 @@ export class EventKeeper {
         const {order, args} = this.events.get(eventName);
         sortedEvents.push({
           order,
-          emit: () => eventListener.apply(eventName, args),
+          replay: () => eventListener.apply(eventName, args),
         });
       }
     } else {
       this.eventNames.forEach((name) =>
-        this.emit(name, eventListener, sortedEvents),
+        this.replayTo(name, eventListener, sortedEvents),
       );
     }
     return sortedEvents;
