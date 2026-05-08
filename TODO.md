@@ -25,17 +25,6 @@ Kann breaking-frei eingeführt werden. Verbessert Konsistenz und DX deutlich.
 - (B) Strikt: `on/once/retain` werfen ebenfalls. Sauberer, aber Breaking Change → besser in v5.
 **Fix für v4.1:** Variante A. README anpassen, Edge-Case-Specs erweitern.
 
-### 🔵 16. `EventStore.remove` refactoren
-**Datei:** `src/EventStore.ts:151-247`
-**Problem:** Die Funktion ist mit `// TODO clean up this messy function!` markiert. 7 verschachtelte Branches, überlappende Bedingungen, schwer zu lesen.
-**Fix:** Aufsplitten in:
-- `removeByEventName(name)` (für `off(ε, 'foo')`)
-- `removeByListenerObject(obj)` (für `off(ε, obj)`)
-- `removeByListenerFunc(fn, obj?)` (für `off(ε, fn[, obj])`)
-- `removeByEventListener(el)` (für unsubscribe-Funktion)
-- `removeAll()` (für `off(ε)` und `off(ε, '*')`)
-und einen schlanken Dispatcher davor. Vorhandene Specs müssen weiterhin grün bleiben.
-
 ### ⚡ 18. Sortierte Insertion statt `arr.sort()` bei `add`
 **Datei:** `src/EventStore.ts`
 **Problem:** Jeder `on()` ruft `arr.sort(sortByPriorityAndId)` → O(n log n). Bei vielen Listenern unnötig.

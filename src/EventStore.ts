@@ -153,92 +153,102 @@ export class EventStore {
     listenerObject: ListenerObjectType,
     removeSimilar = false,
   ): void {
-    // TODO clean up this messy function!
+    // off([...])
     if (listenerObject == null && Array.isArray(listener)) {
-      // ---------------------------------------------------------------
-      // off([...])
-      //
       listener.forEach((li) => this.remove(li, null, removeSimilar));
-      // ---------------------------------------------------------------
-    } else if (
+      return;
+    }
+
+    // off() / off('*')
+    if (
       listener == null ||
       (listenerObject == null && isCatchEmAll(listener))
     ) {
-      // ---------------------------------------------------------------
-      // off()
-      // off('*')
-      //
       this.removeAllListeners();
-      // ---------------------------------------------------------------
-    } else if (listenerObject == null && isEventName(listener)) {
-      // ---------------------------------------------------------------
-      // off('foo')
-      // off(Symbol('foo'))
-      //
-      removeAll(this.namedListeners.get(listener));
-      this.namedListeners.delete(listener);
-      // ---------------------------------------------------------------
-    } else if (listener instanceof EventListener) {
-      // ---------------------------------------------------------------
-      // off(EventListener)
-      // on(...)()
-      //
-      if (!listener.isRemoved) {
-        listener.refCount -= 1;
-        if (listener.refCount < 1) {
-          listener.isRemoved = true;
-          this.namedListeners.forEach((namedListeners, name) => {
-            removeItemFromArray(namedListeners, listener);
-            if (namedListeners.length === 0) {
-              this.namedListeners.delete(name);
-            }
-          });
-          removeItemFromArray(this.catchEmAllListeners, listener);
-        }
-      }
-      // ---------------------------------------------------------------
-    } else if (removeSimilar) {
-      // ---------------------------------------------------------------
-      // off('foo', obj)
-      // off(Symbol('foo'), obj)
-      //
-      this.namedListeners.forEach((namedListeners, name) => {
-        removeSimilarListenersFromArray(
-          namedListeners,
-          listener,
-          listenerObject,
-        );
-        if (namedListeners.length === 0) {
-          this.namedListeners.delete(name);
-        }
-      });
-      // ---------------------------------------------------------------
-    } else {
-      // ---------------------------------------------------------------
-      // off(obj)
-      //
-      this.namedListeners.forEach((namedListeners, name) => {
-        removeListenerFromArray(namedListeners, listener, listenerObject);
-        if (typeof listener === 'object') {
-          removeSimilarListenersFromArray(namedListeners, undefined, listener);
-        }
-        if (namedListeners.length === 0) {
-          this.namedListeners.delete(name);
-        }
-      });
-      removeListenerFromArray(
-        this.catchEmAllListeners,
-        listener,
+      return;
+    }
+
+    // off('foo') / off(Symbol('foo'))
+    if (listenerObject == null && isEventName(listener)) {
+      this.removeByEventName(listener);
+      return;
+    }
+
+    // off(EventListener) — used by the unsubscribe function returned from on()
+    if (listener instanceof EventListener) {
+      this.removeByEventListener(listener);
+      return;
+    }
+
+    // off('foo', obj) / off(Symbol('foo'), obj)
+    if (removeSimilar) {
+      this.removeByEventNameAndListenerObject(
+        listener as EventName,
         listenerObject,
       );
-      if (typeof listener === 'object') {
-        removeSimilarListenersFromArray(
-          this.catchEmAllListeners,
-          undefined,
-          listener,
-        );
+      return;
+    }
+
+    // off(fn[, obj]) / off(obj)
+    this.removeByListener(listener, listenerObject);
+  }
+
+  private removeByEventName(eventName: EventName): void {
+    removeAll(this.namedListeners.get(eventName));
+    this.namedListeners.delete(eventName);
+  }
+
+  private removeByEventListener(listener: EventListener): void {
+    if (listener.isRemoved) return;
+    listener.refCount -= 1;
+    if (listener.refCount >= 1) return;
+    listener.isRemoved = true;
+    this.namedListeners.forEach((namedListeners, name) => {
+      removeItemFromArray(namedListeners, listener);
+      if (namedListeners.length === 0) {
+        this.namedListeners.delete(name);
       }
-      // ---------------------------------------------------------------
+    });
+    removeItemFromArray(this.catchEmAllListeners, listener);
+  }
+
+  private removeByEventNameAndListenerObject(
+    eventName: EventName,
+    listenerObject: ListenerObjectType,
+  ): void {
+    this.namedListeners.forEach((namedListeners, name) => {
+      removeSimilarListenersFromArray(
+        namedListeners,
+        eventName,
+        listenerObject,
+      );
+      if (namedListeners.length === 0) {
+        this.namedListeners.delete(name);
+      }
+    });
+  }
+
+  private removeByListener(
+    listener: unknown,
+    listenerObject: ListenerObjectType,
+  ): void {
+    const isObjectListener = typeof listener === 'object';
+    this.namedListeners.forEach((namedListeners, name) => {
+      removeListenerFromArray(namedListeners, listener, listenerObject);
+      if (isObjectListener) {
+        removeSimilarListenersFromArray(namedListeners, undefined, listener);
+      }
+      if (namedListeners.length === 0) {
+        this.namedListeners.delete(name);
+      }
+    });
+    removeListenerFromArray(this.catchEmAllListeners, listener, listenerObject);
+    if (isObjectListener) {
+      removeSimilarListenersFromArray(
+        this.catchEmAllListeners,
+        undefined,
+        listener,
+      );
     }
   }
 

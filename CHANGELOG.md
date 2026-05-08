@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Refactor:** `EventStore.remove` is now a slim dispatcher that delegates to four single-purpose private methods — `removeByEventName`, `removeByEventListener`, `removeByEventNameAndListenerObject`, and `removeByListener` — replacing the previous tagged `if`/`else if` chain that was annotated with a `// TODO clean up this messy function!` marker. The dispatcher's argument-shape decisions (off, off('*'), off(name), off(EventListener), off(name, obj), off(fn[, obj])/off(obj)) are unchanged, and the existing 314-test suite passes unmodified. Pure internal refactor — no API or behavior change.
 - **Types:** `on()` and `once()` now expose IDE-friendly function overloads instead of a single rest parameter typed as a 14-member tuple union. Hovering or autocompleting either function shows each supported call shape on its own line (event-name + listener function, listener method name on a listener object, listener-object alone, catch-all wildcard variants — each with and without explicit priority), ordered specific → generic. The new overload set covers the standalone exports `on`/`once`, the `eventize.inject(obj)` methods, and the `Eventize` class methods. Internally a new `SubscribeFunc` callable interface in `types.ts` carries the canonical method-form overloads, used by `EventizeApi`. The implementation type alias `SubscribeArgs` is unchanged and still drives the runtime dispatch in `subscribeTo()`. No runtime-behavior change; existing valid calls keep typechecking, and the on()/once() spec suite (all 314 tests) passes unmodified.
 
 
