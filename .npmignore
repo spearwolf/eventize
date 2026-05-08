@@ -1,4 +1,5 @@
 .vscode
+.obsidian
 rollup
 .editorconfig
 .eslintignore
@@ -19,4 +20,4 @@ tsup.config.js
 build
 dist
 src
-docs-assets/yuml.me.txt
+docs-assets

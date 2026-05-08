@@ -17,7 +17,7 @@ Written entirely in TypeScript and targeting modern `ES2022`, it offers a robust
 - 🚀 **Developer-Focused API**: Clean, modern, and functional.
 - ✨ **Wildcards & Priorities**: Subscribe to all events and control listener execution order.
 - 🔷 **Full TypeScript Support**: Optional generic event maps narrow `emit`, `on`, retained-event names and listener arguments — without losing first-class duck-typing for code that doesn't opt in.
-- 📦 **Zero Runtime Dependencies**: Lightweight with a minimal footprint (&lt;5k gzipped).
+- 📦 **Zero Runtime Dependencies**: Lightweight with a minimal footprint (~6 kB gzipped runtime, ~65 kB npm package).
 - ESM & CommonJS Support.
 - Apache 2.0 Licensed.
 
@@ -34,11 +34,23 @@ The library is distributed in both ES Module (`import`) and CommonJS (`require`)
 > [!NOTE]
 > Since version 3.0.0 there is also a [CHANGELOG](./CHANGELOG.md)
 
+### 🤖 For AI coding agents
+
+This repo ships a quick-reference skill for AI coding assistants (Claude Code & co.) at [`skills/using-eventize/SKILL.md`](./skills/using-eventize/SKILL.md). It summarises the API, the auto-eventize vs. strict split, wildcard/forwarding rules, retain semantics, and the common pitfalls — designed to be loaded on demand when an agent sees `@spearwolf/eventize` in code.
+
+To use it, copy or symlink the folder into your agent's skills directory, e.g. for Claude Code:
+
+```sh
+ln -s "$(pwd)/skills/using-eventize" ~/.claude/skills/using-eventize
+```
+
+Skills are auto-discovered — no extra registration step.
+
 ## 📖 Getting Started
 
 The core idea is simple: an object, called an **emitter**, can be "eventized" to emit named events. Other parts of your application, called **listeners**, can subscribe to these events and will be executed immediately when the event is emitted.
 
-![Emitter emits named event to listeners](./docs-assets/emitter-emits-named-events-listeners.svg)
+![Emitter emits named event to listeners](https://raw.githubusercontent.com/spearwolf/eventize/main/docs-assets/emitter-emits-named-events-listeners.svg)
 
 Here is a basic example:
 

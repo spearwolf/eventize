@@ -1,13 +1,12 @@
 # CHANGELOG
 
-## Unreleased
+## `v4.2.0` (2026-05-08)
 
-- **Behavior change:** `emit(ε, '*', …)` and `emit(ε, ['*'], …)` now **throw** `"emit() must be called with a concrete event name …"`. Previously the scalar form was a silent no-op and the array form quietly dispatched to catch-all listeners — an asymmetry that masked typos. The `'*'` symbol is reserved for subscribing to all events. In a multi-event array (`emit(ε, ['foo', '*'], …)`), events listed before `'*'` still dispatch before the throw, consistent with mid-dispatch error semantics.
-- **Behavior change:** `emit()` now throws `"emit() recursion detected for event '<name>' — likely a forwarding cycle between eventized objects"` when the same `(emitter, eventName)` pair is re-entered during dispatch. This catches forwarding loops between eventized objects (`A → B → A`) and direct same-event self-recursion that would previously cause unbounded growth of the JS call stack. Re-emitting a _different_ event from inside a listener, or emitting the same event serially after a previous dispatch finishes, are unaffected.
-- **Docs:** README — new _Forwarding events between emitters_ subsection documenting the long-supported but previously undocumented pattern of subscribing one eventized object as a catch-all listener of another (works for `eventize.inject()` / `class extends Eventize`, silently does nothing for plain `eventize(obj)`), with a callout for the loop-detection behavior.
-- **Docs:** README — clarified that the listener-object `.emit()` fallback also fires for **named** subscriptions (`on(ε, 'foo', {emit(name, ...a) {…}})`), not only for catch-all/wildcard ones; named methods on the listener still win over `.emit()` when both are present.
-- **Docs:** README — `emit()` section calls out the wildcard-throw and recursion-detection behaviors.
-- **Tests:** New `src/wildcard-emit.spec.ts` adds end-to-end coverage (15 specs) for: `emit('*')` / `emit(['*'])` / `emit(['foo', '*'])` throwing, the `.emit()` fallback for both catch-all and named subscriptions through the public API, eventized-to-eventized forwarding for `inject` / `class extends Eventize` / plain `eventize`, and loop detection (`A→B→A`, direct self-recursion, lock release after a thrown listener).
+- **Behavior change:** `emit(ε, '*', …)` (scalar and array form) now throws — `'*'` is subscribe-only. Events before `'*'` in a multi-event array still dispatch before the throw.
+- **Behavior change:** `emit()` throws `"emit() recursion detected …"` when the same `(emitter, eventName)` is re-entered during dispatch, catching forwarding loops (`A → B → A`) and same-event self-recursion. Different events or serial re-emits are unaffected.
+- **Docs:** README — new _Forwarding events between emitters_ subsection (works for `eventize.inject()` / `class extends Eventize`; no-op for plain `eventize(obj)`), and clarification that the listener-object `.emit()` fallback also fires for named subscriptions.
+- **Tooling:** Added `skills/using-eventize/SKILL.md` — quick-reference skill for AI coding agents (Claude Code & co.) summarising API, quirks, and pitfalls. README links it under Installation.
+- **Tests:** New `src/wildcard-emit.spec.ts` covering wildcard-emit throws, `.emit()` fallback, eventized-to-eventized forwarding, and loop detection.
 
 ## `v4.1.0` (2026-05-08)
 
