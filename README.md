@@ -141,6 +141,7 @@ The API is designed to be used functionally, with named exports like `on(ε, ...
 | `off`         | unsubscribe                                                         |
 | `retain`      | hold the last event until it is received by a subscriber            |
 | `retainClear` | clear the last event                                                |
+| `unretain`    | remove the retain policy entirely (clears value and disables retain) |
 
 ### Creating Emitters
 
@@ -222,13 +223,13 @@ Eventize splits its API into two families with different behavior on a non-event
 | Function                                  | On a non-eventized object   |
 | ----------------------------------------- | --------------------------- |
 | `on()`, `once()`, `onceAsync()`, `retain()` | Auto-eventizes the object   |
-| `emit()`, `emitAsync()`, `off()`, `retainClear()` | Throws `"object is not eventized"` |
+| `emit()`, `emitAsync()`, `off()`, `retainClear()`, `unretain()` | Throws `"object is not eventized"` |
 
 **Why the split?**
 
 `on` / `once` / `retain` _install_ behavior — they attach hooks, listeners, or a retain policy to an object. Requiring an explicit `eventize(obj)` call before every `on(obj, …)` would be pure ceremony, so these functions auto-eventize as a developer-experience shortcut. Calling `on({}, 'foo', fn)` is a perfectly meaningful intent: _"I want to start listening to events on this object"_.
 
-`emit` / `emitAsync` / `off` / `retainClear` _operate on_ an existing emitter — they fire events, remove subscriptions, or clear retained state. Calling them on a plain `{}` is almost always a bug: nothing has ever been subscribed, no events were ever retained, no state to remove or fire against. Auto-eventizing here would silently turn typos into no-ops (`emit(typoVariable, 'foo')` would just create a new emitter and discard the call). Throwing surfaces the mistake immediately.
+`emit` / `emitAsync` / `off` / `retainClear` / `unretain` _operate on_ an existing emitter — they fire events, remove subscriptions, or clear retained state. Calling them on a plain `{}` is almost always a bug: nothing has ever been subscribed, no events were ever retained, no state to remove or fire against. Auto-eventizing here would silently turn typos into no-ops (`emit(typoVariable, 'foo')` would just create a new emitter and discard the call). Throwing surfaces the mistake immediately.
 
 ```javascript
 // ✅ Auto-eventize: convenient, intent is clear
@@ -241,6 +242,7 @@ const plain = {};
 emit(plain, 'foo'); // throws: "object is not eventized"
 off(plain); // throws: "object is not eventized"
 retainClear(plain, 'foo'); // throws: "object is not eventized"
+unretain(plain, 'foo'); // throws: "object is not eventized"
 ```
 
 The type guard `isEventized(obj)` (see _Utilities_) lets you check defensively if you ever need to. `getSubscriptionCount(obj)` is the one exception that returns `0` for non-eventized inputs instead of throwing — see its section for the rationale.
@@ -946,6 +948,60 @@ try {
 // Use eventize() first, or use retain() which auto-eventizes
 const ε = eventize(plainObj);
 retainClear(ε, 'foo'); // Now this works
+```
+
+---
+
+#### `unretain(emitter, eventName | eventName[])`
+
+Removes the retain policy for one or more events. Unlike `retainClear()`, which only discards the currently stored value but leaves retain active for future emissions, `unretain()` fully reverses `retain()`: the stored value is dropped **and** future emissions are no longer retained.
+
+**Key Behaviors:**
+
+- Discards the currently stored value (if any) **and** disables retain for future emissions.
+- Does not affect listeners that are already subscribed — they continue to receive new emissions.
+- Throws an error if called on a non-eventized object.
+- Works with both string and symbol event names.
+- Can unretain multiple events at once by passing an array.
+- Calling `unretain()` for an event that was never retained is safe (no-op).
+
+**Basic Usage:**
+
+```javascript
+import {eventize, retain, unretain, emit, on} from '@spearwolf/eventize';
+
+const ε = eventize();
+
+retain(ε, 'status');
+emit(ε, 'status', 'loading');
+
+// Remove the retain policy entirely
+unretain(ε, 'status');
+
+// Future emissions are no longer retained
+emit(ε, 'status', 'complete');
+
+// New subscriber does NOT receive anything
+on(ε, 'status', (s) => console.log(s));
+// (nothing happens)
+```
+
+**`retainClear` vs. `unretain`:**
+
+```javascript
+// retainClear: clears value, retain stays active
+retain(ε, 'foo');
+emit(ε, 'foo', 1);
+retainClear(ε, 'foo');
+emit(ε, 'foo', 2);
+on(ε, 'foo', console.log); // => 2 (newly retained)
+
+// unretain: clears value AND disables retain
+retain(ε, 'bar');
+emit(ε, 'bar', 1);
+unretain(ε, 'bar');
+emit(ε, 'bar', 2);
+on(ε, 'bar', console.log); // (nothing — retain is off)
 ```
 
 ---

@@ -326,3 +326,14 @@ export const retainClear = (
   const {keeper} = eventizedObj[NAMESPACE];
   keeper.clear(eventNames);
 };
+
+export const unretain = (
+  eventizedObj: object,
+  eventNames: AnyEventNames,
+): void => {
+  if (!isEventized(eventizedObj)) {
+    throw new Error('object is not eventized');
+  }
+  const {keeper} = eventizedObj[NAMESPACE];
+  keeper.remove(eventNames);
+};

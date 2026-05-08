@@ -11,22 +11,11 @@ Legende: 🔴 Bug · 🟡 API-Hygiene · 🟢 DX/Doku · 🔵 Refactor · ⚡ Pe
 
 Kann breaking-frei eingeführt werden. Verbessert Konsistenz und DX deutlich.
 
-### 🟡 13. `unretain(ε, eventNames)` als public API
-**Dateien:** `src/eventize-api.ts`, `src/eventize.ts`, `src/index.ts`, README
-**Problem:** Einmal `retain(ε, 'foo')` aufgerufen, gibt es **keine Möglichkeit**, das wieder zurückzunehmen. `EventKeeper.remove` existiert intern, ist aber nicht exportiert. `retainClear` löscht nur den gespeicherten Wert, nicht die "retain-Pflicht".
-**Fix:** `unretain(obj, eventNames)` exportieren, das `keeper.remove(eventNames)` aufruft. In `Eventize`-Klasse und `inject()` analog ergänzen.
-**Test:** Spec, der `retain → emit → unretain → on (neuer subscriber) → kein Replay` verifiziert.
-
 ### 🟢 19. README: TypeScript-Type-Safety-Kapitel
 **Datei:** `README.md`
 **Problem:** Library wirbt mit "Full TypeScript Support", aber `EventArgs = Array<any>`. Es fehlt ein Beispiel, wie man Events typisiert (heute: gar nicht).
 **Fix:** Bis Aufgabe 23 umgesetzt ist: ehrlich beschreiben, dass Argumente untyped sind und ein Wrapper-Pattern für getypte Events vorschlagen. Danach: echtes Generic-Beispiel.
 
-### 🔵 22. Globale Counter überdenken
-**Dateien:** `src/EventListener.ts:48`, `src/EventKeeper.ts:14`
-**Problem:** Modul-globaler `lastId` und `nextOrderId`. In der Praxis OK (Number-Overflow erst nach >9 Billionen Events), aber unhygienisch.
-**Optionen:** Counter pro `EventStore`/`EventKeeper`-Instanz. Reset wäre damit lokal möglich.
-**Priorität:** Niedrig, nur wenn man die Klassen ohnehin anfasst.
 
 ---
 

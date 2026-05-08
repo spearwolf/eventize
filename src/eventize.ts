@@ -8,6 +8,7 @@ import {
   onceAsync,
   retain,
   retainClear,
+  unretain,
 } from './eventize-api';
 import {isEventized} from './isEventized';
 import type {
@@ -59,6 +60,9 @@ export const eventize: EventizerFuncAPI = (() => {
 
       retainClear: (eventNames: AnyEventNames): void =>
         retainClear(obj as EventizedObject, eventNames),
+
+      unretain: (eventNames: AnyEventNames): void =>
+        unretain(obj as EventizedObject, eventNames),
     });
 
     return obj as T & EventizeApi;
@@ -106,5 +110,9 @@ export class Eventize {
 
   retainClear(eventNames: AnyEventNames): void {
     retainClear(this, eventNames);
+  }
+
+  unretain(eventNames: AnyEventNames): void {
+    unretain(this, eventNames);
   }
 }

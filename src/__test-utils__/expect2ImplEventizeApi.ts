@@ -24,5 +24,8 @@ export const expect2ImplEventizeApi = (obj: any) => {
     it('.retainClear()', () => {
       expect(typeof obj.retainClear).toBe('function');
     });
+    it('.unretain()', () => {
+      expect(typeof obj.unretain).toBe('function');
+    });
   });
 };

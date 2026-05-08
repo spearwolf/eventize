@@ -135,6 +135,7 @@ export interface EventizeApi extends EventizedObject {
 
   retain(eventNames: AnyEventNames): void;
   retainClear(eventNames: AnyEventNames): void;
+  unretain(eventNames: AnyEventNames): void;
 }
 
 export interface EventizerFunc {
