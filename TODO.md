@@ -28,11 +28,6 @@ Kann breaking-frei eingeführt werden. Verbessert Konsistenz und DX deutlich.
 **Problem:** Library wirbt mit "Full TypeScript Support", aber `EventArgs = Array<any>`. Es fehlt ein Beispiel, wie man Events typisiert (heute: gar nicht).
 **Fix:** Bis Aufgabe 23 umgesetzt ist: ehrlich beschreiben, dass Argumente untyped sind und ein Wrapper-Pattern für getypte Events vorschlagen. Danach: echtes Generic-Beispiel.
 
-### 🟢 20. README: Wildcard-Konstante statt Magic String
-**Datei:** `README.md`
-**Abhängig von:** Aufgabe 2
-**Fix:** In allen Beispielen, die `'*'` zeigen, optional auf `EVENT_CATCH_EM_ALL` verweisen.
-
 ### 🔵 22. Globale Counter überdenken
 **Dateien:** `src/EventListener.ts:48`, `src/EventKeeper.ts:14`
 **Problem:** Modul-globaler `lastId` und `nextOrderId`. In der Praxis OK (Number-Overflow erst nach >9 Billionen Events), aber unhygienisch.
