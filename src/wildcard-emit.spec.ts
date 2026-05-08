@@ -129,28 +129,8 @@ describe('forwarding events between eventized objects', () => {
   });
 });
 
-describe('emit() loop detection', () => {
-  it('throws when forwarding loops between two eventized objects (A→B→A)', () => {
-    const a = eventize.inject();
-    const b = eventize.inject();
-
-    on(a, b);
-    on(b, a);
-
-    expect(() => emit(a, 'ping', 1)).toThrow(/recursion detected/);
-  });
-
-  it('throws on direct same-emitter same-event recursion', () => {
-    const ε = eventize();
-
-    on(ε, 'foo', () => {
-      emit(ε, 'foo'); // immediate recursion
-    });
-
-    expect(() => emit(ε, 'foo')).toThrow(/recursion detected/);
-  });
-
-  it('does NOT throw when a listener emits a different event on the same emitter', () => {
+describe('emit() re-entrancy', () => {
+  it('allows a listener to emit a different event on the same emitter', () => {
     const ε = eventize();
     const barFn = fake();
     on(ε, 'bar', barFn);
@@ -162,7 +142,7 @@ describe('emit() loop detection', () => {
     expect(barFn.calledOnceWith('from-foo')).toBe(true);
   });
 
-  it('does NOT throw when the same event is emitted serially (after the first dispatch finishes)', () => {
+  it('allows the same event to be emitted serially', () => {
     const ε = eventize();
     const fn = fake();
     on(ε, 'foo', fn);
@@ -174,7 +154,7 @@ describe('emit() loop detection', () => {
     expect(fn.callCount).toBe(3);
   });
 
-  it('releases the lock cleanly after a listener throws', () => {
+  it('continues to dispatch normally after a listener throws', () => {
     const ε = eventize();
     const unsub = on(ε, 'foo', () => {
       throw new Error('listener boom');
@@ -182,8 +162,6 @@ describe('emit() loop detection', () => {
 
     expect(() => emit(ε, 'foo')).toThrow('listener boom');
 
-    // Lock must be released so a subsequent emit can run.
-    // Remove the throwing listener and verify a fresh emit dispatches normally.
     unsub();
     const fn = fake();
     on(ε, 'foo', fn);

@@ -235,13 +235,16 @@ Eventize splits its API into two families with different behavior on a non-event
 | Function                                  | On a non-eventized object   |
 | ----------------------------------------- | --------------------------- |
 | `on()`, `once()`, `onceAsync()`, `retain()` | Auto-eventizes the object   |
-| `emit()`, `emitAsync()`, `off()`, `retainClear()`, `unretain()` | Throws `"object is not eventized"` |
+| `off()`                                   | Silently does nothing       |
+| `emit()`, `emitAsync()`, `retainClear()`, `unretain()` | Throws `"object is not eventized"` |
 
 **Why the split?**
 
 `on` / `once` / `retain` _install_ behavior — they attach hooks, listeners, or a retain policy to an object. Requiring an explicit `eventize(obj)` call before every `on(obj, …)` would be pure ceremony, so these functions auto-eventize as a developer-experience shortcut. Calling `on({}, 'foo', fn)` is a perfectly meaningful intent: _"I want to start listening to events on this object"_.
 
-`emit` / `emitAsync` / `off` / `retainClear` / `unretain` _operate on_ an existing emitter — they fire events, remove subscriptions, or clear retained state. Calling them on a plain `{}` is almost always a bug: nothing has ever been subscribed, no events were ever retained, no state to remove or fire against. Auto-eventizing here would silently turn typos into no-ops (`emit(typoVariable, 'foo')` would just create a new emitter and discard the call). Throwing surfaces the mistake immediately.
+`emit` / `emitAsync` / `retainClear` / `unretain` _operate on_ an existing emitter — they fire events or clear retained state. Calling them on a plain `{}` is almost always a bug: nothing has ever been subscribed, no events were ever retained, no state to remove or fire against. Auto-eventizing here would silently turn typos into no-ops (`emit(typoVariable, 'foo')` would just create a new emitter and discard the call). Throwing surfaces the mistake immediately.
+
+`off` is the exception: cleanup code routinely runs against objects whose lifecycle isn't fully under the caller's control (teardown helpers, conditional listeners, optional handles). Demanding the target be eventized turns harmless cleanup into defensive `isEventized()` boilerplate, so `off()` is permissive — it accepts any object and quietly does nothing if there's nothing to remove.
 
 ```javascript
 // ✅ Auto-eventize: convenient, intent is clear
@@ -249,10 +252,12 @@ const obj = {};
 on(obj, 'foo', () => console.log('foo')); // obj is now eventized
 emit(obj, 'foo'); // works
 
+// ✅ off() is permissive — safe in cleanup paths
+off({}); // no-op, no throw
+
 // ❌ Strict: catches the bug instead of silently doing nothing
 const plain = {};
 emit(plain, 'foo'); // throws: "object is not eventized"
-off(plain); // throws: "object is not eventized"
 retainClear(plain, 'foo'); // throws: "object is not eventized"
 unretain(plain, 'foo'); // throws: "object is not eventized"
 ```
@@ -357,7 +362,7 @@ Caveats:
 
 - The target must have an `.emit(eventName, ...args)` method. `eventize.inject(obj)` and `class extends Eventize` install one; **plain `eventize(obj)` does not** — forwarding to such a target silently does nothing.
 - A target method whose name matches the event takes precedence over `.emit()` (see the note above).
-- Forwarding cycles (`A → B → A`) are detected at runtime: eventize keeps a per-`(emitter, eventName)` re-entrancy lock during dispatch and throws `"emit() recursion detected …"` if the same pair is re-entered. Re-emitting a _different_ event from a listener stays allowed.
+- **Forwarding cycles are not detected.** `A → B → A` (or same-emitter same-event re-emission from inside a listener) will recurse without bound and overflow the stack. Eventize used to throw on this in v4.2 but the guard turned out to forbid valid scenarios; the responsibility for breaking cycles is now on the caller (e.g. set a flag, gate the forward, or emit a different event).
 
 ##### Priorities
 
@@ -486,7 +491,7 @@ Removes listeners from an emitter. This is the counterpart to `on()` and is usef
 | `off(emitter, eventName, listenerObject)` | Unsubscribes a listener object from a specific event only.          |
 
 > [!NOTE]
-> Calling `off()` on a non-eventized object will throw an error: `"object is not eventized"`.
+> Calling `off()` on a non-eventized object (or on `null`/`undefined`) is a no-op — it returns silently. This makes `off()` safe to use in cleanup paths without first checking `isEventized()`.
 
 **Using the Unsubscribe Function:**
 
@@ -727,7 +732,7 @@ emit(ε, ['update', 'log'], 100, {status: 'multi-event'});
 > [!IMPORTANT]
 > `'*'` is reserved for **subscribing** to all events and cannot be emitted. Calling `emit(ε, '*', …)` or `emit(ε, ['*'], …)` throws — emit a concrete event name instead. (In an array form, events listed before the `'*'` element still dispatch before the throw, consistent with mid-dispatch error semantics.)
 >
-> Calling `emit()` from inside a listener is fine — but re-emitting the **same** event on the **same** emitter that is already mid-dispatch (directly or via a forwarding chain) throws `"emit() recursion detected …"`. Different events on the same emitter are unaffected.
+> Calling `emit()` from inside a listener is fine, including re-emitting the same event. Eventize does **not** detect forwarding cycles or same-event self-recursion — `A → B → A` (or `on(ε, 'foo', () => emit(ε, 'foo'))`) will overflow the stack. If you build a forwarding chain, break cycles yourself.
 
 ---
 

@@ -41,14 +41,6 @@ const makeUnsubscribe = (
   ) as UnsubscribeFunc;
 };
 
-// Per-(emitter, eventName) re-entrancy lock. A listener that forwards an
-// event back to an emitter already higher up the dispatch stack — directly
-// or via a chain of eventized objects — would otherwise recurse without
-// bound. We track which (emitter, eventName) pairs are currently dispatching
-// and throw on the second entry. Different events on the same emitter, or
-// the same event on different emitters, do not collide.
-const activeEmits = new WeakMap<EventizedObject, Set<EventName>>();
-
 const _emitOne = (
   eventizedObj: EventizedObject,
   eventName: EventName,
@@ -60,27 +52,11 @@ const _emitOne = (
       "emit() must be called with a concrete event name — '*' is reserved for subscribing to all events and cannot be emitted",
     );
   }
-  let active = activeEmits.get(eventizedObj);
-  if (active?.has(eventName)) {
-    throw new Error(
-      `emit() recursion detected for event '${String(eventName)}' — likely a forwarding cycle between eventized objects`,
-    );
-  }
-  if (!active) {
-    active = new Set();
-    activeEmits.set(eventizedObj, active);
-  }
-  active.add(eventName);
-  try {
-    const {store, keeper} = eventizedObj[NAMESPACE];
-    store.forEach(eventName, (listener) =>
-      listener.apply(eventName, args, returnValue),
-    );
-    keeper.retain(eventName, args);
-  } finally {
-    active.delete(eventName);
-    if (active.size === 0) activeEmits.delete(eventizedObj);
-  }
+  const {store, keeper} = eventizedObj[NAMESPACE];
+  store.forEach(eventName, (listener) =>
+    listener.apply(eventName, args, returnValue),
+  );
+  keeper.retain(eventName, args);
 };
 
 const _emit = (
@@ -406,7 +382,7 @@ export function off(
   listenerObject?: ListenerObjectType,
 ): void {
   if (!isEventized(eventizedObj)) {
-    throw new Error('object is not eventized');
+    return;
   }
   const {store, keeper} = eventizedObj[NAMESPACE];
   const listenerType = typeof listener;

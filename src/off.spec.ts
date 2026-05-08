@@ -266,18 +266,18 @@ describe('off()', () => {
     });
   });
 
-  describe('error handling', () => {
-    it('throws an error when called on a non-eventized object', () => {
+  describe('non-eventized inputs', () => {
+    it('silently does nothing when called on a non-eventized object', () => {
       const plainObj = {};
-      expect(() => off(plainObj)).toThrow('object is not eventized');
+      expect(() => off(plainObj)).not.toThrow();
     });
 
-    it('throws an error when called on null', () => {
-      expect(() => off(null as any)).toThrow();
+    it('silently does nothing when called on null', () => {
+      expect(() => off(null as any)).not.toThrow();
     });
 
-    it('throws an error when called on undefined', () => {
-      expect(() => off(undefined as any)).toThrow();
+    it('silently does nothing when called on undefined', () => {
+      expect(() => off(undefined as any)).not.toThrow();
     });
   });
 

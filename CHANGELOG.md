@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## Unreleased
+
+- **Behavior change:** `off()` no longer throws `"object is not eventized"` when called on a non-eventized object (or on `null`/`undefined`). It now silently does nothing in that case, so cleanup paths can call `off(maybeEmitter, …)` without first checking `isEventized()`. The other strict-mode functions (`emit`, `emitAsync`, `retainClear`, `unretain`) still throw.
+- **Behavior change:** Reverted the `emit()` recursion guard added in v4.2.0. Re-emitting the same `(emitter, eventName)` from inside a listener (directly or via a forwarding chain `A → B → A`) no longer throws `"emit() recursion detected …"` — the guard turned out to forbid legitimate re-emission patterns. Forwarding cycles will recurse until the stack overflows; callers are responsible for breaking cycles. The internal per-emitter re-entrancy `WeakMap` was removed.
+- **Docs:** README _Auto-eventize vs. strict mode_ table and `off()` note updated to reflect the permissive behavior; forwarding caveat and `emit()` note now warn that cycles are caller-managed; `skills/using-eventize/SKILL.md` quirks #1 and #5 likewise updated.
+- **Tests:** `src/wildcard-emit.spec.ts` — dropped the two recursion-detection cases; kept the still-valid re-entrancy cases (different-event re-emit, serial same-event emit, dispatch continues after a throwing listener).
+
 ## `v4.2.1` (2026-05-08)
 
 - **Chore**: Skip AGENTS.md, CLAUDE.md and eslint.config.mjs from npm package (these are docs and tooling files, not source code or types)

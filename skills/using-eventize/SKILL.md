@@ -81,7 +81,8 @@ await emitAsync(ε, 'load')          // resolves when all listener promises sett
 
 1. **Auto-eventize asymmetry — by design**:
    - `on/once/onceAsync/retain` on a plain object → auto-eventizes it.
-   - `emit/emitAsync/off/retainClear/unretain` on a non-eventized object → **throws** `"object is not eventized"`. (`getSubscriptionCount` returns `0`.) This catches typos that would otherwise silently no-op.
+   - `emit/emitAsync/retainClear/unretain` on a non-eventized object → **throws** `"object is not eventized"`. This catches typos that would otherwise silently no-op.
+   - `off` is the exception in the strict family: it accepts any object (including `null`/`undefined`) and **silently no-ops** when there's nothing to remove — safe in cleanup paths without `isEventized()` guards. (`getSubscriptionCount` returns `0` for non-eventized inputs as well.)
 
 2. **`'*'` is subscribe-only.** `emit(ε, '*', …)` throws. Use a concrete name.
 
@@ -89,7 +90,7 @@ await emitAsync(ε, 'load')          // resolves when all listener promises sett
 
 4. **Forwarding between emitters**: `on(upstream, downstream)` works because `eventize.inject()` / `class Eventize` install an `.emit()` method that doubles as the catch-all sink. ⚠️ **Plain `eventize(obj)` does NOT install `.emit`** — forwarding to such a target silently no-ops.
 
-5. **Recursion guard**: re-emitting the **same** event on the **same** emitter while it is mid-dispatch (directly or through a forwarding chain) throws `"emit() recursion detected …"`. Different events on the same emitter are fine.
+5. **No recursion guard**: re-emitting the same event on the same emitter (directly or via a forwarding chain `A → B → A`) is allowed and will recurse until the stack overflows. The v4.2 guard was removed because some valid patterns need same-event re-emission. Break cycles yourself if you build a forwarding chain.
 
 6. **Listener-object de-dup with refcount** — `on(ε, 'foo', listenerObj)` called twice = ONE listener with refcount 2. Each unsubscribe decrements; removed at 0. **Function listeners are NOT deduped** — registering the same function twice fires it twice. Match key: `(eventName, priority, listener, listenerContext)`.
 
