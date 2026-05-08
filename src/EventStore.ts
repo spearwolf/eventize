@@ -15,6 +15,23 @@ const sortByPriorityAndId = (
 ): number =>
   a.priority !== b.priority ? b.priority - a.priority : a.id - b.id;
 
+const findInsertIndex = (
+  arr: Array<HasPriorityOrIdType>,
+  item: HasPriorityOrIdType,
+): number => {
+  let lo = 0;
+  let hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (sortByPriorityAndId(item, arr[mid]) < 0) {
+      hi = mid;
+    } else {
+      lo = mid + 1;
+    }
+  }
+  return lo;
+};
+
 const cloneArray = <T>(arr: Array<T>): Array<T> => arr?.slice(0);
 
 const removeItemFromArray = (arr: Array<any>, item: any) => {
@@ -112,8 +129,7 @@ const insertOrFindSimilarListener = (
     similarListener.refCount += 1;
     return similarListener;
   }
-  arr.push(listener);
-  arr.sort(sortByPriorityAndId);
+  arr.splice(findInsertIndex(arr, listener), 0, listener);
   return listener;
 };
 

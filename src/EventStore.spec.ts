@@ -138,6 +138,35 @@ describe('EventStore', () => {
     });
   });
 
+  describe('insertion order with mixed priorities', () => {
+    it('keeps listeners sorted by descending priority then ascending id, regardless of insertion order', () => {
+      const store = new EventStore();
+      // priorities chosen so that insertion order != sort order
+      const priorities = [0, 100, -50, 50, 0, 25, 100, -10, 75, 0];
+      const added = priorities.map((p, idx) =>
+        store.add(new EventListener('e', p, `L${idx}`)),
+      );
+
+      const seen: EventListener[] = [];
+      store.forEach('e', (l) => seen.push(l));
+
+      const sorted = [...added].sort((a, b) =>
+        a.priority !== b.priority ? b.priority - a.priority : a.id - b.id,
+      );
+      expect(seen).toEqual(sorted);
+    });
+
+    it('keeps insertion stable for equal-priority listeners (FIFO by id)', () => {
+      const store = new EventStore();
+      const listeners = Array.from({length: 20}, (_, i) =>
+        store.add(new EventListener('e', 0, `L${i}`)),
+      );
+      const seen: EventListener[] = [];
+      store.forEach('e', (l) => seen.push(l));
+      expect(seen).toEqual(listeners);
+    });
+  });
+
   describe('with named and catch-em-all listeners', () => {
     const store = new EventStore();
     [

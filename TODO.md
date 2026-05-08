@@ -17,12 +17,6 @@ Kann breaking-frei eingeführt werden. Verbessert Konsistenz und DX deutlich.
 **Fix:** `unretain(obj, eventNames)` exportieren, das `keeper.remove(eventNames)` aufruft. In `Eventize`-Klasse und `inject()` analog ergänzen.
 **Test:** Spec, der `retain → emit → unretain → on (neuer subscriber) → kein Replay` verifiziert.
 
-### ⚡ 18. Sortierte Insertion statt `arr.sort()` bei `add`
-**Datei:** `src/EventStore.ts`
-**Problem:** Jeder `on()` ruft `arr.sort(sortByPriorityAndId)` → O(n log n). Bei vielen Listenern unnötig.
-**Fix:** Binary-Search-Insertion (O(log n) Suche, O(n) Shift). Profitiert von der bereits sortierten Liste.
-**Hinweis:** Mikro-Optimierung — nur sinnvoll, wenn ein Use-Case mit >1000 Listenern dokumentiert ist. Sonst skip.
-
 ### 🟢 19. README: TypeScript-Type-Safety-Kapitel
 **Datei:** `README.md`
 **Problem:** Library wirbt mit "Full TypeScript Support", aber `EventArgs = Array<any>`. Es fehlt ein Beispiel, wie man Events typisiert (heute: gar nicht).
