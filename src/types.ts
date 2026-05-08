@@ -148,12 +148,16 @@ export interface EventizeGuard {
 
 export interface EventizePriority {
   Max: number;
+  Critical: number;
+  High: number;
+  Normal: number;
+  Low: number;
+  Min: number;
+  // Legacy aliases
   AAA: number;
   BB: number;
   C: number;
   Default: number;
-  Low: number;
-  Min: number;
 }
 
 export interface EventizerFuncAPI extends EventizerFunc {

@@ -330,15 +330,15 @@ import {eventize, on, emit, Priority} from '@spearwolf/eventize';
 const ε = eventize();
 const calls = [];
 
-on(ε, 'test', () => calls.push('Default'));
+on(ε, 'test', () => calls.push('Normal'));
 on(ε, 'test', Priority.Low, () => calls.push('Low')); // Runs later
-on(ε, 'test', Priority.AAA, () => calls.push('High')); // Runs sooner
+on(ε, 'test', Priority.Critical, () => calls.push('Critical')); // Runs sooner
 
 emit(ε, 'test');
-console.log(calls); // => ["High", "Default", "Low"]
+console.log(calls); // => ["Critical", "Normal", "Low"]
 ```
 
-`Priority` provides several predefined levels: `Max`, `AAA`, `BB`, `C`, `Default`, `Low`, `Min`.
+`Priority` provides several predefined levels: `Max`, `Critical`, `High`, `Normal`, `Low`, `Min`. The legacy aliases `AAA` (= `Critical`), `BB` (= `High`), `C`, and `Default` (= `Normal`) are kept for backwards compatibility.
 
 ##### Listener Objects
 

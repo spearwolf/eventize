@@ -2,10 +2,14 @@ import type {EventizePriority} from './types';
 
 export const Priority: EventizePriority = {
   Max: Number.POSITIVE_INFINITY,
-  AAA: 1000000000,
-  BB: 1000000,
-  C: 1000,
-  Default: 0,
-  Low: -10000,
+  Critical: 1e9,
+  High: 1e6,
+  Normal: 0,
+  Low: -1e4,
   Min: Number.NEGATIVE_INFINITY,
+  // Legacy aliases — kept for backwards compatibility, prefer the names above
+  AAA: 1e9,
+  BB: 1e6,
+  C: 1e3,
+  Default: 0,
 };
