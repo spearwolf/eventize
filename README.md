@@ -16,7 +16,7 @@ Written entirely in TypeScript and targeting modern `ES2022`, it offers a robust
 
 - 🚀 **Developer-Focused API**: Clean, modern, and functional.
 - ✨ **Wildcards & Priorities**: Subscribe to all events and control listener execution order.
-- 🔷 **Full TypeScript Support**: Leverage strong typing for more reliable code.
+- 🔷 **Full TypeScript Support**: Optional generic event maps narrow `emit`, `on`, retained-event names and listener arguments — without losing first-class duck-typing for code that doesn't opt in.
 - 📦 **Zero Runtime Dependencies**: Lightweight with a minimal footprint (&lt;5k gzipped).
 - ESM & CommonJS Support.
 - Apache 2.0 Licensed.
@@ -1071,3 +1071,135 @@ console.log(getSubscriptionCount(ε)); // => 0
   ```
 
 - A `once()` listener counts as a normal subscription until it fires; afterwards the count drops by one.
+
+---
+
+## TypeScript: Typed Event Maps
+
+Eventize ships an _opt-in_ generic event map you can pass to `eventize<TEvents>()`, `eventize.inject<TEvents>()`, or `class extends Eventize<TEvents>`. The map describes each event's argument tuple, and the standalone API (`emit`, `on`, `once`, `onceAsync`, `retain`, …) picks up the types automatically when called on a typed emitter.
+
+```ts
+import {eventize, emit, on, onceAsync} from '@spearwolf/eventize';
+
+interface ChatEvents {
+  message: [from: string, text: string];
+  joined: [user: string];
+  closed: [];
+}
+
+const ε = eventize<ChatEvents>();
+
+// listener arg types are inferred from the map
+on(ε, 'message', (from, text) => {
+  // from: string, text: string
+});
+
+// emit checks the event name and the argument tuple
+emit(ε, 'message', 'alice', 'hello'); // ✅
+emit(ε, 'joined', 'bob');             // ✅
+emit(ε, 'closed');                    // ✅
+
+// emit('wrong') won't compile
+// emit(ε, 'unknown', 1);              // ❌ "Argument of type '\"unknown\"' is not assignable …"
+// emit(ε, 'message', 'alice');         // ❌ missing 'text'
+// emit(ε, 'message', 1, 2);            // ❌ wrong tuple
+
+// promise-based listener also gets inferred
+const firstMessage = await onceAsync(ε, 'message');
+// firstMessage: string  (the first arg of the tuple)
+```
+
+A typed listener-object lets you register multiple events at once, with each method getting its event's argument tuple:
+
+```ts
+on(ε, {
+  message(from, text) {
+    /* from: string, text: string */
+  },
+  joined(user) {
+    /* user: string */
+  },
+  // unknown keys are rejected:
+  // banana() {}                     // ❌ "Object literal may only specify known properties …"
+});
+```
+
+Same generic works on the inject and class forms:
+
+```ts
+const ε = eventize.inject<ChatEvents>();
+ε.emit('joined', 'carol');                // ✅ typed
+ε.on('message', (from, text) => {/*…*/}); // ✅ typed
+
+class Chat extends Eventize<ChatEvents> {
+  greet(user: string) {
+    this.emit('joined', user);            // ✅ typed
+  }
+}
+```
+
+### Defining the event map
+
+Define the event map as a **plain interface** — _without_ `extends EventMap`:
+
+```ts
+// ✅ correct — keyof MyEvents stays narrow ('foo' | 'bar')
+interface MyEvents {
+  foo: [string];
+  bar: [];
+}
+
+// ❌ avoid — extending EventMap inherits an index signature, which widens
+// keyof MyEvents back to `string | symbol` and defeats the narrowing on
+// emit/on/retain.
+interface MyEventsBad extends EventMap {
+  foo: [string];
+}
+```
+
+The constraint on `TEvents` is intentionally as loose as `object` so a plain interface satisfies it without an index signature. This is the price of strict narrowing on the standalone API.
+
+### Backwards compatibility & duck-typing
+
+Without a generic, every API behaves exactly like v4 — full duck-typing, arbitrary event names, listener-objects with whatever method names you like:
+
+```ts
+const ε = eventize();              // no generic → DefaultEventMap (permissive)
+on(ε, 'whatever', (a, b, c) => {}); // any name, any args
+emit(ε, 'whatever', 1, 'two', {});  // any args
+
+// the listener-object form still accepts arbitrary methods
+on(ε, {
+  somethingDynamic() {},
+  whateverElse() {},
+});
+```
+
+Plain `{}` passed to `on`, `emit`, etc. continues to work the same way (`on` auto-eventizes; `emit` throws `"object is not eventized"` — see _Auto-eventize vs. strict mode_ above).
+
+### Symbol events as an escape hatch
+
+Symbol event names are accepted on typed emitters even when they're not in the map, with permissive arguments. This lets libraries combine a typed surface with private/internal symbol events:
+
+```ts
+const PRIVATE = Symbol('private');
+const ε = eventize<ChatEvents>();
+on(ε, PRIVATE, (...args) => {/*…*/}); // ✅ symbol always allowed
+emit(ε, PRIVATE, 'anything');         // ✅ permissive args
+```
+
+If you want strict typing on a symbol event too, just add it to the map:
+
+```ts
+const PRIVATE = Symbol('private');
+interface ChatEvents {
+  message: [string, string];
+  [PRIVATE]: [reason: string];
+}
+```
+
+### Caveats worth knowing
+
+- Multi-event-name calls (`emit(ε, ['a', 'b'], …)`) on typed emitters require all listed events to share the same argument tuple — that's the typed overload's contract. If they don't, fall back to two separate `emit()` calls.
+- The `__TEventsBrand` phantom field on `EventizedObject<T>` is a compile-time-only contrivance: it's never present at runtime and the symbol is not exported, so user code can't accidentally mismatch it.
+- `getSubscriptionCount(ε)` and the lifecycle helpers (`isEventized`, `EVENT_CATCH_EM_ALL`) are intentionally untyped against `TEvents` — they are diagnostic / structural and don't depend on the event map.

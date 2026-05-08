@@ -13,7 +13,9 @@ import {
 import {isEventized} from './isEventized';
 import type {
   AnyEventNames,
+  DefaultEventMap,
   EventArgs,
+  EventMap,
   EventizeApi,
   EventizedObject,
   EventizerFuncAPI,
@@ -21,19 +23,58 @@ import type {
   UnsubscribeFunc,
 } from './types';
 
-// Internal: TypeScript overload resolution cannot match a spread of a
-// union-of-tuples (`...args: SubscribeArgs`) against the public overload
-// signatures of `on` / `once`. Cast to the implementation-shape signature
-// for the class / inject delegations below; the public exports retain
-// their full overload set for end users.
+// Internal: the class- and inject-side delegations call into the standalone
+// API on a typed `this`, but with arbitrary runtime arg shapes. The public
+// overload sets are tuned for end users (typed first, loose fallback) and
+// don't accept either a spread of `SubscribeArgs` or a typed emitter passed
+// to the loose fallback. So we cast to the implementation-shape signature
+// for internal use; the public exports retain their full overload set.
 const on = _on as (obj: object, ...args: SubscribeArgs) => UnsubscribeFunc;
 const once = _once as (obj: object, ...args: SubscribeArgs) => UnsubscribeFunc;
+const offLoose = off as (
+  obj: object,
+  listener?: unknown,
+  listenerObject?: object,
+) => void;
+const emitLoose = emit as (
+  obj: object,
+  eventNames: AnyEventNames,
+  ...args: EventArgs
+) => void;
+const emitAsyncLoose = emitAsync as (
+  obj: object,
+  eventNames: AnyEventNames,
+  ...args: EventArgs
+) => Promise<any>;
+const onceAsyncLoose = onceAsync as <ReturnType = void>(
+  obj: object,
+  eventNames: AnyEventNames,
+) => Promise<ReturnType>;
+const retainLoose = retain as (obj: object, eventNames: AnyEventNames) => void;
+const retainClearLoose = retainClear as (
+  obj: object,
+  eventNames: AnyEventNames,
+) => void;
+const unretainLoose = unretain as (
+  obj: object,
+  eventNames: AnyEventNames,
+) => void;
 
 export const eventize: EventizerFuncAPI = (() => {
-  const e = <T extends object>(obj: T = {} as T): T & EventizedObject =>
-    asEventized(obj);
+  const e = <
+    TEvents extends EventMap = DefaultEventMap,
+    T extends object = object,
+  >(
+    obj: T = {} as T,
+  ): T & EventizedObject<TEvents> =>
+    asEventized(obj) as T & EventizedObject<TEvents>;
 
-  e.inject = <T extends object>(obj: T = {} as T): T & EventizeApi => {
+  e.inject = <
+    TEvents extends EventMap = DefaultEventMap,
+    T extends object = object,
+  >(
+    obj: T = {} as T,
+  ): T & EventizeApi<TEvents> => {
     obj = asEventized(obj);
 
     Object.assign(obj, {
@@ -43,29 +84,29 @@ export const eventize: EventizerFuncAPI = (() => {
 
       onceAsync: <ReturnType = void>(
         eventNames: AnyEventNames,
-      ): Promise<ReturnType> => onceAsync(obj, eventNames),
+      ): Promise<ReturnType> => onceAsyncLoose<ReturnType>(obj, eventNames),
 
       off: (listener?: unknown, listenerObject?: object): void =>
-        off(obj as EventizedObject, listener, listenerObject),
+        offLoose(obj, listener, listenerObject),
 
       emit: (eventNames: AnyEventNames, ...args: EventArgs): void =>
-        emit(obj as EventizedObject, eventNames, ...args),
+        emitLoose(obj, eventNames, ...args),
 
       emitAsync: (
         eventNames: AnyEventNames,
         ...args: EventArgs
-      ): Promise<any> => emitAsync(obj as EventizedObject, eventNames, ...args),
+      ): Promise<any> => emitAsyncLoose(obj, eventNames, ...args),
 
-      retain: (eventNames: AnyEventNames): void => retain(obj, eventNames),
+      retain: (eventNames: AnyEventNames): void => retainLoose(obj, eventNames),
 
       retainClear: (eventNames: AnyEventNames): void =>
-        retainClear(obj as EventizedObject, eventNames),
+        retainClearLoose(obj, eventNames),
 
       unretain: (eventNames: AnyEventNames): void =>
-        unretain(obj as EventizedObject, eventNames),
+        unretainLoose(obj, eventNames),
     });
 
-    return obj as T & EventizeApi;
+    return obj as T & EventizeApi<TEvents>;
   };
 
   e.is = isEventized;
@@ -73,11 +114,12 @@ export const eventize: EventizerFuncAPI = (() => {
   return e;
 })();
 
-export interface Eventize extends EventizeApi {}
+export interface Eventize<TEvents extends EventMap = DefaultEventMap>
+  extends EventizeApi<TEvents> {}
 
-export class Eventize {
+export class Eventize<TEvents extends EventMap = DefaultEventMap> {
   constructor() {
-    eventize(this);
+    eventize<TEvents>(this);
   }
 
   on(...args: SubscribeArgs): UnsubscribeFunc {
@@ -89,30 +131,30 @@ export class Eventize {
   }
 
   onceAsync<ReturnType = void>(eventNames: AnyEventNames): Promise<ReturnType> {
-    return onceAsync(this, eventNames);
+    return onceAsyncLoose<ReturnType>(this, eventNames);
   }
 
   off(listener?: unknown, listenerObject?: object): void {
-    off(this, listener, listenerObject);
+    offLoose(this, listener, listenerObject);
   }
 
   emit(eventNames: AnyEventNames, ...args: EventArgs): void {
-    emit(this, eventNames, ...args);
+    emitLoose(this, eventNames, ...args);
   }
 
   emitAsync(eventNames: AnyEventNames, ...args: EventArgs): Promise<any> {
-    return emitAsync(this, eventNames, ...args);
+    return emitAsyncLoose(this, eventNames, ...args);
   }
 
   retain(eventNames: AnyEventNames): void {
-    retain(this, eventNames);
+    retainLoose(this, eventNames);
   }
 
   retainClear(eventNames: AnyEventNames): void {
-    retainClear(this, eventNames);
+    retainClearLoose(this, eventNames);
   }
 
   unretain(eventNames: AnyEventNames): void {
-    unretain(this, eventNames);
+    unretainLoose(this, eventNames);
   }
 }
