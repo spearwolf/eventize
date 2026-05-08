@@ -25,19 +25,6 @@ Kann breaking-frei eingeführt werden. Verbessert Konsistenz und DX deutlich.
 - (B) Strikt: `on/once/retain` werfen ebenfalls. Sauberer, aber Breaking Change → besser in v5.
 **Fix für v4.1:** Variante A. README anpassen, Edge-Case-Specs erweitern.
 
-### 🟡 15. Overload-Signaturen für `on` / `once` statt Tupel-Union
-**Datei:** `src/types.ts`, `src/eventize-api.ts`
-**Problem:** `SubscribeArgs` ist eine Union aus 14 Tupel-Permutationen. IDE-Autocomplete zeigt das alles in einer einzigen unleserlichen Zeile.
-**Fix:** Function-Overloads:
-```ts
-export function on(obj, eventName: EventName, listener: ListenerFuncType): UnsubscribeFunc;
-export function on(obj, eventName: EventName, priority: number, listener: ListenerFuncType): UnsubscribeFunc;
-export function on(obj, eventNames: EventName[], listener: ListenerFuncType): UnsubscribeFunc;
-…
-```
-plus eine Implementation-Signature, die intern alles akzeptiert.
-**Achtung:** Reihenfolge der Overloads ist wichtig (spezifisch → generisch).
-
 ### 🔵 16. `EventStore.remove` refactoren
 **Datei:** `src/EventStore.ts:151-247`
 **Problem:** Die Funktion ist mit `// TODO clean up this messy function!` markiert. 7 verschachtelte Branches, überlappende Bedingungen, schwer zu lesen.

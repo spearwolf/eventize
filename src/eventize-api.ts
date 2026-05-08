@@ -8,8 +8,10 @@ import type {
   EventArgs,
   EventName,
   EventizedObject,
+  ListenerFuncType,
   ListenerObjectType,
   ListenerType,
+  OnEventNames,
   SubscribeArgs,
   UnsubscribeFunc,
 } from './types';
@@ -55,13 +57,180 @@ const _emit = (
   }
 };
 
-export const on = (obj: object, ...args: SubscribeArgs): UnsubscribeFunc => {
+// ---------------------------------------------------------------------------
+// on() — overloads ordered specific → generic to mirror SubscribeFunc with
+// a leading `obj` parameter.
+// ---------------------------------------------------------------------------
+
+// (1) listener function with event name(s)
+export function on(
+  obj: object,
+  eventNames: OnEventNames,
+  listener: ListenerFuncType,
+): UnsubscribeFunc;
+export function on(
+  obj: object,
+  eventNames: OnEventNames,
+  listener: ListenerFuncType,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function on(
+  obj: object,
+  eventNames: OnEventNames,
+  priority: number,
+  listener: ListenerFuncType,
+): UnsubscribeFunc;
+export function on(
+  obj: object,
+  eventNames: OnEventNames,
+  priority: number,
+  listener: ListenerFuncType,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+// (2) listener method name on listener object
+export function on(
+  obj: object,
+  eventNames: OnEventNames,
+  methodName: EventName,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function on(
+  obj: object,
+  eventNames: OnEventNames,
+  priority: number,
+  methodName: EventName,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+// (3) listener object alone
+export function on(
+  obj: object,
+  eventNames: OnEventNames,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function on(
+  obj: object,
+  eventNames: OnEventNames,
+  priority: number,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+// (4) catch-all (no event name)
+export function on(obj: object, listener: ListenerFuncType): UnsubscribeFunc;
+export function on(
+  obj: object,
+  listener: ListenerFuncType,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function on(
+  obj: object,
+  priority: number,
+  listener: ListenerFuncType,
+): UnsubscribeFunc;
+export function on(
+  obj: object,
+  priority: number,
+  listener: ListenerFuncType,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function on(
+  obj: object,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function on(
+  obj: object,
+  priority: number,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+// implementation
+export function on(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
   const eventizedObj = asEventized(obj);
   const {store, keeper} = eventizedObj[NAMESPACE];
   return makeUnsubscribe(eventizedObj, subscribeTo(store, keeper, args));
-};
+}
 
-export const once = (obj: object, ...args: SubscribeArgs): UnsubscribeFunc => {
+// ---------------------------------------------------------------------------
+// once() — same overload set as on(); auto-unsubscribes after the first call.
+// ---------------------------------------------------------------------------
+
+// (1) listener function with event name(s)
+export function once(
+  obj: object,
+  eventNames: OnEventNames,
+  listener: ListenerFuncType,
+): UnsubscribeFunc;
+export function once(
+  obj: object,
+  eventNames: OnEventNames,
+  listener: ListenerFuncType,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function once(
+  obj: object,
+  eventNames: OnEventNames,
+  priority: number,
+  listener: ListenerFuncType,
+): UnsubscribeFunc;
+export function once(
+  obj: object,
+  eventNames: OnEventNames,
+  priority: number,
+  listener: ListenerFuncType,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+// (2) listener method name on listener object
+export function once(
+  obj: object,
+  eventNames: OnEventNames,
+  methodName: EventName,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function once(
+  obj: object,
+  eventNames: OnEventNames,
+  priority: number,
+  methodName: EventName,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+// (3) listener object alone
+export function once(
+  obj: object,
+  eventNames: OnEventNames,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function once(
+  obj: object,
+  eventNames: OnEventNames,
+  priority: number,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+// (4) catch-all (no event name)
+export function once(obj: object, listener: ListenerFuncType): UnsubscribeFunc;
+export function once(
+  obj: object,
+  listener: ListenerFuncType,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function once(
+  obj: object,
+  priority: number,
+  listener: ListenerFuncType,
+): UnsubscribeFunc;
+export function once(
+  obj: object,
+  priority: number,
+  listener: ListenerFuncType,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function once(
+  obj: object,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function once(
+  obj: object,
+  priority: number,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+// implementation
+export function once(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
   const eventizedObj = asEventized(obj);
   const {store, keeper} = eventizedObj[NAMESPACE];
   const {listeners, publishRetained} = subscribeToDeferred(store, keeper, args);
@@ -80,7 +249,7 @@ export const once = (obj: object, ...args: SubscribeArgs): UnsubscribeFunc => {
   }
   publishRetained();
   return unsubscribe as UnsubscribeFunc;
-};
+}
 
 export const onceAsync = <ReturnType = void>(
   obj: object,

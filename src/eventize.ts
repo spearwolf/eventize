@@ -3,8 +3,8 @@ import {
   emit,
   emitAsync,
   off,
-  on,
-  once,
+  on as _on,
+  once as _once,
   onceAsync,
   retain,
   retainClear,
@@ -19,6 +19,14 @@ import type {
   SubscribeArgs,
   UnsubscribeFunc,
 } from './types';
+
+// Internal: TypeScript overload resolution cannot match a spread of a
+// union-of-tuples (`...args: SubscribeArgs`) against the public overload
+// signatures of `on` / `once`. Cast to the implementation-shape signature
+// for the class / inject delegations below; the public exports retain
+// their full overload set for end users.
+const on = _on as (obj: object, ...args: SubscribeArgs) => UnsubscribeFunc;
+const once = _once as (obj: object, ...args: SubscribeArgs) => UnsubscribeFunc;
 
 export const eventize: EventizerFuncAPI = (() => {
   const e = <T extends object>(obj: T = {} as T): T & EventizedObject =>

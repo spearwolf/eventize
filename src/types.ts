@@ -54,9 +54,78 @@ export type SubscribeArgs =
   | [number, ListenerObjectType]
   | [ListenerObjectType];
 
+/**
+ * Overloaded call signatures for `on()` / `once()`.
+ *
+ * Ordered specific → generic so TypeScript picks the most precise match first:
+ *   1. listener function (with/without priority, with/without listenerObject)
+ *   2. listener method name on a listener object
+ *   3. listener object alone
+ *   4. catch-all (no event name)
+ */
+export interface SubscribeFunc {
+  // (1) listener function with event name(s)
+  (eventNames: OnEventNames, listener: ListenerFuncType): UnsubscribeFunc;
+  (
+    eventNames: OnEventNames,
+    listener: ListenerFuncType,
+    listenerObject: ListenerObjectType,
+  ): UnsubscribeFunc;
+  (
+    eventNames: OnEventNames,
+    priority: number,
+    listener: ListenerFuncType,
+  ): UnsubscribeFunc;
+  (
+    eventNames: OnEventNames,
+    priority: number,
+    listener: ListenerFuncType,
+    listenerObject: ListenerObjectType,
+  ): UnsubscribeFunc;
+
+  // (2) listener method name on listener object
+  (
+    eventNames: OnEventNames,
+    methodName: EventName,
+    listenerObject: ListenerObjectType,
+  ): UnsubscribeFunc;
+  (
+    eventNames: OnEventNames,
+    priority: number,
+    methodName: EventName,
+    listenerObject: ListenerObjectType,
+  ): UnsubscribeFunc;
+
+  // (3) listener object alone (event-named methods on the object are the listeners)
+  (
+    eventNames: OnEventNames,
+    listenerObject: ListenerObjectType,
+  ): UnsubscribeFunc;
+  (
+    eventNames: OnEventNames,
+    priority: number,
+    listenerObject: ListenerObjectType,
+  ): UnsubscribeFunc;
+
+  // (4) catch-all (no event name; equivalent to subscribing to '*')
+  (listener: ListenerFuncType): UnsubscribeFunc;
+  (
+    listener: ListenerFuncType,
+    listenerObject: ListenerObjectType,
+  ): UnsubscribeFunc;
+  (priority: number, listener: ListenerFuncType): UnsubscribeFunc;
+  (
+    priority: number,
+    listener: ListenerFuncType,
+    listenerObject: ListenerObjectType,
+  ): UnsubscribeFunc;
+  (listenerObject: ListenerObjectType): UnsubscribeFunc;
+  (priority: number, listenerObject: ListenerObjectType): UnsubscribeFunc;
+}
+
 export interface EventizeApi extends EventizedObject {
-  on(...args: SubscribeArgs): UnsubscribeFunc;
-  once(...args: SubscribeArgs): UnsubscribeFunc;
+  on: SubscribeFunc;
+  once: SubscribeFunc;
   onceAsync<ReturnType = void>(eventNames: AnyEventNames): Promise<ReturnType>;
 
   off(listener?: ListenerType, listenerObject?: ListenerObjectType): void;

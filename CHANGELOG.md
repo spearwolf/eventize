@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Types:** `on()` and `once()` now expose IDE-friendly function overloads instead of a single rest parameter typed as a 14-member tuple union. Hovering or autocompleting either function shows each supported call shape on its own line (event-name + listener function, listener method name on a listener object, listener-object alone, catch-all wildcard variants — each with and without explicit priority), ordered specific → generic. The new overload set covers the standalone exports `on`/`once`, the `eventize.inject(obj)` methods, and the `Eventize` class methods. Internally a new `SubscribeFunc` callable interface in `types.ts` carries the canonical method-form overloads, used by `EventizeApi`. The implementation type alias `SubscribeArgs` is unchanged and still drives the runtime dispatch in `subscribeTo()`. No runtime-behavior change; existing valid calls keep typechecking, and the on()/once() spec suite (all 314 tests) passes unmodified.
+
 
 ## `v4.0.3` (2026-05-07)
 
