@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## `v4.3.1` (2026-05-08)
+
 - **Types:** `off()` is now fully permissive at the type level — every parameter accepts `unknown`. Previously, calling `off(ε, eventName)` on a typed emitter (`eventize<TEvents>()` etc.) narrowed `eventName` to `EventKeysOf<TEvents>`, which forced cleanup code to cast whenever the value came from config, a saved unsubscribe handle, or any other arbitrary source. The runtime was already permissive; this change just lets the types reflect that. No runtime change. The injected/class `off()` method, the `EventizeApi.off` interface, the `isEventized()` guard, and the internal `EventStore.remove` chain were loosened to match. Affects `src/eventize-api.ts`, `src/eventize.ts`, `src/types.ts`, `src/isEventized.ts`, `src/EventStore.ts`, `src/EventListener.ts`.
 - **Docs:** README _TypeScript: Typed Event Maps → Caveats_ now lists `off()` alongside `getSubscriptionCount` / `isEventized` as intentionally untyped against `TEvents`.
 
