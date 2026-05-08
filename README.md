@@ -1161,7 +1161,7 @@ The constraint on `TEvents` is intentionally as loose as `object` so a plain int
 
 ### Backwards compatibility & duck-typing
 
-Without a generic, every API behaves exactly like v4 — full duck-typing, arbitrary event names, listener-objects with whatever method names you like:
+Without a generic, every API behaves exactly like v4.0.x — full duck-typing, arbitrary event names, listener-objects with whatever method names you like:
 
 ```ts
 const ε = eventize();              // no generic → DefaultEventMap (permissive)
