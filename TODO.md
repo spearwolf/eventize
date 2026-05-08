@@ -17,14 +17,6 @@ Kann breaking-frei eingeführt werden. Verbessert Konsistenz und DX deutlich.
 **Fix:** `unretain(obj, eventNames)` exportieren, das `keeper.remove(eventNames)` aufruft. In `Eventize`-Klasse und `inject()` analog ergänzen.
 **Test:** Spec, der `retain → emit → unretain → on (neuer subscriber) → kein Replay` verifiziert.
 
-### 🟡 14. Konsistente Fehlerstrategie zwischen Subscribe- und Emit-Pfad
-**Datei:** `src/eventize-api.ts`
-**Problem:** `on/once/retain` rufen auto-`asEventized()` auf nicht-eventized Objekten auf. `emit/emitAsync/off/retainClear` werfen `'object is not eventized'`. Asymmetrie ist verwirrend.
-**Optionen:**
-- (A) Tolerant: `emit/off/retainClear` ebenfalls auto-eventizen. Vorteil: konsistent. Nachteil: `emit({}, …)` funktioniert nun stillschweigend ohne Listener — ist das wünschenswert?
-- (B) Strikt: `on/once/retain` werfen ebenfalls. Sauberer, aber Breaking Change → besser in v5.
-**Fix für v4.1:** Variante A. README anpassen, Edge-Case-Specs erweitern.
-
 ### ⚡ 18. Sortierte Insertion statt `arr.sort()` bei `add`
 **Datei:** `src/EventStore.ts`
 **Problem:** Jeder `on()` ruft `arr.sort(sortByPriorityAndId)` → O(n log n). Bei vielen Listenern unnötig.
@@ -87,12 +79,6 @@ In v5: alte Namen deprecated markieren. In v6: entfernen.
 **Datei:** `src/EventKeeper.ts`
 **Problem:** Methodenname `emit` ist irreführend — die Methode "replayed" retained events an einen neuen Listener, sie emittet nichts neues.
 **Fix:** Umbenennen in `replayTo(listener)` o.ä. Intern, nicht breaking für Public-API-Nutzer (Klasse ist nicht exportiert).
-
-### 🟡 26. Strikte Fehlerstrategie statt Auto-Eventize
-**Datei:** `src/eventize-api.ts`
-**Abhängig von:** Aufgabe 14 (sofern Variante A für v4.1 gewählt wurde, ist das hier die Umkehrung)
-**Überlegung:** `on/once/retain` sollten genauso wie `emit/off/retainClear` werfen, wenn das Objekt nicht eventized ist. Aktuelles Verhalten (auto-eventize bei subscribe) versteckt Bugs (Tippfehler im Variablennamen → stilles Eventize eines anderen Objekts).
-**Migration:** Klar in CHANGELOG vermerken, README umstellen.
 
 ### 🟢 27. Listener-Exception-Handling überdenken
 **Abhängig von:** Aufgabe 7, 8

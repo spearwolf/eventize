@@ -215,6 +215,38 @@ class Foo {
 
 ---
 
+### Auto-eventize vs. strict mode (intentional asymmetry)
+
+Eventize splits its API into two families with different behavior on a non-eventized object — this is **by design**, not a quirk:
+
+| Function                                  | On a non-eventized object   |
+| ----------------------------------------- | --------------------------- |
+| `on()`, `once()`, `onceAsync()`, `retain()` | Auto-eventizes the object   |
+| `emit()`, `emitAsync()`, `off()`, `retainClear()` | Throws `"object is not eventized"` |
+
+**Why the split?**
+
+`on` / `once` / `retain` _install_ behavior — they attach hooks, listeners, or a retain policy to an object. Requiring an explicit `eventize(obj)` call before every `on(obj, …)` would be pure ceremony, so these functions auto-eventize as a developer-experience shortcut. Calling `on({}, 'foo', fn)` is a perfectly meaningful intent: _"I want to start listening to events on this object"_.
+
+`emit` / `emitAsync` / `off` / `retainClear` _operate on_ an existing emitter — they fire events, remove subscriptions, or clear retained state. Calling them on a plain `{}` is almost always a bug: nothing has ever been subscribed, no events were ever retained, no state to remove or fire against. Auto-eventizing here would silently turn typos into no-ops (`emit(typoVariable, 'foo')` would just create a new emitter and discard the call). Throwing surfaces the mistake immediately.
+
+```javascript
+// ✅ Auto-eventize: convenient, intent is clear
+const obj = {};
+on(obj, 'foo', () => console.log('foo')); // obj is now eventized
+emit(obj, 'foo'); // works
+
+// ❌ Strict: catches the bug instead of silently doing nothing
+const plain = {};
+emit(plain, 'foo'); // throws: "object is not eventized"
+off(plain); // throws: "object is not eventized"
+retainClear(plain, 'foo'); // throws: "object is not eventized"
+```
+
+The type guard `isEventized(obj)` (see _Utilities_) lets you check defensively if you ever need to. `getSubscriptionCount(obj)` is the one exception that returns `0` for non-eventized inputs instead of throwing — see its section for the rationale.
+
+---
+
 ### Subscribing to Events
 
 #### `on(emitter, ...args)`
