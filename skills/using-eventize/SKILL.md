@@ -138,3 +138,35 @@ off();
 - You need async-by-default queuing → use a real message bus.
 - You need backpressure / streams → use `ReadableStream` / RxJS.
 - You only need a single callback → just pass the function.
+
+## Migration notes: 4.0.x → 4.3.x (strict types)
+
+v4.3 added a unique-symbol brand (`[__TEventsBrand]`, `[NAMESPACE]`) to `EventizedObject<TEvents>`. The function-style API (`on(obj, …)`, `emit(obj, …)`, `retain(obj, …)`, etc.) now requires the first arg to be either a branded `EventizedObject<T>` or assignable to `NonTypedEmitter<T>`. Plain class instances no longer satisfy this — `eventize(this)` runtime-brands the instance but the *type* of `this` stays unbranded, so every subsequent `emit(this, …)` / `on(this, …)` call inside the class fails to type-check.
+
+**Fix without refactoring**: declaration-merge an empty interface that brings in the brand. Per class file:
+
+```ts
+import {emit, type EventizedObject, eventize, on, retain} from '@spearwolf/eventize';
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface MyClass extends EventizedObject {}
+
+export class MyClass {
+  constructor() {
+    eventize(this);          // unchanged, still required at runtime
+    retain(this, 'ready');   // now type-checks
+  }
+  doStuff() { emit(this, 'ready'); }
+}
+```
+
+Apply to every class that calls `eventize(this)` (or auto-eventizes via `retain`/`on`/`once` on `this`). Works for classes that already `extends SomeBase` — the merge is independent of the runtime inheritance chain. The brand symbols are non-exported `unique symbol`s, so this declaration-merge is the *only* way (besides `extends Eventize`) to satisfy the constraint without `as any`.
+
+**Two residual call sites that still need help even after the merge:**
+
+1. **Polymorphic-`this` + listener-object form**: `on(this, listenerObj)` fails because TS can't reduce `NonTypedEmitter<this>` when `this` is generic. Cast to the concrete class: `on(this as MyClass, listenerObj)`.
+2. **`on.bind(undefined, this, eventName)` patterns**: TS picks a wrong overload (often the priority-as-number one) and rejects the string event name. Cast the function reference: `(on as (...args: unknown[]) => unknown).bind(undefined, this, eventName)`. Don't use `as Function` — ESLint's `no-unsafe-function-type` rejects it.
+
+**Do NOT extend `EventizeApi` instead of `EventizedObject`** — `EventizeApi` carries the public method signatures (`on`, `emit`, `retain`, …) and will collide with any same-named method on the host class (e.g. a class with its own `on()` API method).
+
+**Sanity check after migration**: typecheck → build → tests. Runtime behavior is unchanged; this is purely a type-level adjustment.
