@@ -73,6 +73,58 @@ const _emit = (
   }
 };
 
+// Duck-typing dispatch for non-eventized targets (v5+). Mirrors the
+// listener-object fallback in EventListener.ts: try obj[eventName](...args)
+// first; if no method is found, fall back to obj.emit(eventName, ...args);
+// otherwise silently no-op. Return values are surfaced via the same
+// `returnValue` callback used for eventized dispatch, so emitAsync can
+// aggregate them uniformly across both paths.
+const _duckEmitOne = (
+  obj: object,
+  eventName: EventName,
+  args: EventArgs,
+  returnValue?: (val: unknown) => void,
+) => {
+  if (eventName === EVENT_CATCH_EM_ALL) {
+    throw new Error(
+      "emit() must be called with a concrete event name — '*' is reserved for subscribing to all events and cannot be emitted",
+    );
+  }
+  const target = obj as Record<EventName, unknown>;
+  const fn = target[eventName];
+  if (typeof fn === 'function') {
+    const retVal = (fn as (...a: any[]) => any).apply(obj, args);
+    if (retVal != null) returnValue?.(retVal);
+    return;
+  }
+  const emitFn = (target as {emit?: unknown}).emit;
+  if (typeof emitFn === 'function') {
+    const retVal = (emitFn as (...a: any[]) => any).apply(obj, [
+      eventName,
+      ...args,
+    ]);
+    if (retVal != null) returnValue?.(retVal);
+  }
+};
+
+const _duckEmit = (
+  obj: object,
+  eventNames: AnyEventNames,
+  args: EventArgs,
+  returnValue?: (val: unknown) => void,
+) => {
+  if (Array.isArray(eventNames)) {
+    eventNames.forEach((event: EventName) =>
+      _duckEmitOne(obj, event, args, returnValue),
+    );
+  } else {
+    _duckEmitOne(obj, eventNames, args, returnValue);
+  }
+};
+
+const isDuckTarget = (obj: unknown): obj is object =>
+  obj != null && typeof obj === 'object';
+
 // ---------------------------------------------------------------------------
 // on() — overloads ordered specific → generic.
 //
@@ -414,14 +466,15 @@ export function emit<T extends object>(
 ): void;
 // implementation
 export function emit(
-  eventizedObj: object,
+  target: object,
   eventNames: AnyEventNames,
   ...args: EventArgs
 ): void {
-  if (!isEventized(eventizedObj)) {
-    throw new Error('object is not eventized');
+  if (isEventized(target)) {
+    _emit(target, eventNames, args);
+  } else if (isDuckTarget(target)) {
+    _duckEmit(target, eventNames, args);
   }
-  _emit(eventizedObj, eventNames, args);
 }
 
 export function emitAsync<
@@ -447,17 +500,19 @@ export function emitAsync<T extends object>(
 ): Promise<any>;
 // implementation
 export function emitAsync(
-  eventizedObj: object,
+  target: object,
   eventNames: AnyEventNames,
   ...args: EventArgs
 ): Promise<any> {
-  if (!isEventized(eventizedObj)) {
-    throw new Error('object is not eventized');
-  }
   let values: any[] = [];
-  _emit(eventizedObj, eventNames, args, (val: unknown) => {
+  const returnValue = (val: unknown) => {
     values.push(val);
-  });
+  };
+  if (isEventized(target)) {
+    _emit(target, eventNames, args, returnValue);
+  } else if (isDuckTarget(target)) {
+    _duckEmit(target, eventNames, args, returnValue);
+  }
   values = values.map((val: any) =>
     Array.isArray(val) ? Promise.all(val) : Promise.resolve(val),
   );

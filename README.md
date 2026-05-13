@@ -228,41 +228,60 @@ class Foo {
 
 ---
 
-### Auto-eventize vs. strict mode (intentional asymmetry)
+### Auto-eventize vs. duck-typing vs. strict mode
 
-Eventize splits its API into two families with different behavior on a non-eventized object — this is **by design**, not a quirk:
+Eventize splits its API into three families based on how each function behaves on a non-eventized target. This is **by design**:
 
-| Function                                  | On a non-eventized object   |
-| ----------------------------------------- | --------------------------- |
-| `on()`, `once()`, `onceAsync()`, `retain()` | Auto-eventizes the object   |
-| `off()`                                   | Silently does nothing       |
-| `emit()`, `emitAsync()`, `retainClear()`, `unretain()` | Throws `"object is not eventized"` |
+| Function                                    | On a non-eventized object                  |
+| ------------------------------------------- | ------------------------------------------ |
+| `on()`, `once()`, `onceAsync()`, `retain()` | Auto-eventizes the object                  |
+| `emit()`, `emitAsync()` (v5+)               | Duck-types: calls `obj[eventName](...args)` |
+| `off()`                                     | Silently does nothing                      |
+| `retainClear()`, `unretain()`               | Throws `"object is not eventized"`         |
 
 **Why the split?**
 
 `on` / `once` / `retain` _install_ behavior — they attach hooks, listeners, or a retain policy to an object. Requiring an explicit `eventize(obj)` call before every `on(obj, …)` would be pure ceremony, so these functions auto-eventize as a developer-experience shortcut. Calling `on({}, 'foo', fn)` is a perfectly meaningful intent: _"I want to start listening to events on this object"_.
 
-`emit` / `emitAsync` / `retainClear` / `unretain` _operate on_ an existing emitter — they fire events or clear retained state. Calling them on a plain `{}` is almost always a bug: nothing has ever been subscribed, no events were ever retained, no state to remove or fire against. Auto-eventizing here would silently turn typos into no-ops (`emit(typoVariable, 'foo')` would just create a new emitter and discard the call). Throwing surfaces the mistake immediately.
+`emit` / `emitAsync` fire events. On an eventized target, they dispatch to subscribed listeners. On a **non-eventized object** (v5+), they fall back to duck-typing — the same pattern that already powers listener-object dispatch:
 
-`off` is the exception: cleanup code routinely runs against objects whose lifecycle isn't fully under the caller's control (teardown helpers, conditional listeners, optional handles). Demanding the target be eventized turns harmless cleanup into defensive `isEventized()` boilerplate, so `off()` is permissive — it accepts any object and quietly does nothing if there's nothing to remove.
+1. If `obj[eventName]` is a function → call it with the args (with `this === obj`).
+2. Else if `obj.emit` is a function → call `obj.emit(eventName, ...args)`.
+3. Otherwise → silently no-op.
+
+This lets you point `emit()` at adapters, mocks, or plain method-bags without ceremony. `null` / `undefined` / non-object targets silently no-op. **`'*'` still throws** — it remains subscribe-only.
+
+`retainClear` / `unretain` _operate on retain state_ that only exists on eventized objects. There is no meaningful duck-typed equivalent, so they continue to throw — pointing them at a plain `{}` is almost always a bug.
+
+`off` is permissive: cleanup code routinely runs against objects whose lifecycle isn't fully under the caller's control. Demanding the target be eventized turns harmless cleanup into defensive `isEventized()` boilerplate, so `off()` accepts any object and quietly does nothing if there's nothing to remove.
 
 ```javascript
 // ✅ Auto-eventize: convenient, intent is clear
 const obj = {};
 on(obj, 'foo', () => console.log('foo')); // obj is now eventized
-emit(obj, 'foo'); // works
+emit(obj, 'foo'); // works (dispatches to listener)
+
+// ✅ Duck-typing (v5+): point emit() at a plain method-bag
+const sink = {
+  foo(msg) {
+    console.log('foo:', msg);
+  },
+};
+emit(sink, 'foo', 'hello'); // => "foo: hello"
+emit(sink, 'missing'); // no-op (no method, no .emit fallback)
 
 // ✅ off() is permissive — safe in cleanup paths
 off({}); // no-op, no throw
 
-// ❌ Strict: catches the bug instead of silently doing nothing
+// ❌ Strict: retain-state mutators still surface typos
 const plain = {};
-emit(plain, 'foo'); // throws: "object is not eventized"
 retainClear(plain, 'foo'); // throws: "object is not eventized"
 unretain(plain, 'foo'); // throws: "object is not eventized"
 ```
 
-The type guard `isEventized(obj)` (see _Utilities_) lets you check defensively if you ever need to. `getSubscriptionCount(obj)` is the one exception that returns `0` for non-eventized inputs instead of throwing — see its section for the rationale.
+The type guard `isEventized(obj)` (see _Utilities_) lets you check defensively if you ever need to. `getSubscriptionCount(obj)` is another exception that returns `0` for non-eventized inputs instead of throwing — see its section for the rationale.
+
+> **Migration from v4 → v5:** Previously `emit()` / `emitAsync()` also threw `"object is not eventized"` on a non-eventized target. If you relied on that as a typo-safety net, either gate the call with `isEventized()` or use a typed emitter (`eventize<TEvents>()`) — typed emitters still reject unknown event names at compile time.
 
 ---
 
@@ -1224,7 +1243,7 @@ on(ε, {
 });
 ```
 
-Plain `{}` passed to `on`, `emit`, etc. continues to work the same way (`on` auto-eventizes; `emit` throws `"object is not eventized"` — see _Auto-eventize vs. strict mode_ above).
+Plain `{}` passed to `on`, `emit`, etc. continues to work the same way (`on` auto-eventizes; `emit` falls back to duck-typing on non-eventized objects since v5 — see _Auto-eventize vs. duck-typing vs. strict mode_ above).
 
 ### Symbol events as an escape hatch
 

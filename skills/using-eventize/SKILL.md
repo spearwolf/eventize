@@ -79,16 +79,17 @@ await emitAsync(ε, 'load')          // resolves when all listener promises sett
 
 ## ⚠️ Quirks & pitfalls (read these)
 
-1. **Auto-eventize asymmetry — by design**:
-   - `on/once/onceAsync/retain` on a plain object → auto-eventizes it.
-   - `emit/emitAsync/retainClear/unretain` on a non-eventized object → **throws** `"object is not eventized"`. This catches typos that would otherwise silently no-op.
-   - `off` is the exception in the strict family: it accepts any object (including `null`/`undefined`) and **silently no-ops** when there's nothing to remove — safe in cleanup paths without `isEventized()` guards. (`getSubscriptionCount` returns `0` for non-eventized inputs as well.)
+1. **Auto-eventize vs. strict vs. duck-typing — three families**:
+   - **Auto-eventize (`on/once/onceAsync/retain`)**: on a plain object → auto-eventizes it.
+   - **Duck-typing (`emit/emitAsync`, v5+)**: on a non-eventized **object**, falls back to calling `obj[eventName](...args)`, then `obj.emit(eventName, ...args)`, then silent no-op. `'*'` still throws (subscribe-only). `null`/`undefined`/primitives silently no-op. **No more `"object is not eventized"` throw** — typos no longer surface here, use `isEventized()` defensively if needed, or a typed emitter (`eventize<TEvents>()`) which still rejects unknown event names at compile time. (Pre-v5: these threw.)
+   - **Strict (`retainClear/unretain`)**: still throws `"object is not eventized"` on a non-eventized target — no meaningful duck-typed equivalent for retain state.
+   - **Permissive (`off`)**: accepts any object (including `null`/`undefined`) and **silently no-ops** when there's nothing to remove — safe in cleanup paths without `isEventized()` guards. (`getSubscriptionCount` returns `0` for non-eventized inputs as well.)
 
 2. **`'*'` is subscribe-only.** `emit(ε, '*', …)` throws. Use a concrete name.
 
 3. **Wildcard function listeners do NOT receive the event name** — only the args. To get the name, register a listener-object with an `.emit(eventName, ...args)` method.
 
-4. **Forwarding between emitters**: `on(upstream, downstream)` works because `eventize.inject()` / `class Eventize` install an `.emit()` method that doubles as the catch-all sink. ⚠️ **Plain `eventize(obj)` does NOT install `.emit`** — forwarding to such a target silently no-ops.
+4. **Forwarding between emitters**: `on(upstream, downstream)` works because `eventize.inject()` / `class Eventize` install an `.emit()` method that doubles as the catch-all sink. ⚠️ **Plain `eventize(obj)` does NOT install `.emit`** — forwarding to such a target silently no-ops. Conversely (v5+), since `emit()` itself duck-types non-eventized objects, you can `emit(plainObj, 'foo', …)` directly and it will call `plainObj.foo(…)` if defined, or `plainObj.emit('foo', …)` as fallback.
 
 5. **No recursion guard**: re-emitting the same event on the same emitter (directly or via a forwarding chain `A → B → A`) is allowed and will recurse until the stack overflows. The v4.2 guard was removed because some valid patterns need same-event re-emission. Break cycles yourself if you build a forwarding chain.
 

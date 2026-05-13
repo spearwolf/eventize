@@ -57,11 +57,11 @@ describe('emit()', () => {
     });
   });
 
-  describe('duck typing', () => {
-    it('should throw error if target object is not eventized', () => {
+  describe('duck typing (v5+)', () => {
+    it('no longer throws when the target is a non-eventized plain object', () => {
       expect(() => {
         emit({}, 'foo', 'bar', 666);
-      }).toThrow();
+      }).not.toThrow();
     });
   });
 });

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## `v5.0.0` (2026-05-13) — Duck-typed `emit()` / `emitAsync()`
+
+- **BREAKING:** `emit()` and `emitAsync()` no longer throw `"object is not eventized"` when called on a non-eventized target. Instead, they fall back to duck-typing — the same pattern already used by the listener-object dispatch path (`EventListener.ts`):
+  1. If `obj[eventName]` is a function, call it with the args (with `this === obj`).
+  2. Otherwise, if `obj.emit` is a function, call `obj.emit(eventName, ...args)`.
+  3. Otherwise, silently no-op.
+  Return values are funneled through the same aggregation pipeline as eventized listeners, so `emitAsync()` collects them uniformly. `null` / `undefined` / non-object targets silently no-op. The `'*'` wildcard still throws — it remains subscribe-only. **Migration:** callers that relied on `emit()` / `emitAsync()` throwing as a typo-safety net should add an explicit `isEventized()` guard (or a TypeScript typed emitter, which still rejects unknown event names at compile time).
+- **Unchanged (strict):** `retainClear()` and `unretain()` continue to throw `"object is not eventized"` — they operate on internal retain state that does not exist on plain objects and has no meaningful duck-typed equivalent.
+- **Types:** Public overload set unchanged. The existing typed-emitter overload still binds first for `EventizedObject<TEvents>`, and the loose `NonTypedEmitter<T>` overload accepts plain objects — types now match runtime exactly.
+- **Tests:** New `src/emit-ducktyping.spec.ts` (28 cases) covers method-with-args, `this` binding, symbol event names, `.emit()` fallback, missing-method silent no-op, array forms with mixed method/fallback, wildcard rejection, non-object targets, `retainClear`/`unretain` strictness, and the full `emitAsync()` return-aggregation pipeline (sync value, Promise, array-of-Promises, null, undefined, no-op). Existing `emit.spec.ts › duck typing` case flipped to assert non-throw.
+- **Docs:** README _Auto-eventize vs. strict mode_ table and examples updated; `skills/using-eventize/SKILL.md` quirks #1 and #4 (forwarding caveat) revised.
+- **Affected files:** `src/eventize-api.ts`, `src/emit-ducktyping.spec.ts` (new), `src/emit.spec.ts`, `README.md`, `skills/using-eventize/SKILL.md`, `package.json` (`4.3.1` → `5.0.0`).
+- Coverage for `src/eventize-api.ts`: 100% statements / branches / functions / lines.
+
 ## `v4.3.1` (2026-05-08)
 
 - **Types:** `off()` is now fully permissive at the type level — every parameter accepts `unknown`. Previously, calling `off(ε, eventName)` on a typed emitter (`eventize<TEvents>()` etc.) narrowed `eventName` to `EventKeysOf<TEvents>`, which forced cleanup code to cast whenever the value came from config, a saved unsubscribe handle, or any other arbitrary source. The runtime was already permissive; this change just lets the types reflect that. No runtime change. The injected/class `off()` method, the `EventizeApi.off` interface, the `isEventized()` guard, and the internal `EventStore.remove` chain were loosened to match. Affects `src/eventize-api.ts`, `src/eventize.ts`, `src/types.ts`, `src/isEventized.ts`, `src/EventStore.ts`, `src/EventListener.ts`.
