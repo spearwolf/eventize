@@ -1,0 +1,803 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project Audit — @spearwolf/eventize v5.0.0</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #fafaf9;
+    --panel: #ffffff;
+    --panel-2: #f3f3f0;
+    --fg: #1a1a1a;
+    --fg-muted: #595959;
+    --fg-dim: #8a8a87;
+    --border: #e5e3df;
+    --accent: #4a5fc7;
+    --critical: #c81e1e;
+    --high: #e26b1e;
+    --medium: #c98a08;
+    --low: #2563a8;
+    --info: #6b7280;
+    --improved: #1f8a3a;
+    --carried: #888;
+    --code-bg: #f2f1ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16161a;
+      --panel: #1e1e22;
+      --panel-2: #25252b;
+      --fg: #ececec;
+      --fg-muted: #b0b0b0;
+      --fg-dim: #7d7d83;
+      --border: #2f2f36;
+      --accent: #91a2ee;
+      --critical: #f56565;
+      --high: #fb923c;
+      --medium: #fbbf24;
+      --low: #60a5fa;
+      --info: #9ca3af;
+      --improved: #4ade80;
+      --code-bg: #25252b;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--fg); }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    margin: 0;
+    padding: 0;
+  }
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 28px 80px;
+  }
+  h1 { font-size: 2.1rem; margin: 0 0 0.2em; letter-spacing: -0.01em; }
+  h2 {
+    font-size: 1.35rem;
+    margin: 2.6em 0 0.6em;
+    padding-bottom: 0.4em;
+    border-bottom: 1px solid var(--border);
+    letter-spacing: -0.01em;
+  }
+  h3 { font-size: 1.05rem; margin: 1.6em 0 0.4em; color: var(--fg-muted); }
+  p { margin: 0.4em 0 0.8em; color: var(--fg); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, monospace; }
+  code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 0.92em; }
+  pre {
+    background: var(--code-bg);
+    padding: 12px 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.85em;
+    line-height: 1.5;
+    border: 1px solid var(--border);
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .header-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 20px;
+    align-items: flex-start;
+    margin-bottom: 1.5em;
+  }
+  .meta { color: var(--fg-muted); font-size: 0.92rem; }
+  .meta strong { color: var(--fg); font-weight: 600; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    font-size: 0.78rem;
+    border-radius: 999px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--fg-muted);
+  }
+  .score-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 24px;
+    text-align: center;
+    min-width: 160px;
+  }
+  .score-value { font-size: 2.6rem; font-weight: 700; color: var(--accent); line-height: 1; }
+  .score-label { font-size: 0.78rem; color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 22px;
+    margin: 1em 0;
+  }
+
+  .domains {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+  }
+  .domain {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .domain h4 { margin: 0 0 6px; font-size: 0.98rem; }
+  .domain p { font-size: 0.9rem; color: var(--fg-muted); margin: 0 0 8px; }
+  .pathchip {
+    display: inline-block;
+    font-family: ui-monospace, monospace;
+    font-size: 0.78rem;
+    color: var(--fg-dim);
+    background: var(--panel-2);
+    padding: 1px 7px;
+    margin: 2px 4px 2px 0;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+
+  .sev-bars {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin: 1em 0;
+  }
+  .sev-bar {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--info);
+    border-radius: 6px;
+    padding: 12px 14px;
+  }
+  .sev-bar .n { font-size: 1.6rem; font-weight: 600; }
+  .sev-bar .lbl { font-size: 0.78rem; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .sev-bar.critical { border-left-color: var(--critical); }
+  .sev-bar.high { border-left-color: var(--high); }
+  .sev-bar.medium { border-left-color: var(--medium); }
+  .sev-bar.low { border-left-color: var(--low); }
+  .sev-bar.info { border-left-color: var(--info); }
+
+  .cat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .cat-pill {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    display: flex;
+    justify-content: space-between;
+  }
+  .cat-pill .cnt { font-weight: 600; color: var(--fg-muted); }
+
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0.6em 0 1.2em;
+    align-items: center;
+  }
+  .filter-group { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+  .filter-group .label { font-size: 0.78rem; color: var(--fg-dim); margin-right: 4px; }
+  .filters button {
+    font-family: inherit;
+    font-size: 0.8rem;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--fg-muted);
+    cursor: pointer;
+  }
+  .filters button.active {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  table.backlog {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 0.92rem;
+  }
+  table.backlog thead { background: var(--panel-2); }
+  table.backlog th {
+    text-align: left;
+    padding: 9px 12px;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fg-dim);
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+  }
+  table.backlog td {
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+    vertical-align: top;
+  }
+  table.backlog tr.detail-row td { background: var(--panel-2); padding: 14px 20px; }
+  table.backlog tr.row { cursor: pointer; }
+  table.backlog tr.row:hover { background: var(--panel-2); }
+  table.backlog tr.row td:first-child { font-family: ui-monospace, monospace; font-size: 0.82rem; color: var(--fg-dim); }
+  .sev-tag {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 4px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: white;
+  }
+  .sev-tag.critical { background: var(--critical); }
+  .sev-tag.high { background: var(--high); }
+  .sev-tag.medium { background: var(--medium); }
+  .sev-tag.low { background: var(--low); }
+  .sev-tag.info { background: var(--info); }
+  .loc { font-family: ui-monospace, monospace; font-size: 0.83rem; color: var(--fg-muted); }
+  .effort {
+    display: inline-block;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--panel-2);
+    text-align: center;
+    line-height: 22px;
+    font-size: 0.74rem;
+    color: var(--fg-muted);
+    border: 1px solid var(--border);
+    font-weight: 600;
+  }
+  .detail-row .desc { margin: 0 0 0.6em; }
+  .detail-row .rec {
+    background: var(--panel);
+    padding: 10px 14px;
+    border-left: 3px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+  }
+  .detail-row .rec strong { color: var(--accent); }
+
+  ul.open-q li, ul.opt li { margin-bottom: 0.5em; }
+  .methodology { color: var(--fg-muted); font-size: 0.9rem; }
+  .methodology code { color: var(--fg); }
+
+  .footer { margin-top: 3em; padding-top: 1em; border-top: 1px solid var(--border); color: var(--fg-dim); font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<main>
+
+<header class="header-grid">
+  <div>
+    <h1>Project Audit — <code>@spearwolf/eventize</code></h1>
+    <div class="meta">
+      <strong>Version</strong> 5.0.0 &middot;
+      <strong>Audit-Datum</strong> 2026-05-14 &middot;
+      <strong>Sprache</strong> TypeScript
+    </div>
+    <div class="badges">
+      <span class="badge">TypeScript 5.9</span>
+      <span class="badge">Target ES2022</span>
+      <span class="badge">Jest 30 + ts-jest</span>
+      <span class="badge">tsup (CJS + ESM)</span>
+      <span class="badge">ESLint 9 (flat)</span>
+      <span class="badge">Prettier 3</span>
+      <span class="badge">Node ≥ 18.16</span>
+      <span class="badge">Apache-2.0</span>
+      <span class="badge">399 Tests / 24 Suites</span>
+      <span class="badge">0 Runtime-Deps</span>
+    </div>
+  </div>
+  <div class="score-card">
+    <div class="score-value">85.5</div>
+    <div class="score-label">Health Score</div>
+  </div>
+</header>
+
+<h2>Projektportrait</h2>
+<div class="panel">
+  <p>
+    <code>@spearwolf/eventize</code> ist eine kleine, abhängigkeitsfreie Bibliothek
+    für <strong>synchrones</strong>, Event-getriebenes Programmieren in JS/TS. Sie
+    rüstet beliebige Objekte (POJOs, Klasseninstanzen, leere <code>{}</code>) mit
+    einem versteckten, symbol-keyed Event-Registry nach und bietet drei Stile
+    auf identischer Laufzeitbasis: freistehende Funktionen (<code>on(ε, …)</code>),
+    injizierte Methoden (<code>eventize.inject(obj)</code>) und Basisklassen-
+    Vererbung (<code>class extends Eventize</code>).
+  </p>
+  <p>
+    Das Feature-Set ist bewusst spitz: <strong>Wildcards</strong> (<code>'*'</code>)
+    für catch-all-Listener, numerische <strong>Prioritäten</strong> mit stabiler
+    FIFO-Sortierung bei Gleichstand, <strong>retained events</strong> (das
+    zuletzt emittierte Event wird gespeichert und an späte Subscriber neu
+    abgespielt), opt-in <strong>typisierte Event-Maps</strong> mit strenger
+    Compile-Time-Validierung der Argument-Tupel, sowie <strong>Duck-Typing</strong>
+    auf nicht-eventizierten Zielen (v5+). Bündelt CJS+ESM mit dual&nbsp;<code>.d.ts</code>
+    und wird über <code>attw</code> abgesichert. Test-Coverage greift mit 399
+    Tests insbesondere die kniffligen Pfade auf (Reentrancy, Throwing-Listener,
+    Retain-Replay-Timing, Wildcard-Forwarding).
+  </p>
+
+  <h3 style="margin-top:1.6em;">Domänen</h3>
+  <div class="domains">
+    <div class="domain">
+      <h4>Eventize-Lifecycle</h4>
+      <p>Marker-basiertes Eventizing über versteckten Symbol-Slot; Type-Guard und Idempotenz.</p>
+      <div>
+        <span class="pathchip">asEventized.ts</span>
+        <span class="pathchip">isEventized.ts</span>
+        <span class="pathchip">eventize.ts</span>
+        <span class="pathchip">constants.ts</span>
+      </div>
+    </div>
+    <div class="domain">
+      <h4>Listener-Registry</h4>
+      <p>Speicherung sortierter Listener pro Event-Name und globaler catch-all-Pool. Binary-Insert, Refcount, Reentrancy-tolerant.</p>
+      <div>
+        <span class="pathchip">EventStore.ts</span>
+        <span class="pathchip">EventListener.ts</span>
+        <span class="pathchip">Priority.ts</span>
+      </div>
+    </div>
+    <div class="domain">
+      <h4>Retained Events</h4>
+      <p>„Sticky last-value“-Mechanik mit globaler Order-ID; Replay an späte Subscriber in originaler Sequenz.</p>
+      <div>
+        <span class="pathchip">EventKeeper.ts</span>
+      </div>
+    </div>
+    <div class="domain">
+      <h4>Subscription-Parsing</h4>
+      <p>Decoder für die ~15 überladenen <code>on()</code>-Aufrufformen (Event-Name(n), Prio-Tupel, Funktion vs. Methodenname vs. Listener-Object).</p>
+      <div>
+        <span class="pathchip">subscribeTo.ts</span>
+      </div>
+    </div>
+    <div class="domain">
+      <h4>Public API</h4>
+      <p>Funktionale Surface, Inject-Methode, Klassen-Basis und Typ-Overloads — alle delegieren auf dieselben Primitiven.</p>
+      <div>
+        <span class="pathchip">eventize-api.ts</span>
+        <span class="pathchip">index.ts</span>
+        <span class="pathchip">types.ts</span>
+        <span class="pathchip">getSubscriptionCount.ts</span>
+        <span class="pathchip">utils.ts</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>Executive Summary</h2>
+<div class="panel">
+  <p>
+    Das Projekt ist eine <strong>überdurchschnittlich solide kleine Library</strong>:
+    saubere Schichtung, hervorragend testabgedeckte Edge-Cases (Reentrancy,
+    Throwing-Listener, Retain/Once-Interaktion), CJS+ESM dual und
+    <code>attw</code>-validierte Typen. Die Audit-Punkte sind überwiegend
+    <em>Verfeinerungen</em>, kein Tech-Debt: ein potenzieller Semantik-Bug beim
+    Replay retained Events nach Listener-Object-Dedup
+    (<code>subscribeTo.ts:21</code>, vom Autor selbst als TODO markiert),
+    eine konfigurative Inkonsistenz beim TypeScript-Strictness-Profil
+    (<code>strict: true</code> aber <code>strictNullChecks: false</code>),
+    sowie kosmetische Drift in <code>.npmignore</code>, Importpfaden und
+    veralteten Coverage-Artefakten. Sicherheit, Memory-Hygiene und Build-
+    Pipeline sind unauffällig — ESLint-Konfig deaktiviert allerdings
+    bemerkenswert viele Type-Discipline-Regeln (<code>no-explicit-any</code>,
+    <code>ban-ts-comment</code>, <code>no-unsafe-function-type</code>).
+  </p>
+</div>
+
+<h2>Severity-Übersicht</h2>
+<div class="sev-bars">
+  <div class="sev-bar critical"><div class="n">0</div><div class="lbl">critical</div></div>
+  <div class="sev-bar high"><div class="n">1</div><div class="lbl">high</div></div>
+  <div class="sev-bar medium"><div class="n">5</div><div class="lbl">medium</div></div>
+  <div class="sev-bar low"><div class="n">8</div><div class="lbl">low</div></div>
+  <div class="sev-bar info"><div class="n">2</div><div class="lbl">info</div></div>
+</div>
+
+<h2>Kategorien</h2>
+<div class="cat-grid" id="cat-grid"></div>
+
+<h2>Backlog</h2>
+<div class="filters">
+  <div class="filter-group">
+    <span class="label">Severity:</span>
+    <button data-filter-type="severity" data-value="all" class="active">all</button>
+    <button data-filter-type="severity" data-value="critical">critical</button>
+    <button data-filter-type="severity" data-value="high">high</button>
+    <button data-filter-type="severity" data-value="medium">medium</button>
+    <button data-filter-type="severity" data-value="low">low</button>
+    <button data-filter-type="severity" data-value="info">info</button>
+  </div>
+  <div class="filter-group" id="cat-filter">
+    <span class="label">Category:</span>
+    <button data-filter-type="category" data-value="all" class="active">all</button>
+  </div>
+</div>
+<table class="backlog">
+  <thead><tr>
+    <th>ID</th><th>Severity</th><th>Category</th><th>Title</th><th>Location</th><th>Effort</th>
+  </tr></thead>
+  <tbody id="backlog-body"></tbody>
+</table>
+
+<h2>Offene Fragen / Unklarheiten</h2>
+<ul class="open-q">
+  <li><strong>Intentionalität von <code>strictNullChecks: false</code></strong>?
+    Die <code>tsconfig.json</code> setzt <code>strict: true</code> und schaltet
+    <code>strictNullChecks</code> wieder aus. Ist das eine bewusste Entscheidung
+    (z. B. wegen v4-Backwards-Kompatibilität in Listener-Signaturen), oder ein
+    Legacy-Überbleibsel, das man Schritt für Schritt entfernen kann?</li>
+  <li><strong>Replay-Verhalten bei Listener-Object-Dedup</strong>: Ist es gewollt,
+    dass <code>on(ε, 'foo', listenerObj)</code> beim zweiten Aufruf (mit
+    refCount-Bump) das retainte <code>foo</code>-Event erneut an den schon
+    bekannten Listener zustellt? Aktuelles Verhalten in
+    <code>subscribeTo.ts:21</code> ist mit <code>// TODO what if similarListener
+    ?</code> markiert — entweder ist es das gewollte Verhalten und die TODO kann
+    gelöscht werden, oder die Duplikation ist ein Bug.</li>
+  <li><strong>Engagement zu Node 18</strong>: <code>engines.node: ">=18.16"</code>,
+    CI testet aber gegen Node 24. Node 18 erreicht EOL April 2025 (in 2026 also
+    schon ein Jahr „end-of-life“). Soll die Mindestversion auf 20 oder 22 LTS
+    angehoben werden?</li>
+</ul>
+
+<h2>Optimierungspotenzial</h2>
+<p style="color:var(--fg-muted);">
+  Verbesserungen, die keine Defekte adressieren — Investitionen in Lesbarkeit,
+  Wartbarkeit oder Developer-Experience.
+</p>
+<ul class="opt">
+  <li><strong>Discriminated Union für <code>EventListener</code></strong>: die vier
+    <code>@ts-expect-error</code>-Stellen in <code>EventListener.apply</code> ließen
+    sich durch eine echte Union (<code>{type: 'func', fn} | {type: 'method',
+    obj, name} | {type: 'obj', obj}</code>) ersetzen — der numerische
+    <code>listenerType</code>-Tag ist im Grunde schon der Diskriminator, nur
+    ohne TS-Sichtbarkeit.</li>
+  <li><strong>README ausgliedern</strong>: die <code>README.md</code> ist bei
+    44&nbsp;kB mittlerweile zu groß für ein einzelnes Dokument. Ein
+    <code>docs/</code>-Ordner mit Sektionen (`getting-started.md`, `types.md`,
+    `retain.md`, `forwarding.md`) würde die Pflege erleichtern; der Skill
+    <code>skills/using-eventize/SKILL.md</code> existiert bereits als
+    Komprimat.</li>
+  <li><strong>Per-Instance-IDs statt globalem Counter</strong>: <code>nextOrderId</code>
+    (EventKeeper) und <code>lastId</code> (EventListener) sind Modul-globale
+    Zähler über alle Emitter hinweg. Praktisch unproblematisch
+    (<code>Number.MAX_SAFE_INTEGER</code>), aber unnötig gekoppelt — pro
+    <code>EventStore</code>-Instanz wäre sauberer und SSR-/multi-realm-freundlicher.</li>
+  <li><strong><code>@public</code>/<code>@internal</code> JSDoc-Tags</strong>: einige
+    intern genutzte Klassen (<code>EventStore</code>, <code>EventKeeper</code>,
+    <code>EventListener</code>) sind via <code>index.ts</code> nicht exportiert,
+    aber die Type-Exporte (<code>type {EventListener}</code>) verschwimmen die
+    Grenze. JSDoc-Annotationen würden helfen, das in Hovers sichtbar zu machen.</li>
+  <li><strong>Tightening von <code>tsconfig.json</code></strong>: nach Klärung von
+    <code>strictNullChecks</code> könnten <code>noUncheckedIndexedAccess</code>
+    und <code>exactOptionalPropertyTypes</code> spätestens für einen 6.0-Major
+    aktiviert werden — beide adressieren typische API-Library-Risiken.</li>
+</ul>
+
+<h2>Methodik</h2>
+<div class="panel methodology">
+  <p><strong>Health-Score-Berechnung</strong> (transparent): Start 100,
+    Abzug pro Finding: critical&nbsp;−10 / high&nbsp;−5 / medium&nbsp;−2 /
+    low&nbsp;−0.5 / info&nbsp;0. Hier: 1×high (−5) + 5×medium (−10) +
+    8×low (−4) = <strong>−14.5 → 85.5</strong>. Keine Multiplikation mit
+    Kategorie- oder Domänen-Gewicht.</p>
+  <p><strong>Vorheriges Audit</strong>: keine <code>./audit.html</code> im
+    Arbeitsverzeichnis vorgefunden — dieser Bericht ist ein Erstaudit ohne
+    Diff/Carry-Over-Logik.</p>
+  <p><strong>Untersuchter Umfang</strong>: alle Quelldateien unter
+    <code>src/</code> wurden vollständig gelesen (14 Module + 1 Test-Util,
+    insgesamt ~1.760 Code-Zeilen); Test-Specs wurden gesampelt, schwerpunktmäßig
+    <code>on.spec.ts</code>, <code>off.spec.ts</code>, <code>emit-reentrancy.spec.ts</code>,
+    <code>emit-throwing-listener.spec.ts</code>, <code>emit-ducktyping.spec.ts</code>,
+    <code>retain.spec.ts</code>, <code>wildcard-emit.spec.ts</code>,
+    <code>typed-events.spec.ts</code>, <code>EventStore.spec.ts</code>,
+    <code>eventize.spec.ts</code>. Konfig vollständig geprüft:
+    <code>package.json</code>, <code>tsconfig.json</code>, <code>jest.config.ts</code>,
+    <code>eslint.config.mjs</code>, <code>tsup.config.js</code>,
+    <code>.github/workflows/main.yml</code>, <code>.npmignore</code>,
+    <code>AGENTS.md</code>, <code>CLAUDE.md</code>, <code>CHANGELOG.md</code>,
+    <code>README.md</code>.</p>
+  <p><strong>Validierungs-Runs</strong>: <code>npm test</code> →
+    <em>399 passed / 0 failed</em> (4.0 s). <code>npx attw --pack</code> →
+    <em>No problems found</em> (alle vier Resolution-Modi grün).
+    <code>npm outdated</code> ausgeführt; Ergebnisse in den Dependency-Findings.</p>
+  <p><strong>Nicht im Scope</strong>: <code>lib/</code> (Build-Output),
+    <code>node_modules/</code>, <code>coverage/</code>-Artefakte selbst (nur
+    Existenz und Inhalt überprüft, kein Test-Run mit <code>--coverage</code>),
+    <code>docs-assets/</code>, <code>scripts/createBanner</code>.</p>
+</div>
+
+<div class="footer">
+  Generiert am 2026-05-14 von der <code>js-ts-project-audit</code>-Skill.
+  Empfehlungen sind Empfehlungen — bewusst kein Auto-Fix.
+</div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Backlog data — keep the markup pure-data so filters and rendering stay
+// declarative. Each finding has id/category/severity/title/location/desc/recommendation/effort.
+// ---------------------------------------------------------------------------
+const findings = [
+  // ----- HIGH -----
+  {
+    id: "CORR-001",
+    category: "Bugs & Correctness",
+    severity: "high",
+    title: "Retained event is replayed again on listener-object dedup",
+    location: "src/subscribeTo.ts:21, src/EventStore.ts (insertOrFindSimilarListener)",
+    description: "Wenn on(ε, 'foo', listenerObj) zum zweiten Mal mit dem selben Listener-Object aufgerufen wird, gibt EventStore.add die *bestehende* EventListener-Instanz zurück (refCount += 1). Im selben Atemzug ruft subscribeTo aber keeper.replayTo(eventName, el, retainedEvents) auf — gegen genau diesen schon vorhandenen Listener, der das retainte Event bereits beim ersten on() empfangen hat. Folge: der Listener-Object-Handler wird ein zweites Mal mit dem retainten Wert aufgerufen, obwohl keine neue Subscription stattfand. Der Autor hat die Stelle selbst als TODO markiert (// TODO what if similarListener ?). Spec-Coverage für diese spezielle Sequenz fehlt in retain.spec.ts.",
+    recommendation: "Entweder (a) replayTo nur auslösen, wenn EventStore.add tatsächlich einen NEUEN Listener eingefügt hat — Rückgabe von add anpassen ({listener, isNew: boolean}); oder (b) das Verhalten als gewollt dokumentieren (semantisch: \"jedes on() bekommt einen retain-Replay\") und Test ergänzen. Variante (a) ist konsistenter zur Dedup-Semantik (refCount-Bumps sollen sich identisch zu einer einzigen on()-Subscription verhalten).",
+    effort: "S"
+  },
+  // ----- MEDIUM -----
+  {
+    id: "TYPE-001",
+    category: "Typsicherheit",
+    severity: "medium",
+    title: "strictNullChecks: false widerspricht strict: true",
+    location: "tsconfig.json:16-17",
+    description: "Die Compiler-Konfig setzt strict: true (= alle Strict-Flags) und überschreibt direkt darunter strictNullChecks: false. Damit werden null/undefined-Unterscheidungen nicht durchgesetzt — z.B. in den vielen :unknown-Parametern der off()-Kette, in den Optional-Returns von EventStore.getListenersForEventName, oder im EventKeeper.replayTo-Pfad. Für eine öffentliche, typsensitive Library mit aktivem v5-Typed-EventMap-Feature ist das ein substanzielles Type-Safety-Loch.",
+    recommendation: "Schrittweise aktivieren: strictNullChecks aus tsconfig entfernen, Compile-Errors fixen — die meisten werden in EventListener.apply (listenerObject ist als ListenerObjectType = object|null|undefined typisiert) und in EventStore.removeAll(fromArray) (fromArray könnte undefined sein) auftauchen. Wenn dies aus v4-Kompat nicht möglich ist, im README/CHANGELOG dokumentieren und eine Migration auf v6 planen.",
+    effort: "M"
+  },
+  {
+    id: "ARCH-001",
+    category: "Architektur & Struktur",
+    severity: "medium",
+    title: "Module-globale Counter koppeln alle Emitter über Realm-Grenzen hinweg",
+    location: "src/EventKeeper.ts:14 (nextOrderId), src/EventListener.ts:48 (lastId)",
+    description: "Beide Zähler sind Modul-lokale `let`s — sie wachsen über alle Emitter im Prozess monoton. Konkret problematisch: (1) in Test-Suites kann die Reihenfolge der Tests die ID-Werte verändern und Snapshot-/Order-Assertions fragil machen; (2) bei mehreren Realms (worker, iframes, vm-context) und gleichzeitiger Bundle-Wiederverwendung kann das zu Verwirrung führen; (3) konzeptuell sind 'Reihenfolge der Retains pro Emitter' und 'IDs pro Listener-Slot' beides per-Instance-Eigenschaften. In der Praxis (Number.MAX_SAFE_INTEGER ~9e15) gibt es keinen Overflow-Risk.",
+    recommendation: "nextOrderId nach EventKeeper als Instance-Field verschieben (sortByPriorityAndId in EventStore vergleicht id ohnehin nur innerhalb derselben EventStore.namedListeners-Liste, also ist auch lastId per-Store ausreichend). Reines Refactor, keine API-Änderung.",
+    effort: "S"
+  },
+  {
+    id: "DX-001",
+    category: "Developer Experience",
+    severity: "medium",
+    title: "Inkonsistente .js-Extensions in ESM-Relativimports",
+    location: "src/types.ts:1-3, src/getSubscriptionCount.ts:4",
+    description: "CLAUDE.md schreibt explizit: \"ESM-style relative imports use bare paths (no .js) — tsup handles output extensions.\" 12 von 15 Modulen halten sich daran, drei Stellen weichen ab: types.ts importiert from './EventKeeper.js' / './EventStore.js' / './constants.js', und getSubscriptionCount.ts importiert from './types.js'. Funktioniert dank tsup, aber bricht die Projekt-Konvention und erzeugt visuelle Inkonsistenz beim Lesen.",
+    recommendation: "Die .js-Suffixe in den vier Imports entfernen. Diff ist trivial und keinerlei Tooling-Risiko — die anderen 15+ Files belegen, dass die bare-Path-Form mit dem aktuellen tsup-Setup funktioniert.",
+    effort: "S"
+  },
+  {
+    id: "DX-002",
+    category: "Developer Experience",
+    severity: "medium",
+    title: ".npmignore enthält viele tote Einträge",
+    location: ".npmignore",
+    description: ".npmignore listet u.a. rollup, .eslintignore, .eslintrc.yaml, .travis.yml, BACKLOG.md, .size-snapshot.json, tsconfig.*.json — Dateien/Verzeichnisse, die nicht (mehr) existieren. Das ist ein klassisches drift-Artefakt aus einem früheren Tooling-Setup. Risiko ist niedrig (Einträge sind no-op), aber zukünftige Maintainer müssen Sucharbeit leisten um zu entscheiden, was noch relevant ist.",
+    recommendation: "Alternativ auf eine 'files'-Allowlist im package.json umsteigen (z.B. \"files\": [\"lib\"]) — kleiner, expliziter, und automatisch korrekt, wenn neue Tooling-Files dazukommen. Falls .npmignore beibehalten wird: tote Zeilen entfernen.",
+    effort: "S"
+  },
+  {
+    id: "TEST-001",
+    category: "Testabdeckung",
+    severity: "medium",
+    title: "coverage/-Artefakte im Repo committed und veraltet",
+    location: "coverage/lcov.info, coverage/lcov-report/, .gitignore",
+    description: "Das Verzeichnis coverage/ ist im Repo vorhanden, aber lcov.info enthält nur Daten für src/eventize-api.ts (eine Datei, 106/106 Lines = 100%) — d.h. der letzte gespeicherte Coverage-Lauf war ein fokussierter Run, kein vollständiger. Ohne dediziertes 'test:coverage'-Script und ohne Eintrag in .gitignore wandern solche Artefakte unkontrolliert mit. Gefahr: jemand liest das ein und schließt fälschlich auf eine 100%-Coverage des Projekts; tatsächlich ist die Gesamt-Coverage unbestimmt.",
+    recommendation: "(1) Script 'test:coverage' ergänzen: 'cross-env NODE_ENV=test jest --coverage'. (2) coverage/ in .gitignore aufnehmen. (3) Den aktuellen Inhalt git rm'en. (4) Optional: einen Coverage-Threshold (z.B. 90% Lines) als Jest-Config-Block einziehen, um Regressionen zu fangen.",
+    effort: "S"
+  },
+  // ----- LOW -----
+  {
+    id: "ARCH-002",
+    category: "Architektur & Struktur",
+    severity: "low",
+    title: "Orphan TODO-Kommentar in EventStore",
+    location: "src/EventStore.ts:47",
+    description: "Eine bare Zeile '// TODO removeSimilarListener()' ohne Kontext. Wahrscheinlich Refactor-Stummel aus dem v4.1.0-Split von remove() in vier private Helfer. Entweder ist die Funktion bereits vorhanden (z.B. als removeSimilarListenersFromArray, das direkt darüber definiert ist) oder die Aufgabe ist überholt.",
+    recommendation: "Löschen — der Kommentar trägt keine Information, die nicht aus dem Code direkt darunter ersichtlich wäre.",
+    effort: "S"
+  },
+  {
+    id: "TYPE-002",
+    category: "Typsicherheit",
+    severity: "low",
+    title: "ESLint deaktiviert mehrere Type-Discipline-Regeln",
+    location: "eslint.config.mjs:55-68",
+    description: "Die ts-Regeln-Sektion schaltet aus: no-explicit-any, no-non-null-assertion, no-unsafe-function-type, no-unsafe-declaration-merging, ban-ts-comment, no-empty-object-type, no-empty-function, no-empty-interface. Einige davon haben in einer Library mit überladenen Typen einen legitimen Grund (ban-ts-comment ist nötig wegen der @ts-expect-error-Stellen in EventListener), andere — speziell no-explicit-any und no-unsafe-function-type — sind in einer typed-event-Library eigentlich kontraproduktiv.",
+    recommendation: "no-explicit-any auf 'warn' (statt 0) drehen, damit neue any-Vorkommen sichtbar werden ohne den Build zu blocken. Gleiches für no-unsafe-function-type. Die anderen Regeln können bleiben, wenn der Maintainer dahinter eine Position hat — dann aber idealerweise mit einem Kommentar 'warum' direkt an die Rule-Override.",
+    effort: "S"
+  },
+  {
+    id: "TYPE-003",
+    category: "Typsicherheit",
+    severity: "low",
+    title: "EventListener.apply nutzt vier @ts-expect-error für discriminanten Switch",
+    location: "src/EventListener.ts:108, 114, 120, 129",
+    description: "Der numerische listenerType (LISTENER_IS_FUNC | LISTENER_IS_NAMED_FUNC | LISTENER_IS_OBJ) wird in apply() als Discriminator genutzt, aber listener/listenerObject sind als unknown bzw. ListenerObjectType (object|null|undefined) typisiert. TS kann die Beziehung zwischen Tag und Werten nicht herleiten — daher vier Suppress-Direktiven mit jeweils erklärendem Kommentar. Funktional korrekt, aber die Suppress-Pflicht zeigt, dass das Tag-Modell nicht in der Typsprache ausgedrückt ist.",
+    recommendation: "EventListener-Felder von 'flat' zu 'discriminated union' umstellen: eine ListenerVariant union mit type-Diskriminator, dann TS-natürlicher Switch ohne expect-error. Größerer Refactor, daher als low markiert — nur lohnenswert, wenn parallel TYPE-001 angegangen wird.",
+    effort: "L"
+  },
+  {
+    id: "TEST-002",
+    category: "Testabdeckung",
+    severity: "low",
+    title: "Spec-Files verwenden flächendeckend @ts-ignore statt @ts-expect-error",
+    location: "src/on.spec.ts (~150x), src/eventize.spec.ts (2x), …",
+    description: "v4.0.3 hat die Source-Files konsequent von @ts-ignore auf @ts-expect-error migriert (mit Kommentar pro Stelle), die Spec-Dateien blieben aber auf @ts-ignore. @ts-expect-error ist sicherer: wenn der Typ-Konflikt verschwindet (z.B. weil die Typen angepasst wurden), wird TS die nun überflüssige Direktive melden. @ts-ignore versteckt sie still weiter.",
+    recommendation: "Sed-Migration der Specs: s/@ts-ignore/@ts-expect-error/g, dann tsc laufen lassen und die Stellen entfernen, wo TS jetzt 'unused @ts-expect-error' meldet (= Tests, die nicht mehr typkonflikten). Wahrscheinlich findet man dabei auch einige obsolete Suppress-Stellen.",
+    effort: "M"
+  },
+  {
+    id: "DEP-001",
+    category: "Dependencies",
+    severity: "low",
+    title: "@types/sinon hinkt eine Major hinter sinon her",
+    location: "package.json: sinon ^21.0.0 vs @types/sinon ^17.0.4",
+    description: "sinon ist bei v21, @types/sinon noch bei v17. DefinitelyTyped hat ein Sinon-Typing-Update auf v21 veröffentlicht (npm outdated zeigt latest=21.0.1 für @types/sinon). Funktional unkritisch, aber Auto-Complete in Tests greift evtl. auf veraltete API-Signaturen zu.",
+    recommendation: "@types/sinon auf ^21 anheben; falls Tests dann typkonflikt zeigen, gleich mitfixen.",
+    effort: "S"
+  },
+  {
+    id: "DEP-002",
+    category: "Dependencies",
+    severity: "low",
+    title: "Dev-Dependencies leicht veraltet (alle minor)",
+    location: "package.json devDependencies",
+    description: "npm outdated zeigt ~10 dev-Pakete eine Minor-Version hinter latest: eslint 9.32→9.39, jest 30.0→30.4, prettier 3.6→3.8, ts-jest 29.4.1→29.4.9, tsup 8.5.0→8.5.1, typescript 5.9.2→5.9.3, typescript-eslint 8.39→8.59. Keines davon ist sicherheitsrelevant. Größere Sprünge (eslint 10, typescript 6, sinon 22) sollten bewusst gemacht werden.",
+    recommendation: "Routinemäßig: 'npm update' für die Minor-Bumps; die Major-Bumps separat einplanen.",
+    effort: "S"
+  },
+  {
+    id: "DX-003",
+    category: "Developer Experience",
+    severity: "low",
+    title: "engines.node fixiert auf 18.16, CI testet aber gegen 24",
+    location: "package.json:27, .github/workflows/main.yml",
+    description: "engines.node: \">=18.16\" — Node 18 ist seit April 2025 End-of-Life. Die CI testet ausschließlich gegen Node 24, d.h. die Mindestversion ist nicht durch automatische Tests abgesichert. Risiko: ein zukünftiger Code-Change (z.B. ein neueres Standard-API) bricht still auf Node 18, ohne dass es jemand merkt.",
+    recommendation: "Entweder (a) Mindestversion auf >=20 oder >=22 LTS anheben (sauberer); oder (b) die CI um einen Node-18-Matrix-Job erweitern. Beim Anheben auch das Banner in scripts/createBanner.mjs prüfen.",
+    effort: "S"
+  },
+  {
+    id: "ARCH-003",
+    category: "Architektur & Struktur",
+    severity: "low",
+    title: "EventListener.detectListenerType kann implizit undefined zurückgeben",
+    location: "src/EventListener.ts:36-46",
+    description: "Der Switch deckt 'function' / 'string' / 'symbol' / 'object' ab. Für Listener-Typen 'number', 'boolean', 'bigint' oder 'undefined' wird ohne expliziten Default undefined zurückgegeben — was an listenerType: number-Feld zugewiesen wird. Praktisch wird der dann nicht in den apply()-Cases gematcht und der Listener feuert nie. Es gibt einen Throw-Pfad in _subscribeTo, wenn der Listener falsy ist, aber z.B. number 0 ist falsy → fail-fast; number 1 ist truthy → undefined-listenerType, silent no-op. Edge-Case, aber praktisch lautlos.",
+    recommendation: "default-Case im switch ergänzen, der einen Error wirft oder zumindest einen warn() loggt. Alternativ den TS-Typ verschärfen, sodass der Aufrufer falsche Listener gar nicht erst durchreicht — passt zur Discriminated-Union-Variante in TYPE-003.",
+    effort: "S"
+  },
+  // ----- INFO -----
+  {
+    id: "INFO-001",
+    category: "Konsistenz",
+    severity: "info",
+    title: "Priority-Legacy-Aliase (AAA/BB/C/Default) sind weiterhin im Public-API-Snapshot",
+    location: "src/Priority.ts:11-14, src/types.ts:281-291",
+    description: "Die alphabetischen Aliase wurden in v4.1.0 als Legacy markiert und stehen seitdem im Code. In CHANGELOG ist ein 'prefer the names above'-Hinweis, aber ohne Deprecation-Schedule oder JSDoc-@deprecated-Tag. Für eine v5-Major wäre der ideale Zeitpunkt, sie zu droppen oder zumindest mit @deprecated zu markieren, damit IDEs einen Strikethrough zeigen.",
+    recommendation: "Optional: JSDoc /** @deprecated use Priority.Critical */ etc. an den vier Legacy-Slots. Entfernen ist erst in 6.0 sinnvoll.",
+    effort: "S"
+  },
+  {
+    id: "INFO-002",
+    category: "Architektur & Struktur",
+    severity: "info",
+    title: "subscribeTo dispatch-Heuristik ist nur durch Kommentare strukturiert",
+    location: "src/subscribeTo.ts:39-56",
+    description: "Die if/else-Kette in _subscribeTo dekodiert die ~16 erlaubten on()-Aufrufformen anhand von Länge und typeof. Lesbar, mit Tests gut abgesichert, aber die Logik versteckt sich hinter numerischen len-Checks (>=2 && <=3, >=3 && <=4) — wer das ohne SubscribeArgs-Type-Definition liest, muss die Tabelle in types.ts:113-142 daneben legen. Kein Defekt, aber ein Hot-Spot für zukünftige Bugs, wenn ein neuer Aufruf-Shape hinzukommt.",
+    recommendation: "Optional: einen kleinen Kommentarblock direkt über _subscribeTo, der die Tabelle aus types.ts inline kopiert, oder ein Test-Snapshot, der jede Form gegen die erkannten (eventName, priority, listener, listenerObject)-Tupel mappt.",
+    effort: "S"
+  }
+];
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+const SEV_ORDER = ['critical', 'high', 'medium', 'low', 'info'];
+
+// Categories pill grid
+const categoryCounts = {};
+findings.forEach(f => { categoryCounts[f.category] = (categoryCounts[f.category] || 0) + 1; });
+const catGrid = document.getElementById('cat-grid');
+Object.entries(categoryCounts)
+  .sort((a, b) => b[1] - a[1])
+  .forEach(([cat, cnt]) => {
+    const el = document.createElement('div');
+    el.className = 'cat-pill';
+    el.innerHTML = '<span>' + cat + '</span><span class="cnt">' + cnt + '</span>';
+    catGrid.appendChild(el);
+  });
+
+// Category filter buttons
+const catFilter = document.getElementById('cat-filter');
+Object.keys(categoryCounts).sort().forEach(cat => {
+  const b = document.createElement('button');
+  b.dataset.filterType = 'category';
+  b.dataset.value = cat;
+  b.textContent = cat;
+  catFilter.appendChild(b);
+});
+
+// Backlog table
+const body = document.getElementById('backlog-body');
+const sortedFindings = findings.slice().sort((a, b) => {
+  const sa = SEV_ORDER.indexOf(a.severity);
+  const sb = SEV_ORDER.indexOf(b.severity);
+  if (sa !== sb) return sa - sb;
+  return a.id.localeCompare(b.id);
+});
+sortedFindings.forEach(f => {
+  const row = document.createElement('tr');
+  row.className = 'row';
+  row.dataset.severity = f.severity;
+  row.dataset.category = f.category;
+  row.innerHTML =
+    '<td>' + f.id + '</td>' +
+    '<td><span class="sev-tag ' + f.severity + '">' + f.severity + '</span></td>' +
+    '<td>' + f.category + '</td>' +
+    '<td>' + escapeHTML(f.title) + '</td>' +
+    '<td class="loc">' + escapeHTML(f.location) + '</td>' +
+    '<td><span class="effort">' + f.effort + '</span></td>';
+  const detailRow = document.createElement('tr');
+  detailRow.className = 'detail-row';
+  detailRow.style.display = 'none';
+  detailRow.dataset.severity = f.severity;
+  detailRow.dataset.category = f.category;
+  detailRow.innerHTML =
+    '<td colspan="6">' +
+    '<p class="desc">' + escapeHTML(f.description) + '</p>' +
+    '<div class="rec"><strong>Empfehlung:</strong> ' + escapeHTML(f.recommendation) + '</div>' +
+    '</td>';
+  row.addEventListener('click', () => {
+    detailRow.style.display = detailRow.style.display === 'none' ? 'table-row' : 'none';
+  });
+  body.appendChild(row);
+  body.appendChild(detailRow);
+});
+
+// Filters
+const activeFilters = { severity: 'all', category: 'all' };
+document.querySelectorAll('.filters button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const type = btn.dataset.filterType;
+    const val = btn.dataset.value;
+    activeFilters[type] = val;
+    document.querySelectorAll('.filters button[data-filter-type="' + type + '"]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    applyFilters();
+  });
+});
+function applyFilters() {
+  document.querySelectorAll('#backlog-body tr').forEach(tr => {
+    const sevOK = activeFilters.severity === 'all' || tr.dataset.severity === activeFilters.severity;
+    const catOK = activeFilters.category === 'all' || tr.dataset.category === activeFilters.category;
+    if (!sevOK || !catOK) {
+      tr.style.display = 'none';
+    } else if (tr.classList.contains('detail-row')) {
+      // detail rows stay collapsed by default after filter change
+      tr.style.display = 'none';
+    } else {
+      tr.style.display = '';
+    }
+  });
+}
+
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+</script>
+</main>
+</body>
+</html>
