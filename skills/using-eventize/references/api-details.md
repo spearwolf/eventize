@@ -37,7 +37,7 @@ try {
 controller.abort();
 ```
 
-Aborting unsubscribes the internal `once()` and rejects with `signal.reason`, falling back to an `AbortError` `DOMException`. An already-aborted signal rejects without subscribing at all; a retained event that resolves synchronously inside `once()` never attaches an abort handler. The option type is exported as `OnceAsyncOptions`.
+Aborting unsubscribes the internal `once()` and rejects with `signal.reason`, falling back to an `AbortError` `DOMException` whenever the reason is nullish — `abort(null)` lands on the `DOMException` too, where `fetch()` would reject with the bare `null`. An already-aborted signal rejects without subscribing at all; a retained event that resolves synchronously inside `once()` never attaches an abort handler. The option type is exported as `OnceAsyncOptions`, and the option works identically on all three surfaces: `onceAsync(ε, …)`, `ε.onceAsync(…)` after `eventize.inject()`, and `this.onceAsync(…)` in a `class extends Eventize`.
 
 `once()` is only consumed when a listener actually ran. For the object forms — `once(ε, 'foo', obj)` and `once(ε, 'foo', 'methodName', obj)` — a dispatch that finds neither the method nor the `.emit()` fallback leaves the subscription in place, so a late-initialised listener object still gets its one call. The `.emit()` fallback counts as a call and does consume the `once()`. Function listeners are always callable, so they are always consumed. Before this fix the miss silently burned the subscription.
 

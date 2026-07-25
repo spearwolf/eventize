@@ -419,10 +419,14 @@ export function once(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
 // ---------------------------------------------------------------------------
 // onceAsync() — typed overload first; falls back to the loose v4 signature.
 // An optional AbortSignal cancels the subscription and rejects the promise,
-// mirroring fetch(). Without it, an event that never fires keeps the listener
-// and the caller's continuation alive for the emitter's whole lifetime.
+// in the shape of fetch(). Without it, an event that never fires keeps the
+// listener and the caller's continuation alive for the emitter's whole
+// lifetime.
 // ---------------------------------------------------------------------------
 
+// `??`, not a `=== undefined` test: a signal aborted with an explicit null
+// reason gets the synthesized DOMException too. fetch() would reject with the
+// null itself, which tells a catch block nothing.
 const abortReason = (signal: AbortSignal): unknown =>
   signal.reason ?? new DOMException('This operation was aborted', 'AbortError');
 

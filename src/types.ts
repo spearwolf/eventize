@@ -274,8 +274,12 @@ export interface EventizeApi<TEvents extends EventMap = DefaultEventMap>
   // typed onceAsync — return type matches the first arg of the tuple for K
   onceAsync<K extends EventKeysOf<TEvents>>(
     eventName: K,
+    options?: OnceAsyncOptions,
   ): Promise<TEvents[K] extends [infer A, ...any[]] ? A : void>;
-  onceAsync<ReturnType = void>(eventNames: AnyEventNames): Promise<ReturnType>;
+  onceAsync<ReturnType = void>(
+    eventNames: AnyEventNames,
+    options?: OnceAsyncOptions,
+  ): Promise<ReturnType>;
 
   off(listener?: unknown, listenerObject?: unknown): void;
 

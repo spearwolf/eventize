@@ -478,9 +478,10 @@ controller.abort();
 ```
 
 Aborting unsubscribes the internal `once()` and rejects with the signal's
-`reason`, or an `AbortError` `DOMException` when `abort()` was called without
-one — the same contract as `fetch()`. A signal that is already aborted rejects
-without ever subscribing.
+`reason` whenever it has one, and with an `AbortError` `DOMException`
+otherwise — including the `abort(null)` case, where `fetch()` would hand you a
+`null` to catch. A signal that is already aborted rejects without ever
+subscribing.
 
 ---
 

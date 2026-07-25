@@ -1,4 +1,11 @@
-import {emit, eventize, getSubscriptionCount, onceAsync, retain} from './index';
+import {
+  emit,
+  eventize,
+  Eventize,
+  getSubscriptionCount,
+  onceAsync,
+  retain,
+} from './index';
 
 describe('onceAsync()', () => {
   it('should work as expected', async () => {
@@ -70,12 +77,22 @@ describe('onceAsync()', () => {
     it('resolves normally and detaches the abort handler', async () => {
       const obj = eventize();
       const controller = new AbortController();
+      const addSpy = jest.spyOn(controller.signal, 'addEventListener');
+      const removeSpy = jest.spyOn(controller.signal, 'removeEventListener');
 
       const promise = onceAsync(obj, 'foo', {signal: controller.signal});
       emit(obj, 'foo', 'payload');
 
       await expect(promise).resolves.toBe('payload');
       expect(getSubscriptionCount(obj)).toBe(0);
+
+      // resolving must detach the very handler that was attached — removing
+      // some other function would leave this one on the signal forever
+      expect(removeSpy).toHaveBeenCalledTimes(1);
+      expect(removeSpy).toHaveBeenCalledWith(
+        'abort',
+        addSpy.mock.calls[0][1] as EventListenerOrEventListenerObject,
+      );
 
       // aborting after the fact must not produce an unhandled rejection
       controller.abort();
@@ -130,6 +147,33 @@ describe('onceAsync()', () => {
       const promise = onceAsync(obj, 'foo');
       emit(obj, 'foo', 'payload');
       await expect(promise).resolves.toBe('payload');
+    });
+
+    it('is available on the inject() surface', async () => {
+      const obj = eventize.inject({});
+      const controller = new AbortController();
+
+      const promise = obj.onceAsync('never', {signal: controller.signal});
+      expect(getSubscriptionCount(obj)).toBe(1);
+
+      controller.abort();
+
+      await expect(promise).rejects.toMatchObject({name: 'AbortError'});
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('is available on the class surface', async () => {
+      class Foo extends Eventize {}
+      const obj = new Foo();
+      const controller = new AbortController();
+
+      const promise = obj.onceAsync('never', {signal: controller.signal});
+      expect(getSubscriptionCount(obj)).toBe(1);
+
+      controller.abort();
+
+      await expect(promise).rejects.toMatchObject({name: 'AbortError'});
+      expect(getSubscriptionCount(obj)).toBe(0);
     });
   });
 });

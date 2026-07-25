@@ -19,6 +19,7 @@ import type {
   EventizeApi,
   EventizedObject,
   EventizerFuncAPI,
+  OnceAsyncOptions,
   SubscribeArgs,
   UnsubscribeFunc,
 } from './types';
@@ -49,6 +50,7 @@ const emitAsyncLoose = emitAsync as (
 const onceAsyncLoose = onceAsync as <ReturnType = void>(
   obj: object,
   eventNames: AnyEventNames,
+  options?: OnceAsyncOptions,
 ) => Promise<ReturnType>;
 const retainLoose = retain as (obj: object, eventNames: AnyEventNames) => void;
 const retainClearLoose = retainClear as (
@@ -84,7 +86,9 @@ export const eventize: EventizerFuncAPI = (() => {
 
       onceAsync: <ReturnType = void>(
         eventNames: AnyEventNames,
-      ): Promise<ReturnType> => onceAsyncLoose<ReturnType>(obj, eventNames),
+        options?: OnceAsyncOptions,
+      ): Promise<ReturnType> =>
+        onceAsyncLoose<ReturnType>(obj, eventNames, options),
 
       off: (listener?: unknown, listenerObject?: unknown): void =>
         offLoose(obj, listener, listenerObject),
@@ -130,8 +134,11 @@ export class Eventize<TEvents extends EventMap = DefaultEventMap> {
     return once(this, ...args);
   }
 
-  onceAsync<ReturnType = void>(eventNames: AnyEventNames): Promise<ReturnType> {
-    return onceAsyncLoose<ReturnType>(this, eventNames);
+  onceAsync<ReturnType = void>(
+    eventNames: AnyEventNames,
+    options?: OnceAsyncOptions,
+  ): Promise<ReturnType> {
+    return onceAsyncLoose<ReturnType>(this, eventNames, options);
   }
 
   off(listener?: unknown, listenerObject?: unknown): void {
