@@ -183,11 +183,20 @@ describe('once()', () => {
 
     it('allows off(ε, unsubscribe.listener) as a cleanup path', () => {
       const obj = eventize();
+      const survivor = fake();
+      on(obj, 'bar', survivor);
       const unsubscribe = once(obj, 'foo', fake());
 
-      expect(getSubscriptionCount(obj)).toBe(1);
+      expect(getSubscriptionCount(obj)).toBe(2);
       off(obj, (unsubscribe as any).listener);
-      expect(getSubscriptionCount(obj)).toBe(0);
+
+      // exactly the once() subscription is gone, not the whole emitter —
+      // pre-fix, `.listener` was undefined and off(ε, undefined) swept
+      // everything, which a single-subscription emitter could not reveal
+      expect(getSubscriptionCount(obj)).toBe(1);
+
+      emit(obj, 'bar');
+      expect(survivor.callCount).toBe(1);
     });
 
     it('stays idempotent', () => {
