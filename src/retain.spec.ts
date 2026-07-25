@@ -4,7 +4,9 @@ import {
   Eventize,
   eventize,
   getSubscriptionCount,
+  off,
   on,
+  once,
   emit,
   retain,
 } from './index';
@@ -456,6 +458,54 @@ describe('retain()', () => {
       expect(getSubscriptionCount(obj)).toBe(2);
       expect(first.foo.callCount).toBe(1);
       expect(second.foo.callCount).toBe(1);
+    });
+
+    it('replays each retained event once for a multi-event subscription', () => {
+      const obj = eventize();
+      const listenerObject = {a: fake(), b: fake()};
+
+      retain(obj, ['a', 'b']);
+      emit(obj, 'a', 'A');
+      emit(obj, 'b', 'B');
+
+      on(obj, ['a', 'b'], listenerObject);
+
+      expect(listenerObject.a.callCount).toBe(1);
+      expect(listenerObject.b.callCount).toBe(1);
+      expect(listenerObject.a.calledWith('A')).toBe(true);
+      expect(listenerObject.b.calledWith('B')).toBe(true);
+    });
+
+    it('does not replay again when once() dedups against an existing on()', () => {
+      const obj = eventize();
+      const listenerObject = {foo: fake()};
+
+      retain(obj, 'foo');
+      emit(obj, 'foo', 'RETAINED');
+
+      on(obj, 'foo', listenerObject);
+      expect(listenerObject.foo.callCount).toBe(1);
+
+      once(obj, 'foo', listenerObject);
+      expect(listenerObject.foo.callCount).toBe(1);
+      expect(getSubscriptionCount(obj)).toBe(1);
+    });
+
+    it('replays again after the listener was removed and re-registered', () => {
+      const obj = eventize();
+      const listenerObject = {foo: fake()};
+
+      retain(obj, 'foo');
+      emit(obj, 'foo', 'RETAINED');
+
+      on(obj, 'foo', listenerObject);
+      expect(listenerObject.foo.callCount).toBe(1);
+
+      off(obj, listenerObject);
+      expect(getSubscriptionCount(obj)).toBe(0);
+
+      on(obj, 'foo', listenerObject);
+      expect(listenerObject.foo.callCount).toBe(2);
     });
   });
 });
