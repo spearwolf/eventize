@@ -19,6 +19,14 @@
     "require": "./lib/index.js"
   },
   "sideEffects": false,
+  "files": [
+    "lib",
+    "docs",
+    "skills",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "homepage": "https://github.com/spearwolf/eventize/",
   "bugs": {
     "url": "https://github.com/spearwolf/eventize/issues"
