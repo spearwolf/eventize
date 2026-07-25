@@ -2,12 +2,14 @@
 
 ## Unreleased
 
+- **Fix:** `off(ε, eventName, listenerObject)` now detaches listeners registered in the method-name form `on(ε, eventName, methodName, listenerObject)`. The filter in `removeSimilarListenersFromArray` compared `listener.listener` against the listener object, which only matches the `on(ε, eventName, listenerObject)` shape — in the method-name form `listener.listener` holds the method name and the object sits in `listener.listenerObject`. Code following `docs/off.md` believed it had cleaned up while the emitter kept holding the listener object and everything reachable from it. Affects `src/EventStore.ts`.
+
 ## `v5.1.0` (2026-07-25) — Symbol-safe `off()`, per-event priorities everywhere
 
 - **Fix:** `off(ε, [eventName, …])` now clears retained state for **symbol** event names too. The array branch filtered its elements with `typeof li === 'string'`, so `off(ε, [SOME_SYMBOL])` removed the listeners but left the retained value and the retain policy in place, while the scalar `off(ε, SOME_SYMBOL)` cleared both. The filter is now `isEventName`, which keeps strings and symbols alike. The filter exists because the array branch is also reached from the unsubscribe function of a multi-event `on()`, which passes an array of `EventListener` instances — those are still ignored, and a regression test covers it. Affects `src/eventize-api.ts`.
-- **Types:** `OnEventNames` reworked to describe what `_subscribeTo()` has always accepted. It was `EventName | EventName[] | Array<[EventName, number]>`, which allowed a list of names *or* a list of `[name, priority]` tuples but not a mix — even though the runtime checks `Array.isArray()` per element and handles the mixed form fine. It is now `EventName | Array<EventName | EventNameWithPriority>`, so `on(ε, [['foo', 100], 'bar'], fn)` type-checks without a cast. The new `EventNameWithPriority` (`[eventName: EventName, priority: number]`) is exported from the package root. `AnyEventNames` is unchanged and still used by `emit()` / `retain()`, which have no notion of priority.
+- **Types:** `OnEventNames` reworked to describe what `_subscribeTo()` has always accepted. It was `EventName | EventName[] | Array<[EventName, number]>`, which allowed a list of names _or_ a list of `[name, priority]` tuples but not a mix — even though the runtime checks `Array.isArray()` per element and handles the mixed form fine. It is now `EventName | Array<EventName | EventNameWithPriority>`, so `on(ε, [['foo', 100], 'bar'], fn)` type-checks without a cast. The new `EventNameWithPriority` (`[eventName: EventName, priority: number]`) is exported from the package root. `AnyEventNames` is unchanged and still used by `emit()` / `retain()`, which have no notion of priority.
 - **Types:** Per-event priorities now work on **typed** emitters. Previously the tuple form didn't type-check there at all: the typed overloads accepted only `K` / `K[]`, and the loose fallback was closed off because `NonTypedEmitter<T>` collapses to `never` for a branded emitter. The typed array overload of `on()` / `once()` (and the corresponding `SubscribeFunc` signatures used by the injected and class APIs) now accepts `Array<K | [K, number]>` plus an optional call-level priority. Event names inside tuples are still narrowed against the event map, so `on(ε, [['unknown', 0]], fn)` remains a compile error. Widening a parameter position only — no call that compiled before stops compiling.
-- **Docs:** Corrected a claim that predates this release: `off(ε, eventName)` doesn't merely clear the retained *value*, it drops the retain *policy* as well, so it behaves like `unretain()`. `README.md`, `docs/off.md`, and the skill now say so.
+- **Docs:** Corrected a claim that predates this release: `off(ε, eventName)` doesn't merely clear the retained _value_, it drops the retain _policy_ as well, so it behaves like `unretain()`. `README.md`, `docs/off.md`, and the skill now say so.
 - **Tests:** `src/documented-quirks.spec.ts` grew to 15 cases — symbol/string parity between the scalar and array `off()` forms, the listener-array regression guard, mixed tuple/name arrays on plain and typed emitters, the call-level-priority combination, and two `@ts-expect-error` cases proving tuples still reject unknown event names.
 
 ### Documentation restructure
@@ -27,7 +29,7 @@ _No runtime or type changes in this section._
   1. If `obj[eventName]` is a function, call it with the args (with `this === obj`).
   2. Otherwise, if `obj.emit` is a function, call `obj.emit(eventName, ...args)`.
   3. Otherwise, silently no-op.
-  Return values are funneled through the same aggregation pipeline as eventized listeners, so `emitAsync()` collects them uniformly. `null` / `undefined` / non-object targets silently no-op. The `'*'` wildcard still throws — it remains subscribe-only. **Migration:** callers that relied on `emit()` / `emitAsync()` throwing as a typo-safety net should add an explicit `isEventized()` guard (or a TypeScript typed emitter, which still rejects unknown event names at compile time).
+     Return values are funneled through the same aggregation pipeline as eventized listeners, so `emitAsync()` collects them uniformly. `null` / `undefined` / non-object targets silently no-op. The `'*'` wildcard still throws — it remains subscribe-only. **Migration:** callers that relied on `emit()` / `emitAsync()` throwing as a typo-safety net should add an explicit `isEventized()` guard (or a TypeScript typed emitter, which still rejects unknown event names at compile time).
 - **Unchanged (strict):** `retainClear()` and `unretain()` continue to throw `"object is not eventized"` — they operate on internal retain state that does not exist on plain objects and has no meaningful duck-typed equivalent.
 - **Types:** Public overload set unchanged. The existing typed-emitter overload still binds first for `EventizedObject<TEvents>`, and the loose `NonTypedEmitter<T>` overload accepts plain objects — types now match runtime exactly.
 - **Tests:** New `src/emit-ducktyping.spec.ts` (28 cases) covers method-with-args, `this` binding, symbol event names, `.emit()` fallback, missing-method silent no-op, array forms with mixed method/fallback, wildcard rejection, non-object targets, `retainClear`/`unretain` strictness, and the full `emitAsync()` return-aggregation pipeline (sync value, Promise, array-of-Promises, null, undefined, no-op). Existing `emit.spec.ts › duck typing` case flipped to assert non-throw.
@@ -133,17 +135,17 @@ import {
   emit,
   emitAsync,
   retain,
-  retainClear
+  retainClear,
 } from '@spearwolf/eventize';
 ```
 
-| before | after |
-|--------|-------|
-| `obj.on(..)` | `on(obj, ...)` |
+| before         | after            |
+| -------------- | ---------------- |
+| `obj.on(..)`   | `on(obj, ...)`   |
 | `obj.once(..)` | `once(obj, ...)` |
 | `obj.emit(..)` | `emit(obj, ...)` |
-| `obj.off(..)` | `off(obj, ...)` |
-| ... | ... |
+| `obj.off(..)`  | `off(obj, ...)`  |
+| ...            | ...              |
 
 There is still the option to inject the Eventize API as methods to the object (but this is no longer the default) by using:
 
@@ -155,7 +157,7 @@ There is still the option to inject the Eventize API as methods to the object (b
 If you are using the syntax from the _composition via inheritance_ example, you should now be using `eventize.inject` directly:
 
 ```typescript
-import {eventize, type Eventize} from '@spearwolf/eventize'
+import {eventize, type Eventize} from '@spearwolf/eventize';
 
 export interface Foo extends Eventize {}
 
@@ -170,7 +172,6 @@ Other API Changes
 
 - The _default export_ is still the `eventize()` function, but the `Priority` object is no longer assigned here
   - `Priority` is still available as a named export (only)
-
 
 ## `v3.4.2` (2024-06-01)
 

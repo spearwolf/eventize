@@ -67,7 +67,12 @@ const removeSimilarListenersFromArray = (
   for (const listener of fromArray) {
     if (
       (eventName == null && listener.listenerObject === listenerObject) ||
-      (listener.eventName === eventName && listener.listener === listenerObject)
+      // Both subscription shapes must match: on(ε, name, listenerObject)
+      // parks the object in `listener`, on(ε, name, methodName, listenerObject)
+      // parks it in `listenerObject`.
+      (listener.eventName === eventName &&
+        (listener.listener === listenerObject ||
+          listener.listenerObject === listenerObject))
     ) {
       similarListeners.push(listener);
     }

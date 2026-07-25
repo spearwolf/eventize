@@ -1,6 +1,14 @@
 import {fake} from 'sinon';
 
-import {emit, eventize, off, on, once, retain} from './index';
+import {
+  emit,
+  eventize,
+  getSubscriptionCount,
+  off,
+  on,
+  once,
+  retain,
+} from './index';
 
 describe('off()', () => {
   describe('by function', () => {
@@ -707,6 +715,45 @@ describe('off()', () => {
       emit(ε, 'baz');
 
       expect(fn.called).toBeFalsy();
+    });
+  });
+
+  describe('by event name and listener object', () => {
+    it('removes the listener-object form', () => {
+      const obj = eventize();
+      const listenerObject = {foo: fake()};
+
+      on(obj, 'foo', listenerObject);
+      expect(getSubscriptionCount(obj)).toBe(1);
+
+      off(obj, 'foo', listenerObject);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('removes the method-name form', () => {
+      const obj = eventize();
+      const listenerObject = {foo: fake()};
+
+      on(obj, 'foo', 'foo', listenerObject);
+      expect(getSubscriptionCount(obj)).toBe(1);
+
+      off(obj, 'foo', listenerObject);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('leaves listeners on other event names alone', () => {
+      const obj = eventize();
+      const listenerObject = {foo: fake(), bar: fake()};
+
+      on(obj, 'foo', 'foo', listenerObject);
+      on(obj, 'bar', 'bar', listenerObject);
+      expect(getSubscriptionCount(obj)).toBe(2);
+
+      off(obj, 'foo', listenerObject);
+      expect(getSubscriptionCount(obj)).toBe(1);
+
+      emit(obj, 'bar');
+      expect(listenerObject.bar.callCount).toBe(1);
     });
   });
 });
