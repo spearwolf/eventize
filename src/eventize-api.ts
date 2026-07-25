@@ -18,6 +18,7 @@ import type {
   ListenerObjectType,
   NonTypedEmitter,
   OnEventNames,
+  OnceAsyncOptions,
   SubscribeArgs,
   UnsubscribeFunc,
 } from './types';
@@ -417,25 +418,58 @@ export function once(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
 
 // ---------------------------------------------------------------------------
 // onceAsync() — typed overload first; falls back to the loose v4 signature.
+// An optional AbortSignal cancels the subscription and rejects the promise,
+// mirroring fetch(). Without it, an event that never fires keeps the listener
+// and the caller's continuation alive for the emitter's whole lifetime.
 // ---------------------------------------------------------------------------
+
+const abortReason = (signal: AbortSignal): unknown =>
+  signal.reason ?? new DOMException('This operation was aborted', 'AbortError');
+
 export function onceAsync<
   TEvents extends EventMap,
   K extends EventKeysOf<TEvents>,
 >(
   obj: EventizedObject<TEvents>,
   eventName: K,
+  options?: OnceAsyncOptions,
 ): Promise<TEvents[K] extends [infer A, ...any[]] ? A : void>;
 export function onceAsync<ReturnType = void, T extends object = object>(
   obj: NonTypedEmitter<T>,
   eventNames: AnyEventNames,
+  options?: OnceAsyncOptions,
 ): Promise<ReturnType>;
 // implementation
 export function onceAsync<ReturnType = void>(
   obj: object,
   eventNames: AnyEventNames,
+  options?: OnceAsyncOptions,
 ): Promise<ReturnType> {
-  return new Promise((resolve) => {
-    once(obj, eventNames, resolve as ListenerFuncType);
+  const signal = options?.signal;
+  return new Promise<ReturnType>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(abortReason(signal));
+      return;
+    }
+    // Declared before once() on purpose: the listener closure reads onAbort,
+    // which can only be created once `unsubscribe` exists.
+    let onAbort: (() => void) | undefined;
+    // A retained event fires inside once(), before there is anything to attach.
+    let resolved = false;
+    const unsubscribe = once(obj, eventNames, ((...args: EventArgs) => {
+      resolved = true;
+      if (signal != null && onAbort != null) {
+        signal.removeEventListener('abort', onAbort);
+      }
+      resolve(args[0] as ReturnType);
+    }) as ListenerFuncType);
+    if (signal != null && !resolved) {
+      onAbort = () => {
+        unsubscribe();
+        reject(abortReason(signal));
+      };
+      signal.addEventListener('abort', onAbort, {once: true});
+    }
   });
 }
 

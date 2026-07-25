@@ -127,6 +127,16 @@ export type UnsubscribeFunc =
   | ((() => void) & {listener: EventListener})
   | ((() => void) & {listeners: Array<EventListener>});
 
+/**
+ * Options for `onceAsync()`. Passing a `signal` gives the caller a way to
+ * cancel a subscription that may never fire — without one, an event that
+ * never arrives pins the listener, the resolve closure and the caller's
+ * await continuation to the emitter for its whole lifetime.
+ */
+export type OnceAsyncOptions = {
+  signal?: AbortSignal;
+};
+
 export type SubscribeArgs =
   //
   // .on( eventName*, [ priority, ] listenerFunc [, listenerObject] )

@@ -441,7 +441,7 @@ emit(ε, 'my-event'); // (nothing happens)
 > [!NOTE]
 > With multiple event names, the listener is removed after the _first_ of those events fires.
 
-#### `onceAsync(emitter, eventName | eventName[])`
+#### `onceAsync(emitter, eventName | eventName[], options?)`
 
 Returns a `Promise` that resolves with the event's first argument.
 
@@ -458,6 +458,29 @@ setTimeout(() => emit(ε, 'loaded', {content: '...'}), 100);
 // => Waiting for data...
 // => Data loaded: { content: '...' }
 ```
+
+`onceAsync()` takes an optional `{signal}`. Without it, an event that never
+fires keeps the listener, the resolve closure and the caller's `await`
+continuation attached to the emitter for as long as the emitter lives —
+there is no other handle to release them with.
+
+```javascript
+const controller = new AbortController();
+try {
+  const value = await onceAsync(ε, 'ready', {signal: controller.signal});
+} catch (err) {
+  if (err.name === 'AbortError') {
+    /* cancelled */
+  }
+}
+// somewhere in teardown:
+controller.abort();
+```
+
+Aborting unsubscribes the internal `once()` and rejects with the signal's
+`reason`, or an `AbortError` `DOMException` when `abort()` was called without
+one — the same contract as `fetch()`. A signal that is already aborted rejects
+without ever subscribing.
 
 ---
 
