@@ -197,4 +197,62 @@ describe('EventStore', () => {
       ]);
     });
   });
+
+  describe('removal addresses the bucket directly', () => {
+    it('removes a named listener without scanning other buckets', () => {
+      const store = new EventStore();
+      for (let i = 0; i < 100; i++) {
+        store.add(new EventListener(`other-${i}`, 0, () => {}));
+      }
+      const target = store.add(new EventListener('target', 0, () => {}));
+      expect(store.namedListeners.size).toBe(101);
+
+      store.remove(target, null);
+
+      expect(store.namedListeners.has('target')).toBe(false);
+      expect(store.namedListeners.size).toBe(100);
+      expect(store.getSubscriptionCount()).toBe(100);
+    });
+
+    it('removes a catch-em-all listener', () => {
+      const store = new EventStore();
+      const target = store.add(
+        new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}),
+      );
+      store.add(new EventListener('named', 0, () => {}));
+
+      store.remove(target, null);
+
+      expect(store.catchEmAllListeners).toHaveLength(0);
+      expect(store.getSubscriptionCount()).toBe(1);
+    });
+
+    it('removes by event name and listener object without touching other names', () => {
+      const store = new EventStore();
+      const listenerObject = {};
+      store.add(new EventListener('foo', 0, listenerObject));
+      store.add(new EventListener('bar', 0, listenerObject));
+
+      store.remove('foo', listenerObject, true);
+
+      expect(store.namedListeners.has('foo')).toBe(false);
+      expect(store.namedListeners.has('bar')).toBe(true);
+      expect(store.getSubscriptionCount()).toBe(1);
+    });
+
+    it('honours refCount before removing anything', () => {
+      const store = new EventStore();
+      const listenerObject = {};
+      const first = store.add(new EventListener('foo', 0, listenerObject));
+      const second = store.add(new EventListener('foo', 0, listenerObject));
+      expect(second).toBe(first);
+      expect(first.refCount).toBe(2);
+
+      store.remove(first, null);
+      expect(store.getSubscriptionCount()).toBe(1);
+
+      store.remove(first, null);
+      expect(store.getSubscriptionCount()).toBe(0);
+    });
+  });
 });

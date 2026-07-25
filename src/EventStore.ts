@@ -223,13 +223,22 @@ export class EventStore {
     if (listener.isRemoved) return;
     listener.refCount -= 1;
     if (listener.refCount >= 1) return;
-    this.namedListeners.forEach((namedListeners, name) => {
-      removeItemFromArray(namedListeners, listener);
-      if (namedListeners.length === 0) {
-        this.namedListeners.delete(name);
+
+    // A listener lives in exactly one bucket: the catch-em-all array, or the
+    // named array for its own eventName. A multi-event on() creates one
+    // EventListener per name, so there is never more than one home to visit.
+    if (listener.isCatchEmAll) {
+      removeItemFromArray(this.catchEmAllListeners, listener);
+    } else {
+      const bucket = this.namedListeners.get(listener.eventName);
+      if (bucket) {
+        removeItemFromArray(bucket, listener);
+        if (bucket.length === 0) {
+          this.namedListeners.delete(listener.eventName);
+        }
       }
-    });
-    removeItemFromArray(this.catchEmAllListeners, listener);
+    }
+
     listener.detach();
   }
 
@@ -237,16 +246,16 @@ export class EventStore {
     eventName: EventName,
     listenerObject: unknown,
   ): void {
-    this.namedListeners.forEach((namedListeners, name) => {
-      removeSimilarListenersFromArray(
-        namedListeners,
-        eventName,
-        listenerObject,
-      );
-      if (namedListeners.length === 0) {
-        this.namedListeners.delete(name);
-      }
-    });
+    // The event name is known, and the filter checks it anyway — no reason to
+    // walk every other bucket. Catch-em-all listeners were never reachable
+    // from this path (they live in their own array, not in namedListeners),
+    // and still aren't.
+    const bucket = this.namedListeners.get(eventName);
+    if (!bucket) return;
+    removeSimilarListenersFromArray(bucket, eventName, listenerObject);
+    if (bucket.length === 0) {
+      this.namedListeners.delete(eventName);
+    }
   }
 
   private removeByListener(listener: unknown, listenerObject: unknown): void {
