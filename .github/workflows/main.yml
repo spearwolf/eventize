@@ -10,25 +10,29 @@ permissions:
 
 jobs:
   test:
-    name: Run tests
+    name: Run tests (node ${{ matrix.node }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22, 24]
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ matrix.node }}
           cache: 'npm'
 
       - run: npm ci
         name: Install dependencies
 
-      - run: npm test
+      - run: npm test -- --coverage
         name: Run tests
 
       - run: npm run build
         name: Run build
-          
+
       - run: npm run lint
         name: Check linting
 
@@ -53,7 +57,7 @@ jobs:
           registry-url: https://registry.npmjs.org
           scope: '@spearwolf'
 
-      - run: npm i
+      - run: npm ci
         name: Install dependencies
 
       - run: npm run build
@@ -61,4 +65,3 @@ jobs:
 
       - run: npm run publish:pkg
         name: Publish package
-
