@@ -254,5 +254,37 @@ describe('EventStore', () => {
       store.remove(first, null);
       expect(store.getSubscriptionCount()).toBe(0);
     });
+
+    it('ignores an event name with no bucket', () => {
+      const store = new EventStore();
+      const listenerObject = {};
+      store.add(new EventListener('foo', 0, listenerObject));
+
+      store.remove('never-subscribed', listenerObject, true);
+
+      expect(store.getSubscriptionCount()).toBe(1);
+    });
+
+    // Pins a pre-existing quirk rather than fixing one: the foreign listener is
+    // detach()ed and its refCount decremented while it stays in its own store's
+    // array. The pre-refactor full scan did exactly the same — documentation,
+    // not a behaviour change.
+    it('ignores a listener that belongs to another store', () => {
+      const a = new EventStore();
+      const b = new EventStore();
+      const target = a.add(new EventListener('foo', 0, () => {}));
+      b.add(new EventListener('foo', 0, () => {})); // same name, different instance
+
+      expect(() => b.remove(target, null)).not.toThrow();
+      expect(b.getSubscriptionCount()).toBe(1);
+    });
+
+    it('ignores a foreign listener whose event name is unknown here', () => {
+      const a = new EventStore();
+      const b = new EventStore();
+      const target = a.add(new EventListener('foo', 0, () => {}));
+
+      expect(() => b.remove(target, null)).not.toThrow();
+    });
   });
 });
