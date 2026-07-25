@@ -58,8 +58,8 @@ export class EventListener {
   readonly isCatchEmAll: boolean;
   readonly priority: number | undefined;
   // Not readonly: detach() nulls these on removal so a retained unsubscribe
-  // handle can't keep the emitter graph alive. Internal contract only —
-  // nothing outside this package writes to them.
+  // handle can't keep the emitter graph alive. Nothing inside this package
+  // writes to them outside detach(), and consumers have no reason to either.
   listener: unknown;
   listenerObject: ListenerObjectType;
   readonly listenerType: number;

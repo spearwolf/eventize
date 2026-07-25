@@ -86,6 +86,9 @@ const removeSimilarListenersFromArray = (
 
 const removeAll = (fromArray: Array<EventListener>) => {
   if (fromArray) {
+    // Detach-then-truncate: for the duration of this loop the array still
+    // holds detached listeners. Harmless while the body only detaches; adding
+    // any isEqual-based lookup here would read nulled fields.
     fromArray.forEach((listener) => listener.detach());
     fromArray.length = 0;
   }
