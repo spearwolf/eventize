@@ -44,7 +44,6 @@
     "@arethetypeswrong/cli": "^0.18.2",
     "@eslint/js": "^9.32.0",
     "@types/jest": "^30.0.0",
-    "@types/sinon": "^17.0.4",
     "cross-env": "^10.0.0",
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.8",
