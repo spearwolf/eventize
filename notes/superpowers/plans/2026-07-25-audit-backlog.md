@@ -20,6 +20,7 @@
 - `lib/` is generated and git-ignored. Never edit it, never read it to answer a question about behaviour.
 - Never let anything the emitter attaches become enumerable on a user object.
 - `npm run cbt` (clean → build → `attw --pack` → test → lint → format check) is the only gate that catches dual-format type breakage. Run it at the end of every phase. Individual tasks run `npm test` unless stated otherwise.
+- **`npm run cbt` alone is not a cold gate.** `npm run clean` removes `lib/`, `build/`, `dist/`, `types/` and `tmp/` — it does not touch ts-jest's transform cache, which lives outside the repository (`/tmp/jest_rs` on Linux). A stale cache serves previously compiled output and hides type errors that a fresh checkout or a CI runner will hit immediately. This is not hypothetical: it produced a green `cbt` for a change that broke 13 of 25 spec suites. **Any task that touches `package.json` dependencies, `tsconfig.json`, or a `.d.ts` boundary must run `npx jest --clearCache` before its verification run**, and say so in its report.
 - Any change to public API or runtime behaviour needs a `CHANGELOG.md` entry under `## Unreleased`.
 - Documentation is English. `CLAUDE.md` is a symlink to `AGENTS.md` — edit only `AGENTS.md`.
 - Node floor is `>=18.16`. Do not use syntax or globals newer than ES2022 in `src/`.
@@ -115,7 +116,7 @@ git commit -m "chore: drop dead helpers, orphaned TODO and stray .js import exte
 
 ---
 
-## Task 2: Remove `@types/sinon`
+## Task 2: Bring `@types/sinon` up to the sinon major
 
 **Model:** Sonnet
 **Finding:** DEP-001
@@ -128,26 +129,54 @@ git commit -m "chore: drop dead helpers, orphaned TODO and stray .js import exte
 - Consumes: nothing
 - Produces: nothing
 
-`sinon` ships its own type definitions from v17 onwards. The repo runs `sinon@^21`, so `@types/sinon@^17` does not merely lag — it *overrides* the bundled types with signatures five majors old.
+> **The audit was wrong about the cause, and this task was rewritten mid-execution.** DEP-001 claimed that `sinon` ships its own type definitions from v17 onwards and that `@types/sinon` is therefore redundant. It is not: `node_modules/sinon/package.json` at v21.0.0 has no `types` field, no `typings` field, no `exports["."].types` condition, and the package contains no `.d.ts` file at all. Removing `@types/sinon` broke 13 of 25 spec suites with `TS7016: Could not find a declaration file for module 'sinon'`.
+>
+> That breakage was not caught for three tasks, because ts-jest's transform cache lives in `/tmp/jest_rs`, outside everything `npm run clean` removes. The cache kept serving output compiled while the old types were still installed, so `npm run cbt` reported green against a tree that could not compile from cold. See the corresponding Global Constraint.
+>
+> What survives of the finding is its measurable half: `@types/sinon@^17` against `sinon@^21` is five majors of drift, and a `@types` package that stale describes an API the runtime no longer has. The fix is to update it, not to delete it.
 
-- [ ] **Step 1: Remove the package**
+- [ ] **Step 1: Verify the premise before acting**
 
 ```bash
-npm uninstall @types/sinon
+node -e "const p=require('./node_modules/sinon/package.json'); console.log('version:', p.version, '| types:', p.types ?? p.typings ?? '(none)');"
+find node_modules/sinon -name '*.d.ts' | head
 ```
 
-- [ ] **Step 2: Run the full gate**
+If `types` reports a path or the `find` returns any file, sinon *does* ship declarations after all — stop and report, because then the original finding was right and this rewrite is wrong.
 
-Run: `npm run cbt`
-Expected: PASS.
+- [ ] **Step 2: Update the package to the matching major**
 
-If type errors appear in spec files, they are **real** — previously masked by the stale types. Fix the call sites to match sinon 21's actual signatures rather than reinstating the package. Report each fix in the commit body.
+```bash
+npm install --save-dev @types/sinon@^22
+```
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Clear the transform cache, then run the full gate**
+
+```bash
+npx jest --clearCache
+npm run cbt
+```
+
+Expected: PASS, 25 suites, 414 tests.
+
+The `--clearCache` is not optional. Without it this step proves nothing: a stale cache is precisely what hid the original breakage.
+
+If type errors appear in spec files, they are **real** — five majors of drift means signatures moved. Fix the call sites to match sinon 21's actual API rather than pinning the types back to v17. Report each fix in the commit body.
+
+- [ ] **Step 4: Confirm the suite compiles from cold a second time**
+
+```bash
+npx jest --clearCache
+npx cross-env NODE_ENV=test npx jest 2>&1 | tail -5
+```
+
+Expected: `Tests: 414 passed, 414 total`. Two cold runs, not one — the first proves the fix, the second proves the first was not itself cached.
+
+- [ ] **Step 5: Commit**
 
 ```bash
 git add package.json package-lock.json src/
-git commit -m "chore(deps): drop @types/sinon, sinon ships its own types since v17 (DEP-001)"
+git commit --no-gpg-sign -m "chore(deps): update @types/sinon 17 -> 22 to match sinon 21 (DEP-001)"
 ```
 
 ---
@@ -560,15 +589,17 @@ Insert after the `clearMocks: true,` line:
     global: {
       statements: 97,
       branches: 93,
-      functions: 94,
+      functions: 93,
       lines: 97,
     },
   },
 ```
 
-These numbers replace the 95/93/92/95 the audit proposed. The audit measured 96.13 / 94.32 / 93.07 against the tree as it stood; task 1 deleted two uncovered functions from `src/utils.ts` and the measured state is now **97.62 statements / 94.32 branches / 94.53 functions / 98.08 lines**. Against that, 95/93/92/95 leaves two to three points of slack and decorates rather than binds.
+These numbers replace the 95/93/92/95 the audit proposed. The audit measured 96.13 / 94.32 / 93.07 against the tree as it stood; task 1 deleted two uncovered functions from `src/utils.ts`, and the state measured **within the `collectCoverageFrom` scope above** is now **97.52 statements / 94.32 branches / 94.01 functions / 98 lines**. Against that, 95/93/92/95 leaves two to three points of slack and decorates rather than binds.
 
-`branches` deliberately keeps a wider margin than the rest: at 93 against a measured 94.32 it holds 1.3 points, where 94 would hold 0.32. Branch coverage is the most volatile of the four, and phases 1 and 3 add a lot of conditional code. The other three sit within a point of the measurement.
+Measure inside the scope, not from the unfiltered run. The full-tree figures are about a tenth of a point higher (97.62 / 94.32 / 94.53 / 98.08) because they include `src/__test-utils__`, which the config excludes — and the threshold binds against the filtered number.
+
+`branches` and `functions` deliberately keep a wider margin than `statements` and `lines`. At 93 against 94.32 and 94.01 they hold roughly a point each; at 94 the functions gate would hold 0.02 points, meaning a single uncovered function anywhere turns the build red. Both metrics are the volatile ones, and phases 1 and 3 add a lot of conditional code and a lot of small functions.
 
 - [ ] **Step 3: Verify the threshold passes**
 
