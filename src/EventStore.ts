@@ -44,8 +44,6 @@ const removeItemFromArray = (arr: Array<any>, item: any) => {
 const isSimilarListenerType = (listenerType: number) =>
   listenerType === LISTENER_IS_OBJ || listenerType === LISTENER_IS_NAMED_FUNC;
 
-// TODO removeSimilarListener()
-
 const removeListenerFromArray = (
   listeners: Array<EventListener>,
   listener: unknown,

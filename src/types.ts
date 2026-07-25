@@ -1,6 +1,6 @@
-import type {EventKeeper} from './EventKeeper.js';
-import type {EventStore} from './EventStore.js';
-import type {NAMESPACE} from './constants.js';
+import type {EventKeeper} from './EventKeeper';
+import type {EventStore} from './EventStore';
+import type {NAMESPACE} from './constants';
 
 export type EventName = string | symbol;
 export type AnyEventNames = EventName | Array<EventName>;
