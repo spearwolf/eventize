@@ -147,8 +147,18 @@ If `types` reports a path or the `find` returns any file, sinon *does* ship decl
 - [ ] **Step 2: Update the package to the matching major**
 
 ```bash
-npm install --save-dev @types/sinon@^22
+npm install --save-dev @types/sinon@^21.0.1
 ```
+
+Match the major of the **installed** `sinon`, not the newest `@types/sinon` on the registry. `sinon` is pinned at `^21` here; `@types/sinon@22.0.0` describes `sinon@22`, so installing it would trade a five-major lag for a one-major lead — the same skew DEP-001 objected to, inverted. `@types/sinon@21.0.1` is the exact counterpart. When `sinon` moves to 22 (task 28 or later), `@types/sinon` moves with it, in the same commit.
+
+Verify the pairing rather than assuming it:
+
+```bash
+node -e "console.log('sinon:', require('./node_modules/sinon/package.json').version, '| @types/sinon:', require('./node_modules/@types/sinon/package.json').version)"
+```
+
+The two majors must match.
 
 - [ ] **Step 3: Clear the transform cache, then run the full gate**
 
