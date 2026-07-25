@@ -460,6 +460,8 @@ describe('retain()', () => {
       expect(second.foo.callCount).toBe(1);
     });
 
+    // Behaviour pin, not a CORR-001 guard: each event name builds its own
+    // EventListener, so both registrations insert either way.
     it('replays each retained event once for a multi-event subscription', () => {
       const obj = eventize();
       const listenerObject = {a: fake(), b: fake()};
@@ -476,6 +478,14 @@ describe('retain()', () => {
       expect(listenerObject.b.calledWith('B')).toBe(true);
     });
 
+    // Pins today's semantics: once() collapses into the existing on()
+    // subscription, so the retained value is not replayed a second time.
+    // This case is a regression guard for CORR-001 — together with the first
+    // case in this block, it fails if registerEventListener replays
+    // unconditionally. The remaining cases are pins, not guards.
+    // When once() stops deduplicating (planned), these expectations become
+    // 2 calls and 2 subscriptions. A failure here reading "Expected: 1,
+    // Received: 2" is that change arriving, not a regression.
     it('does not replay again when once() dedups against an existing on()', () => {
       const obj = eventize();
       const listenerObject = {foo: fake()};
@@ -491,6 +501,9 @@ describe('retain()', () => {
       expect(getSubscriptionCount(obj)).toBe(1);
     });
 
+    // Behaviour pin, not a CORR-001 guard: off() splices the listener out, so
+    // the second on() inserts either way. Guards against a future
+    // "remember what was already replayed" implementation.
     it('replays again after the listener was removed and re-registered', () => {
       const obj = eventize();
       const listenerObject = {foo: fake()};
