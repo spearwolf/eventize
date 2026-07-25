@@ -4,7 +4,24 @@ import type {NAMESPACE} from './constants.js';
 
 export type EventName = string | symbol;
 export type AnyEventNames = EventName | Array<EventName>;
-export type OnEventNames = AnyEventNames | Array<[EventName, number]>;
+
+/**
+ * An event name bundled with the priority it should be subscribed at. Only
+ * meaningful for `on()` / `once()` — `emit()` and `retain()` have no notion of
+ * priority, which is why they keep taking `AnyEventNames`.
+ */
+export type EventNameWithPriority = [eventName: EventName, priority: number];
+
+/**
+ * The event-name argument of `on()` / `once()`: either a single name, or a list
+ * whose elements are names, `[name, priority]` tuples, or any mix of the two. A
+ * tuple's priority overrides the call-level priority for that one event.
+ *
+ * The mixed form is what `_subscribeTo()` has always implemented — it tests
+ * `Array.isArray()` per element — but the previous type only allowed a list of
+ * names *or* a list of tuples, so `[['foo', 100], 'bar']` needed a cast.
+ */
+export type OnEventNames = EventName | Array<EventName | EventNameWithPriority>;
 
 export type EventArgs = Array<any>;
 
@@ -146,6 +163,7 @@ export type SubscribeArgs =
  *
  * Ordered specific → generic so TypeScript picks the most precise match first:
  *   1a. typed listener function for a known (or symbol) event key
+ *   1c. typed array of event keys, optionally with per-event priorities
  *   1b. typed listener-object (method names = event names)
  *   1.  listener function (with/without priority, with/without listenerObject)
  *   2.  listener method name on a listener object
@@ -162,6 +180,18 @@ export interface SubscribeFunc<TEvents extends EventMap = DefaultEventMap> {
     eventName: K,
     priority: number,
     listener: ListenerFor<TEvents, K>,
+  ): UnsubscribeFunc;
+
+  // (1c) typed array of event names — common-listener form. Elements may carry
+  // their own priority as a [name, priority] tuple, mixed freely with names.
+  <K extends EventKeysOf<TEvents>>(
+    eventNames: Array<K | [K, number]>,
+    listener: (...args: ArgsFor<TEvents, K>) => void,
+  ): UnsubscribeFunc;
+  <K extends EventKeysOf<TEvents>>(
+    eventNames: Array<K | [K, number]>,
+    priority: number,
+    listener: (...args: ArgsFor<TEvents, K>) => void,
   ): UnsubscribeFunc;
 
   // (1b) typed listener-object (method names = event names)

@@ -1,0 +1,213 @@
+import {emitAsync, emit, off, on, retain} from './eventize-api';
+import {eventize} from './eventize';
+import {Priority} from './Priority';
+import type {OnEventNames} from './types';
+
+// Guards for behaviors that README / docs / the using-eventize skill promise
+// but that had no coverage of their own. Sam Vimes' rule: a claim without a
+// witness is just a rumour.
+describe('documented quirks', () => {
+  describe('per-event priority tuples in the array form', () => {
+    it('overrides the call-level priority per event', () => {
+      const ε = eventize();
+      const calls: string[] = [];
+
+      on(ε, [['foo', Priority.Low]], () => calls.push('low-foo'));
+      on(ε, [['foo', Priority.Critical]], () => calls.push('critical-foo'));
+
+      emit(ε, 'foo');
+      expect(calls).toEqual(['critical-foo', 'low-foo']);
+    });
+
+    it('assigns a separate priority to each event of the call', () => {
+      const ε = eventize();
+      const calls: string[] = [];
+
+      on(
+        ε,
+        [
+          ['a', Priority.High],
+          ['b', Priority.Low],
+        ],
+        (v: unknown) => calls.push(`tuple:${v}`),
+      );
+      on(ε, 'a', (v: unknown) => calls.push(`plain:${v}`));
+      on(ε, 'b', (v: unknown) => calls.push(`plain:${v}`));
+
+      emit(ε, 'a', 1);
+      expect(calls).toEqual(['tuple:1', 'plain:1']); // High beats Normal
+
+      calls.length = 0;
+      emit(ε, 'b', 2);
+      expect(calls).toEqual(['plain:2', 'tuple:2']); // Normal beats Low
+    });
+
+    it('mixes tuples and bare names in one array', () => {
+      const ε = eventize();
+      const calls: string[] = [];
+
+      // OnEventNames allows the mixed form — no cast needed
+      const eventNames: OnEventNames = [['a', Priority.High], 'b'];
+      on(ε, eventNames, (v: unknown) => calls.push(String(v)));
+
+      emit(ε, 'a', 1);
+      emit(ε, 'b', 2);
+      expect(calls).toEqual(['1', '2']);
+    });
+
+    it('mixes tuples and bare names inline', () => {
+      const ε = eventize();
+      const calls: string[] = [];
+
+      on(ε, [['a', Priority.High], 'b'], (v: unknown) => calls.push(String(v)));
+
+      emit(ε, 'a', 1);
+      emit(ε, 'b', 2);
+      expect(calls).toEqual(['1', '2']);
+    });
+  });
+
+  describe('off() and retained state', () => {
+    it('clears the retained value for a scalar symbol event name', () => {
+      const EVENT = Symbol('event');
+      const ε = eventize();
+
+      retain(ε, EVENT);
+      emit(ε, EVENT, 'value');
+      off(ε, EVENT);
+
+      const seen: unknown[] = [];
+      on(ε, EVENT, (v: unknown) => seen.push(v));
+      expect(seen).toEqual([]);
+    });
+
+    it('clears the retained value for an array of symbol names', () => {
+      const EVENT = Symbol('event');
+      const ε = eventize();
+
+      retain(ε, EVENT);
+      emit(ε, EVENT, 'value');
+      off(ε, [EVENT]);
+
+      const seen: unknown[] = [];
+      on(ε, EVENT, (v: unknown) => seen.push(v));
+      expect(seen).toEqual([]);
+    });
+
+    it('treats the array and scalar forms identically for mixed names', () => {
+      const EVENT = Symbol('event');
+      const ε = eventize();
+
+      retain(ε, ['status', EVENT]);
+      emit(ε, 'status', 'a');
+      emit(ε, EVENT, 'b');
+
+      off(ε, ['status', EVENT]);
+
+      const seen: unknown[] = [];
+      on(ε, 'status', (v: unknown) => seen.push(v));
+      on(ε, EVENT, (v: unknown) => seen.push(v));
+      expect(seen).toEqual([]);
+    });
+
+    it('does not mistake an unsubscribe listener array for event names', () => {
+      const ε = eventize();
+      const calls: string[] = [];
+
+      retain(ε, 'kept');
+      emit(ε, 'kept', 'value');
+
+      // the unsubscribe of a multi-event on() passes an array of
+      // EventListener instances into off() — those must not touch the keeper
+      const unsubscribe = on(ε, ['one', 'two'], () => calls.push('hit'));
+      unsubscribe();
+
+      const seen: unknown[] = [];
+      on(ε, 'kept', (v: unknown) => seen.push(v));
+      expect(seen).toEqual(['value']);
+      expect(calls).toEqual([]);
+    });
+
+    it('clears the retained value for an array of string names', () => {
+      const ε = eventize();
+
+      retain(ε, 'status');
+      emit(ε, 'status', 'value');
+      off(ε, ['status']);
+
+      const seen: unknown[] = [];
+      on(ε, 'status', (v: unknown) => seen.push(v));
+      expect(seen).toEqual([]);
+    });
+  });
+
+  describe('per-event priorities on a typed emitter', () => {
+    interface Events {
+      a: [n: number];
+      b: [n: number];
+    }
+
+    it('accepts tuples, bare names, and a mix of both', () => {
+      const ε = eventize<Events>();
+      const calls: string[] = [];
+
+      on(
+        ε,
+        [
+          ['a', Priority.High],
+          ['b', Priority.Low],
+        ],
+        (n) => calls.push(`tuple:${n}`),
+      );
+      on(ε, [['a', Priority.Critical], 'b'], (n) => calls.push(`mixed:${n}`));
+      on(ε, ['a', 'b'], (n) => calls.push(`plain:${n}`));
+
+      emit(ε, 'a', 1);
+      expect(calls).toEqual(['mixed:1', 'tuple:1', 'plain:1']);
+
+      calls.length = 0;
+      emit(ε, 'b', 2);
+      expect(calls).toEqual(['mixed:2', 'plain:2', 'tuple:2']);
+    });
+
+    it('accepts a call-level priority alongside the array form', () => {
+      const ε = eventize<Events>();
+      const calls: string[] = [];
+
+      on(ε, ['a', 'b'], Priority.High, (n) => calls.push(`high:${n}`));
+      on(ε, ['a', 'b'], (n) => calls.push(`normal:${n}`));
+
+      emit(ε, 'a', 1);
+      expect(calls).toEqual(['high:1', 'normal:1']);
+    });
+
+    it('still rejects unknown event names inside tuples', () => {
+      const ε = eventize<Events>();
+      // @ts-expect-error 'nope' is not a key of Events
+      on(ε, [['nope', Priority.High]], () => {});
+      // @ts-expect-error 'nope' is not a key of Events
+      on(ε, [['a', Priority.High], 'nope'], () => {});
+    });
+  });
+
+  describe('emitAsync() with nothing to collect', () => {
+    it('resolves undefined when there are no listeners', async () => {
+      const ε = eventize();
+      await expect(emitAsync(ε, 'foo')).resolves.toBeUndefined();
+    });
+
+    it('resolves undefined when every listener returns null or undefined', async () => {
+      const ε = eventize();
+      on(ε, 'foo', (): unknown => null);
+      on(ε, 'foo', (): unknown => undefined);
+      await expect(emitAsync(ε, 'foo')).resolves.toBeUndefined();
+    });
+  });
+
+  describe('eventize.is()', () => {
+    it('is the same guard as isEventized', () => {
+      expect(eventize.is(eventize())).toBe(true);
+      expect(eventize.is({})).toBe(false);
+    });
+  });
+});

@@ -155,10 +155,17 @@ export function on<
   priority: number,
   listener: ListenerFor<TEvents, K>,
 ): UnsubscribeFunc;
-// (1c) typed array of event names — common-listener form
+// (1c) typed array of event names — common-listener form. Elements may carry
+// their own priority as a [name, priority] tuple, mixed freely with bare names.
 export function on<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
   obj: EventizedObject<TEvents>,
-  eventNames: K[],
+  eventNames: Array<K | [K, number]>,
+  listener: (...args: ArgsFor<TEvents, K>) => void,
+): UnsubscribeFunc;
+export function on<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
+  obj: EventizedObject<TEvents>,
+  eventNames: Array<K | [K, number]>,
+  priority: number,
   listener: (...args: ArgsFor<TEvents, K>) => void,
 ): UnsubscribeFunc;
 // (1b) typed listener-object (method names = event names)
@@ -276,10 +283,17 @@ export function once<
   priority: number,
   listener: ListenerFor<TEvents, K>,
 ): UnsubscribeFunc;
-// (1c) typed array of event names — common-listener form
+// (1c) typed array of event names — common-listener form. Elements may carry
+// their own priority as a [name, priority] tuple, mixed freely with bare names.
 export function once<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
   obj: EventizedObject<TEvents>,
-  eventNames: K[],
+  eventNames: Array<K | [K, number]>,
+  listener: (...args: ArgsFor<TEvents, K>) => void,
+): UnsubscribeFunc;
+export function once<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
+  obj: EventizedObject<TEvents>,
+  eventNames: Array<K | [K, number]>,
+  priority: number,
   listener: (...args: ArgsFor<TEvents, K>) => void,
 ): UnsubscribeFunc;
 // (1b) typed listener-object (method names = event names)
@@ -435,7 +449,13 @@ export function off(
     (listenerType === 'string' || listenerType === 'symbol');
   store.remove(listener, listenerObject, forceRemove);
   if (Array.isArray(listener)) {
-    keeper.remove(listener.filter((li) => typeof li === 'string'));
+    // Only the event-name elements are meaningful to the keeper. Arrays reach
+    // this branch from two directions: an explicit off(ε, [name, …]) call, and
+    // the unsubscribe function returned by a multi-event on(), which passes an
+    // array of EventListener instances. Filtering by isEventName keeps symbol
+    // event names — which the old `typeof === 'string'` test silently dropped —
+    // while still ignoring listener instances.
+    keeper.remove(listener.filter(isEventName));
   } else if (isEventName(listener)) {
     keeper.remove(listener);
   }
