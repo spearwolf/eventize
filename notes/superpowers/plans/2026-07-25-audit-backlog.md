@@ -558,13 +558,17 @@ Insert after the `clearMocks: true,` line:
   // build pass.
   coverageThreshold: {
     global: {
-      statements: 95,
+      statements: 97,
       branches: 93,
-      functions: 92,
-      lines: 95,
+      functions: 94,
+      lines: 97,
     },
   },
 ```
+
+These numbers replace the 95/93/92/95 the audit proposed. The audit measured 96.13 / 94.32 / 93.07 against the tree as it stood; task 1 deleted two uncovered functions from `src/utils.ts` and the measured state is now **97.62 statements / 94.32 branches / 94.53 functions / 98.08 lines**. Against that, 95/93/92/95 leaves two to three points of slack and decorates rather than binds.
+
+`branches` deliberately keeps a wider margin than the rest: at 93 against a measured 94.32 it holds 1.3 points, where 94 would hold 0.32. Branch coverage is the most volatile of the four, and phases 1 and 3 add a lot of conditional code. The other three sit within a point of the measurement.
 
 - [ ] **Step 3: Verify the threshold passes**
 
