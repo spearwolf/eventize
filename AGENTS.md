@@ -1,55 +1,55 @@
-# Project Overview
+# AGENTS.md
 
-`@spearwolf/eventize` is a lightweight, dependency-free TypeScript library for synchronous event-driven programming. It allows objects to be "eventized" (enhanced with event emitter capabilities) and supports features like wildcards, priorities, and full TypeScript type safety.
+Canonical guide for coding agents in this repo. `CLAUDE.md` is a symlink to this file — edit only this one.
 
-# Tech Stack
+`@spearwolf/eventize` makes any JS/TS object a **synchronous** event emitter. Zero runtime deps, ESM + CJS, opt-in typed event maps. All development happens in `src/`; `lib/` is build output.
 
-- **Language:** TypeScript (Target: ES2022)
-- **Testing:** Jest
-- **Linting/Formatting:** ESLint, Prettier
-- **Build Tool:** tsup
+## Verification
 
-# Source Code Structure
+`npm run cbt` — clean → build → `attw --pack` → test → lint → format check. Run it before declaring a task done; it is the only gate that catches dual-format type breakage.
 
-- **`src/`**: The main source code directory. All development happens here.
-    - `index.ts`: The main entry point exporting the public API.
-    - `eventize.ts`: Contains the `eventize` function and factory logic.
-    - `eventize-api.ts`: Implements the core event API functions (`on`, `off`, `emit`, etc.).
-    - `types.ts`: TypeScript type definitions.
-    - `*.spec.ts`: Jest test files, located alongside the source files they test.
-- **`lib/`**: Build output directory. **DO NOT READ OR WRITE** to this directory.
-- **`scripts/`**: Build and maintenance scripts. Generally, you won't need to modify these.
-- **`docs-assets/`**: Assets for documentation.
+Narrower loops while working: `npm test -- src/once.spec.ts`, `npm test -- -t "retains the last value"`, `npm run watch`.
 
-# Development Workflow
+## Architecture invariants
 
-1.  **Install Dependencies:** `npm install`
-2.  **Build:** `npm run build`
-3.  **Test:** `npm run test` (or `npm run watch` for development)
-4.  **Lint & Format:** `npm run lint` and `npm run format:check`
-5.  **Verify All:** `npm run cbt` (Clean, Build, Test) - Run this before finishing a task to ensure integrity.
+These are the things that bite. Everything else is readable from the source.
 
-# Coding Guidelines
+**The eventized marker.** `asEventized(obj)` attaches a non-enumerable property keyed by `NAMESPACE` (`Symbol.for('eventize')`) holding `{store, keeper}`. That hidden slot _is_ the definition of an emitter — `isEventized()` just probes for it. This is why eventize works on plain `{}`, existing objects, and class instances interchangeably, and why nothing may ever enumerate its way onto the public surface.
 
-- **Language:** Use TypeScript for all source code.
-- **Style:**
-    - Follow the existing functional programming style.
-    - Use `const` and arrow functions where appropriate.
-    - Ensure strict type safety; avoid `any` unless absolutely necessary.
-- **Imports:** Keep imports sorted. Re-sort them if you modify a file.
-- **Testing:**
-    - Every new feature or bug fix **MUST** have a corresponding test case in a `*.spec.ts` file.
-    - Ensure all tests pass using `npm run test`.
-- **Documentation:**
-    - **CHANGELOG:**
-        - For every new feature, API change, or significant bug fix, add an entry to `CHANGELOG.md`.
-        - If the publicly exported API changes, please add migration notes and tips in a separate section.
-    - **README:** Update `README.md` if the public API or usage patterns change.
-    - Use clear, concise English for all documentation.
+**Two collaborators per emitter.** `EventStore` is the listener registry (binary-search insertion by priority, removal via `(listener?, listenerObject?, forceRemove?)`). `EventKeeper` is the retained-events log. Their interplay has one ordering rule worth protecting: `subscribeTo` collects retained events into a local `retainedEvents[]` and `EventKeeper.publish()` flushes them **after** registration completes, so a new subscriber sees replayed values in emission order rather than mid-registration.
 
-# Agent Instructions
+**Three API surfaces, one implementation** (`eventize-api.ts` → `eventize.ts`). Standalone functions, `eventize.inject(obj)` methods, and `class Eventize` all delegate to the same `on`/`emit`/`off`. Never fork logic into a surface. The class/inject side casts to loose implementation-shape signatures on purpose — the public overload sets are tuned for end users and don't accept a spread of `SubscribeArgs`.
 
-- **Context:** Start by reading `README.md` to understand the library's purpose and usage.
-- **Navigation:** Use `src/` to understand the implementation. `index.ts` is a good starting point to see what is exported.
-- **Modification:** When implementing features, modify files in `src/`. **Never** modify files in `lib/`.
-- **Verification:** Always run `npm run cbt` after making changes to ensure the build, linting, and tests are all passing.
+**Two dispatch paths in `emit`.** `_emit` handles eventized targets; `_duckEmit` handles non-eventized ones (v5+: `obj[eventName](...args)`, then `obj.emit(eventName, ...args)`, then no-op). Both must reject `'*'` and both must funnel return values through the same `returnValue` callback, or `emitAsync` aggregation silently diverges between the two. `emitAsync` differs from `emit` only in that aggregation — invocation is always synchronous.
+
+**`subscribeTo` and `types.ts` move in lockstep.** `_subscribeTo` decodes the overloaded `on()` shapes positionally (event name(s), optional priority, listener function or method-name + listener object, or a bare listener object). Changing the API means changing `SubscribeArgs` _and_ the parsing; the spec files exercise the corner cases.
+
+## Known asymmetries
+
+Verified quirks that look like bugs but are load-bearing or simply undocumented. Don't "fix" them without a CHANGELOG entry.
+
+- `off(ε, name)` doesn't merely clear the retained *value* for that event — `keeper.remove()` drops the retain *policy* too, so it behaves like `unretain()`. Later emits of that event are no longer retained until `retain()` is called again.
+- The array branch of `off()` is reached from two directions: an explicit `off(ε, [name, …])` and the unsubscribe function of a multi-event `on()`, which passes an array of `EventListener` instances. Anything filtering that array must keep event names and ignore listener instances — `isEventName` does, a `typeof === 'string'` test silently dropped symbol names (fixed).
+- `emitAsync()` resolves to `undefined`, not `[]`, when no listener returned a non-null value.
+- `emit()` on a non-eventized target no longer throws (v5). Typo safety now comes from typed emitters or an explicit `isEventized()` guard.
+- No recursion guard. `A → B → A` forwarding and same-event re-emission overflow the stack by design — the v4.2 guard forbade legitimate patterns and was reverted.
+
+## Conventions
+
+- Specs live next to sources as `*.spec.ts`; Jest `testMatch` is restricted to `src/**`.
+- Every feature or bugfix gets a spec.
+- Relative imports carry no extension — `tsup` writes the output extensions.
+- `lib/` is generated and git-ignored. Never edit it, never read it to answer a question about behavior.
+
+## Documentation obligations
+
+Progressive disclosure applies to this repo's own docs — the deep material lives in `docs/` and the agent-facing reference in `skills/using-eventize/references/`. Touch what the change actually affects:
+
+| Change | Update |
+| --- | --- |
+| Public API or runtime behavior | `CHANGELOG.md` (`## Unreleased`), with migration notes if breaking |
+| Documented behavior or an example | `README.md`, plus the matching `docs/*.md` if the detail lives there |
+| Dispatch semantics, retain behavior, or any quirk above | `skills/using-eventize/` — `SKILL.md` for the summary, `references/*.md` for detail |
+| Purely internal refactor | nothing |
+
+Docs are English. Prefer stating the gotcha over restating the signature.

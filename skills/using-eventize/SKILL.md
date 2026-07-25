@@ -3,24 +3,31 @@ name: using-eventize
 description: Use when code imports `@spearwolf/eventize`, mentions `eventize`/`Eventize`, or when writing/reviewing synchronous event-emitter code using this library (on, once, emit, emitAsync, off, retain). Covers the API surface, the auto-eventize vs strict split, wildcard quirks, retain semantics, priorities, and common pitfalls.
 ---
 
-# @spearwolf/eventize — Quick Reference
+# @spearwolf/eventize
 
-A tiny (~6kb gz), zero-dep, **synchronous** event-emitter library for any JS/TS object. ESM + CJS, full TS types with optional generic event maps.
+A ~5 kB gz, zero-dep, **synchronous** event emitter for any JS/TS object. ESM + CJS, opt-in generic event maps.
+
+Deeper material — load only when the task needs it:
+
+| File | Covers |
+| --- | --- |
+| `references/api-details.md` | every `on()` / `off()` shape, per-event priorities, retain semantics in full |
+| `references/typed-events.md` | generic event maps, the `EventMap` trap, symbol escape hatch |
+| `references/migration.md` | v4 → v5 emit change, the v4.3 type-brand migration for classes |
 
 ## Mental model
 
-- **Emitter** = any object made "eventized" (via `eventize(obj)`, `eventize.inject(obj)`, or `class extends Eventize`). Internally attached: a `store` (listener registry) + `keeper` (retained events).
-- **Listeners run synchronously** in priority order. `emitAsync` only changes how *return values* are aggregated — invocation is still sync.
-- Three API surfaces share the same primitives — pick one, don't mix conceptually:
-  | Style | Create | Call |
-  |---|---|---|
-  | Functional (recommended) | `const ε = eventize(obj?)` | `on(ε, …)`, `emit(ε, …)` |
-  | Injected methods | `eventize.inject(obj)` | `obj.on(…)`, `obj.emit(…)` |
-  | Class inheritance | `class X extends Eventize {}` | `this.on(…)`, `this.emit(…)` |
+An **emitter** is any object carrying a hidden symbol slot with a listener registry (`store`) and a retained-event log (`keeper`). Three ways to attach it, sharing one implementation:
 
-> Convention: name eventized objects `ε` (epsilon).
+| Style | Create | Call |
+| --- | --- | --- |
+| Functional (recommended, tree-shakable) | `const ε = eventize(obj?)` | `on(ε, …)`, `emit(ε, …)` |
+| Injected methods | `eventize.inject(obj)` | `obj.on(…)`, `obj.emit(…)` |
+| Class inheritance | `class X extends Eventize {}` | `this.on(…)`, `this.emit(…)` |
 
-## Core API
+Listeners run **synchronously**, highest priority first. `emitAsync` changes only how return values are aggregated, never when listeners run. Convention: name eventized objects `ε` (epsilon).
+
+## API surface
 
 ```ts
 import {eventize, on, once, onceAsync, emit, emitAsync,
@@ -30,95 +37,51 @@ import {eventize, on, once, onceAsync, emit, emitAsync,
 ```
 
 | Function | Purpose | Returns |
-|---|---|---|
-| `on(ε, name?, [prio,] listener)` | subscribe | `unsubscribe()` |
+| --- | --- | --- |
+| `on(ε, name?, [prio,] listener[, ctx])` | subscribe | `unsubscribe()` |
 | `once(ε, …)` | subscribe, auto-unsub after first call | `unsubscribe()` |
-| `onceAsync(ε, name)` | promise that resolves on next emit | `Promise<firstArg>` |
+| `onceAsync(ε, name)` | promise resolving on next emit | `Promise<firstArg>` |
 | `emit(ε, name, …args)` | sync dispatch | `void` |
-| `emitAsync(ε, name, …args)` | dispatch + collect non-null returns | `Promise<any[]>` |
-| `off(ε, …)` | unsubscribe (many overloads) | `void` |
-| `retain(ε, name)` | start replaying last value to new subscribers | `void` |
-| `retainClear(ε, name)` | drop stored value, keep retain policy | `void` |
-| `unretain(ε, name)` | disable retain entirely | `void` |
-| `isEventized(obj)` | type guard | `boolean` |
-| `getSubscriptionCount(obj)` | listener count (0 for non-eventized — does NOT throw) | `number` |
-| `EVENT_CATCH_EM_ALL` | wildcard symbol (= `'*'`) | `string` |
+| `emitAsync(ε, name, …args)` | dispatch + collect non-null returns | `Promise<any[] \| undefined>` |
+| `off(ε, …)` | unsubscribe; also clears retain for named events | `void` |
+| `retain(ε, name)` | replay last value to new subscribers | `void` |
+| `retainClear(ε, name)` | drop stored value, keep policy | `void` |
+| `unretain(ε, name)` | drop value and policy | `void` |
+| `isEventized(obj)` / `eventize.is(obj)` | type guard | `boolean` |
+| `asEventized(obj)` | attach the slot only, no API methods | `obj` |
+| `getSubscriptionCount(obj)` | listener count, `0` for non-eventized | `number` |
+| `Priority` | `Max Critical High Normal Low Min` (higher runs first) | object |
+| `EVENT_CATCH_EM_ALL` | the wildcard name, `'*'` | `string` |
 
-## Subscribing — `on()` shapes
+Event names are `string` or `symbol`. Anywhere a name is accepted, an array of names works too.
 
-`on()` is heavily overloaded. All forms accept an optional priority `number` between event name(s) and listener:
+## The four behavior families
 
-```ts
-on(ε, 'foo', listener)                      // simple
-on(ε, 'foo', Priority.High, listener)       // with priority
-on(ε, ['foo', 'bar'], listener)             // multiple events, one listener
-on(ε, 'foo', listener, ctx)                 // listener + this-context
-on(ε, 'foo', 'methodName', obj)             // call obj.methodName
-on(ε, 'foo', listenerObj)                   // call listenerObj.foo()
-on(ε, listenerObj)                          // listenerObj.<eventName>() per event
-on(ε, listener)                             // wildcard (same as on(ε, '*', listener))
-```
+How each function treats a target that was never eventized — the single most common source of surprise:
 
-**Listener-object form**: an object whose method names match event names. If a method matches the event, it's called. Otherwise, if `listenerObj.emit(eventName, ...args)` exists, it's the **catch-all fallback** — used for forwarding (see below).
+| Functions | On a non-eventized target |
+| --- | --- |
+| `on`, `once`, `onceAsync`, `retain` | **auto-eventize** it, then proceed |
+| `emit`, `emitAsync` (v5+) | **duck-type**: `obj[eventName](…args)`, else `obj.emit(eventName, …args)`, else no-op |
+| `off`, `getSubscriptionCount` | **permissive**: silent no-op / `0`, even for `null` |
+| `retainClear`, `unretain` | **throw** `"object is not eventized"` |
 
-## Emitting
+`on`-family functions install behavior, so auto-eventizing is a meaningful reading of the intent. Retain-state mutators have no duck-typed equivalent, so they still surface typos. Since v5, `emit()` no longer throws on plain objects — for typo safety use a typed emitter (`eventize<TEvents>()`, which rejects unknown names at compile time) or an explicit `isEventized()` guard.
 
-```ts
-emit(ε, 'name', a, b)
-emit(ε, ['name1', 'name2'], a, b)   // multi-event
-await emitAsync(ε, 'load')          // resolves when all listener promises settle
-```
+## Pitfalls
 
-## Priorities
+1. **`'*'` is subscribe-only.** `emit(ε, '*', …)` throws. In an array form, names before the `'*'` still dispatch before the throw.
+2. **Wildcard function listeners never receive the event name** — only the emit args. To learn the name, subscribe a listener-object with an `.emit(eventName, …args)` method; that method is also the catch-all fallback whenever no method matches the event name.
+3. **Forwarding needs a real `.emit` method.** `on(upstream, downstream)` forwards everything, but only because `eventize.inject()` and `class extends Eventize` install `.emit`. Plain `eventize(obj)` does **not** — forwarding to such a target silently no-ops.
+4. **No cycle detection.** `A → B → A`, or re-emitting the same event from inside its own listener, recurses until the stack overflows. The v4.2 guard was reverted because it forbade valid patterns. Break cycles yourself.
+5. **A throwing listener aborts the rest of that dispatch.** Later listeners for the same `emit()` don't run, the throwing listener stays subscribed, and `retain()` is not updated for that emit (the write happens after all listeners). Wrap risky bodies yourself; there is no global error handler by design.
+6. **Listener-objects dedupe, functions don't.** `on(ε, 'foo', listenerObj)` twice yields one listener with refcount 2; each unsubscribe decrements. The same *function* subscribed twice fires twice. Match key: `(eventName, priority, listener, listenerContext)`.
+7. **`off()` mid-emit** skips listeners that haven't run yet in that dispatch.
+8. **`emitAsync()` resolves `undefined`, not `[]`**, when nothing was collected. `null`/`undefined` returns are dropped; arrays of promises are flattened via `Promise.all`.
+9. **`off(ε, name)` unretains that event** — it drops the stored value *and* the retain policy, so later emits aren't retained until `retain()` is called again. Scalar and array forms behave alike for strings and symbols since v5.1; before that, `off(ε, [aSymbol])` left retained state untouched.
+10. **Events emitted before `retain()` are not stored.** Retain starts recording from the call onwards.
 
-`Priority.{Max, Critical, High, Normal, Low, Min}` (legacy: `AAA`=Critical, `BB`=High, `Default`=Normal). Higher number → runs first. Default `0` = `Normal`.
-
-## State / retain
-
-`retain(ε, name)` makes an event "sticky": the **last** emitted value is replayed to every new subscriber synchronously, in original emission order across multiple retained events. Works with `once`/`onceAsync` too. `retainClear` drops the stored value but keeps retaining future emits; `unretain` disables retain entirely. Events emitted *before* `retain()` is called are NOT stored.
-
-## ⚠️ Quirks & pitfalls (read these)
-
-1. **Auto-eventize vs. strict vs. duck-typing — three families**:
-   - **Auto-eventize (`on/once/onceAsync/retain`)**: on a plain object → auto-eventizes it.
-   - **Duck-typing (`emit/emitAsync`, v5+)**: on a non-eventized **object**, falls back to calling `obj[eventName](...args)`, then `obj.emit(eventName, ...args)`, then silent no-op. `'*'` still throws (subscribe-only). `null`/`undefined`/primitives silently no-op. **No more `"object is not eventized"` throw** — typos no longer surface here, use `isEventized()` defensively if needed, or a typed emitter (`eventize<TEvents>()`) which still rejects unknown event names at compile time. (Pre-v5: these threw.)
-   - **Strict (`retainClear/unretain`)**: still throws `"object is not eventized"` on a non-eventized target — no meaningful duck-typed equivalent for retain state.
-   - **Permissive (`off`)**: accepts any object (including `null`/`undefined`) and **silently no-ops** when there's nothing to remove — safe in cleanup paths without `isEventized()` guards. (`getSubscriptionCount` returns `0` for non-eventized inputs as well.)
-
-2. **`'*'` is subscribe-only.** `emit(ε, '*', …)` throws. Use a concrete name.
-
-3. **Wildcard function listeners do NOT receive the event name** — only the args. To get the name, register a listener-object with an `.emit(eventName, ...args)` method.
-
-4. **Forwarding between emitters**: `on(upstream, downstream)` works because `eventize.inject()` / `class Eventize` install an `.emit()` method that doubles as the catch-all sink. ⚠️ **Plain `eventize(obj)` does NOT install `.emit`** — forwarding to such a target silently no-ops. Conversely (v5+), since `emit()` itself duck-types non-eventized objects, you can `emit(plainObj, 'foo', …)` directly and it will call `plainObj.foo(…)` if defined, or `plainObj.emit('foo', …)` as fallback.
-
-5. **No recursion guard**: re-emitting the same event on the same emitter (directly or via a forwarding chain `A → B → A`) is allowed and will recurse until the stack overflows. The v4.2 guard was removed because some valid patterns need same-event re-emission. Break cycles yourself if you build a forwarding chain.
-
-6. **Listener-object de-dup with refcount** — `on(ε, 'foo', listenerObj)` called twice = ONE listener with refcount 2. Each unsubscribe decrements; removed at 0. **Function listeners are NOT deduped** — registering the same function twice fires it twice. Match key: `(eventName, priority, listener, listenerContext)`.
-
-7. **Synchronous error semantics**: a throwing listener aborts the rest of that `emit()`'s dispatch; subsequent listeners do not run; the throwing listener stays subscribed; `retain()` is **not** updated for that emit (write happens after all listeners). Wrap risky listener bodies yourself.
-
-8. **`off()` clears retain for that event** when called with an event name. Quietly important.
-
-9. **`off()` during emit**: already-scheduled listeners continue; not-yet-run listeners for that emit are skipped.
-
-10. **`emitAsync` collects only non-null/undefined returns**; arrays-of-promises are flattened with `Promise.all`.
-
-## Typed events (opt-in, v4.1+)
-
-```ts
-interface MyEvents {
-  data: [payload: string, code: number];
-  close: [];
-}
-const ε = eventize<MyEvents>();
-emit(ε, 'data', 'hi', 42);    // ✅
-emit(ε, 'data', 'hi');        // ❌ TS error
-emit(ε, 'unknown');            // ❌ TS error
-```
-
-Without a generic, behavior is fully permissive (v4 ducktyping preserved).
-
-## Minimal idiomatic example
+## Idiomatic shape
 
 ```ts
 import {eventize, on, emit, retain, Priority} from '@spearwolf/eventize';
@@ -127,47 +90,13 @@ const bus = eventize();
 retain(bus, 'status');
 emit(bus, 'status', 'loading');
 
-const off = on(bus, 'status', Priority.High, (s) => console.log('hi:', s));
-// fires immediately with retained 'loading'
+const unsubscribe = on(bus, 'status', Priority.High, (s) => console.log(s));
+// fires immediately with the retained 'loading'
 
 emit(bus, 'status', 'ready');
-off();
+unsubscribe();
 ```
 
-## When NOT to reach for eventize
+## When not to reach for eventize
 
-- You need async-by-default queuing → use a real message bus.
-- You need backpressure / streams → use `ReadableStream` / RxJS.
-- You only need a single callback → just pass the function.
-
-## Migration notes: 4.0.x → 4.3.x (strict types)
-
-v4.3 added a unique-symbol brand (`[__TEventsBrand]`, `[NAMESPACE]`) to `EventizedObject<TEvents>`. The function-style API (`on(obj, …)`, `emit(obj, …)`, `retain(obj, …)`, etc.) now requires the first arg to be either a branded `EventizedObject<T>` or assignable to `NonTypedEmitter<T>`. Plain class instances no longer satisfy this — `eventize(this)` runtime-brands the instance but the *type* of `this` stays unbranded, so every subsequent `emit(this, …)` / `on(this, …)` call inside the class fails to type-check.
-
-**Fix without refactoring**: declaration-merge an empty interface that brings in the brand. Per class file:
-
-```ts
-import {emit, type EventizedObject, eventize, on, retain} from '@spearwolf/eventize';
-
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-export interface MyClass extends EventizedObject {}
-
-export class MyClass {
-  constructor() {
-    eventize(this);          // unchanged, still required at runtime
-    retain(this, 'ready');   // now type-checks
-  }
-  doStuff() { emit(this, 'ready'); }
-}
-```
-
-Apply to every class that calls `eventize(this)` (or auto-eventizes via `retain`/`on`/`once` on `this`). Works for classes that already `extends SomeBase` — the merge is independent of the runtime inheritance chain. The brand symbols are non-exported `unique symbol`s, so this declaration-merge is the *only* way (besides `extends Eventize`) to satisfy the constraint without `as any`.
-
-**Two residual call sites that still need help even after the merge:**
-
-1. **Polymorphic-`this` + listener-object form**: `on(this, listenerObj)` fails because TS can't reduce `NonTypedEmitter<this>` when `this` is generic. Cast to the concrete class: `on(this as MyClass, listenerObj)`.
-2. **`on.bind(undefined, this, eventName)` patterns**: TS picks a wrong overload (often the priority-as-number one) and rejects the string event name. Cast the function reference: `(on as (...args: unknown[]) => unknown).bind(undefined, this, eventName)`. Don't use `as Function` — ESLint's `no-unsafe-function-type` rejects it.
-
-**Do NOT extend `EventizeApi` instead of `EventizedObject`** — `EventizeApi` carries the public method signatures (`on`, `emit`, `retain`, …) and will collide with any same-named method on the host class (e.g. a class with its own `on()` API method).
-
-**Sanity check after migration**: typecheck → build → tests. Runtime behavior is unchanged; this is purely a type-level adjustment.
+Async-by-default queuing wants a real message bus. Backpressure or streaming wants `ReadableStream` or RxJS. A single callback wants to be a callback.
