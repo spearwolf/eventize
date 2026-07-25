@@ -14,14 +14,17 @@ export default {
     '!src/__test-utils__/**',
   ],
 
-  // Set just below the measured state so the threshold binds instead of
-  // decorating. Raise it when coverage rises; never lower it to make a
-  // build pass.
+  // Set just below the state measured within the collectCoverageFrom scope
+  // above, so the threshold binds instead of decorating. The unfiltered
+  // figures (i.e. without the collectCoverageFrom filter, which also pulls
+  // in the fully-covered src/__test-utils__/) run about a tenth of a point
+  // higher — don't use those as the reference when re-measuring.
+  // Raise these when coverage rises; never lower them to make a build pass.
   coverageThreshold: {
     global: {
       statements: 97,
       branches: 93,
-      functions: 94,
+      functions: 93,
       lines: 97,
     },
   },
