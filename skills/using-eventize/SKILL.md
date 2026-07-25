@@ -39,7 +39,7 @@ import {eventize, on, once, onceAsync, emit, emitAsync,
 | Function | Purpose | Returns |
 | --- | --- | --- |
 | `on(ε, name?, [prio,] listener[, ctx])` | subscribe | `unsubscribe()` |
-| `once(ε, …)` | subscribe, auto-unsub after first call | `unsubscribe()` |
+| `once(ε, …)` | subscribe, auto-unsub after the first call that actually happens | `unsubscribe()` |
 | `onceAsync(ε, name)` | promise resolving on next emit | `Promise<firstArg>` |
 | `emit(ε, name, …args)` | sync dispatch | `void` |
 | `emitAsync(ε, name, …args)` | dispatch + collect non-null returns | `Promise<any[] \| undefined>` |

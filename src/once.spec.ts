@@ -124,6 +124,25 @@ describe('once()', () => {
       expect(getSubscriptionCount(obj)).toBe(0);
     });
 
+    it('keeps a wildcard listener object subscribed until it can handle an event', () => {
+      const obj = eventize();
+      const listenerObject: {foo?: () => void} = {};
+
+      once(obj, listenerObject);
+
+      // the object has no method for 'bar' and no emit fallback — nothing ran,
+      // so the once() must survive
+      emit(obj, 'bar');
+      expect(getSubscriptionCount(obj)).toBe(1);
+
+      const handler = fake();
+      listenerObject.foo = handler;
+      emit(obj, 'foo', 'payload');
+
+      expect(handler.calledWith('payload')).toBe(true);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
     it('still consumes the once when the emit() fallback runs', () => {
       const obj = eventize();
       const emitFake = fake();
