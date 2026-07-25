@@ -78,6 +78,8 @@ Called from inside a listener, `off()` takes effect immediately for the running 
 
 Only listener-object forms dedupe — `on(ε, name, listenerObject)` and `on(ε, name, 'methodName', listenerObject)`. Registering an identical tuple `(eventName, priority, listener, listenerContext)` increments a refcount on the existing entry instead of adding a second listener; each unsubscribe decrements, and removal happens at zero. Plain function listeners are never deduped: subscribing the same function twice produces two independent listeners that both fire.
 
+A deduped registration does not replay retained events again — the replay runs only for a genuinely inserted listener, so `on()` on an already-subscribed listener object is a pure refcount bump.
+
 ## `emit()` / `emitAsync()`
 
 ```ts

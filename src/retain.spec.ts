@@ -1,6 +1,13 @@
 import {fake, replace} from 'sinon';
 
-import {Eventize, eventize, on, emit, retain} from './index';
+import {
+  Eventize,
+  eventize,
+  getSubscriptionCount,
+  on,
+  emit,
+  retain,
+} from './index';
 
 describe('retain()', () => {
   it('calls the listener function after registration with on()', () => {
@@ -416,6 +423,39 @@ describe('retain()', () => {
       // through the '*' entry in eventNames until the stack blew
       const listener = fake();
       expect(() => on(obj, '*', listener)).not.toThrow();
+    });
+  });
+
+  describe('deduplicated listener objects', () => {
+    it('replays a retained event only once when on() dedups the listener', () => {
+      const obj = eventize();
+      const listenerObject = {foo: fake()};
+
+      retain(obj, 'foo');
+      emit(obj, 'foo', 'RETAINED');
+
+      on(obj, 'foo', listenerObject);
+      on(obj, 'foo', listenerObject);
+
+      expect(getSubscriptionCount(obj)).toBe(1);
+      expect(listenerObject.foo.callCount).toBe(1);
+      expect(listenerObject.foo.calledWith('RETAINED')).toBe(true);
+    });
+
+    it('still replays to a genuinely new listener', () => {
+      const obj = eventize();
+      const first = {foo: fake()};
+      const second = {foo: fake()};
+
+      retain(obj, 'foo');
+      emit(obj, 'foo', 'RETAINED');
+
+      on(obj, 'foo', first);
+      on(obj, 'foo', second);
+
+      expect(getSubscriptionCount(obj)).toBe(2);
+      expect(first.foo.callCount).toBe(1);
+      expect(second.foo.callCount).toBe(1);
     });
   });
 });

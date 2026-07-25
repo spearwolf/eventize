@@ -15,10 +15,19 @@ const registerEventListener = (
   listenerObject: ListenerObjectType,
   retainedEvents: KeeperEvent[],
 ): EventListener => {
-  const el = store.add(
-    new EventListener(eventName, priority, listener, listenerObject),
+  const newListener = new EventListener(
+    eventName,
+    priority,
+    listener,
+    listenerObject,
   );
-  keeper.replayTo(eventName, el, retainedEvents); // TODO what if similarListener ?
+  const el = store.add(newListener);
+  // store.add() returns the argument when it inserted, or an existing similar
+  // listener whose refCount it bumped. Replaying to the latter would deliver
+  // the retained event a second time to a listener that already got it.
+  if (el === newListener) {
+    keeper.replayTo(eventName, el, retainedEvents);
+  }
   return el;
 };
 
