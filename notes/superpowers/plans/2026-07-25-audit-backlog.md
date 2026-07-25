@@ -2802,6 +2802,14 @@ const isSimilar = (
 
 `priority` is already `number | undefined` on the class and needs the same treatment in this literal. `isSimilarListenerType(listenerType: number)` at line 44 likewise takes `number | undefined` — an `undefined` tag is similar to nothing, and the two `===` comparisons already return `false` for it.
 
+- [ ] **Step 4b: Expect `src/getRetainedCount.spec.ts` to need four `@ts-expect-error` directives back**
+
+Task 16 added a case named `is safe on null, undefined and primitives at runtime`. It calls `getRetainedCount(null)`, `getRetainedCount(undefined)`, `getRetainedEventNames(null)` and `getRetainedEventNames(undefined)` — all four written *without* a suppression, because under `strictNullChecks: false` those arguments are assignable to `object` and a `@ts-expect-error` there fails with `TS2578: Unused directive`.
+
+Flipping the flag reverses that: the four calls become genuine type errors and each needs its directive back. The two primitive cases (`42`, `'nope'`) already carry one and must keep it.
+
+This is not incidental — it is the finding measuring itself. A signature reading `(o: object)` that silently accepted `null` is exactly the nullability blindness TYPE-001 describes, and this spec is where it becomes visible.
+
 - [ ] **Step 5: Work through the remaining errors**
 
 Fix them one file at a time, re-running `npx tsc --noEmit` after each. Rules:
