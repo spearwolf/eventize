@@ -1,6 +1,14 @@
 import {fake} from 'sinon';
 
-import {emit, eventize, getSubscriptionCount, on, once, retain} from './index';
+import {
+  emit,
+  eventize,
+  getSubscriptionCount,
+  off,
+  on,
+  once,
+  retain,
+} from './index';
 
 describe('once()', () => {
   describe('once() before on()', () => {
@@ -153,6 +161,46 @@ describe('once()', () => {
 
       expect(emitFake.calledWith('foo', 'payload')).toBe(true);
       expect(getSubscriptionCount(obj)).toBe(0);
+    });
+  });
+
+  describe('UnsubscribeFunc contract', () => {
+    it('exposes .listener for a single event name', () => {
+      const obj = eventize();
+      const unsubscribe = once(obj, 'foo', fake());
+
+      expect(Object.keys(unsubscribe)).toEqual(['listener']);
+      expect((unsubscribe as any).listener).toBeDefined();
+    });
+
+    it('exposes .listeners for an array of event names', () => {
+      const obj = eventize();
+      const unsubscribe = once(obj, ['foo', 'bar'], fake());
+
+      expect(Object.keys(unsubscribe)).toEqual(['listeners']);
+      expect((unsubscribe as any).listeners).toHaveLength(2);
+    });
+
+    it('allows off(ε, unsubscribe.listener) as a cleanup path', () => {
+      const obj = eventize();
+      const unsubscribe = once(obj, 'foo', fake());
+
+      expect(getSubscriptionCount(obj)).toBe(1);
+      off(obj, (unsubscribe as any).listener);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('stays idempotent', () => {
+      const obj = eventize();
+      const listener = fake();
+      const unsubscribe = once(obj, 'foo', listener);
+
+      unsubscribe();
+      unsubscribe();
+
+      expect(getSubscriptionCount(obj)).toBe(0);
+      emit(obj, 'foo');
+      expect(listener.callCount).toBe(0);
     });
   });
 });

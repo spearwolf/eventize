@@ -400,6 +400,12 @@ export function once(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
       unsubscribeCalled = true;
     }
   };
+  // The idempotence wrapper would otherwise swallow the .listener /
+  // .listeners properties that UnsubscribeFunc declares and on() delivers.
+  Object.assign(
+    unsubscribe,
+    Array.isArray(listeners) ? {listeners} : {listener: listeners},
+  );
   if (Array.isArray(listeners)) {
     listeners.forEach(afterApply(unsubscribe));
   } else {
