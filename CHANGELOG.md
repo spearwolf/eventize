@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+## `v5.1.0` (2026-07-25) — Symbol-safe `off()`, per-event priorities everywhere
+
+- **Fix:** `off(ε, [eventName, …])` now clears retained state for **symbol** event names too. The array branch filtered its elements with `typeof li === 'string'`, so `off(ε, [SOME_SYMBOL])` removed the listeners but left the retained value and the retain policy in place, while the scalar `off(ε, SOME_SYMBOL)` cleared both. The filter is now `isEventName`, which keeps strings and symbols alike. The filter exists because the array branch is also reached from the unsubscribe function of a multi-event `on()`, which passes an array of `EventListener` instances — those are still ignored, and a regression test covers it. Affects `src/eventize-api.ts`.
+- **Types:** `OnEventNames` reworked to describe what `_subscribeTo()` has always accepted. It was `EventName | EventName[] | Array<[EventName, number]>`, which allowed a list of names *or* a list of `[name, priority]` tuples but not a mix — even though the runtime checks `Array.isArray()` per element and handles the mixed form fine. It is now `EventName | Array<EventName | EventNameWithPriority>`, so `on(ε, [['foo', 100], 'bar'], fn)` type-checks without a cast. The new `EventNameWithPriority` (`[eventName: EventName, priority: number]`) is exported from the package root. `AnyEventNames` is unchanged and still used by `emit()` / `retain()`, which have no notion of priority.
+- **Types:** Per-event priorities now work on **typed** emitters. Previously the tuple form didn't type-check there at all: the typed overloads accepted only `K` / `K[]`, and the loose fallback was closed off because `NonTypedEmitter<T>` collapses to `never` for a branded emitter. The typed array overload of `on()` / `once()` (and the corresponding `SubscribeFunc` signatures used by the injected and class APIs) now accepts `Array<K | [K, number]>` plus an optional call-level priority. Event names inside tuples are still narrowed against the event map, so `on(ε, [['unknown', 0]], fn)` remains a compile error. Widening a parameter position only — no call that compiled before stops compiling.
+- **Docs:** Corrected a claim that predates this release: `off(ε, eventName)` doesn't merely clear the retained *value*, it drops the retain *policy* as well, so it behaves like `unretain()`. `README.md`, `docs/off.md`, and the skill now say so.
+- **Tests:** `src/documented-quirks.spec.ts` grew to 15 cases — symbol/string parity between the scalar and array `off()` forms, the listener-array regression guard, mixed tuple/name arrays on plain and typed emitters, the call-level-priority combination, and two `@ts-expect-error` cases proving tuples still reject unknown event names.
+
+### Documentation restructure
+
+_No runtime or type changes in this section._
+
+- **Docs:** Restructured the agent- and human-facing documentation around progressive disclosure, following Anthropic's _"The new rules of context engineering for Claude 5 generation models"_ (2026-07-24). `README.md` shrank from 1275 to 678 lines; the deep material moved to `docs/off.md`, `docs/retain.md`, and `docs/typed-events.md`, linked from the summaries that remain.
+- **Docs:** `AGENTS.md` is now the single canonical agent guide and `CLAUDE.md` a symlink to it, removing the duplicated command lists and documentation rules that had been drifting apart in the two files. `AGENTS.md` dropped the file-tree and tech-stack listings (readable from the repo) in favour of architecture invariants and verified quirks, and lost a stale convention block referring to `TODO.md`, deleted back in v4.1.0. The `npm run cbt` description was wrong — it also runs `attw`, lint, and the format check.
+- **Docs:** `skills/using-eventize/SKILL.md` is now a ~90-line pointer; the detail lives in `references/api-details.md` (all `on()` / `off()` shapes, priorities, retain semantics), `references/typed-events.md`, and `references/migration.md`.
+- **Docs:** Newly documented, previously unrecorded behavior — `emitAsync()` resolves to `undefined` rather than `[]` when nothing was collected; `eventize.is()` is a public alias of `isEventized()`; `asEventized()` is exported as the low-level primitive behind `eventize()`; and per-event priority tuples exist at all. Two further findings from this audit turned out to be defects rather than quirks and were fixed in this release instead of documented: the `off()` symbol asymmetry and the un-typeable mixed tuple array (see above).
+- **Docs:** Fixed a README example that showed a wildcard function listener receiving the event name as its first argument — it does not; only the `emit()` args are passed.
+- **Tests:** New `src/documented-quirks.spec.ts` (9 cases) covers the five behaviors above, so the documentation claims now have witnesses.
+
 ## `v5.0.0` (2026-05-13) — Duck-typed `emit()` / `emitAsync()`
 
 - **BREAKING:** `emit()` and `emitAsync()` no longer throw `"object is not eventized"` when called on a non-eventized target. Instead, they fall back to duck-typing — the same pattern already used by the listener-object dispatch path (`EventListener.ts`):
