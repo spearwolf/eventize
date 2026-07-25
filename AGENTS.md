@@ -10,6 +10,10 @@ Canonical guide for coding agents in this repo. `CLAUDE.md` is a symlink to this
 
 Narrower loops while working: `npm test -- src/once.spec.ts`, `npm test -- -t "retains the last value"`, `npm run watch`.
 
+**`npm run clean` does not clear the ts-jest cache.** It removes `lib/`, `build/`, `dist/`, `types/` and `tmp/`. ts-jest's transform cache lives outside the repository — `/tmp/jest_rs` on Linux — and survives every clean, every `npm ci`, and every `cbt`. A stale cache serves previously compiled output and hides type errors that a fresh checkout or a CI runner hits immediately. This is not hypothetical: it once produced a green `cbt` for a change that broke 13 of 25 spec suites, and the breakage survived two code reviews because both trusted the green suite. Run `npx jest --clearCache` before verifying any change to dependencies, `tsconfig.json`, or a `.d.ts` boundary.
+
+Coverage is gated, not merely measured: `jest.config.ts` carries a global `coverageThreshold`, and both workflows run `npm test -- --coverage`. Raise the numbers when coverage rises; never lower them to make a build pass.
+
 ## Architecture invariants
 
 These are the things that bite. Everything else is readable from the source.
