@@ -222,3 +222,7 @@ unretain(ε, 'bar');
 emit(ε, 'bar', 2);
 on(ε, 'bar', console.log); // (nothing — retain is off)
 ```
+
+### Inspecting what's retained
+
+`getRetainedCount(ε)` and `getRetainedEventNames(ε)` (see [README → Inspecting emitter state](../README.md#inspecting-emitter-state)) let you check retained state from the outside instead of reaching into `ε[Symbol.for('eventize')].keeper`. The two report different things on purpose — a name can carry a retain policy without ever having fired — so `getRetainedEventNames(ε).length >= getRetainedCount(ε)` always holds. Both return `0` / `[]` for a non-eventized object rather than throwing, unlike `retain()`/`retainClear()`/`unretain()` themselves.

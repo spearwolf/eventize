@@ -667,6 +667,16 @@ Edge cases worth knowing:
 - Subscriptions sharing an entry through reference counting count as **one**, not as the number of `on()` calls.
 - A `once()` listener counts as a normal subscription until it fires.
 
+### Inspecting emitter state
+
+- `getSubscriptionCount(ε)` — how many listeners are registered.
+- `getRetainedCount(ε)` — how many events hold a retained value.
+- `getRetainedEventNames(ε)` — every name carrying a retain policy, fired or not.
+
+All three return `0` / `[]` for objects that were never eventized, so they are
+safe to call on anything. They exist for debugging, testing, and verifying
+that cleanup actually happened.
+
 #### `EVENT_CATCH_EM_ALL`
 
 The wildcard event name (`'*'`) as a named export, so you don't have to write the magic string.

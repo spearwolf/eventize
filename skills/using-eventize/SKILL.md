@@ -33,6 +33,7 @@ Listeners run **synchronously**, highest priority first. `emitAsync` changes onl
 import {eventize, on, once, onceAsync, emit, emitAsync,
         off, retain, retainClear, unretain, Priority,
         isEventized, asEventized, getSubscriptionCount,
+        getRetainedCount, getRetainedEventNames,
         Eventize, EVENT_CATCH_EM_ALL} from '@spearwolf/eventize';
 ```
 
@@ -50,6 +51,8 @@ import {eventize, on, once, onceAsync, emit, emitAsync,
 | `isEventized(obj)` / `eventize.is(obj)` | type guard | `boolean` |
 | `asEventized(obj)` | attach the slot only, no API methods | `obj` |
 | `getSubscriptionCount(obj)` | listener count, `0` for non-eventized | `number` |
+| `getRetainedCount(obj)` | count of events holding a retained value, `0` for non-eventized | `number` |
+| `getRetainedEventNames(obj)` | every name carrying a retain policy (fired or not), `[]` for non-eventized | `EventName[]` |
 | `Priority` | `Max Critical High Normal Low Min` (higher runs first) | object |
 | `EVENT_CATCH_EM_ALL` | the wildcard name, `'*'` | `string` |
 
@@ -63,7 +66,7 @@ How each function treats a target that was never eventized — the single most c
 | --- | --- |
 | `on`, `once`, `onceAsync`, `retain` | **auto-eventize** it, then proceed |
 | `emit`, `emitAsync` (v5+) | **duck-type**: `obj[eventName](…args)`, else `obj.emit(eventName, …args)`, else no-op |
-| `off`, `getSubscriptionCount` | **permissive**: silent no-op / `0`, even for `null` |
+| `off`, `getSubscriptionCount`, `getRetainedCount`, `getRetainedEventNames` | **permissive**: silent no-op / `0` / `[]`, even for `null` |
 | `retainClear`, `unretain` | **throw** `"object is not eventized"` |
 
 `on`-family functions install behavior, so auto-eventizing is a meaningful reading of the intent. Retain-state mutators have no duck-typed equivalent, so they still surface typos. Since v5, `emit()` no longer throws on plain objects — for typo safety use a typed emitter (`eventize<TEvents>()`, which rejects unknown names at compile time) or an explicit `isEventized()` guard.
