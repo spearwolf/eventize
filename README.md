@@ -673,9 +673,13 @@ Edge cases worth knowing:
 - `getRetainedCount(ε)` — how many events hold a retained value.
 - `getRetainedEventNames(ε)` — every name carrying a retain policy, fired or not.
 
-All three return `0` / `[]` for objects that were never eventized, so they are
-safe to call on anything. They exist for debugging, testing, and verifying
-that cleanup actually happened.
+All three return `0` / `[]` for objects that were never eventized. Their
+TypeScript signature takes `object`, which is the typed contract — but the
+runtime check underneath is a plain truthy/property probe with no `typeof`
+guard, so none of them throw even when a `null`, `undefined`, or primitive
+value reaches them past the type system (an untyped call site, a teardown
+helper). They exist for debugging, testing, and verifying that cleanup
+actually happened.
 
 #### `EVENT_CATCH_EM_ALL`
 
