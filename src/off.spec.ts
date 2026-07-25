@@ -755,5 +755,36 @@ describe('off()', () => {
       emit(obj, 'bar');
       expect(listenerObject.bar.callCount).toBe(1);
     });
+
+    it('also detaches the function-with-context form sharing that object', () => {
+      const obj = eventize();
+      const ctx = {foo: fake()};
+      const listenerFunc = fake();
+
+      on(obj, 'foo', listenerFunc, ctx);
+      on(obj, 'foo', 'foo', ctx);
+      expect(getSubscriptionCount(obj)).toBe(2);
+
+      off(obj, 'foo', ctx);
+
+      // off(ε, ctx) has always swept function listeners bound to ctx as their
+      // context; the named form now follows the same rule, scoped to one event.
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('matches what the nameless off(ε, listenerObject) form does', () => {
+      const withName = eventize();
+      const withoutName = eventize();
+      const ctx = {};
+
+      on(withName, 'foo', fake(), ctx);
+      on(withoutName, 'foo', fake(), ctx);
+
+      off(withName, 'foo', ctx);
+      off(withoutName, ctx);
+
+      expect(getSubscriptionCount(withName)).toBe(0);
+      expect(getSubscriptionCount(withoutName)).toBe(0);
+    });
   });
 });

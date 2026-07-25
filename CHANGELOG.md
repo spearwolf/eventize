@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- **Fix:** `off(ε, eventName, listenerObject)` now detaches listeners registered in the method-name form `on(ε, eventName, methodName, listenerObject)`. The filter in `removeSimilarListenersFromArray` compared `listener.listener` against the listener object, which only matches the `on(ε, eventName, listenerObject)` shape — in the method-name form `listener.listener` holds the method name and the object sits in `listener.listenerObject`. Code following `docs/off.md` believed it had cleaned up while the emitter kept holding the listener object and everything reachable from it. Affects `src/EventStore.ts`.
+- **Fix:** `off(ε, eventName, listenerObject)` now detaches listeners registered in the method-name form `on(ε, eventName, methodName, listenerObject)`. The filter in `removeSimilarListenersFromArray` compared `listener.listener` against the listener object, which only matches the `on(ε, eventName, listenerObject)` shape — in the method-name form `listener.listener` holds the method name and the object sits in `listener.listenerObject`. Code following `docs/off.md` believed it had cleaned up while the emitter kept holding the listener object and everything reachable from it. Affects `src/EventStore.ts`. The widened comparison also detaches the function-with-context form `on(ε, eventName, fn, context)` when called with that context object, which was previously a no-op here. That is deliberate: the nameless `off(ε, listenerObject)` has always swept those listeners, so the two forms now follow one rule and the named one is simply narrower in scope.
 
 ## `v5.1.0` (2026-07-25) — Symbol-safe `off()`, per-event priorities everywhere
 

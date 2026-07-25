@@ -67,9 +67,11 @@ const removeSimilarListenersFromArray = (
   for (const listener of fromArray) {
     if (
       (eventName == null && listener.listenerObject === listenerObject) ||
-      // Both subscription shapes must match: on(ε, name, listenerObject)
-      // parks the object in `listener`, on(ε, name, methodName, listenerObject)
-      // parks it in `listenerObject`.
+      // Three registration shapes can associate an object with a listener:
+      // on(ε, name, listenerObject) parks it in `listener`, while both
+      // on(ε, name, methodName, listenerObject) and on(ε, name, fn, context)
+      // park it in `listenerObject`. All three are matched here, which mirrors
+      // the nameless off(ε, listenerObject) branch above.
       (listener.eventName === eventName &&
         (listener.listener === listenerObject ||
           listener.listenerObject === listenerObject))
