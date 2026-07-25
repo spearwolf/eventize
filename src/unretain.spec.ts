@@ -194,4 +194,28 @@ describe('unretain()', () => {
     expect(sub1.called).toBeFalsy();
     expect(sub2.called).toBeFalsy();
   });
+
+  describe("bulk form unretain(ε, '*')", () => {
+    it('drops every retain policy and every retained value', () => {
+      const obj = eventize();
+
+      retain(obj, 'a');
+      retain(obj, 'b');
+      emit(obj, 'a', 1);
+      emit(obj, 'b', 2);
+
+      unretain(obj, '*');
+
+      const listener = fake();
+      on(obj, 'a', listener);
+      on(obj, 'b', listener);
+      expect(listener.callCount).toBe(0);
+
+      // policy is gone too: a later emit is not retained either
+      emit(obj, 'a', 3);
+      const late = fake();
+      on(obj, 'a', late);
+      expect(late.callCount).toBe(0);
+    });
+  });
 });

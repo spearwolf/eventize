@@ -70,7 +70,7 @@ How each function treats a target that was never eventized — the single most c
 
 ## Pitfalls
 
-1. **`'*'` is subscribe-only.** `emit(ε, '*', …)` throws. In an array form, names before the `'*'` still dispatch before the throw.
+1. **`'*'` is subscribe-only.** `emit(ε, '*', …)` throws. In an array form, names before the `'*'` still dispatch before the throw. `retain(ε, '*')` throws as well — an array containing `'*'` throws whatever else it lists. On `unretain()` and `retainClear()` the wildcard is not an error but a bulk form: it targets every retained event.
 2. **Wildcard function listeners never receive the event name** — only the emit args. To learn the name, subscribe a listener-object with an `.emit(eventName, …args)` method; that method is also the catch-all fallback whenever no method matches the event name.
 3. **Forwarding needs a real `.emit` method.** `on(upstream, downstream)` forwards everything, but only because `eventize.inject()` and `class extends Eventize` install `.emit`. Plain `eventize(obj)` does **not** — forwarding to such a target silently no-ops.
 4. **No cycle detection.** `A → B → A`, or re-emitting the same event from inside its own listener, recurses until the stack overflows. The v4.2 guard was reverted because it forbade valid patterns. Break cycles yourself.

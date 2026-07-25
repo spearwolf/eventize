@@ -225,4 +225,27 @@ describe('retainClear()', () => {
 
     expect(sub.called).toBeFalsy();
   });
+
+  describe("bulk form retainClear(ε, '*')", () => {
+    it('drops every retained value but keeps the retain policies', () => {
+      const obj = eventize();
+
+      retain(obj, 'a');
+      retain(obj, 'b');
+      emit(obj, 'a', 1);
+      emit(obj, 'b', 2);
+
+      retainClear(obj, '*');
+
+      const listener = fake();
+      on(obj, 'a', listener);
+      expect(listener.callCount).toBe(0);
+
+      // policy survived: the next emit is retained again
+      emit(obj, 'a', 3);
+      const late = fake();
+      on(obj, 'a', late);
+      expect(late.calledWith(3)).toBe(true);
+    });
+  });
 });

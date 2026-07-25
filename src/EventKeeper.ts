@@ -46,6 +46,17 @@ export class EventKeeper {
     }
   }
 
+  /** Drops every retain policy and every retained value. */
+  removeAll(): void {
+    this.eventNames.clear();
+    this.events.clear();
+  }
+
+  /** Drops every retained value, keeping the retain policies in place. */
+  clearAll(): void {
+    this.events.clear();
+  }
+
   retain(eventName: EventName, args: EventArgs): void {
     if (this.eventNames.has(eventName)) {
       this.events.set(eventName, {args, order: nextOrderId++});
@@ -70,9 +81,14 @@ export class EventKeeper {
         });
       }
     } else {
-      this.eventNames.forEach((name) =>
-        this.replayTo(name, eventListener, sortedEvents),
-      );
+      this.eventNames.forEach((name) => {
+        // '*' can never be a retained name — retain() rejects it — but the
+        // guard costs nothing and stops any future path that lets it in from
+        // recursing through this branch forever.
+        if (!isCatchEmAll(name)) {
+          this.replayTo(name, eventListener, sortedEvents);
+        }
+      });
     }
     return sortedEvents;
   }

@@ -96,6 +96,12 @@ console.log(result); // => { ready: true }
 - New wildcard (`*`) subscribers also receive retained events.
 - A throwing listener leaves the previously retained value untouched — the retain write happens after all listeners have run.
 
+`'*'` is subscribe-only. `retain(ε, '*')` throws, matching `emit()`. On
+`unretain()` and `retainClear()` the wildcard means *all retained events*:
+`unretain(ε, '*')` drops every retain policy and every retained value,
+`retainClear(ε, '*')` drops the values and keeps the policies. An array
+containing `'*'` is treated as the wildcard, whatever else it lists.
+
 ---
 
 ## `retainClear(emitter, eventName | eventName[])`

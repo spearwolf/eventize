@@ -125,6 +125,11 @@ const _duckEmit = (
 const isDuckTarget = (obj: unknown): obj is object =>
   obj != null && typeof obj === 'object';
 
+const hasWildcard = (eventNames: unknown): boolean =>
+  Array.isArray(eventNames)
+    ? eventNames.some((name) => name === EVENT_CATCH_EM_ALL)
+    : eventNames === EVENT_CATCH_EM_ALL;
+
 // ---------------------------------------------------------------------------
 // on() — overloads ordered specific → generic.
 //
@@ -553,6 +558,11 @@ export function retain<T extends object>(
 ): void;
 // implementation
 export function retain(obj: object, eventNames: any): void {
+  if (hasWildcard(eventNames)) {
+    throw new Error(
+      "retain() must be called with a concrete event name — '*' is reserved for subscribing to all events and cannot be retained",
+    );
+  }
   const eventizedObj = asEventized(obj);
   const {keeper} = eventizedObj[NAMESPACE];
   keeper.add(eventNames);
@@ -572,6 +582,10 @@ export function retainClear(eventizedObj: object, eventNames: any): void {
     throw new Error('object is not eventized');
   }
   const {keeper} = eventizedObj[NAMESPACE];
+  if (hasWildcard(eventNames)) {
+    keeper.clearAll();
+    return;
+  }
   keeper.clear(eventNames);
 }
 
@@ -589,6 +603,10 @@ export function unretain(eventizedObj: object, eventNames: any): void {
     throw new Error('object is not eventized');
   }
   const {keeper} = eventizedObj[NAMESPACE];
+  if (hasWildcard(eventNames)) {
+    keeper.removeAll();
+    return;
+  }
   keeper.remove(eventNames);
 }
 

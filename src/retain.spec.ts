@@ -396,4 +396,26 @@ describe('retain()', () => {
     // but each in their own priority order as they subscribe
     expect(order.length).toBe(3);
   });
+
+  describe("wildcard '*'", () => {
+    it('rejects retain(ε, "*")', () => {
+      const obj = eventize();
+      expect(() => retain(obj, '*')).toThrow(/subscrib/i);
+    });
+
+    it('rejects an array containing "*"', () => {
+      const obj = eventize();
+      expect(() => retain(obj, ['foo', '*'])).toThrow(/subscrib/i);
+    });
+
+    it('does not register "*" as a retained name after a rejected call', () => {
+      const obj = eventize();
+      expect(() => retain(obj, '*')).toThrow();
+
+      // the crash this guards against: a wildcard subscribe used to recurse
+      // through the '*' entry in eventNames until the stack blew
+      const listener = fake();
+      expect(() => on(obj, '*', listener)).not.toThrow();
+    });
+  });
 });

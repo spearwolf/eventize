@@ -99,4 +99,5 @@ A listener that throws synchronously aborts the dispatch in both functions. A li
 - With several retained events, a new subscriber receives them in original emission order — `subscribeTo` buffers them and `EventKeeper.publish()` flushes after registration completes.
 - New wildcard subscribers also receive retained events.
 - `retainClear(ε, name)` drops the stored value and keeps recording future emits; `unretain(ε, name)` drops the value and the policy. Both throw on non-eventized targets.
+- `retain(ε, '*')` throws — the wildcard cannot be retained. On the other two it means *all retained events*: `retainClear(ε, '*')` drops every stored value and keeps every policy, `unretain(ε, '*')` drops both. An array containing `'*'` is treated as the wildcard, whatever else it lists.
 - A throwing listener leaves the previously retained value untouched — the retain write happens after all listeners have run.
