@@ -247,5 +247,28 @@ describe('retainClear()', () => {
       on(obj, 'a', late);
       expect(late.calledWith(3)).toBe(true);
     });
+
+    it('an array containing "*" behaves like the bare wildcard', () => {
+      const obj = eventize();
+
+      retain(obj, 'a');
+      retain(obj, 'b');
+      emit(obj, 'a', 1);
+      emit(obj, 'b', 2);
+
+      // 'b' is not listed, yet the wildcard clears it too
+      retainClear(obj, ['a', '*']);
+
+      const listener = fake();
+      on(obj, 'a', listener);
+      on(obj, 'b', listener);
+      expect(listener.callCount).toBe(0);
+
+      // policies survived for both
+      emit(obj, 'b', 3);
+      const late = fake();
+      on(obj, 'b', late);
+      expect(late.calledWith(3)).toBe(true);
+    });
   });
 });

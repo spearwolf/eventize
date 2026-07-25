@@ -112,6 +112,7 @@ Discards the currently stored value but keeps the retain policy active, so futur
 - Throws on a non-eventized object.
 - Accepts a single name or an array; string and symbol names both work.
 - Clearing a non-existent or already-cleared event is a no-op.
+- `retainClear(ε, '*')` is the bulk form — it drops **every** stored value and keeps every policy. See the wildcard note under [`retain()`](#notes).
 
 ```javascript
 import {eventize, retain, retainClear, emit, on} from '@spearwolf/eventize';
@@ -186,6 +187,7 @@ Fully reverses `retain()`: the stored value is dropped **and** future emissions 
 - Throws on a non-eventized object.
 - Accepts a single name or an array; string and symbol names both work.
 - Unretaining an event that was never retained is a no-op.
+- `unretain(ε, '*')` is the bulk form — it drops **every** policy and **every** stored value. See the wildcard note under [`retain()`](#notes).
 
 ```javascript
 import {eventize, retain, unretain, emit, on} from '@spearwolf/eventize';

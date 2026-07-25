@@ -241,4 +241,82 @@ describe('EventKeeper', () => {
 
     expect(emitter.apply).toHaveBeenCalledWith('foo', []);
   });
+
+  it('removeAll() drops every retain policy and every retained value', () => {
+    const keeper = new EventKeeper();
+    keeper.add(['foo', bar, 'plah']);
+    keeper.retain('foo', ['fooData']);
+    keeper.retain(bar, ['barData']);
+
+    expect(keeper.eventNames.size).toBe(3);
+    expect(keeper.events.size).toBe(2);
+
+    keeper.removeAll();
+
+    expect(keeper.eventNames.size).toBe(0);
+    expect(keeper.events.size).toBe(0);
+    expect(keeper.isKnown('foo')).toBe(false);
+    expect(keeper.isKnown(bar)).toBe(false);
+
+    // nothing left to replay, and a later retain() is a no-op without a policy
+    keeper.retain('foo', ['afterwards']);
+    expect(keeper.events.size).toBe(0);
+  });
+
+  it('clearAll() drops every retained value and keeps the retain policies', () => {
+    const keeper = new EventKeeper();
+    keeper.add(['foo', bar, 'plah']);
+    keeper.retain('foo', ['fooData']);
+    keeper.retain(bar, ['barData']);
+
+    expect(keeper.eventNames.size).toBe(3);
+    expect(keeper.events.size).toBe(2);
+
+    keeper.clearAll();
+
+    expect(keeper.events.size).toBe(0);
+    expect(keeper.eventNames.size).toBe(3);
+    expect(keeper.isKnown('foo')).toBe(true);
+    expect(keeper.isKnown(bar)).toBe(true);
+    expect(keeper.isKnown('plah')).toBe(true);
+
+    // the policies survived, so the next retain() stores again
+    keeper.retain('foo', ['afterwards']);
+    expect(keeper.events.size).toBe(1);
+  });
+
+  it('removeAll() and clearAll() on an empty keeper do not throw', () => {
+    const keeper = new EventKeeper();
+
+    expect(() => keeper.removeAll()).not.toThrow();
+    expect(() => keeper.clearAll()).not.toThrow();
+    expect(keeper.eventNames.size).toBe(0);
+    expect(keeper.events.size).toBe(0);
+  });
+
+  it('replayTo skips a wildcard name inside eventNames instead of recursing', () => {
+    const keeper = new EventKeeper();
+
+    // retain() rejects '*' since v5.2, so this can only be reached by seeding
+    // eventNames by hand. Without the isCatchEmAll guard in the catch-em-all
+    // branch, replayTo('*') walks into itself here and blows the stack.
+    keeper.eventNames.add('*');
+    keeper.add('foo');
+    keeper.retain('foo', ['payload']);
+
+    const emitter = {apply: jest.fn()};
+    const result = keeper.replayTo('*', emitter);
+
+    // returned at all — the point of the guard
+    expect(result.length).toBe(1);
+
+    EventKeeper.publish(result);
+
+    expect(emitter.apply).toHaveBeenCalledTimes(1);
+    expect(emitter.apply.mock.calls[0]).toEqual(['foo', ['payload']]);
+
+    const replayedNames = emitter.apply.mock.calls.map((c) => c[0]);
+    expect(replayedNames).toContain('foo');
+    expect(replayedNames).not.toContain('*');
+  });
 });

@@ -37,6 +37,7 @@ Verified quirks that look like bugs but are load-bearing or simply undocumented.
 - `emitAsync()` resolves to `undefined`, not `[]`, when no listener returned a non-null value.
 - `emit()` on a non-eventized target no longer throws (v5). Typo safety now comes from typed emitters or an explicit `isEventized()` guard.
 - No recursion guard. `A → B → A` forwarding and same-event re-emission overflow the stack by design — the v4.2 guard forbade legitimate patterns and was reverted.
+- `retain(ε, [name, …])` rejects a wildcard atomically: nothing is retained if `'*'` appears anywhere in the array. `emit(ε, [name, …])` does not — it dispatches the names preceding `'*'` and then throws. Both are pinned by specs; unify them only with a CHANGELOG entry.
 
 ## Conventions
 

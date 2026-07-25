@@ -217,5 +217,27 @@ describe('unretain()', () => {
       on(obj, 'a', late);
       expect(late.callCount).toBe(0);
     });
+
+    it('an array containing "*" behaves like the bare wildcard', () => {
+      const obj = eventize();
+
+      retain(obj, 'a');
+      retain(obj, 'b');
+      emit(obj, 'a', 1);
+      emit(obj, 'b', 2);
+
+      // 'b' is not listed, yet the wildcard takes everything with it
+      unretain(obj, ['a', '*']);
+
+      const listener = fake();
+      on(obj, 'a', listener);
+      on(obj, 'b', listener);
+      expect(listener.callCount).toBe(0);
+
+      emit(obj, 'b', 3);
+      const late = fake();
+      on(obj, 'b', late);
+      expect(late.callCount).toBe(0);
+    });
   });
 });
