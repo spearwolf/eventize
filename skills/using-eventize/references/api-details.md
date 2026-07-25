@@ -22,6 +22,8 @@ Parsing is positional (`_subscribeTo` in `src/subscribeTo.ts`): a leading `numbe
 
 `once()` with several event names removes the listener after the **first** of them fires.
 
+`once()` is only consumed when a listener actually ran. For the object forms — `once(ε, 'foo', obj)` and `once(ε, 'foo', 'methodName', obj)` — a dispatch that finds neither the method nor the `.emit()` fallback leaves the subscription in place, so a late-initialised listener object still gets its one call. The `.emit()` fallback counts as a call and does consume the `once()`. Function listeners are always callable, so they are always consumed. Before this fix the miss silently burned the subscription.
+
 ### Per-event priorities
 
 Elements of the array form may be `[eventName, priority]` tuples, mixed freely with bare names. A tuple's priority overrides the call-level one for that event:

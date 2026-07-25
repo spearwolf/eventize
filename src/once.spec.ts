@@ -87,4 +87,53 @@ describe('once()', () => {
       expect(getSubscriptionCount(e)).toBe(0);
     });
   });
+
+  describe('when nothing was actually called', () => {
+    it('keeps the subscription for a listener object without a matching method', () => {
+      const obj = eventize();
+      const listenerObject: {foo?: () => void} = {};
+
+      once(obj, 'foo', listenerObject);
+      emit(obj, 'foo');
+
+      expect(getSubscriptionCount(obj)).toBe(1);
+
+      // the method arrives late — the once() must still be live
+      const handler = fake();
+      listenerObject.foo = handler;
+      emit(obj, 'foo', 'payload');
+
+      expect(handler.calledWith('payload')).toBe(true);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('keeps the subscription for a method name that does not exist yet', () => {
+      const obj = eventize();
+      const listenerObject: {handler?: () => void} = {};
+
+      once(obj, 'foo', 'handler', listenerObject);
+      emit(obj, 'foo');
+
+      expect(getSubscriptionCount(obj)).toBe(1);
+
+      const handler = fake();
+      listenerObject.handler = handler;
+      emit(obj, 'foo', 'payload');
+
+      expect(handler.calledWith('payload')).toBe(true);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('still consumes the once when the emit() fallback runs', () => {
+      const obj = eventize();
+      const emitFake = fake();
+      const listenerObject = {emit: emitFake};
+
+      once(obj, 'foo', listenerObject);
+      emit(obj, 'foo', 'payload');
+
+      expect(emitFake.calledWith('foo', 'payload')).toBe(true);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+  });
 });

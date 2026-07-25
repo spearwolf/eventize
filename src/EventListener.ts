@@ -12,18 +12,21 @@ type EmitFnType = Function | undefined;
 type CallAfterApplyFnType = (() => void) | undefined;
 type ReturnValue = (retVal: any) => void;
 
+/** Returns true when `func` was actually callable and got invoked. */
 const apply = (
   context: unknown,
   func: EmitFnType,
   args: EventArgs,
   returnValue?: ReturnValue,
-) => {
+): boolean => {
   if (typeof func === 'function') {
     const retVal = func.apply(context, args);
     if (retVal != null) {
       returnValue?.(retVal);
     }
+    return true;
   }
+  return false;
 };
 
 const emit = (
@@ -31,7 +34,8 @@ const emit = (
   listener: {emit: EmitFnType},
   args: EventArgs,
   returnValue?: ReturnValue,
-) => apply(listener, listener.emit, [eventName].concat(args), returnValue);
+): boolean =>
+  apply(listener, listener.emit, [eventName].concat(args), returnValue);
 
 const detectListenerType = (listener: unknown) => {
   switch (typeof listener) {
@@ -110,26 +114,29 @@ export class EventListener {
         if (this.callAfterApply) this.callAfterApply();
         break;
 
-      case LISTENER_IS_NAMED_FUNC:
-        // @ts-expect-error listenerType discriminant guarantees `listener` is a string/symbol method key on `listenerObject`.
-        apply(listenerObject, listenerObject[listener], args, returnValue);
-        if (this.callAfterApply) this.callAfterApply();
+      case LISTENER_IS_NAMED_FUNC: {
+        const didCall = apply(
+          listenerObject,
+          // @ts-expect-error listenerType discriminant guarantees `listener` is a string/symbol method key on `listenerObject`.
+          listenerObject[listener],
+          args,
+          returnValue,
+        );
+        // A once() must survive a dispatch that found no method — late-bound
+        // listener objects are a normal pattern.
+        if (didCall && this.callAfterApply) this.callAfterApply();
         break;
+      }
 
       case LISTENER_IS_OBJ: {
         // @ts-expect-error listenerType discriminant guarantees `listener` is an indexable object whose own keys are event names.
         const func = listener[eventName];
         if (this.isCatchEmAll || this.eventName === eventName) {
-          if (typeof func === 'function') {
-            const retVal = func.apply(listener, args);
-            if (retVal != null) {
-              returnValue?.(retVal);
-            }
-          } else {
+          const didCall =
+            apply(listener, func, args, returnValue) ||
             // @ts-expect-error listenerType discriminant guarantees `listener` is an object that may expose an `emit` method.
             emit(eventName, listener, args, returnValue);
-          }
-          if (this.callAfterApply) this.callAfterApply();
+          if (didCall && this.callAfterApply) this.callAfterApply();
         }
         break;
       }
