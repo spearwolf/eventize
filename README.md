@@ -50,6 +50,15 @@ ln -s "$(pwd)/skills/using-eventize" ~/.claude/skills/using-eventize
 
 Skills are auto-discovered — no extra registration step.
 
+### 📚 Further documentation
+
+The deep material behind the summaries below:
+
+- [Unsubscribing in depth](./docs/off.md) — every `off()` signature, the interaction with `retain()`, and reference counting
+- [Retained events in depth](./docs/retain.md) — `retain()`, `retainClear()`, `unretain()`, symbol names, and the wildcard bulk forms
+- [Typed event maps](./docs/typed-events.md) — generic event maps, the inject and class forms, symbol events as an escape hatch
+- [Lifecycle & cleanup](./docs/lifecycle.md) — what an emitter holds and what releases it
+
 ## 📖 Getting Started
 
 The core idea is simple: an object, called an **emitter**, can be "eventized" to emit named events. Other parts of your application, called **listeners**, subscribe to those events and run immediately when the event is emitted.

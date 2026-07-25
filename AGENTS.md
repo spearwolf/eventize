@@ -39,6 +39,9 @@ Verified quirks that look like bugs but are load-bearing or simply undocumented.
 - No recursion guard. `A → B → A` forwarding and same-event re-emission overflow the stack by design — the v4.2 guard forbade legitimate patterns and was reverted.
 - `off(ε, undefined)` is not a no-op — it takes the same branch as `off(ε)` and removes **every** listener. Cleanup code that passes a handle property through (`off(ε, maybeHandle.listener)`) wipes the emitter when that property is missing, rather than doing nothing. Guard the call, or pass the handle itself.
 - `retain(ε, [name, …])` rejects a wildcard atomically: nothing is retained if `'*'` appears anywhere in the array. `emit(ε, [name, …])` does not — it dispatches the names preceding `'*'` and then throws. Both are pinned by specs; unify them only with a CHANGELOG entry.
+- `retain()`, `unretain()` and `retainClear()` treat `'*'` specially, but not identically: `retain(ε, '*')` throws — `'*'` stays subscribe-only, matching `emit()`. `unretain(ε, '*')` and `retainClear(ε, '*')` instead mean "all retained events": the former drops every retain policy and every retained value, the latter drops only the values and keeps the policies.
+- `off(ε)` and `off(ε, '*')` only empty the store — retained state (both the values and the policies) survives untouched. This is scheduled to change in v6.0.0, where both forms will also clear retained state — see `docs/lifecycle.md`.
+- `off(ε, eventName, listenerObject)` unretains the *whole* event name — drops its retained value and policy — even though it only detaches one listener object's subscription and leaves any sibling listener for that same name subscribed. Unlike the bullet above, this is not scheduled to change: `git log -L` shows the branch unchanged since the 4.0.0 functional API, and fixing it now would be breaking. See `docs/lifecycle.md`.
 
 ## Conventions
 
@@ -56,6 +59,7 @@ Progressive disclosure applies to this repo's own docs — the deep material liv
 | Public API or runtime behavior | `CHANGELOG.md` (`## Unreleased`), with migration notes if breaking |
 | Documented behavior or an example | `README.md`, plus the matching `docs/*.md` if the detail lives there |
 | Dispatch semantics, retain behavior, or any quirk above | `skills/using-eventize/` — `SKILL.md` for the summary, `references/*.md` for detail |
+| Cleanup, retain lifetime, or handle semantics | `docs/lifecycle.md`, plus a case in `src/lifecycle.spec.ts` |
 | Purely internal refactor | nothing |
 
 Docs are English. Prefer stating the gotcha over restating the signature.

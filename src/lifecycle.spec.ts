@@ -93,6 +93,17 @@ describe('lifecycle', () => {
       expect(getSubscriptionCount(obj)).toBe(0);
     });
 
+    it('off(ε, undefined) is not a no-op — it takes the off(ε) branch', () => {
+      const obj = eventize();
+      on(obj, 'foo', fake());
+      on(obj, 'bar', fake());
+      const maybeHandle: {listener?: unknown} = {};
+
+      off(obj, maybeHandle.listener); // maybeHandle.listener is undefined
+
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
     it('the unsubscribe handle clears its own subscription', () => {
       const obj = eventize();
       const unsubscribe = on(obj, 'foo', fake());
@@ -124,6 +135,107 @@ describe('lifecycle', () => {
 
       expect(getRetainedCount(obj)).toBe(0);
       expect(getRetainedEventNames(obj)).toEqual([]);
+    });
+
+    it('off(ε, undefined) also leaves retained state untouched, on its way to wiping every listener', () => {
+      const obj = eventize();
+      retain(obj, 'foo');
+      emit(obj, 'foo', 'payload');
+      on(obj, 'foo', fake());
+
+      off(obj, undefined);
+
+      expect(getSubscriptionCount(obj)).toBe(0);
+      expect(getRetainedCount(obj)).toBe(1);
+      expect(getRetainedEventNames(obj)).toEqual(['foo']);
+    });
+
+    it('off(ε) — the bare form — leaves retained state untouched', () => {
+      const obj = eventize();
+      retain(obj, 'foo');
+      emit(obj, 'foo', 'payload');
+      on(obj, 'foo', fake());
+
+      off(obj);
+
+      expect(getSubscriptionCount(obj)).toBe(0);
+      expect(getRetainedCount(obj)).toBe(1);
+      expect(getRetainedEventNames(obj)).toEqual(['foo']);
+    });
+
+    it('off(ε, "*") also leaves retained state untouched, just like the bare form', () => {
+      const obj = eventize();
+      retain(obj, 'foo');
+      emit(obj, 'foo', 'payload');
+      on(obj, 'foo', fake());
+
+      off(obj, '*');
+
+      expect(getSubscriptionCount(obj)).toBe(0);
+      expect(getRetainedCount(obj)).toBe(1);
+      expect(getRetainedEventNames(obj)).toEqual(['foo']);
+    });
+
+    it('off(ε, [names]) drops the retained value and the policy for each listed name', () => {
+      const obj = eventize();
+      retain(obj, ['foo', 'bar', 'baz']);
+      emit(obj, 'foo', 1);
+      emit(obj, 'bar', 2);
+      emit(obj, 'baz', 3);
+
+      off(obj, ['foo', 'bar']);
+
+      expect(getRetainedCount(obj)).toBe(1);
+      expect(getRetainedEventNames(obj)).toEqual(['baz']);
+    });
+
+    it('off(ε, listenerFunc) and off(ε, listenerObject) leave retained state untouched', () => {
+      const obj = eventize();
+      retain(obj, 'foo');
+      emit(obj, 'foo', 'payload');
+
+      const fn = fake();
+      on(obj, 'foo', fn);
+      off(obj, fn);
+      expect(getRetainedCount(obj)).toBe(1);
+
+      const listenerObject = {foo: fake()};
+      on(obj, 'foo', listenerObject);
+      off(obj, listenerObject);
+      expect(getRetainedCount(obj)).toBe(1);
+      expect(getRetainedEventNames(obj)).toEqual(['foo']);
+    });
+
+    it('off(ε, eventName, listenerObject) unretains that name too, even though a sibling listener survives', () => {
+      const obj = eventize();
+      retain(obj, 'foo');
+      emit(obj, 'foo', 'payload');
+      const other = {foo: fake()};
+      on(obj, 'foo', other);
+      const listenerObject = {foo: fake()};
+      on(obj, 'foo', listenerObject);
+      expect(getSubscriptionCount(obj)).toBe(2);
+
+      off(obj, 'foo', listenerObject);
+
+      // one listener removed, one left...
+      expect(getSubscriptionCount(obj)).toBe(1);
+      // ...but the retained value and policy for 'foo' are both gone
+      expect(getRetainedCount(obj)).toBe(0);
+      expect(getRetainedEventNames(obj)).toEqual([]);
+    });
+
+    it('retain() holds the payload by reference — no cloning', () => {
+      const obj = eventize();
+      const payload = {big: 'buffer-or-dom-node'};
+      retain(obj, 'foo');
+
+      emit(obj, 'foo', payload);
+
+      const received = fake();
+      on(obj, 'foo', received);
+
+      expect(received.firstCall.args[0]).toBe(payload);
     });
 
     it('unretain(ε, "*") drops everything', () => {
@@ -232,6 +344,28 @@ describe('lifecycle', () => {
       });
     });
 
+    it('a de-duplicated subscription is not released until the LAST handle calls back', () => {
+      const obj = eventize();
+      const service = {foo: fake()};
+
+      const h1 = on(obj, 'foo', service) as any;
+      const h2 = on(obj, 'foo', service) as any; // shares one EventListener, refCount = 2
+      expect(getSubscriptionCount(obj)).toBe(1);
+
+      h1();
+
+      // decremented, but not detached — the shared listener is still live
+      expect(getSubscriptionCount(obj)).toBe(1);
+      expect(h1.listener.listener).not.toBeNull();
+
+      h2();
+
+      // only the last outstanding handle actually releases the reference
+      expect(getSubscriptionCount(obj)).toBe(0);
+      expect(h1.listener.listener).toBeNull();
+      expect(h2.listener.listener).toBeNull();
+    });
+
     it('onceAsync with an aborted signal leaves nothing behind', async () => {
       const obj = eventize();
       const controller = new AbortController();
@@ -241,6 +375,35 @@ describe('lifecycle', () => {
       await expect(promise).rejects.toMatchObject({name: 'AbortError'});
 
       expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('once() returns a handle carrying .listener, released once consumed', () => {
+      const obj = eventize();
+      const handle = once(obj, 'foo', fake()) as any;
+
+      expect(handle.listener).not.toBeNull();
+
+      emit(obj, 'foo');
+
+      // once() already auto-unsubscribed after firing — the handle is a
+      // no-op now, but it still carries the (detached) listener reference.
+      expect(handle.listener.listener).toBeNull();
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('once(ε, [names]) returns a handle carrying .listeners, all released', () => {
+      const obj = eventize();
+      const handle = once(obj, ['foo', 'bar'], fake()) as any;
+
+      expect(Array.isArray(handle.listeners)).toBe(true);
+      expect(handle.listeners).toHaveLength(2);
+
+      handle();
+
+      expect(getSubscriptionCount(obj)).toBe(0);
+      handle.listeners.forEach((l: any) => {
+        expect(l.listener).toBeNull();
+      });
     });
   });
 
