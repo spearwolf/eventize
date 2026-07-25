@@ -142,18 +142,18 @@ export class EventStore {
   readonly namedListeners: Map<EventName, Array<EventListener>>;
   readonly catchEmAllListeners: Array<EventListener>;
 
-  getListenersForEventName = (eventName: string | symbol): EventListener[] => {
+  constructor() {
+    this.namedListeners = new Map();
+    this.catchEmAllListeners = [];
+  }
+
+  getListenersForEventName(eventName: string | symbol): EventListener[] {
     let namedListeners = this.namedListeners.get(eventName);
     if (!namedListeners) {
       namedListeners = [];
       this.namedListeners.set(eventName, namedListeners);
     }
     return namedListeners;
-  };
-
-  constructor() {
-    this.namedListeners = new Map();
-    this.catchEmAllListeners = [];
   }
 
   /**
