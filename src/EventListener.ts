@@ -57,8 +57,11 @@ export class EventListener {
   readonly eventName: EventName;
   readonly isCatchEmAll: boolean;
   readonly priority: number | undefined;
-  readonly listener: unknown;
-  readonly listenerObject: ListenerObjectType;
+  // Not readonly: detach() nulls these on removal so a retained unsubscribe
+  // handle can't keep the emitter graph alive. Internal contract only —
+  // nothing outside this package writes to them.
+  listener: unknown;
+  listenerObject: ListenerObjectType;
   readonly listenerType: number;
   callAfterApply: CallAfterApplyFnType;
   isRemoved: boolean;
@@ -96,6 +99,19 @@ export class EventListener {
       return false;
     }
     return this.listener === listener && this.listenerObject === listenerObject;
+  }
+
+  /**
+   * Marks the listener as removed and releases everything it holds. Removed
+   * listeners are spliced out of their bucket, so nothing looks them up
+   * again; `apply()` bails on `isRemoved` before touching any of the nulled
+   * fields.
+   */
+  detach(): void {
+    this.isRemoved = true;
+    this.listener = null;
+    this.listenerObject = null;
+    this.callAfterApply = undefined;
   }
 
   apply(

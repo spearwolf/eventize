@@ -53,7 +53,7 @@ const removeListenerFromArray = (
     item.isEqual(listener, listenerObject),
   );
   if (idx > -1) {
-    listeners[idx].isRemoved = true;
+    listeners[idx].detach();
     listeners.splice(idx, 1);
   }
 };
@@ -86,10 +86,7 @@ const removeSimilarListenersFromArray = (
 
 const removeAll = (fromArray: Array<EventListener>) => {
   if (fromArray) {
-    fromArray.forEach((listener) => {
-      listener.isRemoved = true;
-      // listener.refCount = 0;
-    });
+    fromArray.forEach((listener) => listener.detach());
     fromArray.length = 0;
   }
 };
@@ -223,7 +220,6 @@ export class EventStore {
     if (listener.isRemoved) return;
     listener.refCount -= 1;
     if (listener.refCount >= 1) return;
-    listener.isRemoved = true;
     this.namedListeners.forEach((namedListeners, name) => {
       removeItemFromArray(namedListeners, listener);
       if (namedListeners.length === 0) {
@@ -231,6 +227,7 @@ export class EventStore {
       }
     });
     removeItemFromArray(this.catchEmAllListeners, listener);
+    listener.detach();
   }
 
   private removeByEventNameAndListenerObject(

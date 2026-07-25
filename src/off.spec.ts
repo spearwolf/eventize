@@ -787,4 +787,43 @@ describe('off()', () => {
       expect(getSubscriptionCount(withoutName)).toBe(0);
     });
   });
+
+  describe('reference release after unsubscribe', () => {
+    it('drops the listener references from a consumed handle', () => {
+      const obj = eventize();
+      const listenerObject = {foo: fake()};
+      const unsubscribe = on(obj, 'foo', 'foo', listenerObject) as any;
+
+      expect(unsubscribe.listener.listenerObject).toBe(listenerObject);
+
+      unsubscribe();
+
+      expect(unsubscribe.listener.isRemoved).toBe(true);
+      expect(unsubscribe.listener.listener).toBeNull();
+      expect(unsubscribe.listener.listenerObject).toBeNull();
+      expect(unsubscribe.listener.callAfterApply).toBeUndefined();
+    });
+
+    it('drops references on off(ε, eventName) too', () => {
+      const obj = eventize();
+      const listenerFunc = fake();
+      const unsubscribe = on(obj, 'foo', listenerFunc) as any;
+
+      off(obj, 'foo');
+
+      expect(unsubscribe.listener.isRemoved).toBe(true);
+      expect(unsubscribe.listener.listener).toBeNull();
+    });
+
+    it('drops references on off(ε) too', () => {
+      const obj = eventize();
+      const listenerFunc = fake();
+      const unsubscribe = on(obj, 'foo', listenerFunc) as any;
+
+      off(obj);
+
+      expect(unsubscribe.listener.isRemoved).toBe(true);
+      expect(unsubscribe.listener.listener).toBeNull();
+    });
+  });
 });
