@@ -7,6 +7,25 @@ export default {
   // Automatically clear mock calls and instances between every test
   clearMocks: true,
 
+  // Which files count towards coverage — sources only, no specs, no fixtures
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.spec.ts',
+    '!src/__test-utils__/**',
+  ],
+
+  // Set just below the measured state so the threshold binds instead of
+  // decorating. Raise it when coverage rises; never lower it to make a
+  // build pass.
+  coverageThreshold: {
+    global: {
+      statements: 97,
+      branches: 93,
+      functions: 94,
+      lines: 97,
+    },
+  },
+
   // An array of file extensions your modules use
   moduleFileExtensions: ['js', 'ts'],
 
