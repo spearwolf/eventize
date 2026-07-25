@@ -14,6 +14,7 @@
 ## Global Constraints
 
 - Every task commits directly to `main`. One commit per finding, with the finding ID in the message: `fix(off): … (MEM-003)`.
+- **Always pass `--no-gpg-sign` to `git commit` and `git tag`.** The repo has `commit.gpgsign = true` globally, and a signed commit blocks on an interactive passphrase prompt that a subagent cannot answer. Every `git commit` in this plan is to be run as `git commit --no-gpg-sign -m "…"`, and every `git tag` as `git tag --no-sign`.
 - Specs live next to sources as `*.spec.ts`. Jest `testMatch` is restricted to `src/**`.
 - Relative imports carry no extension — `tsup` writes the output extensions. (Fixing the four violations is task 1c.)
 - `lib/` is generated and git-ignored. Never edit it, never read it to answer a question about behaviour.
