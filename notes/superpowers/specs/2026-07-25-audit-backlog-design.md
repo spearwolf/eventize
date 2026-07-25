@@ -2,7 +2,7 @@
 
 **Source:** `audit.html` (2026-07-25, 35 findings, health score 39.5).
 **Status:** approved 2026-07-25.
-**Plan:** `docs/superpowers/plans/2026-07-25-audit-backlog.md`
+**Plan:** `notes/superpowers/plans/2026-07-25-audit-backlog.md`
 
 The audit is the requirements document. This file records only the decisions
 the audit left open, plus the phase cut that follows from them. Everything

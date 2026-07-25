@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript 5.9, tsup (ESM + CJS + types), Jest 30 / ts-jest, ESLint 9 flat config, sinon for fakes, Node ≥ 18.16, zero runtime dependencies.
 
-**Decisions:** `docs/superpowers/specs/2026-07-25-audit-backlog-design.md`
+**Decisions:** `notes/superpowers/specs/2026-07-25-audit-backlog-design.md`
 **Findings:** `audit.html` (open in a browser; IDs referenced below match its backlog table)
 
 ## Global Constraints
