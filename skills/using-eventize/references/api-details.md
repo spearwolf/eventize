@@ -102,7 +102,7 @@ Only listener-object forms of **`on()`** dedupe — `on(ε, name, listenerObject
 
 A deduped registration does not replay retained events again — the replay runs only for a genuinely inserted listener, so `on()` on an already-subscribed listener object is a pure refcount bump.
 
-**`once()` is exempt from all of this (v6.0.0).** It passes `noDedup` down to the store, so every call inserts its own listener even when an identical `on()` or `once()` subscription already exists. Consequences: two `once()` calls fire twice and both detach; each returned handle releases exactly its own subscription; and on a retained event both receive the replay, because the insert is genuine in each case. Up to v5.2.0 `once()` shared `on()`'s dedup, and the collapsed listener fired on every emit forever — `MEM-002`.
+**`once()` is exempt from all of this (v6.0.0).** It passes `noDedup` down to the store, so every call inserts its own listener even when an identical `on()` or `once()` subscription already exists. Consequences: two `once()` calls fire twice and both detach; each returned handle releases exactly its own subscription; and on a retained event both receive the replay, because the insert is genuine in each case. Up to v5.1.0 `once()` shared `on()`'s dedup, and the collapsed listener fired on every emit forever — `MEM-002`.
 
 ## `emit()` / `emitAsync()`
 

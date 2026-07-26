@@ -2,7 +2,7 @@
 
 [← back to README](../README.md)
 
-What an emitter holds, and what actually releases it — the two questions that matter once an app subscribes and unsubscribes for longer than a single test run. Every claim below has an assertion behind it somewhere in the spec suite — most in [`src/lifecycle.spec.ts`](../src/lifecycle.spec.ts), which exists specifically to state cleanup as executable assertions, with the rest in [`src/off.spec.ts`](../src/off.spec.ts) (the `off(ε, ['*', …])` wildcard-array row), [`src/once.spec.ts`](../src/once.spec.ts) (`once()` firing twice per registration) and [`src/retain.spec.ts`](../src/retain.spec.ts) (the double-replay of a retained value). This describes the **v6.0.0** state, with two breaking changes against v5.2.0: `off(ε)` and `off(ε, '*')` now clear retained state as well as listeners, where they used to clear only the store, and `once()` no longer shares `on()`'s reference-counted de-duplication (`MEM-002`, described below). Upgrading from v5? See [Migrating from v5](#migrating-from-v5) below.
+What an emitter holds, and what actually releases it — the two questions that matter once an app subscribes and unsubscribes for longer than a single test run. Every claim below has an assertion behind it somewhere in the spec suite — most in [`src/lifecycle.spec.ts`](../src/lifecycle.spec.ts), which exists specifically to state cleanup as executable assertions, with the rest in [`src/off.spec.ts`](../src/off.spec.ts) (the `off(ε, ['*', …])` wildcard-array row), [`src/once.spec.ts`](../src/once.spec.ts) (`once()` firing twice per registration) and [`src/retain.spec.ts`](../src/retain.spec.ts) (the double-replay of a retained value). This describes the **v6.0.0** state, closing a 35-finding audit against the last released version, `v5.1.0`. The two lifecycle changes with the widest blast radius: `off(ε)` and `off(ε, '*')` now clear retained state as well as listeners, where they used to clear only the store, and `once()` no longer shares `on()`'s reference-counted de-duplication (`MEM-002`, described below). Upgrading from v5? See [Migrating from v5](#migrating-from-v5) below for these and the rest of this release's breaking changes.
 
 ## What an emitter holds
 
@@ -49,19 +49,19 @@ on(ε, 'foo', (received) => {
 The row worth pausing on is `off(ε, eventName, listenerObject)`: it narrowly removes one listener object's subscription to that name, but it drops the retained value and policy for the name *entirely*. Any sibling listener still subscribed to that name keeps running on future emits exactly as before — nothing is unsubscribed out from under it — but the *next* listener to subscribe to that name gets no replay, because the retained state it would have replayed from is gone.
 
 > [!IMPORTANT]
-> **The bulk `off()` forms clear retained state as of v6.0.0.** Up to v5.2.0 the bare and wildcard forms only emptied the store: every retained value and every retain policy survived, so the call that reads as "reset the emitter" was precisely the one that pinned the payloads and still replayed them to the next subscriber. `off(ε)`, `off(ε, '*')` and `off(ε, ['*', …])` now wipe store and keeper together — the array form worst of all before, since it removed every listener but unretained only the names listed beside the `'*'`, leaving the rest pinned. Code that relied on retained values surviving a bulk `off(ε)` must re-`retain()` and re-`emit()`, or switch to the targeted `off(ε, eventName)` / `off(ε, [names])` forms, which are unchanged as long as no `'*'` appears in the array. The explicit `unretain(ε, '*')` after an `off(ε)` is now redundant, not wrong.
+> **The bulk `off()` forms clear retained state as of v6.0.0.** Up to v5.1.0 the bare and wildcard forms only emptied the store: every retained value and every retain policy survived, so the call that reads as "reset the emitter" was precisely the one that pinned the payloads and still replayed them to the next subscriber. `off(ε)`, `off(ε, '*')` and `off(ε, ['*', …])` now wipe store and keeper together — the array form worst of all before, since it removed every listener but unretained only the names listed beside the `'*'`, leaving the rest pinned. Code that relied on retained values surviving a bulk `off(ε)` must re-`retain()` and re-`emit()`, or switch to the targeted `off(ε, eventName)` / `off(ε, [names])` forms, which are unchanged as long as no `'*'` appears in the array. The explicit `unretain(ε, '*')` after an `off(ε)` is now redundant, not wrong.
 >
-> **`off(ε, eventName, listenerObject)` unretaining the whole name was deliberately left off this release's break list.** Unlike the bulk forms above, this branch has been unchanged since the 4.0.0 functional API, and code may already depend on it — `off(ε, eventName, listenerObject)` reversing a `retain()` on that name is exactly what a caller reaches for when they mean "detach this listener and reset the event." Fixing it was not out of scope because it's impossible; it was left out because v6.0.0 already carries two behavior breaks and a third, narrower one goes on the next major's list instead of piling onto this one. Treat it as intentional, not overlooked.
+> **`off(ε, eventName, listenerObject)` unretaining the whole name was deliberately left off this release's break list.** Unlike the bulk forms above, this branch has been unchanged since the 4.0.0 functional API, and code may already depend on it — `off(ε, eventName, listenerObject)` reversing a `retain()` on that name is exactly what a caller reaches for when they mean "detach this listener and reset the event." Fixing it was not out of scope because it's impossible; it was left out because this release already carries several breaking changes, and a further, narrower one goes on the next major's list instead of piling onto this one. Treat it as intentional, not overlooked.
 
 See [`docs/off.md`](./off.md) for the full signature reference and [`docs/retain.md`](./retain.md) for `retain()` itself.
 
 ## Migrating from v5
 
-Two breaking changes, both closing memory-lifecycle gaps: the bulk `off()`
-forms now clear retained state, and `once()` no longer deduplicates. Neither
-has a compile-time signal — both are runtime behavior changes on signatures
-that don't change shape — so grep for the two patterns below rather than
-relying on the type checker to find call sites.
+Nine breaking changes against the last released version, `v5.1.0`. Most are
+runtime behavior changes on signatures that don't change shape, so the type
+checker won't find the call sites — grep for the patterns below instead. Two
+are type-only (a wrong type binding fixed, a dead type export removed) and
+surface as compile errors instead.
 
 ### `off(ε)` now clears retained state
 
@@ -89,7 +89,49 @@ off(ε, 'someOtherEvent');
 
 The same applies to `off(ε, '*')` and any array form containing `'*'`
 (`off(ε, ['*', …])`) — all three take the same wildcard branch in the store
-and now take the matching branch in the keeper.
+and now take the matching branch in the keeper. So does an array containing
+a `null` or `undefined` element (`off(ε, [null])`, `off(ε, ['foo', undefined])`)
+— it has always emptied the store the same way a wildcard array does, and
+now empties the keeper along with it. An event-name list assembled at
+runtime (`off(ε, ids.map((id) => nameFor(id)))`) hits this the moment one
+lookup misses — filter nullish values out before passing the array.
+
+### Unsubscribe handles are single-shot
+
+```js
+// v5 — a second call on the same handle could release a SIBLING
+// handle's registration instead of being a no-op
+const u1 = on(ε, 'foo', listenerObject);
+on(ε, 'foo', listenerObject); // same subscription → refCount = 2, no new handle kept
+
+u1();
+u1(); // second call decremented the shared refCount again
+getSubscriptionCount(ε); // => 0 — the OTHER handle's registration is gone too
+
+// v6 — the second call on u1 is inert
+const u1 = on(ε, 'foo', listenerObject);
+const u2 = on(ε, 'foo', listenerObject); // refCount = 2
+
+u1();
+u1(); // no-op — a consumed handle cannot decrement twice
+getSubscriptionCount(ε); // => 1 — u2's registration is untouched
+
+u2();
+getSubscriptionCount(ε); // => 0 — only now released
+```
+
+`off(ε, unsub.listener)` is affected the same way `unsub()` itself is: both
+now go through the same single-shot `makeUnsubscribe()` guard, so calling
+`off()` with a handle's `.listener` after the handle itself already fired
+decrements nothing — the registration it pointed at may already be gone, or
+may be a live sibling registration, but either way a second release attempt
+is a no-op rather than a second decrement. Code that stored a handle only to
+call `off(ε, unsub.listener)` unconditionally on cleanup, regardless of
+whether `unsub()` already ran, now gets the safe behavior `docs/off.md` had
+always promised. Nothing to change unless a cleanup path *relied* on the old
+double-decrement to force a shared registration to zero — reach for
+`off(ε, listenerObject)` instead, which removes every matching subscription
+in one call regardless of how many handles it was split across.
 
 ### `once()` no longer deduplicates
 
@@ -111,6 +153,16 @@ expected a single call, it now receives one call per registration — either
 drop the duplicate `once()` call, or guard the handler itself against being
 invoked twice. `on()` is unaffected; its reference-counted de-duplication is
 unchanged.
+
+### Smaller breaking changes
+
+Five more, each narrow enough not to need a worked snippet:
+
+- **`on(ε, eventName, methodName, listenerObject)` with a missing or `null` listener object now dispatches to nothing instead of throwing.** `on(ε, 'foo', 'handler', null)` used to throw `TypeError: Cannot read properties of null` the moment the event fired; it now silently does nothing until a real listener object is supplied later, matching how the same branch already tolerated a listener object with no matching method. Code that caught the `TypeError` as a signal no longer sees it — check with `getSubscriptionCount(ε)` instead if that mattered.
+- **`off(ε, <numeric listener id>)` no longer removes anything.** Passing `unsub.listener.id` — the internal `EventListener`'s numeric id — used to detach the listener outright, skipping the reference count every documented removal path honours. It was never documented and had no test. Use `unsub()` or `off(ε, unsub.listener)` instead; both go through the same reference-counted path.
+- **`UnsubscribeFunc.listener` / `.listeners` are now typed as this package's `EventListener`, not the DOM global of the same name.** `src/types.ts` referenced the name without importing it, so it silently bound to `lib.dom`'s `EventListener` (`(evt: Event) => void`) in the published declarations. Code that annotated `const l: EventListener = unsub.listener` against the DOM type now gets a type error — that annotation was already wrong, it just had no way to know. No runtime change.
+- **`export type ListenerType` is gone.** It was `export type ListenerType = unknown` — an alias nothing in the package referenced. Replace an import of it with `unknown` directly.
+- **An `EventListener` built directly with a `null` or `undefined` listener now dispatches to nothing instead of throwing.** Only reachable by constructing `EventListener` yourself; `on()` / `once()` reject a falsy listener before one is ever built, and the runtime bundles don't export the class at all (`src/index.ts` re-exports it as a type only). No action needed unless code somehow holds a reference to the class itself.
 
 ### Verifying a migration actually worked
 
@@ -198,12 +250,12 @@ A handle that is never called keeps its listener (and, transitively, whatever th
 > // getSubscriptionCount(ε) is now 0 — only now is the reference released
 > ```
 >
-> **Each handle is single-shot (since v6.0.0).** Calling one a second time does nothing at all — it does not decrement the shared count again, and so it cannot take a *sibling* handle's registration down with it. Up to v5.2.0 only `once()` carried that guard: `h1(); h1();` on the pair above dropped the count straight to 0, unsubscribing `h2`'s registration from under it, and the double call is precisely what defensive cleanup code writes.
+> **Each handle is single-shot (since v6.0.0).** Calling one a second time does nothing at all — it does not decrement the shared count again, and so it cannot take a *sibling* handle's registration down with it. Up to v5.1.0 only `once()` carried that guard: `h1(); h1();` on the pair above dropped the count straight to 0, unsubscribing `h2`'s registration from under it, and the double call is precisely what defensive cleanup code writes.
 >
 > The retention window is what survives. Holding on to `h1` after calling it, expecting it to have released `service`, is exactly the pattern the "consumed handle" claim above is meant to rule out — and the guard does not shorten it, because `h1` is inert while the shared listener is still very much alive. If a listener object may be subscribed more than once, only the *last* handle's call marks the true release point.
 
 > [!NOTE]
-> **`once()` is exempt from de-duplication (since v6.0.0).** Calling `once()` twice for the same event name on the same listener object creates two independent one-shot subscriptions: two firings on the first `emit()`, two retained-value replays if the event is retained, and two handles that each release exactly their own listener. Up to v5.2.0 the second call bumped the first listener's reference count instead, while the auto-unsubscribe hook accounted for a single firing — one emit took the count from 2 to 1 and the surviving handle's idempotence guard stopped it ever reaching 0. That listener fired on every subsequent `emit()` and could only be removed with an external `off(ε, listenerObject)` (`MEM-002`). If you upgrade from v5.x and relied on two `once()` calls collapsing into one, use a single `once()`.
+> **`once()` is exempt from de-duplication (since v6.0.0).** Calling `once()` twice for the same event name on the same listener object creates two independent one-shot subscriptions: two firings on the first `emit()`, two retained-value replays if the event is retained, and two handles that each release exactly their own listener. Up to v5.1.0 the second call bumped the first listener's reference count instead, while the auto-unsubscribe hook accounted for a single firing — one emit took the count from 2 to 1 and the surviving handle's idempotence guard stopped it ever reaching 0. That listener fired on every subsequent `emit()` and could only be removed with an external `off(ε, listenerObject)` (`MEM-002`). If you upgrade from v5.x and relied on two `once()` calls collapsing into one, use a single `once()`.
 
 ## `onceAsync` and cancellation
 

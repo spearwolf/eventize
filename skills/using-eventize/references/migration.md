@@ -1,25 +1,52 @@
 # eventize — migration notes
 
-## v5 → v6: two silent behavior breaks
+## v5 → v6: nine breaking changes
 
-Neither has a compile-time signal — both are runtime changes on signatures
-that don't change shape, so grep for the call patterns rather than relying
-on the type checker to find affected sites.
+Against the last released version, `v5.1.0`. Most are runtime changes on
+signatures that don't change shape, so grep for the call patterns rather
+than relying on the type checker to find affected sites. Two are type-only
+(a wrong type binding fixed, a dead type export removed) and surface as
+compile errors instead.
 
 - **Bulk `off()` now clears retained state.** `off(ε)`, `off(ε, '*')`, and
-  any array containing `'*'` (`off(ε, ['*', …])`) used to empty only the
-  listener registry, leaving retained values and retain policies intact. All
-  three now wipe the keeper too. Targeted forms — `off(ε, eventName)`,
-  `off(ε, [names])`, `off(ε, eventName, listenerObject)` — are unchanged.
+  any array containing `'*'`, `null` or `undefined` (`off(ε, ['*', …])`,
+  `off(ε, [null, …])`) used to empty only the listener registry, leaving
+  retained values and retain policies intact. All of them now wipe the
+  keeper too. Targeted forms — `off(ε, eventName)`, `off(ε, [names])`,
+  `off(ε, eventName, listenerObject)` — are unchanged.
 - **`once()` no longer deduplicates.** Two `once(ε, 'foo', listenerObject)`
   calls on the same object used to collapse into one listener that then
   fired on every subsequent emit and could not be released through its own
   handles. Each `once()` now gets its own listener: two registrations mean
   two firings, each releasing independently. `on()`'s reference-counted
   dedup is unaffected.
+- **Unsubscribe handles are single-shot.** Calling one a second time used to
+  decrement a shared reference count again, releasing a *sibling* handle's
+  registration out from under it. A second call is now inert — including
+  `off(ε, unsub.listener)` called after `unsub()` already ran, which now
+  no-ops instead of risking a second decrement.
+- **A method-name subscription with a missing listener object no-ops
+  instead of throwing.** `on(ε, 'foo', 'handler', null)` used to throw the
+  moment the event fired; it now silently does nothing until a real
+  listener object is supplied.
+- **`off(ε, <numeric listener id>)` no longer removes anything.** This was
+  undocumented and untested — passing `unsub.listener.id` used to detach
+  the listener outright, skipping the reference count every documented
+  path honours. Use `unsub()` or `off(ε, unsub.listener)`.
+- **`UnsubscribeFunc.listener` / `.listeners` are now typed as this
+  package's `EventListener`**, not the DOM global of the same name they
+  silently bound to before. Type-only; code that annotated against the DOM
+  type now gets a type error.
+- **`export type ListenerType` is gone** — an alias for `unknown` nothing
+  referenced. Replace an import with `unknown` directly.
+- **An `EventListener` built directly with a `null`/`undefined` listener
+  now dispatches to nothing instead of throwing.** Only reachable by
+  constructing the class yourself, which the runtime bundles don't even
+  export.
 
-Worked before/after snippets for both, plus how to verify a migration with
-`getRetainedCount(ε)` / `getSubscriptionCount(ε)`, live in
+Worked before/after snippets for the four runtime changes, plus how to
+verify a migration with `getRetainedCount(ε)` / `getSubscriptionCount(ε)`,
+live in
 [`docs/lifecycle.md#migrating-from-v5`](../../../docs/lifecycle.md#migrating-from-v5)
 rather than being duplicated here.
 

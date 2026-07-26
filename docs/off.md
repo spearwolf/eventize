@@ -54,7 +54,7 @@ emit(ε, 'foo'); // (nothing happens)
 emit(ε, 'bar'); // (nothing happens)
 ```
 
-Since v6.0.0 both forms empty the retained-events keeper as well as the listener registry: every retained value and every retain policy is dropped, exactly as [`unretain(ε, '*')`](./retain.md#unretainemitter-eventname--eventname) does. Up to v5.2.0 they left retained state alone, so a subscriber arriving after the "reset" still got the old payload replayed.
+Since v6.0.0 both forms empty the retained-events keeper as well as the listener registry: every retained value and every retain policy is dropped, exactly as [`unretain(ε, '*')`](./retain.md#unretainemitter-eventname--eventname) does. Up to v5.1.0 they left retained state alone, so a subscriber arriving after the "reset" still got the old payload replayed.
 
 A `'*'` anywhere in an array counts as the bulk form, on the keeper exactly as it always has on the listeners — `off(ε, ['*'])` and `off(ε, ['*', 'foo'])` both wipe everything, and the names listed beside the wildcard add nothing:
 
@@ -242,7 +242,7 @@ emit(ε, 'foo'); // (nothing happens)
 > emit(ε, 'foo'); // => "foo" twice — then both are gone
 > ```
 >
-> Two one-shot subscriptions mean two firings, each returned handle releases exactly its own, and a `once()` registered next to an existing `on()` for the same listener object is independent of it. Up to v5.2.0 `once()` shared `on()`'s dedup, which produced a listener that fired on every emit and could only be removed with `off(ε, listenerObject)`.
+> Two one-shot subscriptions mean two firings, each returned handle releases exactly its own, and a `once()` registered next to an existing `on()` for the same listener object is independent of it. Up to v5.1.0 `once()` shared `on()`'s dedup, which produced a listener that fired on every emit and could only be removed with `off(ε, listenerObject)`.
 
 Function listeners behave differently — each `on()` is an independent registration:
 
