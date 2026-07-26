@@ -1,5 +1,28 @@
 # eventize — migration notes
 
+## v5 → v6: two silent behavior breaks
+
+Neither has a compile-time signal — both are runtime changes on signatures
+that don't change shape, so grep for the call patterns rather than relying
+on the type checker to find affected sites.
+
+- **Bulk `off()` now clears retained state.** `off(ε)`, `off(ε, '*')`, and
+  any array containing `'*'` (`off(ε, ['*', …])`) used to empty only the
+  listener registry, leaving retained values and retain policies intact. All
+  three now wipe the keeper too. Targeted forms — `off(ε, eventName)`,
+  `off(ε, [names])`, `off(ε, eventName, listenerObject)` — are unchanged.
+- **`once()` no longer deduplicates.** Two `once(ε, 'foo', listenerObject)`
+  calls on the same object used to collapse into one listener that then
+  fired on every subsequent emit and could not be released through its own
+  handles. Each `once()` now gets its own listener: two registrations mean
+  two firings, each releasing independently. `on()`'s reference-counted
+  dedup is unaffected.
+
+Worked before/after snippets for both, plus how to verify a migration with
+`getRetainedCount(ε)` / `getSubscriptionCount(ε)`, live in
+[`docs/lifecycle.md#migrating-from-v5`](../../../docs/lifecycle.md#migrating-from-v5)
+rather than being duplicated here.
+
 ## v4 → v5: `emit()` stopped throwing
 
 `emit()` and `emitAsync()` no longer throw `"object is not eventized"` on a non-eventized target. They duck-type instead:

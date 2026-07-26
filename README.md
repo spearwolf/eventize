@@ -12,6 +12,9 @@ A tiny, clever, and dependency-free library for synchronous event-driven program
 
 Written entirely in TypeScript and targeting modern `ES2022`, it offers a type-safe developer experience without sacrificing performance or adding bloat.
 
+Zero runtime dependencies, `sideEffects: false`, tree-shakeable. The ESM
+build is about 27.2 kB unminified.
+
 ### Features
 
 - 🚀 **Developer-Focused API**: Clean, modern, and functional.
@@ -40,7 +43,7 @@ This repo ships a quick-reference skill for AI coding assistants (Claude Code & 
 | --- | --- |
 | [`api-details.md`](./skills/using-eventize/references/api-details.md) | every `on()` / `off()` shape, per-event priorities, retain semantics in full |
 | [`typed-events.md`](./skills/using-eventize/references/typed-events.md) | generic event maps, the `EventMap` trap, symbol escape hatch |
-| [`migration.md`](./skills/using-eventize/references/migration.md) | v4 → v5 emit change, the v4.3 type-brand migration for classes |
+| [`migration.md`](./skills/using-eventize/references/migration.md) | v5 → v6 breaking changes, the v4 → v5 emit change, the v4.3 type-brand migration for classes |
 
 To use it, copy or symlink the folder into your agent's skills directory, e.g. for Claude Code:
 
@@ -57,7 +60,7 @@ The deep material behind the summaries below:
 - [Unsubscribing in depth](./docs/off.md) — every `off()` signature, the interaction with `retain()`, and reference counting
 - [Retained events in depth](./docs/retain.md) — `retain()`, `retainClear()`, `unretain()`, symbol names, and the wildcard bulk forms
 - [Typed event maps](./docs/typed-events.md) — generic event maps, the inject and class forms, symbol events as an escape hatch
-- [Lifecycle & cleanup](./docs/lifecycle.md) — what an emitter holds and what releases it
+- [Lifecycle & cleanup](./docs/lifecycle.md) — what an emitter holds and what releases it; upgrading from v5 → [migration notes](./docs/lifecycle.md#migrating-from-v5)
 
 ## 📖 Getting Started
 

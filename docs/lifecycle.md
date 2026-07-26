@@ -2,7 +2,7 @@
 
 [← back to README](../README.md)
 
-What an emitter holds, and what actually releases it — the two questions that matter once an app subscribes and unsubscribes for longer than a single test run. Every claim below has an assertion behind it in [`src/lifecycle.spec.ts`](../src/lifecycle.spec.ts). This describes the **v6.0.0** state, with two breaking changes against v5.2.0: `off(ε)` and `off(ε, '*')` now clear retained state as well as listeners, where they used to clear only the store, and `once()` no longer shares `on()`'s reference-counted de-duplication (`MEM-002`, described below).
+What an emitter holds, and what actually releases it — the two questions that matter once an app subscribes and unsubscribes for longer than a single test run. Every claim below has an assertion behind it somewhere in the spec suite — most in [`src/lifecycle.spec.ts`](../src/lifecycle.spec.ts), which exists specifically to state cleanup as executable assertions, with the rest in [`src/off.spec.ts`](../src/off.spec.ts) (the `off(ε, ['*', …])` wildcard-array row), [`src/once.spec.ts`](../src/once.spec.ts) (`once()` firing twice per registration) and [`src/retain.spec.ts`](../src/retain.spec.ts) (the double-replay of a retained value). This describes the **v6.0.0** state, with two breaking changes against v5.2.0: `off(ε)` and `off(ε, '*')` now clear retained state as well as listeners, where they used to clear only the store, and `once()` no longer shares `on()`'s reference-counted de-duplication (`MEM-002`, described below). Upgrading from v5? See [Migrating from v5](#migrating-from-v5) below.
 
 ## What an emitter holds
 
@@ -48,9 +48,85 @@ The row worth pausing on is `off(ε, eventName, listenerObject)`: it narrowly re
 > [!IMPORTANT]
 > **The bulk `off()` forms clear retained state as of v6.0.0.** Up to v5.2.0 the bare and wildcard forms only emptied the store: every retained value and every retain policy survived, so the call that reads as "reset the emitter" was precisely the one that pinned the payloads and still replayed them to the next subscriber. `off(ε)`, `off(ε, '*')` and `off(ε, ['*', …])` now wipe store and keeper together — the array form worst of all before, since it removed every listener but unretained only the names listed beside the `'*'`, leaving the rest pinned. Code that relied on retained values surviving a bulk `off(ε)` must re-`retain()` and re-`emit()`, or switch to the targeted `off(ε, eventName)` / `off(ε, [names])` forms, which are unchanged as long as no `'*'` appears in the array. The explicit `unretain(ε, '*')` after an `off(ε)` is now redundant, not wrong.
 >
-> **`off(ε, eventName, listenerObject)` unretaining the whole name is not scheduled to change.** Unlike the gap above, this branch has been unchanged since the 4.0.0 functional API; fixing it now would be a breaking change to a release that isn't one. Treat it as permanent, not as a bug to wait out.
+> **`off(ε, eventName, listenerObject)` unretaining the whole name was deliberately left off this release's break list.** Unlike the bulk forms above, this branch has been unchanged since the 4.0.0 functional API, and code may already depend on it — `off(ε, eventName, listenerObject)` reversing a `retain()` on that name is exactly what a caller reaches for when they mean "detach this listener and reset the event." Fixing it was not out of scope because it's impossible; it was left out because v6.0.0 already carries two behavior breaks and a third, narrower one goes on the next major's list instead of piling onto this one. Treat it as intentional, not overlooked.
 
 See [`docs/off.md`](./off.md) for the full signature reference and [`docs/retain.md`](./retain.md) for `retain()` itself.
+
+## Migrating from v5
+
+Two breaking changes, both closing memory-lifecycle gaps: the bulk `off()`
+forms now clear retained state, and `once()` no longer deduplicates. Neither
+has a compile-time signal — both are runtime behavior changes on signatures
+that don't change shape — so grep for the two patterns below rather than
+relying on the type checker to find call sites.
+
+### `off(ε)` now clears retained state
+
+```js
+// v5 — the retained value survived a bulk off()
+retain(ε, 'config');
+emit(ε, 'config', settings);
+off(ε);
+on(ε, 'config', fn); // fn received `settings` — replayed from the keeper
+
+// v6 — off(ε) clears everything, listeners and retained state alike
+retain(ε, 'config');
+emit(ε, 'config', settings);
+off(ε);
+on(ε, 'config', fn); // fn receives nothing — the keeper was wiped too
+
+// if you relied on the old behavior, re-retain and re-emit after the reset:
+retain(ε, 'config');
+emit(ε, 'config', settings);
+
+// or narrow the call to what you actually mean to remove — targeted forms
+// (off(ε, eventName), off(ε, [names])) are unchanged:
+off(ε, 'someOtherEvent');
+```
+
+The same applies to `off(ε, '*')` and any array form containing `'*'`
+(`off(ε, ['*', …])`) — all three take the same wildcard branch in the store
+and now take the matching branch in the keeper.
+
+### `once()` no longer deduplicates
+
+```js
+// v5 — two once() calls on the same listener object collapsed into one
+// listener that then never stopped firing (MEM-002)
+once(ε, 'ready', handlerObject);
+once(ε, 'ready', handlerObject);
+emit(ε, 'ready'); // one call — and the listener is still subscribed
+
+// v6 — two independent one-shot subscriptions
+once(ε, 'ready', handlerObject);
+once(ε, 'ready', handlerObject);
+emit(ε, 'ready'); // two calls — both detached afterward
+```
+
+If code registered the same listener object with `once()` more than once and
+expected a single call, it now receives one call per registration — either
+drop the duplicate `once()` call, or guard the handler itself against being
+invoked twice. `on()` is unaffected; its reference-counted de-duplication is
+unchanged.
+
+### Verifying a migration actually worked
+
+[`getRetainedCount(ε)`](#verifying-cleanup) and
+[`getSubscriptionCount(ε)`](#verifying-cleanup) read the two halves of an
+emitter's state without reaching into the internals. A migration that
+touched either breaking change is worth pinning with both, before and after
+the call in question:
+
+```js
+retain(ε, 'config');
+emit(ε, 'config', settings);
+on(ε, 'config', fn);
+
+off(ε);
+
+getSubscriptionCount(ε); // => 0 — always true, v5 and v6 alike
+getRetainedCount(ε); // => 0 in v6, would have been 1 in v5
+```
 
 ## Retain semantics
 
