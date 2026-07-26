@@ -200,7 +200,7 @@ emit(ε, 'test');
 
 ## Reference counting
 
-When the *same* listener-object subscription is registered more than once, eventize collapses the duplicates into a single entry carrying a reference count. Each `on()` increments it, each unsubscribe decrements it, and the listener is only really removed at zero.
+When the *same* listener-object subscription is registered more than once **through `on()`**, eventize collapses the duplicates into a single entry carrying a reference count. Each `on()` increments it, each unsubscribe decrements it, and the listener is only really removed at zero.
 
 ```javascript
 const ε = eventize();
@@ -219,7 +219,19 @@ emit(ε, 'foo'); // (nothing happens)
 ```
 
 > [!IMPORTANT]
-> Reference counting applies **only to listener-object forms** — `on(ε, eventName, listenerObject)` and `on(ε, eventName, 'methodName', listenerObject)`. Two subscriptions count as identical when event name, priority, listener object, and listener context all match.
+> Reference counting applies **only to listener-object forms of `on()`** — `on(ε, eventName, listenerObject)` and `on(ε, eventName, 'methodName', listenerObject)`. Two subscriptions count as identical when event name, priority, listener object, and listener context all match.
+
+> [!IMPORTANT]
+> **`once()` never deduplicates (since v6.0.0).** Every `once()` call registers its own listener, whatever is already subscribed:
+>
+> ```javascript
+> once(ε, 'foo', listener);
+> once(ε, 'foo', listener); // a SECOND one-shot subscription
+>
+> emit(ε, 'foo'); // => "foo" twice — then both are gone
+> ```
+>
+> Two one-shot subscriptions mean two firings, each returned handle releases exactly its own, and a `once()` registered next to an existing `on()` for the same listener object is independent of it. Up to v5.2.0 `once()` shared `on()`'s dedup, which produced a listener that fired on every emit and could only be removed with `off(ε, listenerObject)`.
 
 Function listeners behave differently — each `on()` is an independent registration:
 

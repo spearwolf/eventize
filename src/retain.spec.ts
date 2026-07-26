@@ -478,15 +478,13 @@ describe('retain()', () => {
       expect(listenerObject.b.calledWith('B')).toBe(true);
     });
 
-    // Pins today's semantics: once() collapses into the existing on()
-    // subscription, so the retained value is not replayed a second time.
-    // This case is a regression guard for CORR-001 — together with the first
-    // case in this block, it fails if registerEventListener replays
-    // unconditionally. The remaining cases are pins, not guards.
-    // When once() stops deduplicating (planned), these expectations become
-    // 2 calls and 2 subscriptions. A failure here reading "Expected: 1,
-    // Received: 2" is that change arriving, not a regression.
-    it('does not replay again when once() dedups against an existing on()', () => {
+    // once() is exempt from dedup (v6.0.0), so it never folds into the
+    // existing on() subscription: it gets its own listener, receives the
+    // replay on its own account, and detaches again in the same breath. The
+    // on() subscription is what remains. The CORR-001 guard against an
+    // unconditional replay lives in the first case of this block — this one
+    // pins that the exemption reaches the retained path too.
+    it('replays to a once() registered next to an existing on()', () => {
       const obj = eventize();
       const listenerObject = {foo: fake()};
 
@@ -497,7 +495,8 @@ describe('retain()', () => {
       expect(listenerObject.foo.callCount).toBe(1);
 
       once(obj, 'foo', listenerObject);
-      expect(listenerObject.foo.callCount).toBe(1);
+      expect(listenerObject.foo.callCount).toBe(2);
+      // the once() consumed itself on the replay; only the on() is left
       expect(getSubscriptionCount(obj)).toBe(1);
     });
 

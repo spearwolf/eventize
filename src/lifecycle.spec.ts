@@ -297,11 +297,7 @@ describe('lifecycle', () => {
   });
 
   describe('repeated once() on the same listener object', () => {
-    // MEM-002: two once() calls on the same listener object collapse into one
-    // EventListener with refCount = 2, and the surviving handle is blocked by
-    // its own idempotence guard. Fixed in v6.0.0 — task 24 flips this back to
-    // a normal `it`.
-    it.failing('does not degenerate into a permanent listener', () => {
+    it('does not degenerate into a permanent listener', () => {
       const obj = eventize();
       const listenerObject = {foo: fake()};
 

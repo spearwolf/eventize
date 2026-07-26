@@ -14,6 +14,7 @@ const registerEventListener = (
   listener: unknown,
   listenerObject: ListenerObjectType,
   retainedEvents: KeeperEvent[],
+  noDedup: boolean,
 ): EventListener => {
   const newListener = new EventListener(
     eventName,
@@ -21,7 +22,7 @@ const registerEventListener = (
     listener,
     listenerObject,
   );
-  const el = store.add(newListener);
+  const el = store.add(newListener, noDedup);
   // store.add() returns the argument when it inserted, or an existing similar
   // listener whose refCount it bumped. Replaying to the latter would deliver
   // the retained event a second time to a listener that already got it.
@@ -36,6 +37,7 @@ const _subscribeTo = (
   keeper: EventKeeper,
   args: EventArgs,
   retainedEvents: KeeperEvent[],
+  noDedup: boolean,
 ): EventListener | Array<EventListener> => {
   const len = args.length;
   const typeOfFirstArg = typeof args[0];
@@ -80,6 +82,7 @@ const _subscribeTo = (
       listener,
       listenerObject,
       retainedEvents,
+      noDedup,
     );
 
   if (Array.isArray(eventName)) {
@@ -105,9 +108,10 @@ export const subscribeTo = (
   store: EventStore,
   keeper: EventKeeper,
   args: EventArgs,
+  noDedup = false,
 ): EventListener | Array<EventListener> => {
   const retainedEvents: KeeperEvent[] = [];
-  const listener = _subscribeTo(store, keeper, args, retainedEvents);
+  const listener = _subscribeTo(store, keeper, args, retainedEvents, noDedup);
   EventKeeper.publish(retainedEvents);
   return listener;
 };
@@ -116,12 +120,13 @@ export const subscribeToDeferred = (
   store: EventStore,
   keeper: EventKeeper,
   args: EventArgs,
+  noDedup = false,
 ): {
   listeners: EventListener | Array<EventListener>;
   publishRetained: () => void;
 } => {
   const retainedEvents: KeeperEvent[] = [];
-  const listeners = _subscribeTo(store, keeper, args, retainedEvents);
+  const listeners = _subscribeTo(store, keeper, args, retainedEvents, noDedup);
   return {
     listeners,
     publishRetained: () => EventKeeper.publish(retainedEvents),

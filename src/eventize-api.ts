@@ -392,7 +392,15 @@ export function once<T extends object>(
 export function once(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
   const eventizedObj = asEventized(obj);
   const {store, keeper} = eventizedObj[NAMESPACE];
-  const {listeners, publishRetained} = subscribeToDeferred(store, keeper, args);
+  // noDedup: each once() gets its own listener instance. Folding two one-shot
+  // subscriptions into one refCounted listener left the second callAfterApply
+  // overwriting the first, and the surviving handle could never release it.
+  const {listeners, publishRetained} = subscribeToDeferred(
+    store,
+    keeper,
+    args,
+    true,
+  );
   const unsubscribeFn = makeUnsubscribe(eventizedObj, listeners);
   let unsubscribeCalled = false;
   const unsubscribe = () => {

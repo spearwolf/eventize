@@ -212,4 +212,96 @@ describe('once()', () => {
       expect(listener.callCount).toBe(0);
     });
   });
+
+  describe('no dedup between once() registrations', () => {
+    it('two once() on the same listener object fire twice, then detach', () => {
+      const obj = eventize();
+      const listenerObject = {foo: fake()};
+
+      once(obj, 'foo', listenerObject);
+      once(obj, 'foo', listenerObject);
+      expect(getSubscriptionCount(obj)).toBe(2);
+
+      emit(obj, 'foo', 'first');
+
+      expect(listenerObject.foo.callCount).toBe(2);
+      expect(getSubscriptionCount(obj)).toBe(0);
+
+      emit(obj, 'foo', 'second');
+      expect(listenerObject.foo.callCount).toBe(2);
+    });
+
+    it('the same holds for the method-name form', () => {
+      const obj = eventize();
+      const listenerObject = {handler: fake()};
+
+      once(obj, 'foo', 'handler', listenerObject);
+      once(obj, 'foo', 'handler', listenerObject);
+      expect(getSubscriptionCount(obj)).toBe(2);
+
+      emit(obj, 'foo');
+
+      expect(listenerObject.handler.callCount).toBe(2);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('each returned handle releases its own subscription', () => {
+      const obj = eventize();
+      const listenerObject = {foo: fake()};
+
+      const first = once(obj, 'foo', listenerObject);
+      const second = once(obj, 'foo', listenerObject);
+
+      first();
+      expect(getSubscriptionCount(obj)).toBe(1);
+
+      second();
+      expect(getSubscriptionCount(obj)).toBe(0);
+
+      emit(obj, 'foo');
+      expect(listenerObject.foo.callCount).toBe(0);
+    });
+
+    it('on() still deduplicates', () => {
+      const obj = eventize();
+      const listenerObject = {foo: fake()};
+
+      on(obj, 'foo', listenerObject);
+      on(obj, 'foo', listenerObject);
+
+      expect(getSubscriptionCount(obj)).toBe(1);
+      emit(obj, 'foo');
+      expect(listenerObject.foo.callCount).toBe(1);
+    });
+
+    it('a once() and an on() on the same object stay independent', () => {
+      const obj = eventize();
+      const listenerObject = {foo: fake()};
+
+      on(obj, 'foo', listenerObject);
+      once(obj, 'foo', listenerObject);
+      expect(getSubscriptionCount(obj)).toBe(2);
+
+      emit(obj, 'foo');
+      expect(listenerObject.foo.callCount).toBe(2);
+      expect(getSubscriptionCount(obj)).toBe(1);
+
+      emit(obj, 'foo');
+      expect(listenerObject.foo.callCount).toBe(3);
+    });
+
+    it('two once() on a retained event both receive the replay', () => {
+      const obj = eventize();
+      const listenerObject = {foo: fake()};
+
+      retain(obj, 'foo');
+      emit(obj, 'foo', 'RETAINED');
+
+      once(obj, 'foo', listenerObject);
+      once(obj, 'foo', listenerObject);
+
+      expect(listenerObject.foo.callCount).toBe(2);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+  });
 });

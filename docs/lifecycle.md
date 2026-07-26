@@ -2,7 +2,7 @@
 
 [← back to README](../README.md)
 
-What an emitter holds, and what actually releases it — the two questions that matter once an app subscribes and unsubscribes for longer than a single test run. Every claim below has an assertion behind it in [`src/lifecycle.spec.ts`](../src/lifecycle.spec.ts). This describes the **v6.0.0** state, in which `off(ε)` and `off(ε, '*')` clear retained state as well as listeners — a breaking change against v5.2.0, where they cleared only the store. One gap remains open and is called out below: `MEM-002`.
+What an emitter holds, and what actually releases it — the two questions that matter once an app subscribes and unsubscribes for longer than a single test run. Every claim below has an assertion behind it in [`src/lifecycle.spec.ts`](../src/lifecycle.spec.ts). This describes the **v6.0.0** state, with two breaking changes against v5.2.0: `off(ε)` and `off(ε, '*')` now clear retained state as well as listeners, where they used to clear only the store, and `once()` no longer shares `on()`'s reference-counted de-duplication (`MEM-002`, described below).
 
 ## What an emitter holds
 
@@ -105,7 +105,7 @@ subs.forEach((unsubscribe) => unsubscribe());
 A handle that is never called keeps its listener (and, transitively, whatever the listener closes over) alive for as long as the emitter itself is reachable — the array in the example above is exactly as leaky as any other array of live references if `forEach` is never run.
 
 > [!NOTE]
-> **"Calling a handle releases its references" is qualified by reference counting.** Two `on()` calls for the same `(eventName, priority, listener, context)` share one `EventListener` with `refCount = 2` (see [`docs/off.md` → Reference counting](./off.md#reference-counting)). The *first* handle's `.listener()` call only decrements the count — it does not detach, and does not null the listener reference, until the *last* outstanding handle for that shared listener calls back too:
+> **"Calling a handle releases its references" is qualified by reference counting — for `on()`.** Two `on()` calls for the same `(eventName, priority, listener, context)` share one `EventListener` with `refCount = 2` (see [`docs/off.md` → Reference counting](./off.md#reference-counting)); `once()` is exempt and always registers its own. The *first* handle's `.listener()` call only decrements the count — it does not detach, and does not null the listener reference, until the *last* outstanding handle for that shared listener calls back too:
 >
 > ```javascript
 > const h1 = on(ε, 'foo', service); // shared EventListener, refCount = 1
@@ -119,8 +119,8 @@ A handle that is never called keeps its listener (and, transitively, whatever th
 >
 > Holding on to `h1` after calling it, expecting it to have released `service`, is a retention window in exactly the pattern the "consumed handle" claim above is meant to rule out. If a listener object may be subscribed more than once, only the *last* handle's callback marks the true release point.
 
-> [!WARNING]
-> **Known gap, fixed in v6.0.0:** calling `once()` twice for the same event name on the *same* listener object does not create two independent one-shot subscriptions. `once()` shares the de-duplication `on()` uses for listener objects — the second call bumps the first listener's reference count instead of registering separately — but the auto-unsubscribe hook only accounts for a single firing. The result is one listener that survives every `emit()` indefinitely, never reaching refCount zero. `src/lifecycle.spec.ts` carries this as an `it.failing` tripwire (`MEM-002`) rather than a passing case, specifically so it stays visible until fixed. Until then, don't call `once()` more than once for the same `(eventName, listenerObject)` pair — use one `once()` call, or switch to `on()` with a manual unsubscribe.
+> [!NOTE]
+> **`once()` is exempt from de-duplication (since v6.0.0).** Calling `once()` twice for the same event name on the same listener object creates two independent one-shot subscriptions: two firings on the first `emit()`, two retained-value replays if the event is retained, and two handles that each release exactly their own listener. Up to v5.2.0 the second call bumped the first listener's reference count instead, while the auto-unsubscribe hook accounted for a single firing — one emit took the count from 2 to 1 and the surviving handle's idempotence guard stopped it ever reaching 0. That listener fired on every subsequent `emit()` and could only be removed with an external `off(ε, listenerObject)` (`MEM-002`). If you upgrade from v5.x and relied on two `once()` calls collapsing into one, use a single `once()`.
 
 ## `onceAsync` and cancellation
 

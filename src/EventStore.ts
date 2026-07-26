@@ -156,16 +156,23 @@ export class EventStore {
   }
 
   /**
-   * Returns the given listener (newListener), or if there is already a similar listener in the store,
-   * the existing one with increased reference count (refCount)
+   * Returns the given listener, or — when an identical one is already
+   * registered and `noDedup` is false — the existing one with its reference
+   * count increased.
+   *
+   * `once()` passes `noDedup: true`: two one-shot subscriptions mean two
+   * firings, and collapsing them leaves a listener whose own idempotence
+   * guard blocks its handles from ever releasing it.
    */
-  add(listener: EventListener): EventListener {
-    return insertOrFindSimilarListener(
-      listener,
-      listener.isCatchEmAll
-        ? this.catchEmAllListeners
-        : this.getListenersForEventName(listener.eventName),
-    );
+  add(listener: EventListener, noDedup = false): EventListener {
+    const bucket = listener.isCatchEmAll
+      ? this.catchEmAllListeners
+      : this.getListenersForEventName(listener.eventName);
+    if (noDedup) {
+      bucket.splice(findInsertIndex(bucket, listener), 0, listener);
+      return listener;
+    }
+    return insertOrFindSimilarListener(listener, bucket);
   }
 
   remove(

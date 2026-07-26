@@ -10,13 +10,16 @@ describe('on() multiple times', () => {
 
     const unsubscribe0 = on(obj, 'foo', obj);
     const unsubscribe1 = on(obj, 'foo', obj);
+    // once() is exempt from dedup (v6.0.0): it does not join the refCount of
+    // the two on() calls but adds a second, independent subscription.
     once(obj, 'foo', obj);
 
-    expect(getSubscriptionCount(obj)).toBe(1);
+    expect(getSubscriptionCount(obj)).toBe(2);
 
     emit(obj, 'foo');
 
-    expect(obj.foo.callCount).toBe(1);
+    // once per subscription: the deduplicated on() pair, and the once()
+    expect(obj.foo.callCount).toBe(2);
     expect(getSubscriptionCount(obj)).toBe(1);
 
     unsubscribe0();
@@ -43,11 +46,12 @@ describe('on() multiple times', () => {
 
     const unsubscribe0 = on(obj, 'bar', 'foo', obj);
     const unsubscribe1 = on(obj, 'bar', 'foo', obj);
+    // not deduplicated against the on() pair — its own subscription
     once(obj, 'bar', 'foo', obj);
 
     emit(obj, 'bar');
 
-    expect(obj.foo.callCount).toBe(1);
+    expect(obj.foo.callCount).toBe(2);
 
     unsubscribe0();
     obj.foo.resetHistory();
@@ -88,11 +92,12 @@ describe('on() multiple times', () => {
 
     const unsubscribe0 = on(obj, obj);
     const unsubscribe1 = on(obj, obj);
+    // not deduplicated against the on() pair — its own subscription
     once(obj, obj);
 
     emit(obj, 'foo');
 
-    expect(obj.foo.callCount).toBe(1);
+    expect(obj.foo.callCount).toBe(2);
 
     unsubscribe0();
     obj.foo.resetHistory();

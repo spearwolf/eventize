@@ -246,6 +246,27 @@ describe('EventStore', () => {
       expect(store.getSubscriptionCount()).toBe(1);
     });
 
+    it('inserts instead of deduplicating when noDedup is set', () => {
+      const store = new EventStore();
+      const listenerObject = {};
+      const first = store.add(new EventListener('foo', 0, listenerObject));
+      // what once() passes: a similar listener is present, and it is ignored
+      const second = store.add(
+        new EventListener('foo', 0, listenerObject),
+        true,
+      );
+
+      expect(second).not.toBe(first);
+      expect(first.refCount).toBe(1);
+      expect(second.refCount).toBe(1);
+      expect(store.getSubscriptionCount()).toBe(2);
+
+      store.remove(second, null);
+      expect(store.getSubscriptionCount()).toBe(1);
+      store.remove(first, null);
+      expect(store.getSubscriptionCount()).toBe(0);
+    });
+
     it('honours refCount before removing anything', () => {
       const store = new EventStore();
       const listenerObject = {};

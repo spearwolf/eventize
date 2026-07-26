@@ -420,7 +420,7 @@ emit(ε, 'onSave', {user: 'test'}); // => "Saving: { user: 'test' }"
 emit(ε, 'onDelete', 123); // => "Deleting: 123"
 ```
 
-Subscribing the **same listener-object** twice for the same event does _not_ register two listeners — eventize collapses the second call into the existing entry and increments an internal reference count, so the listener still fires once per `emit()`:
+Subscribing the **same listener-object** twice for the same event with `on()` does _not_ register two listeners — eventize collapses the second call into the existing entry and increments an internal reference count, so the listener still fires once per `emit()`:
 
 ```javascript
 const listener = {foo: () => console.log('foo')};
@@ -432,7 +432,7 @@ emit(ε, 'foo'); // => "foo"  (called once, not twice)
 ```
 
 > [!IMPORTANT]
-> De-duplication applies **only to listener-object forms**. Plain function listeners are **not** deduplicated: registering the same function twice produces two independent listeners that will both run. See [_Reference counting_](./docs/off.md#reference-counting) for details.
+> De-duplication applies **only to listener-object forms of `on()`**. Plain function listeners are **not** deduplicated: registering the same function twice produces two independent listeners that will both run. Neither is `once()` — since v6.0.0 every `once()` call registers its own listener, so two one-shot subscriptions mean two firings. See [_Reference counting_](./docs/off.md#reference-counting) for details.
 
 ---
 
@@ -449,6 +449,9 @@ emit(ε, 'my-event'); // (nothing happens)
 
 > [!NOTE]
 > With multiple event names, the listener is removed after the _first_ of those events fires.
+
+> [!NOTE]
+> `once()` does **not** de-duplicate (since v6.0.0). Two `once(ε, 'foo', listenerObject)` calls are two independent one-shot subscriptions: the next `emit()` calls the listener twice and removes both. `on()`'s [reference counting](./docs/off.md#reference-counting) is unaffected.
 
 #### `onceAsync(emitter, eventName | eventName[], options?)`
 
