@@ -2697,6 +2697,10 @@ Do **not** push or publish. Report to the user that the release is staged and aw
 
 No user-facing change. Ships with v6.0.0.
 
+**Release latitude, granted 2026-07-26.** v5.2.0 is tagged and its content is settled, but it is not a constraint on what follows. If work in this phase or the next uncovers a defect whose honest fix changes behaviour, fix it — do not defer it, do not water it down to preserve a non-breaking story. Everything from here lands in v6.0.0, which is a major precisely so it can absorb that. The one thing that stays forbidden is a silent behaviour change: every one gets a `CHANGELOG.md` entry under `## Unreleased` marked **BREAKING**, with migration notes.
+
+This matters most for `strictNullChecks` below. The flag exists to surface nullability the code was lying about, and some of what it surfaces will be real defects rather than type noise. Those are the point of the exercise, not a distraction from it.
+
 ## Task 19: `strictNullChecks: true`
 
 **Model:** Opus
