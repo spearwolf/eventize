@@ -1,9 +1,10 @@
+import {defineConfig} from 'eslint/config';
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import eslintConfigPrettier from 'eslint-config-prettier/flat';
 import globals from 'globals';
 
-export default tseslint.config(
+export default defineConfig(
   {
     ignores: ['.vscode/*', '**/lib', '**/build', '**/node_modules'],
   },
