@@ -1,1253 +1,638 @@
-<title>Project Audit — @spearwolf/eventize</title>
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit — @spearwolf/eventize</title>
 <style>
-  :root {
-    --bg: #fafaf9;
-    --surface: #ffffff;
-    --surface-2: #f5f5f4;
-    --text: #1c1917;
-    --text-2: #57534e;
-    --text-3: #8a8580;
-    --line: #e7e5e4;
-    --line-2: #d6d3d1;
-    --accent: #4f46e5;
-    --accent-soft: #eef2ff;
-    --critical: #b91c1c;
-    --high: #c2410c;
-    --medium: #b45309;
-    --low: #1d4ed8;
-    --info: #6b7280;
-    --ok: #15803d;
-    --radius: 10px;
+  :root{
+    --bg:#fafaf9; --surface:#ffffff; --surface-2:#f5f5f4;
+    --text:#1c1917; --text-2:#57534e; --text-3:#8b8683;
+    --border:#e7e5e4; --border-2:#d6d3d1;
+    --accent:#4f46e5; --accent-soft:#eef2ff;
+    --critical:#dc2626; --high:#ea580c; --medium:#d97706; --low:#2563eb; --info:#78716c;
+    --good:#15803d;
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: ui-sans-serif, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
-    line-height: 1.65;
-    font-size: 15px;
-    -webkit-font-smoothing: antialiased;
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:ui-sans-serif,-apple-system,"Segoe UI",Inter,Roboto,sans-serif;
+    line-height:1.65; font-size:16px;
   }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
-  code {
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-    font-size: 0.87em;
-    background: var(--surface-2);
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    padding: 0.08em 0.34em;
-    word-break: break-word;
+  .wrap{max-width:1080px; margin:0 auto; padding:48px 24px 96px}
+  h1,h2,h3{font-weight:600; line-height:1.25; margin:0}
+  h1{font-size:2rem; letter-spacing:-.02em}
+  h2{font-size:1.4rem; margin:64px 0 20px; letter-spacing:-.01em}
+  h3{font-size:1.05rem; margin:32px 0 10px}
+  p{margin:0 0 14px}
+  a{color:var(--accent)}
+  code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.87em; background:var(--surface-2); border:1px solid var(--border);
+    border-radius:4px; padding:.1em .35em;
   }
-  h1 { font-size: 1.85rem; font-weight: 600; margin: 0 0 0.4rem; letter-spacing: -0.01em; }
-  h2 {
-    font-size: 1.2rem; font-weight: 600; margin: 3.2rem 0 1rem;
-    padding-bottom: 0.5rem; border-bottom: 1px solid var(--line);
-    letter-spacing: -0.005em;
-  }
-  h3 { font-size: 1rem; font-weight: 600; margin: 1.8rem 0 0.6rem; }
-  h4 { font-size: 0.74rem; font-weight: 600; margin: 0 0 0.35rem;
-       text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-3); }
-  p { margin: 0 0 0.9rem; }
-  a { color: var(--accent); }
 
-  /* header */
-  header { border-bottom: 1px solid var(--line); padding-bottom: 2rem; }
-  .sub { color: var(--text-2); margin: 0 0 1.2rem; }
-  .badges { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 1.6rem; }
-  .chip {
-    font-size: 0.76rem; color: var(--text-2); background: var(--surface);
-    border: 1px solid var(--line-2); border-radius: 999px; padding: 0.18rem 0.62rem;
+  header{border-bottom:1px solid var(--border); padding-bottom:28px}
+  .sub{color:var(--text-2); margin:6px 0 18px}
+  .badges{display:flex; flex-wrap:wrap; gap:7px; margin-bottom:24px}
+  .badge{
+    font-size:.78rem; background:var(--surface); border:1px solid var(--border-2);
+    border-radius:99px; padding:3px 11px; color:var(--text-2);
   }
-  .headgrid { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: stretch; }
-  .score-card {
-    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 1.1rem 1.5rem; min-width: 190px; text-align: center;
+  .scorebar{display:flex; align-items:center; gap:26px; flex-wrap:wrap}
+  .score{display:flex; align-items:baseline; gap:10px}
+  .score .n{font-size:3.2rem; font-weight:600; letter-spacing:-.03em; line-height:1}
+  .score .of{color:var(--text-3); font-size:1rem}
+  .trend{font-size:.95rem; color:var(--good); font-weight:600}
+  .trend .ctx{color:var(--text-2); font-weight:400}
+  .diffline{
+    margin-top:18px; padding:12px 16px; background:var(--accent-soft);
+    border:1px solid #c7d2fe; border-radius:8px; font-size:.92rem; color:#3730a3;
   }
-  .score-value { font-size: 2.7rem; font-weight: 600; line-height: 1.05; letter-spacing: -0.02em; }
-  .score-label { font-size: 0.74rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.08em; }
-  .delta-card {
-    flex: 1 1 380px; background: var(--surface); border: 1px solid var(--line);
-    border-radius: var(--radius); padding: 1.1rem 1.3rem;
-  }
-  .delta-line { font-size: 0.95rem; margin-bottom: 0.35rem; }
-  .delta-num { font-weight: 600; color: var(--medium); }
-  .delta-note { color: var(--text-2); font-size: 0.87rem; }
-  .delta-counts { margin-top: 0.6rem; font-size: 0.87rem; color: var(--text-2); }
-  .delta-counts strong { color: var(--text); font-weight: 600; }
 
-  /* portrait */
-  .domains { display: grid; grid-template-columns: repeat(auto-fill, minmax(288px, 1fr)); gap: 0.85rem; }
-  .domain {
-    background: var(--surface); border: 1px solid var(--line);
-    border-radius: var(--radius); padding: 0.9rem 1.05rem;
-  }
-  .domain h3 { margin: 0 0 0.3rem; font-size: 0.95rem; }
-  .domain p { margin: 0 0 0.6rem; font-size: 0.88rem; color: var(--text-2); line-height: 1.55; }
-  .paths { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-  .path { font-size: 0.72rem; }
-  figure { margin: 1.6rem 0 0; }
-  figure svg { display: block; width: 100%; height: auto; max-width: 780px; margin: 0 auto; }
-  figcaption { font-size: 0.83rem; color: var(--text-2); margin-top: 0.7rem; text-align: center; }
-  .diagram-scroll { overflow-x: auto; }
+  .panel{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:22px 24px}
+  .grid{display:grid; gap:14px}
+  @media(min-width:720px){ .grid.cols2{grid-template-columns:1fr 1fr} }
 
-  /* charts */
-  .panel {
-    background: var(--surface); border: 1px solid var(--line);
-    border-radius: var(--radius); padding: 1.2rem 1.4rem;
+  .domain{background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px 18px}
+  .domain h3{margin:0 0 6px; font-size:.98rem}
+  .domain p{margin:0 0 10px; font-size:.9rem; color:var(--text-2)}
+  .chips{display:flex; flex-wrap:wrap; gap:6px}
+  .chip{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.74rem; background:var(--surface-2); border:1px solid var(--border);
+    border-radius:5px; padding:2px 7px; color:var(--text-2);
   }
-  .sevrow, .catrow { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.55rem; }
-  .sevname { min-width: 74px; text-align: center; }
-  .catname { min-width: 220px; font-size: 0.87rem; color: var(--text-2); }
-  .bartrack { flex: 1; height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
-  .bar { height: 100%; border-radius: 999px; }
-  .bar-critical { background: var(--critical); }
-  .bar-high { background: var(--high); }
-  .bar-medium { background: var(--medium); }
-  .bar-low { background: var(--low); }
-  .bar-info { background: var(--info); }
-  .bar-cat { background: var(--accent); opacity: 0.75; }
-  .sevnum { min-width: 24px; text-align: right; font-variant-numeric: tabular-nums;
-            font-size: 0.87rem; color: var(--text-2); }
 
-  /* severity pills */
-  .sev {
-    display: inline-block; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.03em;
-    padding: 0.1rem 0.5rem; border-radius: 999px; border: 1px solid currentColor;
-    white-space: nowrap;
-  }
-  .sev-critical { color: var(--critical); }
-  .sev-high { color: var(--high); }
-  .sev-medium { color: var(--medium); }
-  .sev-low { color: var(--low); }
-  .sev-info { color: var(--info); }
+  .sev-row{display:flex; align-items:center; gap:14px; margin-bottom:10px}
+  .sev-label{width:82px; font-size:.88rem; font-weight:600; flex:none}
+  .sev-track{flex:1; height:11px; background:var(--surface-2); border-radius:99px; overflow:hidden}
+  .sev-fill{height:100%; border-radius:99px}
+  .sev-n{width:28px; text-align:right; font-variant-numeric:tabular-nums; font-size:.9rem; color:var(--text-2); flex:none}
+  .c-critical{color:var(--critical)} .b-critical{background:var(--critical)}
+  .c-high{color:var(--high)} .b-high{background:var(--high)}
+  .c-medium{color:var(--medium)} .b-medium{background:var(--medium)}
+  .c-low{color:var(--low)} .b-low{background:var(--low)}
+  .c-info{color:var(--info)} .b-info{background:var(--info)}
 
-  .badge {
-    display: inline-block; margin-left: 0.5rem; font-size: 0.64rem; font-weight: 600;
-    letter-spacing: 0.05em; text-transform: uppercase; padding: 0.06rem 0.4rem;
-    border-radius: 4px; vertical-align: 1px; white-space: nowrap;
-  }
-  .badge-new { background: var(--accent-soft); color: var(--accent); }
-  .badge-unchanged { background: var(--surface-2); color: var(--text-2); }
-  .badge-improved { background: #dcfce7; color: var(--ok); }
-  .badge-carried-over { background: var(--surface-2); color: var(--text-3); }
+  .cat{display:flex; justify-content:space-between; gap:12px; padding:8px 0; border-bottom:1px solid var(--border); font-size:.92rem}
+  .cat:last-child{border-bottom:0}
+  .cat span:last-child{color:var(--text-2); font-variant-numeric:tabular-nums}
 
-  /* filters + table */
-  .filters { display: flex; flex-wrap: wrap; gap: 1.2rem; align-items: center; margin: 0 0 1rem; }
-  .fgroup { display: flex; align-items: center; gap: 0.5rem; font-size: 0.83rem; color: var(--text-2); }
-  select {
-    font: inherit; font-size: 0.85rem; color: var(--text); background: var(--surface);
-    border: 1px solid var(--line-2); border-radius: 6px; padding: 0.28rem 0.5rem;
+  .filters{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; align-items:center}
+  .filters .lbl{font-size:.8rem; color:var(--text-3); margin-right:2px}
+  button.f{
+    font:inherit; font-size:.82rem; cursor:pointer; background:var(--surface);
+    border:1px solid var(--border-2); border-radius:99px; padding:4px 12px; color:var(--text-2);
   }
-  .count { margin-left: auto; font-size: 0.83rem; color: var(--text-3); }
-  .tablewrap { overflow-x: auto; border: 1px solid var(--line);
-               border-radius: var(--radius); background: var(--surface); }
-  table { border-collapse: collapse; width: 100%; min-width: 780px; }
-  thead th {
-    text-align: left; font-size: 0.71rem; font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.07em; color: var(--text-3); padding: 0.7rem 0.85rem;
-    border-bottom: 1px solid var(--line); background: var(--surface-2);
-    position: sticky; top: 0;
+  button.f:hover{border-color:var(--accent); color:var(--accent)}
+  button.f[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
+  select.f{
+    font:inherit; font-size:.82rem; background:var(--surface); color:var(--text-2);
+    border:1px solid var(--border-2); border-radius:99px; padding:4px 10px;
   }
-  tbody td { padding: 0.65rem 0.85rem; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 0.88rem; }
-  tr.row { cursor: pointer; }
-  tr.row:hover td { background: var(--surface-2); }
-  tr.row:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
-  tr.row.open td { background: var(--accent-soft); }
-  .c-id { white-space: nowrap; }
-  .c-cat { color: var(--text-2); font-size: 0.82rem; white-space: nowrap; }
-  .c-title { min-width: 260px; }
-  .c-loc { font-size: 0.78rem; max-width: 260px; }
-  .c-eff { text-align: center; color: var(--text-2); font-variant-numeric: tabular-nums; }
-  tr.detail td { background: var(--surface-2); padding: 0; }
-  .detail-inner {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
-    gap: 1.4rem; padding: 1.1rem 1.3rem 1.3rem;
-  }
-  .d-block p { margin: 0; font-size: 0.88rem; color: var(--text-2); line-height: 1.62; }
-  .empty { padding: 2rem; text-align: center; color: var(--text-3); font-size: 0.9rem; }
 
-  /* generic lists */
-  ul.clean { margin: 0 0 1rem; padding-left: 1.15rem; }
-  ul.clean li { margin-bottom: 0.5rem; }
-  .method-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.2rem; }
-  .formula {
-    background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px;
-    padding: 0.7rem 0.9rem; font-family: ui-monospace, Menlo, Consolas, monospace;
-    font-size: 0.82rem; color: var(--text-2); overflow-x: auto; white-space: pre;
+  .tablewrap{overflow-x:auto; background:var(--surface); border:1px solid var(--border); border-radius:10px}
+  table{border-collapse:collapse; width:100%; min-width:660px}
+  th{
+    text-align:left; font-size:.74rem; text-transform:uppercase; letter-spacing:.06em;
+    color:var(--text-3); font-weight:600; padding:12px 16px; border-bottom:1px solid var(--border);
+    background:var(--surface-2); white-space:nowrap;
   }
-  footer { margin-top: 3.5rem; padding-top: 1.2rem; border-top: 1px solid var(--line);
-           font-size: 0.8rem; color: var(--text-3); }
-  @media (max-width: 620px) {
-    .catname { min-width: 130px; }
-    .wrap { padding: 2rem 1rem 3rem; }
+  td{padding:12px 16px; border-bottom:1px solid var(--border); vertical-align:top; font-size:.92rem}
+  tr.row{cursor:pointer}
+  tr.row:hover{background:var(--surface-2)}
+  .id{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.8rem; color:var(--text-3); white-space:nowrap}
+  .pill{
+    display:inline-block; font-size:.72rem; font-weight:600; text-transform:uppercase;
+    letter-spacing:.04em; border-radius:5px; padding:2px 8px; white-space:nowrap;
   }
+  .p-critical{background:#fee2e2; color:#991b1b}
+  .p-high{background:#ffedd5; color:#9a3412}
+  .p-medium{background:#fef3c7; color:#92400e}
+  .p-low{background:#dbeafe; color:#1e40af}
+  .p-info{background:#f5f5f4; color:#57534e}
+  .status{
+    display:inline-block; font-size:.68rem; font-weight:600; border-radius:99px;
+    padding:1px 8px; margin-left:8px; vertical-align:middle; white-space:nowrap;
+  }
+  .s-new{background:var(--accent-soft); color:#3730a3; border:1px solid #c7d2fe}
+  .s-carried-over{background:var(--surface-2); color:var(--text-3); border:1px solid var(--border-2)}
+  .s-unchanged{background:var(--surface-2); color:var(--text-2); border:1px solid var(--border-2)}
+  .s-improved{background:#dcfce7; color:#166534; border:1px solid #bbf7d0}
+  .loc{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.78rem; color:var(--text-2); word-break:break-all}
+  .eff{font-variant-numeric:tabular-nums; color:var(--text-2); text-align:center}
+  tr.detail td{background:var(--surface-2)}
+  tr.detail .dd{max-width:820px}
+  tr.detail h4{margin:0 0 4px; font-size:.76rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-3); font-weight:600}
+  tr.detail p{margin:0 0 16px; font-size:.92rem}
+  tr.detail p:last-child{margin-bottom:0}
+  .empty{padding:28px 16px; text-align:center; color:var(--text-3); font-size:.9rem}
+
+  ul{margin:0 0 14px; padding-left:22px}
+  li{margin-bottom:8px}
+  .meta dt{font-size:.76rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-3); font-weight:600; margin-top:16px}
+  .meta dt:first-child{margin-top:0}
+  .meta dd{margin:4px 0 0; font-size:.92rem; color:var(--text-2)}
+  figure{margin:0}
+  figcaption{font-size:.82rem; color:var(--text-3); margin-top:8px; text-align:center}
+  .formula{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.84rem;
+    background:var(--surface-2); border:1px solid var(--border); border-radius:8px;
+    padding:12px 16px; overflow-x:auto; white-space:pre; color:var(--text-2);
+  }
+  footer{margin-top:72px; padding-top:22px; border-top:1px solid var(--border); font-size:.82rem; color:var(--text-3)}
 </style>
-
+</head>
+<body>
 <div class="wrap">
+
 <header>
-  <h1>Project Audit — @spearwolf/eventize</h1>
-  <p class="sub">v5.1.0 · Stand 2026-07-25 · Schwerpunkt dieses Laufs: Memory Leaks &amp; Ressourcen-Lebenszyklus</p>
+  <h1>@spearwolf/eventize</h1>
+  <p class="sub">Projekt-Audit · 26. Juli 2026 · Version 6.0.0</p>
   <div class="badges">
-    <span class="chip">TypeScript 5.9</span>
-    <span class="chip">ESM + CJS (tsup)</span>
-    <span class="chip">Jest 30 / ts-jest</span>
-    <span class="chip">ESLint 9 flat</span>
-    <span class="chip">Node ≥ 18.16</span>
-    <span class="chip">0 runtime deps</span>
+    <span class="badge">TypeScript 5.9 (auf &lt;7 gepinnt)</span>
+    <span class="badge">ESM + CJS via tsup</span>
+    <span class="badge">Jest 30 / ts-jest</span>
+    <span class="badge">ESLint 10 flat</span>
+    <span class="badge">Node ≥ 18.16</span>
+    <span class="badge">0 Runtime-Dependencies</span>
+    <span class="badge">≈2.200 LOC Quelltext · ≈5.800 LOC Specs</span>
   </div>
-  <div class="headgrid">
-    <div class="score-card">
-      <div class="score-value">39,5</div>
-      <div class="score-label">Health Score</div>
+  <div class="scorebar">
+    <div class="score">
+      <span class="n">80,5</span><span class="of">/ 100</span>
     </div>
-    <div class="delta-card">
-      <div class="delta-line">
-        <span class="delta-num">▼ −46</span>
-        gegenüber 85,5 vom 2026-05-14
-        <span class="delta-note">(Prüftiefe, nicht Codeverfall)</span>
-      </div>
-      <div class="delta-counts">
-        <strong>1</strong> behoben ·
-        <strong>0</strong> verbessert ·
-        <strong>20</strong> neu ·
-        <strong>15</strong> unverändert
-        seit 2026-05-14
-      </div>
-      <div class="delta-counts">
-        Der Vorlauf arbeitete rein statisch. Dieser Lauf hat den Build zusätzlich mit
-        rund 30 Laufzeit-Sonden vermessen — sieben der zehn schwersten Befunde
-        stammen daraus und waren im Quelltext nicht sichtbar.
-      </div>
-    </div>
+    <div class="trend">▲ +41,0 <span class="ctx">(vorher 39,5 am 25.07.2026) — überwiegend Codefortschritt, teils andere Prüftiefe</span></div>
+  </div>
+  <div class="diffline">
+    <strong>33 Findings behoben</strong> · 0 verbessert · <strong>12 neu</strong> · 2 unverändert übernommen — seit dem Audit vom 25.07.2026.
+    Behobene Punkte erscheinen bewusst nur als Zähler; die Details liefert der git-Verlauf dieser Datei.
   </div>
 </header>
 
 <h2>Projektportrait</h2>
-<p>
-  <code>@spearwolf/eventize</code> macht beliebige JavaScript-Objekte zu <em>synchronen</em>
-  Event-Emittern. Kein Vererbungszwang, keine Runtime-Dependencies: ein Aufruf von
-  <code>eventize(obj)</code> heftet dem Objekt eine versteckte, unter
-  <code>Symbol.for('eventize')</code> abgelegte Property an, die eine Listener-Registry und
-  ein Retained-Events-Log zusammenfasst. Alles darüber — die freistehenden Funktionen,
-  die injizierten Methoden, die Basisklasse — sind drei Oberflächen auf derselben
-  Implementierung.
-</p>
-<p>
-  Die Zielgruppe sind Anwendungen, die Ereignisse synchron und in kontrollierter
-  Reihenfolge brauchen: Szenengraphen, Entity-Systeme, Web-Component-Bäume. Daher
-  Prioritäten mit stabiler Sortierung, ein <code>retain()</code> im Sinne eines
-  <code>ReplaySubject(1)</code> und Duck-Typing-Dispatch für nicht-eventisierte Ziele.
-  Ausgeliefert wird als Dual-Format-Paket (ESM + CJS) mit optional typisierten
-  Event-Maps.
-</p>
-
-<div class="domains">
-  <div class="domain">
-    <h3>API-Fassaden</h3>
-    <p>Drei Aufrufstile — freistehende Funktionen, <code>eventize.inject()</code> und
-       <code>class Eventize</code> — die alle auf dieselben <code>on</code>/<code>emit</code>/<code>off</code>
-       delegieren. Hier liegen auch die Überladungssätze.</p>
-    <div class="paths"><code class="path">src/eventize-api.ts</code><code class="path">src/eventize.ts</code><code class="path">src/index.ts</code></div>
-  </div>
-  <div class="domain">
-    <h3>Listener-Registry</h3>
-    <p>Einfügen per Binärsuche nach Priorität, Deduplizierung gleichartiger
-       Listener über einen Referenzzähler, vier Entfernungspfade. Der dichteste
-       Teil der Codebasis — und der, aus dem die meisten Befunde stammen.</p>
-    <div class="paths"><code class="path">src/EventStore.ts</code><code class="path">src/EventListener.ts</code><code class="path">src/Priority.ts</code></div>
-  </div>
-  <div class="domain">
-    <h3>Retained Events</h3>
-    <p>Hält je Event-Name die letzte Emission fest und spielt sie neuen Abonnenten
-       in ursprünglicher Emissionsreihenfolge vor. 79 Zeilen, an denen vier Findings
-       dieses Laufs hängen.</p>
-    <div class="paths"><code class="path">src/EventKeeper.ts</code></div>
-  </div>
-  <div class="domain">
-    <h3>Subscription-Parsing</h3>
-    <p>Zerlegt die achtzehn Überladungen von <code>on()</code> positionsbasiert in
-       Event-Name, Priorität, Listener und Kontext. Muss im Gleichschritt mit
-       <code>types.ts</code> geändert werden.</p>
-    <div class="paths"><code class="path">src/subscribeTo.ts</code><code class="path">src/types.ts</code></div>
-  </div>
-  <div class="domain">
-    <h3>Objekt-Markierung</h3>
-    <p>Setzt und erkennt den versteckten Marker, der ein Objekt zum Emitter macht.
-       Nichts davon darf je auf der öffentlichen Oberfläche eines Nutzerobjekts
-       auftauchen.</p>
-    <div class="paths"><code class="path">src/asEventized.ts</code><code class="path">src/isEventized.ts</code><code class="path">src/constants.ts</code><code class="path">src/utils.ts</code></div>
-  </div>
-  <div class="domain">
-    <h3>Build &amp; Release</h3>
-    <p>tsup erzeugt ESM, CJS und Typen in einem Lauf; <code>npm run cbt</code> ist das
-       Gate, das Dual-Format-Typbrüche fängt. Publish läuft über ein eigenes
-       Node-Skript.</p>
-    <div class="paths"><code class="path">tsup.config.js</code><code class="path">scripts/</code><code class="path">.github/workflows/</code></div>
+<div class="panel">
+  <p><code>@spearwolf/eventize</code> macht ein beliebiges JS/TS-Objekt zu einem <strong>synchronen</strong> Event-Emitter — plain <code>{}</code>, bestehende Instanzen und Klassen gleichermaßen, ohne Runtime-Dependency und ohne Vererbungszwang. Die Zugehörigkeit hängt an einer nicht-enumerierbaren Property unter <code>Symbol.for('eventize')</code>; wer sie hat, ist ein Emitter.</p>
+  <p>Über die reine Zustellung hinaus deckt die Bibliothek Prioritäten, Wildcard-Subscriptions, Listener-Objekte mit methodennamen-basiertem Dispatch, zurückgehaltene Events mit Replay an Nachzügler sowie optional typisierte Event-Maps ab. Zielgruppe sind Anwendungen, die Entkopplung wollen, aber keine Asynchronität einkaufen möchten: <code>emit()</code> kehrt erst zurück, wenn jeder Listener gelaufen ist.</p>
+  <div class="grid cols2" style="margin-top:20px">
+    <div class="domain">
+      <h3>Subscription &amp; Dispatch</h3>
+      <p>Registry, Prioritäts-Sortierung per Binärsuche, reentrancy-sichere Zustellung, Referenzzählung beim Abmelden.</p>
+      <div class="chips"><span class="chip">src/EventStore.ts</span><span class="chip">src/EventListener.ts</span><span class="chip">src/subscribeTo.ts</span></div>
+    </div>
+    <div class="domain">
+      <h3>Retained Events</h3>
+      <p>Der letzte Wert je Event-Name wird gehalten und an später eintreffende Subscriber in Emissions-Reihenfolge nachgespielt.</p>
+      <div class="chips"><span class="chip">src/EventKeeper.ts</span><span class="chip">src/getRetainedCount.ts</span></div>
+    </div>
+    <div class="domain">
+      <h3>Emitter-Identität &amp; drei Oberflächen</h3>
+      <p>Marker-Injektion plus die drei Zugänge — freie Funktionen, <code>eventize.inject()</code>, <code>class Eventize</code> — die auf dieselbe Implementierung delegieren.</p>
+      <div class="chips"><span class="chip">src/asEventized.ts</span><span class="chip">src/eventize.ts</span><span class="chip">src/eventize-api.ts</span></div>
+    </div>
+    <div class="domain">
+      <h3>Typisierte Event-Maps</h3>
+      <p>Opt-in-Typschicht: gebrandete Emitter, Überladungssätze und ein Conditional Type, der untypisierte Aufrufe von typisierten trennt.</p>
+      <div class="chips"><span class="chip">src/types.ts</span><span class="chip">docs/typed-events.md</span></div>
+    </div>
+    <div class="domain">
+      <h3>Build &amp; Auslieferung</h3>
+      <p>Dual-Format-Bundle, Declaration-Rollup, <code>attw</code>-Gate über vier Auflösungsmodi, OIDC-Publish aus GitHub Actions.</p>
+      <div class="chips"><span class="chip">tsup.config.js</span><span class="chip">scripts/publishPackage.cjs</span><span class="chip">.github/workflows/</span></div>
+    </div>
+    <div class="domain">
+      <h3>Dokumentation für Menschen und Agenten</h3>
+      <p>Vier Vertiefungs-Dokumente plus ein mitgeliefertes Agent-Skill, beides Teil des npm-Tarballs.</p>
+      <div class="chips"><span class="chip">docs/</span><span class="chip">skills/using-eventize/</span><span class="chip">AGENTS.md</span></div>
+    </div>
   </div>
 </div>
 
-<figure>
-  <div class="diagram-scroll">
-  <svg viewBox="0 0 760 300" role="img" aria-label="Datenfluss von den drei API-Fassaden über subscribeTo zu EventStore und EventKeeper">
-    <defs>
-      <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-        <path d="M0,0 L10,5 L0,10 z" fill="#8a8580"/>
-      </marker>
-      <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-        <path d="M0,0 L10,5 L0,10 z" fill="#4f46e5"/>
-      </marker>
-    </defs>
-    <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">
-      <!-- facades -->
-      <rect x="14" y="18" width="150" height="34" rx="7" fill="#ffffff" stroke="#d6d3d1"/>
-      <text x="89" y="39" text-anchor="middle" fill="#1c1917">on() / emit() / off()</text>
-      <rect x="14" y="62" width="150" height="34" rx="7" fill="#ffffff" stroke="#d6d3d1"/>
-      <text x="89" y="83" text-anchor="middle" fill="#1c1917">eventize.inject(obj)</text>
-      <rect x="14" y="106" width="150" height="34" rx="7" fill="#ffffff" stroke="#d6d3d1"/>
-      <text x="89" y="127" text-anchor="middle" fill="#1c1917">class Eventize</text>
-      <text x="89" y="160" text-anchor="middle" fill="#8a8580" font-size="10.5">drei Fassaden</text>
-
-      <!-- core -->
-      <rect x="248" y="52" width="152" height="56" rx="7" fill="#eef2ff" stroke="#4f46e5"/>
-      <text x="324" y="76" text-anchor="middle" fill="#1c1917" font-weight="600">eventize-api.ts</text>
-      <text x="324" y="93" text-anchor="middle" fill="#57534e" font-size="10.5">eine Implementierung</text>
-
-      <!-- marker -->
-      <rect x="248" y="176" width="152" height="52" rx="7" fill="#ffffff" stroke="#d6d3d1"/>
-      <text x="324" y="197" text-anchor="middle" fill="#1c1917">asEventized(obj)</text>
-      <text x="324" y="214" text-anchor="middle" fill="#8a8580" font-size="10.5">Symbol.for('eventize')</text>
-
-      <!-- subscribeTo -->
-      <rect x="470" y="8" width="140" height="42" rx="7" fill="#ffffff" stroke="#d6d3d1"/>
-      <text x="540" y="26" text-anchor="middle" fill="#1c1917">subscribeTo</text>
-      <text x="540" y="41" text-anchor="middle" fill="#8a8580" font-size="10.5">18 Überladungen</text>
-
-      <!-- store / keeper -->
-      <rect x="470" y="76" width="140" height="52" rx="7" fill="#ffffff" stroke="#d6d3d1"/>
-      <text x="540" y="97" text-anchor="middle" fill="#1c1917" font-weight="600">EventStore</text>
-      <text x="540" y="114" text-anchor="middle" fill="#8a8580" font-size="10.5">Listener nach Priorität</text>
-
-      <rect x="470" y="150" width="140" height="52" rx="7" fill="#ffffff" stroke="#d6d3d1"/>
-      <text x="540" y="171" text-anchor="middle" fill="#1c1917" font-weight="600">EventKeeper</text>
-      <text x="540" y="188" text-anchor="middle" fill="#8a8580" font-size="10.5">letzte Emission je Name</text>
-
-      <rect x="660" y="103" width="86" height="72" rx="7" fill="#f5f5f4" stroke="#d6d3d1" stroke-dasharray="4 3"/>
-      <text x="703" y="130" text-anchor="middle" fill="#57534e" font-size="10.5">Listener</text>
-      <text x="703" y="146" text-anchor="middle" fill="#57534e" font-size="10.5">+ Payloads</text>
-      <text x="703" y="162" text-anchor="middle" fill="#8a8580" font-size="10">(gehalten)</text>
-
-      <!-- arrows -->
-      <path d="M164,35 C205,35 210,68 246,73" fill="none" stroke="#8a8580" marker-end="url(#ar)"/>
-      <path d="M164,79 L246,80" fill="none" stroke="#8a8580" marker-end="url(#ar)"/>
-      <path d="M164,123 C205,123 210,92 246,87" fill="none" stroke="#8a8580" marker-end="url(#ar)"/>
-      <path d="M324,108 L324,174" fill="none" stroke="#8a8580" marker-end="url(#ar)"/>
-      <path d="M400,68 C435,64 440,38 468,32" fill="none" stroke="#4f46e5" marker-end="url(#ar2)"/>
-      <path d="M400,80 C435,84 440,96 468,100" fill="none" stroke="#4f46e5" marker-end="url(#ar2)"/>
-      <path d="M400,96 C435,120 440,166 468,172" fill="none" stroke="#4f46e5" marker-end="url(#ar2)"/>
-      <path d="M540,50 L540,74" fill="none" stroke="#8a8580" marker-end="url(#ar)"/>
-      <path d="M610,110 L658,124" fill="none" stroke="#8a8580" marker-end="url(#ar)"/>
-      <path d="M610,172 L658,158" fill="none" stroke="#8a8580" marker-end="url(#ar)"/>
-      <text x="659" y="248" text-anchor="middle" fill="#b45309" font-size="10.5">MEM-001 · MEM-005 · MEM-006</text>
-      <text x="659" y="264" text-anchor="middle" fill="#8a8580" font-size="10">was hier hängen bleibt, bleibt hängen</text>
-    </g>
-  </svg>
-  </div>
-  <figcaption>
-    Alle drei Aufrufstile münden in <code>eventize-api.ts</code>; <code>asEventized()</code> hängt dem
-    Zielobjekt den versteckten Marker an, hinter dem Store und Keeper sitzen. Der Store hält
-    Listener, der Keeper zusätzlich deren Nutzdaten — die gestrichelte Box rechts ist der
-    Bereich, in dem die Befunde dieses Laufs zusammenlaufen.
-  </figcaption>
-</figure>
-
 <h2>Executive Summary</h2>
-<p>
-  Der Schwerpunkt dieses Laufs hat sich gelohnt: sechs der Befunde sind reproduzierbare
-  Ressourcen- und Lebenszyklus-Defekte, die im Quelltext unauffällig aussehen und sich
-  erst unter Laufzeit-Sonden zeigen. Der schwerwiegendste ist eine Asymmetrie im
-  Aufräumen — <code>off(ε)</code> leert die Listener-Registry vollständig, lässt das
-  Retained-Log aber unangetastet, und eine Bulk-Operation dafür existiert nicht. Wer
-  Event-Namen dynamisch erzeugt, kommt an die eigenen Nutzdaten nur noch über das
-  interne Symbol heran.
-</p>
-<p>
-  Zwei weitere Defekte liegen im Zusammenspiel von Referenzzählung und Einmal-Semantik:
-  ein zweifaches <code>once()</code> auf dasselbe Listener-Objekt kollabiert zu einem
-  Listener, dessen Abmeldung von seinem eigenen Idempotenz-Guard blockiert wird — er
-  feuert danach unbegrenzt weiter und ist über die zurückgegebenen Handles nicht mehr
-  lösbar. Und <code>off(ε, eventName, listenerObject)</code>, in der Dokumentation als
-  der Weg beschrieben, ein Listener-Objekt von einem Event zu lösen, greift für die
-  Methodennamen-Form überhaupt nicht: der Vergleich prüft das falsche Feld.
-</p>
-<p>
-  Dem gegenüber steht eine Codebasis in gutem Zustand. 414 Tests laufen grün bei 96 %
-  Statement-Abdeckung, <code>attw</code> meldet für alle vier Auflösungsmodi saubere
-  Typen, es gibt null Runtime-Dependencies und null bekannte Schwachstellen, und die
-  Dokumentation ist ungewöhnlich gründlich. Seit dem Vorlauf ging es aufwärts: v5.1.0
-  hat zwei seiner Findings behoben, ein drittes ist ebenfalls erledigt, keines hat sich
-  verschlechtert. Der Punkteabfall im Header misst die tiefere Prüfung, nicht den Code.
-</p>
-<p>
-  Die Reihenfolge für die Umsetzung folgt der Testbarkeit: MEM-003 und BUG-001 sind
-  Einzeiler mit sofortigem Nutzen, MEM-001 und MEM-002 brauchen eine Entscheidung über
-  die gewünschte Semantik und gehören in den CHANGELOG, BUILD-001 sollte vor dem
-  nächsten Release fallen — bis dahin kann ein fehlgeschlagener Publish als grüner Job
-  durchgehen.
-</p>
+<div class="panel">
+  <p>Zwischen dem letzten Audit und heute liegt Release v6.0.0, und es hat geliefert: alle sechs schweren und alle zwölf mittleren Befunde des Vorlaufs sind am Code oder zur Laufzeit als behoben nachgewiesen — vom nicht geleerten Keeper über den unentfernbaren <code>once()</code>-Dauerlistener bis zum Release-Job, der Fehlschläge als Erfolg meldete. Was bleibt, ist keine Altlast, sondern ein neuer Fund.</p>
+  <p>Der Dispatch an Listener-Objekte liest Member ohne Prototypen-Schranke. Ein <code>emit(ε, 'toString')</code> findet <code>Object.prototype.toString</code>, ruft es auf, speist den Rückgabewert in die <code>emitAsync()</code>-Aggregation und verbrennt dabei ein <code>once()</code> — nachgemessen am gebauten Paket. Die Bibliothek verteidigt sich an genau dieser Stelle bereits gegen Primitive (<code>on(ε, 'toFixed', 42)</code>), nur eben nicht gegen <code>Object.prototype</code>. Auf dem Duck-Typing-Pfad für nicht-eventisierte Ziele steht dasselbe Loch offen.</p>
+  <p>Zwei weitere Befunde betreffen Zusagen, die die Doku macht und der Code nicht hält: <code>off(ε, '*', listenerObject)</code> tut nichts, obwohl die benannte Variante daneben dokumentiert funktioniert, und die Garantie »Equal priorities keep insertion order« gilt nicht über die Grenze zwischen benannten und Wildcard-Listenern. Beide zeigen sich nur in einer von zwei Registrierungsreihenfolgen und rutschen deshalb leicht durch.</p>
+  <p>Auf der Werkzeugseite zwei Lücken, die zur eigenen Anspruchshöhe nicht passen: fünf Delegationen der Klassen- und Inject-Oberfläche sind ungetestet, obwohl »drei Oberflächen, eine Implementierung« als Architektur-Invariante geführt wird — und kein einziger Test läuft gegen das gebaute Dual-Format-Paket, dessen Zähler-Semantik ausdrücklich eine Eigenschaft des Build-Artefakts ist. Alles andere ist in gutem Zustand: 538 Tests grün, Coverage gegated, <code>attw</code> in vier Modi sauber, null Schwachstellen, null <code>TODO</code>s, eine einzige Lint-Suppression im gesamten Produktivcode.</p>
+</div>
 
 <h2>Severity-Übersicht</h2>
 <div class="panel">
-      <div class="sevrow">
-        <span class="sevname sev sev-critical">critical</span>
-        <div class="bartrack"><div class="bar bar-critical" style="width:0%"></div></div>
-        <span class="sevnum">0</span>
-      </div>
-      <div class="sevrow">
-        <span class="sevname sev sev-high">high</span>
-        <div class="bartrack"><div class="bar bar-high" style="width:46%"></div></div>
-        <span class="sevnum">6</span>
-      </div>
-      <div class="sevrow">
-        <span class="sevname sev sev-medium">medium</span>
-        <div class="bartrack"><div class="bar bar-medium" style="width:92%"></div></div>
-        <span class="sevnum">12</span>
-      </div>
-      <div class="sevrow">
-        <span class="sevname sev sev-low">low</span>
-        <div class="bartrack"><div class="bar bar-low" style="width:100%"></div></div>
-        <span class="sevnum">13</span>
-      </div>
-      <div class="sevrow">
-        <span class="sevname sev sev-info">info</span>
-        <div class="bartrack"><div class="bar bar-info" style="width:31%"></div></div>
-        <span class="sevnum">4</span>
-      </div>
+  <div class="sev-row"><div class="sev-label c-critical">Critical</div><div class="sev-track"><div class="sev-fill b-critical" style="width:0%"></div></div><div class="sev-n">0</div></div>
+  <div class="sev-row"><div class="sev-label c-high">High</div><div class="sev-track"><div class="sev-fill b-high" style="width:16.7%"></div></div><div class="sev-n">1</div></div>
+  <div class="sev-row"><div class="sev-label c-medium">Medium</div><div class="sev-track"><div class="sev-fill b-medium" style="width:100%"></div></div><div class="sev-n">6</div></div>
+  <div class="sev-row"><div class="sev-label c-low">Low</div><div class="sev-track"><div class="sev-fill b-low" style="width:83.3%"></div></div><div class="sev-n">5</div></div>
+  <div class="sev-row"><div class="sev-label c-info">Info</div><div class="sev-track"><div class="sev-fill b-info" style="width:33.3%"></div></div><div class="sev-n">2</div></div>
 </div>
 
-<h2>Kategorien</h2>
+<h2>Kategorie-Übersicht</h2>
 <div class="panel">
-      <div class="catrow">
-        <span class="catname">Memory Leaks &amp; Ressourcen</span>
-        <div class="bartrack"><div class="bar bar-cat" style="width:23%"></div></div>
-        <span class="sevnum">8</span>
-      </div>
-      <div class="catrow">
-        <span class="catname">Projektaufbau &amp; Build</span>
-        <div class="bartrack"><div class="bar bar-cat" style="width:11%"></div></div>
-        <span class="sevnum">4</span>
-      </div>
-      <div class="catrow">
-        <span class="catname">Architektur &amp; Struktur</span>
-        <div class="bartrack"><div class="bar bar-cat" style="width:11%"></div></div>
-        <span class="sevnum">4</span>
-      </div>
-      <div class="catrow">
-        <span class="catname">Bugs &amp; Korrektheitsrisiken</span>
-        <div class="bartrack"><div class="bar bar-cat" style="width:9%"></div></div>
-        <span class="sevnum">3</span>
-      </div>
-      <div class="catrow">
-        <span class="catname">Testabdeckung &amp; Teststrategie</span>
-        <div class="bartrack"><div class="bar bar-cat" style="width:9%"></div></div>
-        <span class="sevnum">3</span>
-      </div>
-      <div class="catrow">
-        <span class="catname">Typsicherheit (TS)</span>
-        <div class="bartrack"><div class="bar bar-cat" style="width:9%"></div></div>
-        <span class="sevnum">3</span>
-      </div>
-      <div class="catrow">
-        <span class="catname">Developer Experience</span>
-        <div class="bartrack"><div class="bar bar-cat" style="width:9%"></div></div>
-        <span class="sevnum">3</span>
-      </div>
-      <div class="catrow">
-        <span class="catname">Öffentliche API</span>
-        <div class="bartrack"><div class="bar bar-cat" style="width:6%"></div></div>
-        <span class="sevnum">2</span>
-      </div>
-      <div class="catrow">
-        <span class="catname">Dependencies</span>
-        <div class="bartrack"><div class="bar bar-cat" style="width:6%"></div></div>
-        <span class="sevnum">2</span>
-      </div>
-      <div class="catrow">
-        <span class="catname">Performance</span>
-        <div class="bartrack"><div class="bar bar-cat" style="width:3%"></div></div>
-        <span class="sevnum">1</span>
-      </div>
-      <div class="catrow">
-        <span class="catname">Implementierungsstand</span>
-        <div class="bartrack"><div class="bar bar-cat" style="width:3%"></div></div>
-        <span class="sevnum">1</span>
-      </div>
-      <div class="catrow">
-        <span class="catname">Konsistenz</span>
-        <div class="bartrack"><div class="bar bar-cat" style="width:3%"></div></div>
-        <span class="sevnum">1</span>
-      </div>
+  <div class="cat"><span>Bugs &amp; Korrektheitsrisiken</span><span>4</span></div>
+  <div class="cat"><span>Testabdeckung &amp; Teststrategie</span><span>2</span></div>
+  <div class="cat"><span>Konsistenz</span><span>2</span></div>
+  <div class="cat"><span>Projektaufbau &amp; Build</span><span>1</span></div>
+  <div class="cat"><span>Typsicherheit (TS)</span><span>1</span></div>
+  <div class="cat"><span>Performance</span><span>1</span></div>
+  <div class="cat"><span>Dependencies</span><span>1</span></div>
+  <div class="cat"><span>Developer Experience</span><span>1</span></div>
+  <div class="cat"><span>Architektur &amp; Struktur</span><span>1</span></div>
 </div>
 
 <h2>Backlog</h2>
 <div class="filters">
-  <div class="fgroup"><label for="fsev">Severity</label>
-    <select id="fsev">
-      <option value="all">alle</option>
-      <option value="critical">critical</option>
-      <option value="high">high</option>
-      <option value="medium">medium</option>
-      <option value="low">low</option>
-      <option value="info">info</option>
-    </select>
-  </div>
-  <div class="fgroup"><label for="fcat">Kategorie</label>
-    <select id="fcat"><option value="all">alle</option><option value="Memory Leaks &amp; Ressourcen">Memory Leaks &amp; Ressourcen</option><option value="Projektaufbau &amp; Build">Projektaufbau &amp; Build</option><option value="Architektur &amp; Struktur">Architektur &amp; Struktur</option><option value="Bugs &amp; Korrektheitsrisiken">Bugs &amp; Korrektheitsrisiken</option><option value="Testabdeckung &amp; Teststrategie">Testabdeckung &amp; Teststrategie</option><option value="Typsicherheit (TS)">Typsicherheit (TS)</option><option value="Developer Experience">Developer Experience</option><option value="Öffentliche API">Öffentliche API</option><option value="Dependencies">Dependencies</option><option value="Performance">Performance</option><option value="Implementierungsstand">Implementierungsstand</option><option value="Konsistenz">Konsistenz</option></select>
-  </div>
-  <div class="fgroup"><label for="fstat">Status</label>
-    <select id="fstat">
-      <option value="all">alle</option>
-      <option value="new">new</option>
-      <option value="unchanged">unchanged</option>
-      <option value="carried-over">carried-over</option>
-    </select>
-  </div>
-  <span class="count" id="count"></span>
+  <span class="lbl">Severity</span>
+  <button class="f" data-sev="all" aria-pressed="true">alle</button>
+  <button class="f" data-sev="high" aria-pressed="false">high</button>
+  <button class="f" data-sev="medium" aria-pressed="false">medium</button>
+  <button class="f" data-sev="low" aria-pressed="false">low</button>
+  <button class="f" data-sev="info" aria-pressed="false">info</button>
+  <span class="lbl" style="margin-left:12px">Kategorie</span>
+  <select class="f" id="catFilter"><option value="all">alle Kategorien</option></select>
+  <span class="lbl" style="margin-left:12px">Status</span>
+  <select class="f" id="statusFilter">
+    <option value="all">alle</option>
+    <option value="new">new</option>
+    <option value="carried-over">carried-over</option>
+  </select>
 </div>
 <div class="tablewrap">
   <table>
-    <thead><tr><th>ID</th><th>Severity</th><th>Kategorie</th><th>Titel</th><th>Location</th><th>Aufwand</th></tr></thead>
-    <tbody id="tbody">
-      <tr class="row" data-sev="high" data-cat="Memory Leaks &amp; Ressourcen" data-status="new" tabindex="0">
-        <td class="c-id"><code>MEM-001</code></td>
-        <td><span class="sev sev-high">high</span></td>
-        <td class="c-cat">Memory Leaks &amp; Ressourcen</td>
-        <td class="c-title"><code>off(ε)</code> räumt die Listener, lässt den EventKeeper aber vollständig stehen<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>src/eventize-api.ts:437-462, src/EventKeeper.ts:32-47</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="high" data-cat="Memory Leaks &amp; Ressourcen" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Verifiziert: nach <code>retain(ε,"data"); emit(ε,"data",payload); off(ε)</code> steht <code>getSubscriptionCount()</code> auf 0, <code>keeper.events.size</code> aber weiterhin auf 1 — der Payload bleibt hart referenziert, und ein danach hinzukommender Subscriber bekommt ihn immer noch repliziert. Der Keeper wird nur angefasst, wenn <code>off()</code> mit einem Event-Namen oder einem Namens-Array aufgerufen wird. Der Aufräum-Aufruf, den jeder als „alles weg" liest, ist genau der, der nichts wegräumt. Zusätzlich fehlt jede Bulk-Operation: <code>unretain(ε,"*")</code> behandelt <code>"*"</code> als gewöhnlichen Namen und leert nichts. Wer Event-Namen dynamisch erzeugt hat (<code>item:${id}</code>), kommt ohne Zugriff auf <code>ε[Symbol.for("eventize")].keeper.eventNames</code> nicht mehr an die eigenen Payloads heran.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p><code>off(ε)</code> und <code>off(ε,"*")</code> auf <code>keeper.eventNames.clear()</code> + <code>keeper.events.clear()</code> erweitern — der Store wird in diesem Pfad ohnehin komplett geleert, die Asymmetrie ist nicht begründet. Alternativ oder ergänzend <code>unretain(ε,"*")</code> / <code>retainClear(ε,"*")</code> als Bulk-Form implementieren. Der Wechsel ist ein Verhaltensbruch für Code, der auf dem Weiterleben der Retains baut, gehört also in den CHANGELOG als Breaking Change.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="high" data-cat="Memory Leaks &amp; Ressourcen" data-status="new" tabindex="0">
-        <td class="c-id"><code>MEM-002</code></td>
-        <td><span class="sev sev-high">high</span></td>
-        <td class="c-cat">Memory Leaks &amp; Ressourcen</td>
-        <td class="c-title"><code>once()</code> mit Listener-Objekt degeneriert zu einem unentfernbaren Dauer-Listener<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>src/eventize-api.ts:386-405, src/EventStore.ts:123-134</code></td>
-        <td class="c-eff">M</td>
-      </tr>
-      <tr class="detail" data-sev="high" data-cat="Memory Leaks &amp; Ressourcen" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Verifiziert: zweimal <code>once(ε,"foo",listenerObject)</code> (oder die Methodennamen-Form <code>once(ε,"foo","handler",obj)</code>) auf dasselbe Objekt — der Store kollabiert beide via <code>insertOrFindSimilarListener</code> zu **einem** EventListener mit <code>refCount = 2</code>. Beide <code>once()</code>-Aufrufe setzen nacheinander <code>callAfterApply</code>, der zweite überschreibt den ersten. Nach dem ersten Emit läuft nur ein <code>unsubscribe</code>, senkt <code>refCount</code> von 2 auf 1 — und der eigene <code>unsubscribeCalled</code>-Guard verhindert, dass der überlebende Handle jemals weiter dekrementiert. Ergebnis im Test: der Listener feuerte bei drei aufeinanderfolgenden Emits dreimal und blieb subscribed. <code>once()</code> ist dann kein <code>once</code> mehr, sondern ein <code>on()</code>, dessen zurückgegebene Handles ihn nicht mehr lösen können. Nur ein <code>off(ε, listenerObject)</code> von außen wird ihn los.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Den refCount-Kollaps und die Einmal-Semantik entkoppeln. Zwei Wege: (a) <code>once()</code>-Registrierungen von <code>findSimilarListener</code> ausnehmen, so dass jede eine eigene EventListener-Instanz bekommt — deckt sich mit dem Verhalten von Funktions-Listenern, die bereits korrekt sind; oder (b) <code>callAfterApply</code> zu einer Liste machen und beim Feuern **alle** hinterlegten Unsubscribes ausführen, statt den letzten gewinnen zu lassen. Variante (a) ist die kleinere Änderung und die ehrlichere Semantik.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="high" data-cat="Memory Leaks &amp; Ressourcen" data-status="new" tabindex="0">
-        <td class="c-id"><code>MEM-003</code></td>
-        <td><span class="sev sev-high">high</span></td>
-        <td class="c-cat">Memory Leaks &amp; Ressourcen</td>
-        <td class="c-title"><code>off(ε, eventName, listenerObject)</code> entfernt die Methodennamen-Form nicht<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>src/EventStore.ts:63-80 (removeSimilarListenersFromArray), docs/off.md:18</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="high" data-cat="Memory Leaks &amp; Ressourcen" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Verifiziert: nach <code>on(ε,"foo","foo",lo)</code> und anschließendem <code>off(ε,"foo",lo)</code> steht die Subscription unverändert auf 1. Der Filter in <code>removeSimilarListenersFromArray</code> prüft <code>listener.eventName === eventName &amp;&amp; listener.listener === listenerObject</code> — bei der Methodennamen-Form ist <code>listener.listener</code> aber der String <code>"foo"</code>, das Objekt steckt in <code>listener.listenerObject</code>. Der Vergleich kann nie greifen. Für die Listener-Objekt-Form <code>on(ε,"foo",lo)</code> passt er zufällig, weil dort das Objekt tatsächlich in <code>listener</code> liegt. <code>docs/off.md:18</code> und <code>README.md</code> führen <code>off(emitter, eventName, listenerObject)</code> ohne Einschränkung als den Weg auf, ein Listener-Objekt von einem einzelnen Event zu lösen, und <code>docs/off.md:211</code> stellt beide Formen ausdrücklich gleich. Wer dem Handbuch folgt, glaubt aufgeräumt zu haben und hält Listener-Objekt samt allem, was daran hängt, am Emitter fest.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Die zweite Bedingung um den <code>listenerObject</code>-Vergleich ergänzen: <code>listener.eventName === eventName &amp;&amp; (listener.listener === listenerObject || listener.listenerObject === listenerObject)</code>. Der <code>off.spec.ts</code> fehlt genau dieser Fall — Regressionstest für beide Formen mitliefern.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="high" data-cat="Bugs &amp; Korrektheitsrisiken" data-status="new" tabindex="0">
-        <td class="c-id"><code>BUG-001</code></td>
-        <td><span class="sev sev-high">high</span></td>
-        <td class="c-cat">Bugs &amp; Korrektheitsrisiken</td>
-        <td class="c-title"><code>retain(ε, "*")</code> plus Wildcard-Subscribe endet im Stack Overflow<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>src/EventKeeper.ts:59-78 (replayTo)</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="high" data-cat="Bugs &amp; Korrektheitsrisiken" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Verifiziert, reproduzierbar in vier Zeilen: <code>retain(ε,"*")</code> legt <code>"*"</code> als gewöhnlichen Namen in <code>eventNames</code> ab. Ein späteres <code>on(ε,"*",fn)</code> ruft <code>replayTo("*")</code>, das über den <code>isCatchEmAll</code>-Zweig alle bekannten Namen durchläuft — darunter <code>"*"</code> selbst — und sich damit unbegrenzt selbst aufruft. Ergebnis: <code>RangeError: Maximum call stack size exceeded</code>, der den gesamten Prozess mitnimmt. <code>emit()</code> und <code>_duckEmit()</code> weisen <code>"*"</code> beide mit einer expliziten Fehlermeldung ab, <code>retain()</code> reicht es kommentarlos durch. Die Kombination ist untypisch, aber sie steht in keiner Doku als verboten, und der Absturz gibt keinerlei Hinweis auf die Ursache.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p><code>retain()</code> / <code>unretain()</code> / <code>retainClear()</code> <code>"*"</code> genauso behandeln wie <code>emit()</code>: mit derselben Fehlermeldung ablehnen, dass der Wildcard subscribe-only ist. Zusätzlich <code>EventKeeper.replayTo</code> gegen den rekursiven Fall härten, indem der Catch-em-all-Zweig <code>isCatchEmAll(name)</code> überspringt — die Guard-Klausel kostet nichts und schützt vor jedem künftigen Weg, auf dem <code>"*"</code> doch in die Menge gerät.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="high" data-cat="Bugs &amp; Korrektheitsrisiken" data-status="unchanged" tabindex="0">
-        <td class="c-id"><code>CORR-001</code></td>
-        <td><span class="sev sev-high">high</span></td>
-        <td class="c-cat">Bugs &amp; Korrektheitsrisiken</td>
-        <td class="c-title">Retained Event wird beim Listener-Objekt-Dedup ein zweites Mal ausgeliefert<span class="badge badge-unchanged">unchanged</span></td>
-        <td class="c-loc"><code>src/subscribeTo.ts:21, src/EventStore.ts:123-134 (insertOrFindSimilarListener)</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="high" data-cat="Bugs &amp; Korrektheitsrisiken" data-status="unchanged" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Weiterhin belegt und jetzt mit Laufzeit-Nachweis: <code>retain(ε,"foo"); emit(ε,"foo","RETAINED")</code>, danach zweimal <code>on(ε,"foo",lo)</code> — der Listener empfängt <code>"RETAINED"</code> zweimal, obwohl der Store nur eine Subscription führt (<code>refCount = 2</code>). <code>registerEventListener</code> ruft <code>keeper.replayTo()</code> unbedingt, auch wenn <code>store.add()</code> gar keinen neuen Listener eingefügt, sondern nur den Zähler eines bestehenden erhöht hat. Der TODO in <code>src/subscribeTo.ts:21</code> benennt exakt diese Lücke. In Reducer- oder Zähl-Patterns führt das zu doppelt verbuchten Werten.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p><code>store.add()</code> mitteilen lassen, ob eingefügt oder dedupliziert wurde (Rückgabe-Flag oder Identitätsvergleich <code>el === neuerListener</code>), und <code>replayTo</code> nur im Einfüge-Fall aufrufen. Den TODO-Kommentar mit dem Fix entfernen und einen Spec-Fall in <code>retain.spec.ts</code> ergänzen.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="high" data-cat="Projektaufbau &amp; Build" data-status="new" tabindex="0">
-        <td class="c-id"><code>BUILD-001</code></td>
-        <td><span class="sev sev-high">high</span></td>
-        <td class="c-cat">Projektaufbau &amp; Build</td>
-        <td class="c-title">Fehlgeschlagenes Release meldet dem CI trotzdem Erfolg<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>scripts/publishPackage.cjs:11-13, 26-40</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="high" data-cat="Projektaufbau &amp; Build" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Zwei Pfade in <code>publishPackage.cjs</code> beenden den Prozess mit Code 0, ohne veröffentlicht zu haben. Erstens: schlägt <code>npm show &lt;pkg&gt; versions --json</code> fehl (Registry-Timeout, Netzwerkfehler, Auth-Problem), landet der Code im <code>else</code>-Zweig, schreibt eine Meldung nach stderr und ruft <code>process.exit</code> nie auf — Node beendet regulär mit 0, der Deploy-Job in <code>main.yml</code> wird grün, das Release existiert nicht. Zweitens: <code>process.exit(!error ? 0 : error)</code> übergibt im Fehlerfall ein Error-Objekt an <code>process.exit</code>; Node ≥ 20 wirft dafür <code>ERR_INVALID_ARG_TYPE</code>, so dass der echte Publish-Fehler in stderr von einem irreführenden TypeError verdeckt wird.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Im <code>npm show</code>-Fehlerzweig <code>process.exit(1)</code> setzen und <code>process.exit(!error ? 0 : 1)</code> schreiben; <code>error.code</code> gehört ins Log, nicht in den Exit-Code. Bei der Gelegenheit auf <code>execFileSync</code> mit <code>stdio: "inherit"</code> umstellen — die Callback-Kaskade ist der eigentliche Grund, warum diese Pfade unbemerkt durchrutschen.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="medium" data-cat="Memory Leaks &amp; Ressourcen" data-status="new" tabindex="0">
-        <td class="c-id"><code>MEM-004</code></td>
-        <td><span class="sev sev-medium">medium</span></td>
-        <td class="c-cat">Memory Leaks &amp; Ressourcen</td>
-        <td class="c-title"><code>onceAsync()</code> hinterlässt eine Subscription, die niemand mehr lösen kann<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>src/eventize-api.ts:422-429</code></td>
-        <td class="c-eff">M</td>
-      </tr>
-      <tr class="detail" data-sev="medium" data-cat="Memory Leaks &amp; Ressourcen" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Verifiziert: <code>onceAsync(ε,"never")</code> registriert einen Listener und gibt ein Promise zurück — sonst nichts. Feuert das Event nie, bleiben Listener, <code>resolve</code>-Closure und der gesamte await-Continuation-Frame des Aufrufers am Emitter hängen, solange dieser lebt. Es gibt weder ein Unsubscribe-Handle noch einen <code>AbortSignal</code>-Parameter noch ein Timeout. Genau das Muster, das in Komponenten-Lebenszyklen (Unmount vor Event) und in abgebrochenen Requests entsteht — und der einzige Ausweg, <code>off(ε, …)</code>, braucht eine Referenz, die der Aufrufer nie bekommen hat.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Einen optionalen zweiten Parameter <code>{signal?: AbortSignal}</code> einführen, der bei <code>abort</code> den internen <code>once()</code>-Handle löst und das Promise rejected (<code>AbortError</code>, wie <code>fetch</code>). Das ist additiv und bricht keinen bestehenden Aufruf. Minimallösung ohne API-Änderung: die Unsubscribe-Funktion als Property am zurückgegebenen Promise mitgeben und dokumentieren.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="medium" data-cat="Memory Leaks &amp; Ressourcen" data-status="new" tabindex="0">
-        <td class="c-id"><code>MEM-005</code></td>
-        <td><span class="sev sev-medium">medium</span></td>
-        <td class="c-cat">Memory Leaks &amp; Ressourcen</td>
-        <td class="c-title">EventKeeper wächst bei dynamischen Event-Namen unbegrenzt<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>src/EventKeeper.ts:21-53</code></td>
-        <td class="c-eff">M</td>
-      </tr>
-      <tr class="detail" data-sev="medium" data-cat="Memory Leaks &amp; Ressourcen" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Verifiziert: 1000 Runden <code>retain(ε, "item-"+n); emit(ε, "item-"+n, payload)</code> hinterlassen 1000 Einträge in <code>eventNames</code> und 1000 in <code>events</code> — keine Obergrenze, kein Eviction, kein LRU. Für den Listener-Store wurde dieselbe Klasse von Leck in v4.3.0 gefunden und behoben (leere <code>namedListeners</code>-Buckets werden seitdem gelöscht, in den Tests I/K/L bestätigt); der Keeper hat diese Behandlung nie bekommen. Er ist zudem die teurere Hälfte, weil er nicht nur Schlüssel hält, sondern die vollständigen Emit-Argumente. Für die typische Nutzung mit einer Handvoll fester Event-Namen ist das folgenlos — für pro-Entity erzeugte Namen ist es ein wachsender Speicherfriedhof.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Kein Eviction einbauen (eine Event-Bibliothek soll nicht raten, was der Nutzer noch braucht), sondern die Kosten sichtbar und beherrschbar machen: <code>getRetainedCount(ε)</code> analog zu <code>getSubscriptionCount()</code> exportieren, die Bulk-Clear-Form aus MEM-001 nachliefern und in <code>docs/retain.md</code> einen Absatz ergänzen, dass <code>retain()</code> mit dynamisch erzeugten Namen den Aufrufer in die Pflicht nimmt.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="medium" data-cat="Memory Leaks &amp; Ressourcen" data-status="new" tabindex="0">
-        <td class="c-id"><code>MEM-006</code></td>
-        <td><span class="sev sev-medium">medium</span></td>
-        <td class="c-cat">Memory Leaks &amp; Ressourcen</td>
-        <td class="c-title">Verbrauchte Unsubscribe-Handles halten Emitter und Listener-Objekt am Leben<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>src/eventize-api.ts:32-41 (makeUnsubscribe)</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="medium" data-cat="Memory Leaks &amp; Ressourcen" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Verifiziert: nach dem Aufruf zeigt <code>unsubscribe.listener.listenerObject</code> weiterhin auf das Listener-Objekt, und die Closure hält <code>host</code>. Der EventListener ist nur mit <code>isRemoved = true</code> markiert, nicht entkoppelt. Ein einzelner Handle ist belanglos; das übliche <code>const subs = []; subs.push(on(…))</code>-Muster mit anschließendem <code>subs.forEach(u =&gt; u())</code> ist es nicht — solange das Array lebt, hält es Emitter, Listener-Funktionen und Listener-Objekte aller je registrierten Subscriptions am Leben, obwohl alle längst abgemeldet sind.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>In <code>removeByEventListener</code> und <code>removeListenerFromArray</code> nach dem Setzen von <code>isRemoved</code> die Felder <code>listener</code>, <code>listenerObject</code> und <code>callAfterApply</code> auf <code>null</code> setzen. <code>isEqual()</code> und <code>apply()</code> prüfen <code>isRemoved</code> bereits vor jedem Zugriff, die Felder sind ab diesem Punkt tot. Dafür müssen <code>listener</code> und <code>listenerObject</code> ihr <code>readonly</code> verlieren — ein interner Klassenvertrag, kein öffentlicher.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="medium" data-cat="Bugs &amp; Korrektheitsrisiken" data-status="new" tabindex="0">
-        <td class="c-id"><code>BUG-002</code></td>
-        <td><span class="sev sev-medium">medium</span></td>
-        <td class="c-cat">Bugs &amp; Korrektheitsrisiken</td>
-        <td class="c-title"><code>once()</code> mit einem Listener-Objekt ohne passende Methode verbraucht sich trotzdem<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>src/EventListener.ts:119-135</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="medium" data-cat="Bugs &amp; Korrektheitsrisiken" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Verifiziert: <code>once(ε,"foo",{})</code> gefolgt von <code>emit(ε,"foo")</code> meldet den Listener ab, obwohl nichts aufgerufen wurde — das Objekt hat weder eine <code>foo</code>-Methode noch ein <code>emit</code>. Wird die Methode danach nachgereicht, feuert nichts mehr. Im <code>LISTENER_IS_OBJ</code>-Zweig steht <code>callAfterApply()</code> außerhalb der <code>typeof func === "function"</code>-Prüfung und läuft auch dann, wenn der Fallback-Pfad <code>emit()</code> ebenfalls ins Leere lief. Für spät initialisierte Listener-Objekte — ein durchaus übliches Muster — verpufft das <code>once()</code> still.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p><code>callAfterApply</code> nur auslösen, wenn tatsächlich eine Methode oder der <code>emit</code>-Fallback lief. Dazu muss die interne <code>emit</code>-Hilfsfunktion melden, ob sie etwas aufgerufen hat (Rückgabe <code>boolean</code> statt <code>void</code>) — die Änderung ist auf <code>EventListener.ts</code> beschränkt.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="medium" data-cat="Öffentliche API" data-status="new" tabindex="0">
-        <td class="c-id"><code>API-001</code></td>
-        <td><span class="sev sev-medium">medium</span></td>
-        <td class="c-cat">Öffentliche API</td>
-        <td class="c-title"><code>once()</code> bricht den <code>UnsubscribeFunc</code>-Vertrag<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>src/eventize-api.ts:390-405, src/types.ts:126-128</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="medium" data-cat="Öffentliche API" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p><code>UnsubscribeFunc</code> ist deklariert als Funktion **mit** <code>.listener</code> bzw. <code>.listeners</code>. <code>on()</code> liefert das über <code>makeUnsubscribe</code>; <code>once()</code> verpackt den Handle in eine eigene Closure und gibt sie mit <code>as UnsubscribeFunc</code> zurück, ohne die Properties durchzureichen. Verifiziert: <code>Object.keys(on(…))</code> ergibt <code>["listener"]</code>, bei <code>once(…)</code> und <code>once(…, [a,b])</code> jeweils <code>[]</code>. TypeScript verspricht ein Feld, das zur Laufzeit <code>undefined</code> ist — <code>off(ε, unsub.listener)</code> als Cleanup-Weg schlägt lautlos fehl, ohne dass der Compiler warnt. Das ist derselbe <code>as</code>-Cast, den <code>strictNullChecks: false</code> (TYPE-001) nicht auffangen kann.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>In <code>once()</code> die Properties an die äußere Closure weiterreichen: <code>Object.assign(unsubscribe, Array.isArray(listeners) ? {listeners} : {listener: listeners})</code> — dieselbe Zeile, die <code>makeUnsubscribe</code> bereits enthält. Alternativ <code>makeUnsubscribe</code> um einen Guard-Parameter erweitern und den Idempotenz-Wrapper dorthin ziehen, dann gibt es nur noch eine Stelle, die den Vertrag erfüllt.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="medium" data-cat="Performance" data-status="new" tabindex="0">
-        <td class="c-id"><code>PERF-001</code></td>
-        <td><span class="sev sev-medium">medium</span></td>
-        <td class="c-cat">Performance</td>
-        <td class="c-title">Unsubscribe scannt die gesamte Event-Namen-Map, obwohl der Bucket bekannt ist<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>src/EventStore.ts:217-245</code></td>
-        <td class="c-eff">M</td>
-      </tr>
-      <tr class="detail" data-sev="medium" data-cat="Performance" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p><code>removeByEventListener</code> durchläuft <code>this.namedListeners.forEach(…)</code> über **alle** Event-Namen, um einen Listener zu entfernen, dessen <code>eventName</code> er als Feld direkt vor sich hat — ein Multi-Event-<code>on()</code> erzeugt pro Name eine eigene EventListener-Instanz, jede liegt in genau einem Bucket. <code>removeByEventNameAndListenerObject</code> macht dasselbe, obwohl der Event-Name sogar als Parameter hereinkommt und die innere Filterfunktion ohnehin darauf prüft. Für einen Emitter mit vielen Event-Namen kostet jedes Unsubscribe O(Anzahl Namen) statt O(1) — bei zyklischem Auf- und Abbau vieler Subscriptions summiert sich das quadratisch.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Beide Methoden über <code>listener.isCatchEmAll ? this.catchEmAllListeners : this.namedListeners.get(listener.eventName)</code> bzw. <code>.get(eventName)</code> direkt adressieren und den vollen Scan nur als Fallback behalten, falls der Bucket fehlt. Der bestehende Test „does not leak with many unique event names (1000 add/remove cycles)" in <code>EventStore.spec.ts:129</code> deckt den Pfad bereits ab und schützt den Umbau.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="medium" data-cat="Projektaufbau &amp; Build" data-status="new" tabindex="0">
-        <td class="c-id"><code>PKG-001</code></td>
-        <td><span class="sev sev-medium">medium</span></td>
-        <td class="c-cat">Projektaufbau &amp; Build</td>
-        <td class="c-title"><code>audit.html</code> wird ins veröffentlichte npm-Paket gepackt<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>.npmignore, package.json (kein `files`-Feld)</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="medium" data-cat="Projektaufbau &amp; Build" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p><code>npm pack --dry-run</code> listet 30 Dateien, darunter <code>audit.html</code> mit 39,8 kB — gut ein Drittel des Tarballs (112,2 kB gepackt). Ein interner Qualitätsreport samt Backlog und Schwachstellenliste geht damit an jeden Konsumenten des Pakets. Ursache ist der Allowlist-Ansatz, der fehlt: <code>package.json</code> hat kein <code>files</code>-Feld, also entscheidet die <code>.npmignore</code>-Denylist, und die kennt nur, was zum Zeitpunkt ihres Schreibens existierte.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Ein <code>files</code>-Feld in <code>package.json</code> setzen — <code>["lib", "docs", "skills", "README.md", "CHANGELOG.md", "LICENSE"]</code> — und die <code>.npmignore</code> löschen. Eine Allowlist kann nicht veralten; jede neue Datei im Repo-Root ist damit standardmäßig draußen statt standardmäßig drin. Deckt zugleich DX-002 vollständig ab.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="medium" data-cat="Projektaufbau &amp; Build" data-status="new" tabindex="0">
-        <td class="c-id"><code>BUILD-002</code></td>
-        <td><span class="sev sev-medium">medium</span></td>
-        <td class="c-cat">Projektaufbau &amp; Build</td>
-        <td class="c-title">Release-Job installiert mit <code>npm i</code> statt <code>npm ci</code><span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>.github/workflows/main.yml (deploy-Job)</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="medium" data-cat="Projektaufbau &amp; Build" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Der <code>test</code>-Job installiert korrekt mit <code>npm ci</code>, der <code>deploy</code>-Job daneben mit <code>npm i</code>. Das darf das Lockfile verändern und zieht potenziell andere Versionen als die, gegen die soeben getestet wurde — veröffentlicht wird also ein Artefakt aus einem Baum, den kein Test je gesehen hat. Bei einer Bibliothek mit null Runtime-Dependencies ist das Risiko klein, aber <code>tsup</code>, <code>typescript</code> und die Banner-Skripte bestimmen die Ausgabe unmittelbar.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p><code>npm i</code> durch <code>npm ci</code> ersetzen. Besser noch: das <code>lib/</code>-Verzeichnis als Artefakt aus dem <code>test</code>-Job übernehmen (<code>actions/upload-artifact</code> / <code>download-artifact</code>), statt im Deploy-Job ein zweites Mal zu bauen — dann ist veröffentlicht, was getestet wurde, und nicht bloß etwas Gleichartiges.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="medium" data-cat="Testabdeckung &amp; Teststrategie" data-status="new" tabindex="0">
-        <td class="c-id"><code>TEST-001</code></td>
-        <td><span class="sev sev-medium">medium</span></td>
-        <td class="c-cat">Testabdeckung &amp; Teststrategie</td>
-        <td class="c-title">Coverage wird gemessen, aber nirgends abgesichert<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>jest.config.ts, .github/workflows/*.yml</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="medium" data-cat="Testabdeckung &amp; Teststrategie" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Der aktuelle Stand ist gut — 414 Tests, 96,13 % Statements, 94,32 % Branches — nur schützt ihn nichts. <code>jest.config.ts</code> hat weder <code>collectCoverageFrom</code> noch <code>coverageThreshold</code>, und keiner der beiden Workflows ruft Jest mit <code>--coverage</code> auf. Coverage kann also unbemerkt fallen, und niemand erfährt es. Bei einer Bibliothek, deren Verhaltensversprechen fast vollständig aus den Specs erwachsen, ist das die empfindlichste offene Flanke der Testinfrastruktur.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p><code>collectCoverageFrom: ["src/**/*.ts", "!src/**/*.spec.ts", "!src/__test-utils__/**"]</code> und einen <code>coverageThreshold</code> knapp unter dem Ist-Stand setzen (etwa 95/93/92/95), damit die Schwelle bindet statt zu dekorieren. <code>npm test</code> in beiden Workflows um <code>-- --coverage</code> erweitern.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="medium" data-cat="Typsicherheit (TS)" data-status="carried-over" tabindex="0">
-        <td class="c-id"><code>TYPE-001</code></td>
-        <td><span class="sev sev-medium">medium</span></td>
-        <td class="c-cat">Typsicherheit (TS)</td>
-        <td class="c-title"><code>strictNullChecks: false</code> hebelt <code>strict: true</code> aus<span class="badge badge-carried-over">carried-over</span></td>
-        <td class="c-loc"><code>tsconfig.json:16-17</code></td>
-        <td class="c-eff">M</td>
-      </tr>
-      <tr class="detail" data-sev="medium" data-cat="Typsicherheit (TS)" data-status="carried-over" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Weiterhin unverändert: <code>"strict": true</code> steht direkt neben <code>"strictNullChecks": false</code>, was die wichtigste der von <code>strict</code> aktivierten Prüfungen wieder abschaltet. Sichtbare Folgen im Code: <code>EventKeeper.replayTo</code> dereferenziert <code>this.events.get(eventName)</code> ohne Prüfung, <code>detectListenerType</code> kann <code>undefined</code> liefern, ohne dass der Rückgabetyp es zeigt (ARCH-003), und der <code>as UnsubscribeFunc</code>-Cast in <code>once()</code> verdeckt fehlende Properties (API-001). Da die Konsumenten ihre eigene <code>strictNullChecks</code>-Einstellung mitbringen, trifft die Nachlässigkeit vor allem die eigene Entwicklung — dort aber an genau den Stellen, an denen dieser Lauf Defekte gefunden hat.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Schrittweise umstellen: <code>strictNullChecks: true</code> setzen, die Fehlerliste erzeugen, <code>EventKeeper.replayTo</code>, <code>detectListenerType</code> und die Rückgabetypen von <code>getListenersForEventName</code> sauber typisieren. Der Umfang ist überschaubar (&lt; 800 Zeilen Produktivcode) und die entstehenden Fehler zeigen mit hoher Trefferquote auf die Stellen, die bereits im Backlog stehen.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="medium" data-cat="Architektur &amp; Struktur" data-status="carried-over" tabindex="0">
-        <td class="c-id"><code>ARCH-001</code></td>
-        <td><span class="sev sev-medium">medium</span></td>
-        <td class="c-cat">Architektur &amp; Struktur</td>
-        <td class="c-title">Modul-globale Zähler koppeln alle Emitter über Realm-Grenzen hinweg<span class="badge badge-carried-over">carried-over</span></td>
-        <td class="c-loc"><code>src/EventKeeper.ts:14 (nextOrderId), src/EventListener.ts:48 (lastId)</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="medium" data-cat="Architektur &amp; Struktur" data-status="carried-over" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Weiterhin belegt: beide Zähler sind Modul-globale <code>let</code>-Variablen. <code>lastId</code> bestimmt die Sekundärsortierung gleicher Priorität, <code>nextOrderId</code> die Replay-Reihenfolge retained Events. Werden ESM- und CJS-Build im selben Prozess geladen — was das Dual-Format-Paket ausdrücklich erlaubt —, laufen zwei unabhängige Zählerpaare, und die Ordnungsgarantie gilt nur noch innerhalb einer Instanz. Verifiziert wurde die monotone globale Vergabe (<code>id 16 → 17</code> für zwei Emitter). Praktisch selten, aber es ist genau der Zustand, den <code>Symbol.for("eventize")</code> beim Marker bewusst vermeidet.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Entweder konsequent den <code>Symbol.for</code>-Weg gehen und die Zähler in einem realm-weiten Registry-Objekt halten, oder die Grenze dokumentieren: eine Zeile in <code>AGENTS.md</code> unter „Architecture invariants", dass Sortierstabilität pro geladener Modulinstanz gilt. Die Dokumentation ist hier die ehrlichere und billigere Lösung.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="medium" data-cat="Developer Experience" data-status="carried-over" tabindex="0">
-        <td class="c-id"><code>DX-002</code></td>
-        <td><span class="sev sev-medium">medium</span></td>
-        <td class="c-cat">Developer Experience</td>
-        <td class="c-title"><code>.npmignore</code> listet überwiegend Dateien, die es nicht mehr gibt<span class="badge badge-carried-over">carried-over</span></td>
-        <td class="c-loc"><code>.npmignore</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="medium" data-cat="Developer Experience" data-status="carried-over" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Von 22 Einträgen zeigen <code>rollup</code>, <code>.eslintignore</code>, <code>.eslintrc.yaml</code>, <code>.travis.yml</code>, <code>.size-snapshot.json</code> und <code>BACKLOG.md</code> auf nichts — Überbleibsel früherer Toolchains. Gleichzeitig fehlen die Einträge, die zählen würden: <code>audit.html</code> und <code>coverage/</code> sind nicht gelistet, ersteres wird tatsächlich ausgeliefert (PKG-001). Eine Denylist, die vergangene Dateien blockiert und gegenwärtige durchlässt, ist genau die Fehlerart, gegen die eine Allowlist immun ist.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Mit PKG-001 in einem Zug erledigen: <code>files</code>-Allowlist in <code>package.json</code>, <code>.npmignore</code> ersatzlos löschen.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="low" data-cat="Memory Leaks &amp; Ressourcen" data-status="new" tabindex="0">
-        <td class="c-id"><code>MEM-007</code></td>
-        <td><span class="sev sev-low">low</span></td>
-        <td class="c-cat">Memory Leaks &amp; Ressourcen</td>
-        <td class="c-title"><code>getListenersForEventName</code> ist ein Instanzfeld statt einer Prototyp-Methode<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>src/EventStore.ts:140-147</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="low" data-cat="Memory Leaks &amp; Ressourcen" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Verifiziert: die Funktion liegt als eigene Property auf jeder <code>EventStore</code>-Instanz, nicht auf dem Prototyp — als einzige der Klasse, alle übrigen sind reguläre Methoden. Da pro eventisiertem Objekt ein Store entsteht, bedeutet das eine überflüssige Closure je Emitter. Bei einer Handvoll Emittern irrelevant, bei zehntausenden (Entity-Systeme, Szenengraphen — das Anwendungsfeld, aus dem dieses Paket stammt) messbar. Ein <code>this</code>-Binding braucht die Funktion nicht: sie wird ausschließlich intern über <code>this.</code> aufgerufen.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>In eine gewöhnliche Methode umwandeln. Rein mechanisch, kein Aufrufer außerhalb der Klasse.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="low" data-cat="Testabdeckung &amp; Teststrategie" data-status="new" tabindex="0">
-        <td class="c-id"><code>TEST-002</code></td>
-        <td><span class="sev sev-low">low</span></td>
-        <td class="c-cat">Testabdeckung &amp; Teststrategie</td>
-        <td class="c-title">Kein Spec deckt die in diesem Lauf verifizierten Leak-Pfade ab<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>src/off.spec.ts, src/once.spec.ts, src/retain.spec.ts</code></td>
-        <td class="c-eff">M</td>
-      </tr>
-      <tr class="detail" data-sev="low" data-cat="Testabdeckung &amp; Teststrategie" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Die Testsuite ist mit 414 Fällen dicht, aber sechs reproduzierbare Defekte dieses Audits (MEM-001, MEM-002, MEM-003, BUG-001, BUG-002, API-001) sind sämtlich ungetestet — sie liegen alle in derselben blinden Zone: dem Zusammenspiel von refCount-Dedup, <code>callAfterApply</code> und dem Keeper. Jeder Einzelfall lässt sich in unter zehn Zeilen prüfen, <code>getSubscriptionCount()</code> liefert die Zusicherung.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Eine <code>src/lifecycle.spec.ts</code> anlegen, die pro Fix aus diesem Backlog einen Fall enthält: Subscription-Zähler nach jeder <code>off()</code>-Variante, Keeper-Größe nach <code>off(ε)</code>, mehrfaches <code>once()</code> auf dasselbe Listener-Objekt, <code>retain(ε,"*")</code>. Die Datei wird nebenbei zur ausführbaren Beschreibung dessen, was Aufräumen in dieser Bibliothek bedeutet.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="low" data-cat="Implementierungsstand" data-status="new" tabindex="0">
-        <td class="c-id"><code>IMPL-001</code></td>
-        <td><span class="sev sev-low">low</span></td>
-        <td class="c-cat">Implementierungsstand</td>
-        <td class="c-title"><code>definePublicPropertyRO</code> / <code>definePublicPropertiesRO</code> sind toter Code<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>src/utils.ts:26-49</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="low" data-cat="Implementierungsstand" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Beide Funktionen werden nirgends im Projekt aufgerufen — weder im Produktivcode noch in Specs — und <code>index.ts</code> exportiert sie nicht. Das schlägt sich unmittelbar in der Coverage nieder: <code>utils.ts</code> steht bei 50 % Funktions- und 70,37 % Statement-Abdeckung, während jede andere Kerndatei bei oder nahe 100 % liegt. Die einzige tatsächlich genutzte Variante ist <code>defineHiddenPropertyRO</code>.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Beide löschen. Sie sind nicht Teil der öffentlichen API, der Verlust ist über git jederzeit rekonstruierbar, und <code>utils.ts</code> springt damit auf volle Abdeckung.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="low" data-cat="Projektaufbau &amp; Build" data-status="new" tabindex="0">
-        <td class="c-id"><code>BUILD-003</code></td>
-        <td><span class="sev sev-low">low</span></td>
-        <td class="c-cat">Projektaufbau &amp; Build</td>
-        <td class="c-title">Die beiden Workflows sind auseinandergelaufen<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>.github/workflows/dev.yml vs. main.yml</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="low" data-cat="Projektaufbau &amp; Build" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p><code>dev.yml</code> verwendet <code>actions/checkout@v3</code> und <code>actions/setup-node@v3</code> auf Node 18, <code>main.yml</code> die v4-Actions auf Node 24. Die v3-Actions laufen auf einer abgekündigten Node-16-Runner-Umgebung und erzeugen bei jedem Lauf Deprecation-Warnungen. Bei identischen Schrittlisten in beiden Dateien ist die Divergenz reine Drift, keine Absicht — und sie kaschiert, dass gegen genau eine Node-Version getestet wird, während <code>engines</code> <code>&gt;=18.16</code> verspricht (DX-003).</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Beide auf <code>@v4</code> heben und die gemeinsame Schrittfolge in eine Matrix über Node 18/20/24 ziehen; <code>dev.yml</code> und <code>main.yml</code> unterscheiden sich dann nur noch im Trigger und im Deploy-Job.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="low" data-cat="Typsicherheit (TS)" data-status="carried-over" tabindex="0">
-        <td class="c-id"><code>TYPE-002</code></td>
-        <td><span class="sev sev-low">low</span></td>
-        <td class="c-cat">Typsicherheit (TS)</td>
-        <td class="c-title">ESLint schaltet mehrere Typdisziplin-Regeln pauschal ab<span class="badge badge-carried-over">carried-over</span></td>
-        <td class="c-loc"><code>eslint.config.mjs:55-68</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="low" data-cat="Typsicherheit (TS)" data-status="carried-over" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Unverändert: 14 <code>@typescript-eslint</code>-Regeln stehen auf <code>0</code>, darunter <code>no-explicit-any</code>, <code>ban-ts-comment</code> und <code>no-non-null-assertion</code>. Ein Teil ist an dieser Codebasis begründbar — die Dispatch-Logik arbeitet konstruktionsbedingt mit <code>unknown</code> und <code>any</code> —, aber die Liste enthält auch Altlasten für Regeln, die es unter diesen Namen nicht mehr gibt (<code>ban-ts-ignore</code>, <code>interface-name-prefix</code>, <code>no-var-requires</code>).</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Die toten Einträge entfernen und die verbleibenden von <code>0</code> auf <code>warn</code> mit einem Kommentar versehen, warum sie in dieser Codebasis nicht greifen können. Eine abgeschaltete Regel mit Begründung ist eine Entscheidung, eine ohne ist ein Zufall.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="low" data-cat="Typsicherheit (TS)" data-status="carried-over" tabindex="0">
-        <td class="c-id"><code>TYPE-003</code></td>
-        <td><span class="sev sev-low">low</span></td>
-        <td class="c-cat">Typsicherheit (TS)</td>
-        <td class="c-title">Vier <code>@ts-expect-error</code> tragen den diskriminierten Switch<span class="badge badge-carried-over">carried-over</span></td>
-        <td class="c-loc"><code>src/EventListener.ts:108, 114, 120, 129</code></td>
-        <td class="c-eff">M</td>
-      </tr>
-      <tr class="detail" data-sev="low" data-cat="Typsicherheit (TS)" data-status="carried-over" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Unverändert: <code>EventListener.apply</code> schaltet über den numerischen <code>listenerType</code> und muss TypeScript an vier Stellen überstimmen, weil eine Zahl kein Discriminator ist, aus dem sich <code>listener</code> verengen ließe. Die Kommentare erklären jeweils sauber, warum der Zugriff sicher ist — aber vier unterdrückte Fehler in einer 138-Zeilen-Datei sind der Preis für eine Modellierung, die es nicht sein müsste.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p><code>EventListener</code> als diskriminierte Union über ein String-Literal-Feld modellieren (<code>kind: "func" | "named" | "obj"</code>) mit korrekt typisiertem <code>listener</code> je Variante. Dann verengt der Switch von selbst und alle vier Unterdrückungen entfallen. Der numerische <code>listenerType</code> bleibt als internes Feld erhalten, solange <code>isSimilar()</code> ihn vergleicht.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="low" data-cat="Testabdeckung &amp; Teststrategie" data-status="carried-over" tabindex="0">
-        <td class="c-id"><code>TEST-003</code></td>
-        <td><span class="sev sev-low">low</span></td>
-        <td class="c-cat">Testabdeckung &amp; Teststrategie</td>
-        <td class="c-title">Specs nutzen 81-mal <code>@ts-ignore</code> statt <code>@ts-expect-error</code><span class="badge badge-carried-over">carried-over</span></td>
-        <td class="c-loc"><code>src/on.spec.ts, src/off.spec.ts, src/eventize.spec.ts u. a.</code></td>
-        <td class="c-eff">M</td>
-      </tr>
-      <tr class="detail" data-sev="low" data-cat="Testabdeckung &amp; Teststrategie" data-status="carried-over" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Unverändert im Verhältnis: 81 <code>@ts-ignore</code> gegenüber 13 <code>@ts-expect-error</code>. Der Unterschied ist an dieser Stelle wesentlich — <code>@ts-expect-error</code> schlägt fehl, sobald der Fehler verschwindet, und wird damit selbst zum Test der Typen. <code>@ts-ignore</code> schweigt in beiden Richtungen: wenn eine Typänderung einen bisher abgelehnten Aufruf plötzlich erlaubt, merkt es niemand. Bei einer Bibliothek, deren Typ-Ebene ein zentrales Feature ist (typisierte Event-Maps, <code>NonTypedEmitter</code>-Weiche), verschenkt das 81 kostenlose Assertions. Die 13 vorhandenen <code>@ts-expect-error</code> in <code>documented-quirks.spec.ts</code> und <code>typed-events.spec.ts</code> zeigen, dass die Technik im Projekt bereits etabliert ist.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Mechanisch ersetzen und die Suite laufen lassen; jede Stelle, die danach bricht, ist ein Fund. Als ESLint-Regel absichern: <code>@typescript-eslint/ban-ts-comment</code> mit <code>{"ts-ignore": true, "ts-expect-error": false}</code> für <code>**/*.spec.ts</code> — steht aktuell auf <code>0</code> (TYPE-002).</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="low" data-cat="Developer Experience" data-status="carried-over" tabindex="0">
-        <td class="c-id"><code>DX-001</code></td>
-        <td><span class="sev sev-low">low</span></td>
-        <td class="c-cat">Developer Experience</td>
-        <td class="c-title">Vier Relativimports tragen <code>.js</code>-Endungen gegen die eigene Konvention<span class="badge badge-carried-over">carried-over</span></td>
-        <td class="c-loc"><code>src/types.ts:1-3, src/getSubscriptionCount.ts:4</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="low" data-cat="Developer Experience" data-status="carried-over" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p><code>AGENTS.md</code> legt unter „Conventions" fest: „Relative imports carry no extension — tsup writes the output extensions." Vier Importe halten sich nicht daran. Alle vier sind Type-Only-Importe und damit folgenlos für die Ausgabe — es ist ein Konsistenz-, kein Korrektheitsproblem. Es bleibt im Backlog, weil eine Regel, die in der eigenen Agenten-Dokumentation steht und im eigenen Code gebrochen wird, jede künftige Berufung darauf schwächt.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Die vier Endungen entfernen. Als Regel absichern, damit es nicht erneut driftet: <code>@typescript-eslint/consistent-type-imports</code> ist bereits aktiv, <code>import/extensions</code> ließe sich ergänzen.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="low" data-cat="Developer Experience" data-status="carried-over" tabindex="0">
-        <td class="c-id"><code>DX-003</code></td>
-        <td><span class="sev sev-low">low</span></td>
-        <td class="c-cat">Developer Experience</td>
-        <td class="c-title"><code>engines.node</code> verspricht mehr, als getestet wird<span class="badge badge-carried-over">carried-over</span></td>
-        <td class="c-loc"><code>package.json:27, .github/workflows/main.yml</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="low" data-cat="Developer Experience" data-status="carried-over" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Unverändert: <code>"node": "&gt;=18.16"</code> deckt vier Major-Versionen ab, die Pipeline prüft <code>dev.yml</code> gegen 18 und <code>main.yml</code> gegen 24 — 20 und 22 laufen nie. Die Bibliothek hat keine Runtime-Dependencies und nutzt nur ES2022-Sprachmittel, das Risiko ist entsprechend gering; die Zusage bleibt trotzdem ungedeckt.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Mit BUILD-003 zusammen erledigen: Node-Matrix <code>[18, 20, 22, 24]</code> im Test-Job. Kostet ein paar Minuten CI und macht aus der Behauptung eine Prüfung.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="low" data-cat="Architektur &amp; Struktur" data-status="carried-over" tabindex="0">
-        <td class="c-id"><code>ARCH-002</code></td>
-        <td><span class="sev sev-low">low</span></td>
-        <td class="c-cat">Architektur &amp; Struktur</td>
-        <td class="c-title">Verwaister TODO-Kommentar in EventStore<span class="badge badge-carried-over">carried-over</span></td>
-        <td class="c-loc"><code>src/EventStore.ts:47</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="low" data-cat="Architektur &amp; Struktur" data-status="carried-over" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p><code>// TODO removeSimilarListener()</code> steht ohne Bezug zwischen zwei Funktionsdefinitionen. Die Funktion existiert unter dem Namen <code>removeSimilarListenersFromArray</code> direkt darunter — was der Kommentar noch fordert, ist nicht erkennbar. Der zweite TODO im Projekt (<code>src/subscribeTo.ts:21</code>) ist dagegen substanziell und als CORR-001 im Backlog.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Löschen. Ein TODO, dessen Absicht sich nicht mehr rekonstruieren lässt, ist Rauschen.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="low" data-cat="Architektur &amp; Struktur" data-status="carried-over" tabindex="0">
-        <td class="c-id"><code>ARCH-003</code></td>
-        <td><span class="sev sev-low">low</span></td>
-        <td class="c-cat">Architektur &amp; Struktur</td>
-        <td class="c-title"><code>detectListenerType</code> kann implizit <code>undefined</code> liefern<span class="badge badge-carried-over">carried-over</span></td>
-        <td class="c-loc"><code>src/EventListener.ts:36-46</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="low" data-cat="Architektur &amp; Struktur" data-status="carried-over" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Unverändert: der Switch deckt <code>function</code>, <code>string</code>, <code>symbol</code> und <code>object</code> ab und hat keinen <code>default</code>-Zweig — für <code>number</code>, <code>boolean</code>, <code>bigint</code> oder <code>undefined</code> fällt er auf <code>undefined</code> durch. Der Rückgabetyp wird als <code>number</code> inferiert, weil <code>strictNullChecks: false</code> das <code>undefined</code> verschluckt (TYPE-001). Praktisch fängt <code>subscribeTo</code> falsche Listener vorher ab, weshalb der Zweig nie erreicht wird — der Typ lügt trotzdem, und mit aktivem <code>strictNullChecks</code> wäre es sofort ein Fehler.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Einen <code>default</code>-Zweig ergänzen, der wirft oder einen expliziten Sentinel liefert, und den Rückgabetyp annotieren. Ein Kandidat für den ersten Schritt der TYPE-001-Umstellung.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="low" data-cat="Dependencies" data-status="carried-over" tabindex="0">
-        <td class="c-id"><code>DEP-001</code></td>
-        <td><span class="sev sev-low">low</span></td>
-        <td class="c-cat">Dependencies</td>
-        <td class="c-title"><code>@types/sinon</code> hinkt fünf Majors hinter <code>sinon</code> her<span class="badge badge-carried-over">carried-over</span></td>
-        <td class="c-loc"><code>package.json:46,56</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="low" data-cat="Dependencies" data-status="carried-over" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Unverändert und deutlicher geworden: <code>sinon@^21.0.0</code> gegen <code>@types/sinon@^17.0.4</code>, aktuell wären 22.x. Da sinon ab Version 17 eigene Typdefinitionen mitbringt, ist das Paket nicht bloß veraltet, sondern überflüssig — und schlimmer als überflüssig, weil ein <code>@types</code>-Paket die mitgelieferten Typen überschreibt und in den Specs Signaturen vortäuscht, die fünf Majors alt sind.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p><code>@types/sinon</code> ersatzlos entfernen und <code>npm run cbt</code> laufen lassen. Falls dabei Typfehler auftauchen, sind es echte — bislang von veralteten Typen verdeckt.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="low" data-cat="Dependencies" data-status="carried-over" tabindex="0">
-        <td class="c-id"><code>DEP-002</code></td>
-        <td><span class="sev sev-low">low</span></td>
-        <td class="c-cat">Dependencies</td>
-        <td class="c-title">14 Dev-Dependencies veraltet, drei mit Major-Sprung<span class="badge badge-carried-over">carried-over</span></td>
-        <td class="c-loc"><code>package.json devDependencies</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="low" data-cat="Dependencies" data-status="carried-over" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p><code>npm outdated</code> meldet 14 Pakete. Die Mehrzahl sind Minor-Rückstände (jest 30.0.5 → 30.4.2, prettier 3.6.2 → 3.9.6, ts-jest, tsup, typescript-eslint), drei sind Majors: eslint 9 → 10, typescript 5.9 → 7.0 und globals 16 → 17. <code>npm audit</code> meldet null Schwachstellen — es geht um Aktualität, nicht um Sicherheit. Bei null Runtime-Dependencies ist die Angriffsfläche des veröffentlichten Pakets davon ohnehin unberührt.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Die Minors sammelweise ziehen (<code>npm update</code>), dann <code>npm run cbt</code>. Die drei Majors getrennt und einzeln — besonders TypeScript 7, dessen nativer Compiler das Verhalten von <code>attw</code>, <code>ts-jest</code> und den generierten <code>.d.ts</code> neu vermisst. Dependabot ist im Repo aktiv (siehe Commit a0ba6bc), aber ohne eingecheckte <code>.github/dependabot.yml</code>; die Konfiguration gehört ins Repo, damit sie überprüfbar ist.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="info" data-cat="Memory Leaks &amp; Ressourcen" data-status="new" tabindex="0">
-        <td class="c-id"><code>MEM-008</code></td>
-        <td><span class="sev sev-info">info</span></td>
-        <td class="c-cat">Memory Leaks &amp; Ressourcen</td>
-        <td class="c-title">Retained Events halten die Emit-Argumente per Referenz<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>src/eventize-api.ts:58, src/EventKeeper.ts:49-53</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="info" data-cat="Memory Leaks &amp; Ressourcen" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Verifiziert: <code>keeper.events.get(name).args[0]</code> ist identisch mit dem übergebenen Objekt — der Keeper legt keine Kopie an. Das ist die einzig sinnvolle Implementierung (eine Event-Bibliothek darf Payloads nicht klonen), hat aber eine Konsequenz, die nirgends steht: ein einziges <code>retain()</code> auf ein Event, das einmal einen großen Buffer, ein DOM-Element oder einen Objektgraphen transportiert hat, hält diesen bis zum nächsten Emit desselben Events, bis <code>retainClear()</code> oder bis zum Ende des Emitters am Leben.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Einen Absatz in <code>docs/retain.md</code> unter „Notes" ergänzen: retained Payloads sind starke Referenzen, <code>retainClear()</code> ist das Gegenmittel, und bei großen Nutzlasten ist es sinnvoll. Kein Codefix — die Dokumentation ist der Fix.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="info" data-cat="Öffentliche API" data-status="new" tabindex="0">
-        <td class="c-id"><code>API-002</code></td>
-        <td><span class="sev sev-info">info</span></td>
-        <td class="c-cat">Öffentliche API</td>
-        <td class="c-title">Retained State lässt sich von außen nicht inspizieren<span class="badge badge-new">new</span></td>
-        <td class="c-loc"><code>src/getSubscriptionCount.ts, src/index.ts</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="info" data-cat="Öffentliche API" data-status="new" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p><code>getSubscriptionCount()</code> existiert ausdrücklich, um Aufräumen verifizieren zu können — die README nennt es „useful for debugging, testing, or verifying that cleanup actually happened". Für die zweite Hälfte des Emitter-Zustands gibt es kein Gegenstück: wie viele Events retained sind, welche Namen eine Retain-Policy tragen und wie viel daran hängt, ist ohne Zugriff auf <code>ε[Symbol.for("eventize")].keeper</code> nicht feststellbar. Genau dieser blinde Fleck macht MEM-001 und MEM-005 in fremdem Code unsichtbar.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p><code>getRetainedCount(ε)</code> und <code>getRetainedEventNames(ε)</code> analog zu <code>getSubscriptionCount()</code> exportieren — beide sind Einzeiler auf dem bestehenden Keeper und schließen die Diagnoselücke, die dieser Audit an mehreren Stellen umgehen musste.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="info" data-cat="Konsistenz" data-status="carried-over" tabindex="0">
-        <td class="c-id"><code>INFO-001</code></td>
-        <td><span class="sev sev-info">info</span></td>
-        <td class="c-cat">Konsistenz</td>
-        <td class="c-title">Priority-Legacy-Aliase bleiben Teil der öffentlichen Oberfläche<span class="badge badge-carried-over">carried-over</span></td>
-        <td class="c-loc"><code>src/Priority.ts:10-14, src/types.ts:309-321</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="info" data-cat="Konsistenz" data-status="carried-over" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p><code>AAA</code>, <code>BB</code>, <code>C</code> und <code>Default</code> stehen weiterhin neben den sprechenden Namen <code>Max</code>/<code>Critical</code>/<code>High</code>/<code>Normal</code>/<code>Low</code>/<code>Min</code> und sind über <code>EventizePriority</code> fest im exportierten Interface verankert. Der Kommentar markiert sie als Legacy, aber nichts warnt beim Gebrauch, und <code>C: 1e3</code> hat kein modernes Gegenstück — der Wert liegt zwischen <code>High</code> (1e6) und <code>Normal</code> (0), ein Alias ist es also nicht.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Für v6 sammeln: <code>@deprecated</code>-JSDoc an die vier Felder, damit Editoren sie durchstreichen, und im CHANGELOG als Entfernungskandidaten ankündigen. Solange <code>C</code> keinen Nachfolger hat, gehört ein <code>Medium: 1e3</code> daneben.</p></div>
-          </div>
-        </td>
-      </tr>
-      <tr class="row" data-sev="info" data-cat="Architektur &amp; Struktur" data-status="carried-over" tabindex="0">
-        <td class="c-id"><code>INFO-002</code></td>
-        <td><span class="sev sev-info">info</span></td>
-        <td class="c-cat">Architektur &amp; Struktur</td>
-        <td class="c-title">Die Argument-Heuristik von <code>_subscribeTo</code> ist nur durch Kommentare strukturiert<span class="badge badge-carried-over">carried-over</span></td>
-        <td class="c-loc"><code>src/subscribeTo.ts:39-56</code></td>
-        <td class="c-eff">S</td>
-      </tr>
-      <tr class="detail" data-sev="info" data-cat="Architektur &amp; Struktur" data-status="carried-over" hidden>
-        <td colspan="6">
-          <div class="detail-inner">
-            <div class="d-block"><h4>Befund</h4><p>Achtzehn Überladungen von <code>on()</code> werden in einer Kaskade aus Längenprüfungen und <code>typeof</code>-Tests auf vier Variablen destrukturiert. Der Code ist korrekt und durch die Specs breit abgedeckt, aber die Zuordnung Überladung → Zweig existiert nur im Kopf des Lesers; <code>AGENTS.md</code> weist eigens darauf hin, dass <code>subscribeTo</code> und <code>types.ts</code> im Gleichschritt geändert werden müssen. Das ist die Stelle, an der eine künftige API-Erweiterung am ehesten still danebengreift.</p></div>
-            <div class="d-block"><h4>Empfehlung</h4><p>Über jeden der drei Zweige einen Einzeiler setzen, der die Überladungsnummern aus <code>eventize-api.ts</code> nennt (<code>// (4) catch-all: on(priority, listener[, obj])</code>). Der Kommentarblock in <code>eventize-api.ts:128-138</code> nummeriert bereits — die Nummern nur an der zweiten Stelle sichtbar machen, die sie betrifft.</p></div>
-          </div>
-        </td>
-      </tr>
-    </tbody>
+    <thead>
+      <tr>
+        <th>ID</th><th>Severity</th><th>Titel</th><th>Kategorie</th><th>Location</th><th>Aufwand</th>
+      </tr>
+    </thead>
+    <tbody id="backlog"></tbody>
   </table>
-  <div class="empty" id="empty" hidden>Keine Findings für diese Filterkombination.</div>
+  <div class="empty" id="emptyMsg" hidden>Keine Findings für diese Filter.</div>
 </div>
-<p style="margin-top:0.8rem;font-size:0.83rem;color:var(--text-3)">
-  Zeile anklicken für Befund und Empfehlung. Aufwand: S ≈ unter einer Stunde,
-  M ≈ ein halber Tag, L ≈ mehr.
-</p>
+<p style="font-size:.85rem; color:var(--text-3); margin-top:10px">Zeile anklicken für Problem und Empfehlung.</p>
 
 <h2>Offene Fragen</h2>
-<ul class="clean">
-  <li>
-    <strong>MEM-001 — welche Semantik ist gewollt?</strong> Dass <code>off(ε)</code> die
-    Retains überleben lässt, kann Absicht sein: ein Emitter, der seinen Zustand behält,
-    während die Zuhörer wechseln, ist ein legitimes Muster. Nur steht diese Absicht
-    nirgends, und <code>off(ε, name)</code> verhält sich genau umgekehrt — dort fällt die
-    Retain-Policy mit weg. Eine der beiden Formen ist falsch; welche, ist eine
-    Produktentscheidung.
-  </li>
-  <li>
-    <strong>MEM-002 — soll <code>once()</code> überhaupt dedupliziert werden?</strong> Die
-    Referenzzählung ist für <code>on()</code> dokumentiert und gewollt. Für
-    <code>once()</code> ergibt sie kaum Sinn, weil zwei Einmal-Abonnements zwei
-    Auslösungen erwarten lassen. Die Frage entscheidet, ob der Fix in
-    <code>EventStore</code> oder in <code>eventize-api</code> gehört.
-  </li>
-  <li>
-    <strong>Ist <code>retain()</code> mit dynamisch erzeugten Namen ein unterstütztes
-    Muster?</strong> Davon hängt ab, ob MEM-005 eine Dokumentationszeile braucht oder
-    eine API (<code>getRetainedCount</code>, Bulk-Clear). Aus README und
-    <code>docs/retain.md</code> geht die Erwartungshaltung nicht hervor.
-  </li>
-</ul>
+<div class="panel">
+  <p>Zwei Befunde lassen sich nicht beheben, ohne vorher eine Produktentscheidung zu treffen. Beide Wege sind vertretbar, aber sie führen zu unterschiedlichem Code und unterschiedlicher Doku.</p>
+  <ul>
+    <li><strong>BUG-003 — soll <code>off(ε, '*', listenerObject)</code> abmelden oder ablehnen?</strong> Analog zur benannten Form würde man erwarten, dass die Wildcard-Subscriptions genau dieses Objekts verschwinden. Die Alternative ist, die Kombination als Aufruferfehler zu behandeln und zu werfen. Der heutige stille No-Op ist die einzige Variante, die niemand erwartet.</li>
+    <li><strong>BUG-004 — Code an die Zusage anpassen oder die Zusage an den Code?</strong> Entweder der Merge in <code>forEach()</code> vergleicht bei Prioritätsgleichheit die <code>id</code> und stellt echte Registrierungsreihenfolge her, oder die dokumentierte Garantie wird auf »innerhalb eines Buckets« eingeschränkt und die Bevorzugung benannter Listener wird selbst zur Zusage. Ersteres ist ein Breaking Change für Code, der sich auf die heutige Reihenfolge verlässt.</li>
+  </ul>
+  <p style="margin-bottom:0">Offen bleibt außerdem, ob <code>moduleResolution</code> (BUILD-001) auf <code>bundler</code> oder <code>node16</code> gehen soll. <code>bundler</code> bildet ab, wie tsup und die meisten Consumer auflösen; <code>node16</code> wäre strenger, verlangt aber Datei-Endungen an Relativimports und bricht damit die ausdrückliche Konvention des Repos.</p>
+</div>
 
 <h2>Optimierungspotenzial</h2>
-<p>Kein Defekt, aber Hebel mit gutem Verhältnis von Aufwand zu Wirkung:</p>
-<ul class="clean">
-  <li>
-    <strong>Eine Lebenszyklus-Doku.</strong> Der Bibliothek fehlt die Seite, die
-    beantwortet, was Aufräumen bedeutet: welche Referenzen ein Emitter hält, was
-    <code>off()</code> in welcher Form löst, wann Retains bestehen bleiben, welche
-    Handles man behalten muss. <code>docs/lifecycle.md</code> würde die Hälfte dieses
-    Backlogs für künftige Nutzer vorwegnehmen.
-  </li>
-  <li>
-    <strong><code>getRetainedCount()</code> als Gegenstück zu
-    <code>getSubscriptionCount()</code>.</strong> Ein Einzeiler auf dem bestehenden
-    Keeper, der die Diagnoselücke schließt, die dieser Audit über Zugriffe auf
-    <code>Symbol.for('eventize')</code> umgehen musste.
-  </li>
-  <li>
-    <strong>Ein Leak-Regressionstest als Gattung.</strong> <code>EventStore.spec.ts:129</code>
-    („does not leak with many unique event names") ist genau die richtige Idee und steht
-    allein da. Dieselbe Bauart für Keeper-Wachstum, refCount-Kollaps und
-    Handle-Lebensdauer macht aus einem Einzelfall ein Sicherheitsnetz.
-  </li>
-  <li>
-    <strong>Der Bundle ist klein — sagen, wie klein.</strong> 22,4 kB ESM unminifiziert,
-    <code>sideEffects: false</code>, sauber tree-shakebar. Eine Size-Zeile in der README
-    oder ein Size-Limit-Check in der CI macht aus einer Eigenschaft ein Versprechen, das
-    nicht unbemerkt verfällt.
-  </li>
-  <li>
-    <strong><code>EventListener</code> als diskriminierte Union.</strong> Löst TYPE-003
-    und macht zugleich BUG-002 schwerer wiederholbar, weil der Compiler die Zweige
-    auseinanderhält, die heute nur der numerische Tag trennt.
-  </li>
-</ul>
+<div class="panel">
+  <p>Kein Defekt, aber Hebel — nach erwartetem Nutzen sortiert.</p>
+  <ul>
+    <li><strong>Konformitäts-Suite über alle drei Oberflächen.</strong> <code>expect2ImplEventizeApi</code> prüft heute nur, dass die Methoden existieren. Eine tabellengetriebene Suite, die dieselben Verhaltensfälle einmal je Oberfläche fährt, würde TEST-001 nicht nur schließen, sondern die Invariante »eine Implementierung« dauerhaft absichern, statt sie zu behaupten.</li>
+    <li><strong>Benchmark-Harness.</strong> Die Bibliothek verkauft synchrone Zustellgeschwindigkeit, hat aber keinen Messpunkt dafür. Ohne Baseline ist PERF-001 nicht zu bewerten und jede künftige Optimierung nicht zu belegen.</li>
+    <li><strong><code>verbatimModuleSyntax</code> aktivieren.</strong> Macht die Typ-Import-Konvention des Repos zu einer Compiler-Regel statt zu einer Gewohnheit — CONS-001 wäre dann nicht auffindbar, sondern unmöglich.</li>
+    <li><strong>CI-Duplikat auflösen.</strong> <code>dev.yml</code> und <code>main.yml</code> listen dieselben fünf Schritte einzeln auf. Ein Job, der <code>npm run cbt</code> aufruft, hält lokale und entfernte Gate-Definition automatisch deckungsgleich — genau das Auseinanderlaufen, das der Vorlauf als BUILD-003 gemeldet hatte und das jetzt behoben, aber nicht strukturell verhindert ist.</li>
+    <li><strong><code>Object.freeze(Priority)</code>.</strong> Das exportierte Objekt ist beschreibbar; ein versehentliches <code>Priority.Normal = 5</code> im Consumer-Code verschiebt die Sortierung global und lautlos.</li>
+  </ul>
+</div>
 
 <h2>Methodik</h2>
-<div class="method-grid">
-  <div>
-    <h3>Gelesen</h3>
-    <p style="font-size:0.88rem;color:var(--text-2)">Alle 19 Produktivdateien unter src/ vollständig; jest.config.ts, tsconfig.json, eslint.config.mjs, tsup.config.js, package.json, beide GitHub-Workflows, scripts/publishPackage.cjs, scripts/createBanner.mjs, .npmignore, .gitignore; README.md, AGENTS.md, CHANGELOG.md, docs/off.md, docs/retain.md; Spec-Dateien als Stichprobe (emit-throwing-listener, documented-quirks, EventStore, once, onceAsync, retain) plus vollständige Testtitel-Liste aller 25 Suites.</p>
-  </div>
-  <div>
-    <h3>Nicht gelesen</h3>
-    <p style="font-size:0.88rem;color:var(--text-2)">lib/ als Quelltext (Build-Ausgabe, per AGENTS.md ausgeschlossen) — wurde ausschließlich als Laufzeit-Prüfstand geladen; docs-assets/; das Vorgänger-audit.html wurde bis nach Abschluss der frischen Analyse nicht geöffnet.</p>
-  </div>
-  <div>
-    <h3>Ausgeführt</h3>
-    <p style="font-size:0.88rem;color:var(--text-2)">npm test --coverage (414 Tests, 25 Suites, alle grün — 96,13 % Statements / 94,32 % Branches / 93,07 % Funktionen); npx attw --pack (node10, node16 CJS/ESM, bundler: alle grün); npm outdated; npm audit (0 Schwachstellen); npm pack --dry-run; vier eigene Node-Prüfskripte mit rund 30 Sonden gegen lib/index.js.</p>
-  </div>
-  <div>
-    <h3>Folgelauf-Abgleich</h3>
-    <p style="font-size:0.88rem;color:var(--text-2)">
-      Vorgänger vom 2026-05-14 (Score 85,5, 16 Findings). Er hat keine
-      JSON-Insel, die Findings wurden aus dem eingebetteten JS-Datenblock rekonstruiert.
-      Zuordnung über Kategorie plus überlappende Location, sekundär über Titelähnlichkeit.
-      Jedes nicht neu gefundene Altfinding wurde vor der Übernahme an seiner Location
-      gegen den heutigen Code geprüft: 15 weiterhin belegt, 1 entfallen
-      (TEST-001 des Vorlaufs — <code>coverage/</code> steht in <code>.gitignore</code> und ist
-      nicht mehr getrackt). Kontextbedingt entfernt: keines.
-    </p>
-  </div>
+<div class="panel">
+  <figure>
+    <svg viewBox="0 0 640 200" width="100%" style="max-width:640px; display:block; margin:0 auto" role="img" aria-label="Verlauf der Health-Scores: 85,5 am 14.05.2026, 39,5 am 25.07.2026, 80,5 am 26.07.2026">
+      <line x1="60" y1="20"  x2="600" y2="20"  stroke="#e7e5e4" stroke-width="1"/>
+      <line x1="60" y1="90"  x2="600" y2="90"  stroke="#e7e5e4" stroke-width="1"/>
+      <line x1="60" y1="160" x2="600" y2="160" stroke="#d6d3d1" stroke-width="1"/>
+      <text x="52" y="24"  text-anchor="end" font-size="11" fill="#8b8683">100</text>
+      <text x="52" y="94"  text-anchor="end" font-size="11" fill="#8b8683">50</text>
+      <text x="52" y="164" text-anchor="end" font-size="11" fill="#8b8683">0</text>
+      <polyline points="60,40.3 330,104.7 600,47.3" fill="none" stroke="#4f46e5" stroke-width="2.5" stroke-linejoin="round"/>
+      <circle cx="60"  cy="40.3"  r="4" fill="#fafaf9" stroke="#4f46e5" stroke-width="2.5"/>
+      <circle cx="330" cy="104.7" r="4" fill="#fafaf9" stroke="#4f46e5" stroke-width="2.5"/>
+      <circle cx="600" cy="47.3"  r="6" fill="#4f46e5"/>
+      <text x="60"  y="31"  text-anchor="middle" font-size="11" fill="#57534e">85,5</text>
+      <text x="330" y="121" text-anchor="middle" font-size="11" fill="#57534e">39,5</text>
+      <text x="600" y="35"  text-anchor="middle" font-size="11" font-weight="600" fill="#4f46e5">80,5</text>
+      <text x="60"  y="180" text-anchor="middle" font-size="11" fill="#8b8683">14.05.2026</text>
+      <text x="330" y="180" text-anchor="middle" font-size="11" fill="#8b8683">25.07.2026</text>
+      <text x="600" y="180" text-anchor="middle" font-size="11" fill="#8b8683">26.07.2026</text>
+    </svg>
+    <figcaption>Verlauf der Health-Scores seit 14.05.2026</figcaption>
+  </figure>
+
+  <h3>Score-Berechnung</h3>
+  <div class="formula">Start              100,0
+critical  0 × −10      −0,0
+high      1 ×  −5      −5,0
+medium    6 ×  −2     −12,0
+low       5 × −0,5     −2,5
+info      2 ×   0      −0,0
+                     ────────
+                       80,5</div>
+  <p style="font-size:.88rem; color:var(--text-2); margin-top:10px">Die Heuristik ist über alle Läufe identisch und wird nicht pro Finding nachjustiert: <code>critical −10</code>, <code>high −5</code>, <code>medium −2</code>, <code>low −0,5</code>, <code>info 0</code>, Untergrenze 0. Ein Befund, den man schwerer gewichten will, bekommt eine höhere Severity — keinen Sonderfaktor, sonst ist der Verlauf über mehrere Läufe nicht mehr vergleichbar.</p>
+
+  <h3>Einordnung des Score-Sprungs</h3>
+  <p style="font-size:.92rem">Der Sprung von 39,5 auf 80,5 ist <strong>überwiegend Codefortschritt</strong>, teils Prüftiefen-Effekt. Der Code-Anteil überwiegt klar: 33 von 35 Altbefunden wurden einzeln nachgeprüft und sind erledigt — nicht laut CHANGELOG, sondern per Quelltext-Beleg oder Laufzeit-Sonde gegen <code>lib/index.mjs</code>. Release v6.0.0 hat die gesamte Ressourcen-Familie geschlossen. Der Prüftiefen-Anteil wirkte in die Gegenrichtung: dieser Lauf hat andere Sonden gefahren als der Vorlauf — Prototypen-Dispatch, bucket-übergreifende Reihenfolge, Wildcard-<code>off()</code> statt Leak-Zähler — und dabei vier Verhaltensfehler gefunden, die der Vorlauf nicht gesehen hat. Ohne diese vier stünde der Score bei 91,5. Die 39,5 und die 80,5 sind also nicht mit identischem Instrument gemessen; bei gleicher Sondenwahl wäre der Abstand größer, nicht kleiner.</p>
+
+  <h3>Prüfumfang</h3>
+  <dl class="meta">
+    <dt>Vollständig gelesen</dt>
+    <dd>Alle 16 Produktivdateien unter <code>src/</code>; <code>package.json</code>, <code>tsconfig.json</code>, <code>jest.config.ts</code>, <code>eslint.config.mjs</code>, <code>tsup.config.js</code>, <code>.gitignore</code>, <code>.prettierrc.yaml</code>, <code>.editorconfig</code>; beide GitHub-Workflows; <code>scripts/publishPackage.cjs</code> und <code>scripts/createBanner.mjs</code>; <code>src/__test-utils__/expect2ImplEventizeApi.ts</code>. Aus <code>README.md</code>, <code>AGENTS.md</code>, <code>CHANGELOG.md</code>, <code>docs/*.md</code> und <code>skills/using-eventize/**</code> die für die Findings maßgeblichen Abschnitte gezielt.</dd>
+    <dt>Als Stichprobe</dt>
+    <dd>Spec-Dateien über Testtitel-Listen und gezielte Greps statt Zeile für Zeile — 27 Suites, 538 Tests. Vollständig gelesen wurden nur die Stellen, an denen ein Finding hängt (<code>emit-ducktyping.spec.ts</code>, <code>on.spec.ts</code>, <code>off.spec.ts</code>).</dd>
+    <dt>Nicht gelesen</dt>
+    <dd><code>lib/</code> als Quelltext (Build-Ausgabe, per AGENTS.md ausgeschlossen) — ausschließlich als Laufzeit-Prüfstand geladen. <code>docs-assets/</code>, <code>coverage/</code> (letzteres nur maschinell für die Funktionsabdeckung in TEST-001 ausgewertet). Das Vorgänger-<code>audit.html</code> wurde erst nach Abschluss der frischen Analyse geöffnet.</dd>
+    <dt>Ausgeführt</dt>
+    <dd><code>npm run cbt</code> (clean → build → attw → Coverage-Tests → lint → format:check, alles grün: 538 Tests, 98,88 % Statements / 97,15 % Branches / 95,27 % Funktionen); <code>npx tsc --noEmit</code> (fehlerfrei); <code>npx tsc --showConfig</code>; <code>npx attw --pack</code> (node10, node16 CJS/ESM, bundler — alle grün); <code>npm outdated</code>; <code>npm audit</code> (0 Schwachstellen); <code>npm pack --dry-run</code>; drei eigene Node-Skripte mit 16 Sonden gegen <code>lib/index.mjs</code>, davon 9 zur Re-Verifikation von Altbefunden.</dd>
+    <dt>Folgelauf-Abgleich</dt>
+    <dd>Vorgänger vom <strong>25.07.2026</strong> (Score 39,5, 35 Findings). Matching primär über Kategorie und überlappende Location, sekundär über Titelähnlichkeit. <strong>33 Findings entfallen</strong>, davon 5 kontextbedingt: MEM-005 (Keeper-Wachstum) und MEM-008 (Payloads per Referenz) sind seit v6.0.0 in <code>docs/lifecycle.md:14</code> und <code>docs/retain.md:110</code> als bewusstes Verhalten dokumentiert, inklusive <code>getRetainedEventNames()</code> als Beobachtungswerkzeug; ARCH-001 (modulglobale Zähler) ist in <code>AGENTS.md</code> unter »Counters are per module instance« als Absicht festgehalten; ARCH-003 und TYPE-002 sind an Ort und Stelle begründet statt stillschweigend geduldet. Die übrigen 28 wurden am Code oder zur Laufzeit als behoben nachgewiesen.</dd>
+    <dt>Abgrenzung zu Alt-BUG-002</dt>
+    <dd>Der Vorlauf meldete »<code>once()</code> mit einem Listener-Objekt ohne passende Methode verbraucht sich trotzdem«. Das ist behoben und wurde nachgemessen — <code>once()</code> überlebt einen Dispatch ohne Treffer. Das neue BUG-001 ist ein anderer Pfad: dort <em>gibt</em> es einen Treffer, nur stammt er vom Prototyp. Beide als dasselbe Finding zu führen hieße zu behaupten, der v6.0.0-Fix habe nicht gewirkt — er hat.</dd>
+    <dt>Theme</dt>
+    <dd>Light, übernommen aus <code>summary.theme</code> des Vorlaufs; keine abweichende Vorgabe in dieser Sitzung.</dd>
+  </dl>
 </div>
-
-<h3>Score-Berechnung</h3>
-<div class="formula">Start                        100
-critical  0 × −10          −0
-high      6 × −5           −30
-medium   12 × −2           −24
-low      13 × −0,5        −6,5
-info      4 ×   0           −0
-                             ─────
-Health Score                  39,5</div>
-
-<h3>Zum Punkteabfall</h3>
-<p style="font-size:0.9rem;color:var(--text-2)">Der Absturz um 46 Punkte ist ein Prüftiefen-Effekt, kein Codeverfall. Der Vorlauf vom 14.05.2026 arbeitete rein statisch am Quelltext; dieser Lauf hat den gebauten `lib/index.js` mit rund 30 gezielten Laufzeit-Sonden zum Thema Ressourcen-Lebenszyklus vermessen (Subscription-Zähler nach jeder off()-Variante, Keeper-Größe, refCount-Kollaps, Wildcard-Retain, npm pack). Sieben der zehn schwersten Befunde stammen aus diesen Sonden und waren statisch nicht zu sehen. Am Code selbst ging es seit dem Vorlauf aufwärts: v5.1.0 hat zwei Findings des Vorgängers behoben, ein drittes (committete coverage/-Artefakte) ist ebenfalls erledigt, keines der 15 verbliebenen hat sich verschlechtert.</p>
-
-<h3>Theme</h3>
-<p style="font-size:0.9rem;color:var(--text-2)">
-  Light — der Vorgängerbericht hat keine Theme-Wahl persistiert, und ohne
-  Nutzeranweisung gilt der Standard. Fix ausgeliefert, nicht an
-  <code>prefers-color-scheme</code> gekoppelt.
-</p>
 
 <footer>
-  Erzeugt am 2026-07-25 · 35 Findings · Backlog und Kennzahlen liegen als
-  JSON in diesem Dokument (<code>#audit-data</code>) und werden vom nächsten Lauf gelesen.
+  Erzeugt am 26.07.2026 · Health-Score 80,5 / 100 · 14 offene Findings · Standalone-Datei ohne externe Ressourcen, Filter in Vanilla-JS.
 </footer>
+
 </div>
 
-<script id="audit-data" type="application/json">{"summary":{"project":"@spearwolf/eventize","version":"5.1.0","stack":["TypeScript 5.9","ESM + CJS (tsup)","Jest 30 / ts-jest","ESLint 9 flat","Node ≥ 18.16","0 runtime deps"],"date":"2026-07-25","previousDate":"2026-05-14","previousScore":85.5,"score":39.5,"scoreDelta":-46,"theme":"light","bySeverity":{"critical":0,"high":6,"medium":12,"low":13,"info":4},"byCategory":{"Memory Leaks & Ressourcen":8,"Bugs & Korrektheitsrisiken":3,"Projektaufbau & Build":4,"Öffentliche API":2,"Performance":1,"Testabdeckung & Teststrategie":3,"Typsicherheit (TS)":3,"Architektur & Struktur":4,"Developer Experience":3,"Implementierungsstand":1,"Dependencies":2,"Konsistenz":1},"resolvedCount":1,"improvedCount":0,"newCount":20,"carriedOverCount":14,"unchangedCount":1,"scoreHistory":[{"date":"2026-05-14","score":85.5},{"date":"2026-07-25","score":39.5}],"deltaCause":"coverage","deltaExplanation":"Der Absturz um 46 Punkte ist ein Prüftiefen-Effekt, kein Codeverfall. Der Vorlauf vom 14.05.2026 arbeitete rein statisch am Quelltext; dieser Lauf hat den gebauten `lib/index.js` mit rund 30 gezielten Laufzeit-Sonden zum Thema Ressourcen-Lebenszyklus vermessen (Subscription-Zähler nach jeder off()-Variante, Keeper-Größe, refCount-Kollaps, Wildcard-Retain, npm pack). Sieben der zehn schwersten Befunde stammen aus diesen Sonden und waren statisch nicht zu sehen. Am Code selbst ging es seit dem Vorlauf aufwärts: v5.1.0 hat zwei Findings des Vorgängers behoben, ein drittes (committete coverage/-Artefakte) ist ebenfalls erledigt, keines der 15 verbliebenen hat sich verschlechtert.","methodology":{"filesRead":"Alle 19 Produktivdateien unter src/ vollständig; jest.config.ts, tsconfig.json, eslint.config.mjs, tsup.config.js, package.json, beide GitHub-Workflows, scripts/publishPackage.cjs, scripts/createBanner.mjs, .npmignore, .gitignore; README.md, AGENTS.md, CHANGELOG.md, docs/off.md, docs/retain.md; Spec-Dateien als Stichprobe (emit-throwing-listener, documented-quirks, EventStore, once, onceAsync, retain) plus vollständige Testtitel-Liste aller 25 Suites.","notRead":"lib/ als Quelltext (Build-Ausgabe, per AGENTS.md ausgeschlossen) — wurde ausschließlich als Laufzeit-Prüfstand geladen; docs-assets/; das Vorgänger-audit.html wurde bis nach Abschluss der frischen Analyse nicht geöffnet.","executed":"npm test --coverage (414 Tests, 25 Suites, alle grün — 96,13 % Statements / 94,32 % Branches / 93,07 % Funktionen); npx attw --pack (node10, node16 CJS/ESM, bundler: alle grün); npm outdated; npm audit (0 Schwachstellen); npm pack --dry-run; vier eigene Node-Prüfskripte mit rund 30 Sonden gegen lib/index.js."}},"findings":[{"id":"MEM-001","category":"Memory Leaks & Ressourcen","severity":"high","title":"`off(ε)` räumt die Listener, lässt den EventKeeper aber vollständig stehen","location":"src/eventize-api.ts:437-462, src/EventKeeper.ts:32-47","description":"Verifiziert: nach `retain(ε,\"data\"); emit(ε,\"data\",payload); off(ε)` steht `getSubscriptionCount()` auf 0, `keeper.events.size` aber weiterhin auf 1 — der Payload bleibt hart referenziert, und ein danach hinzukommender Subscriber bekommt ihn immer noch repliziert. Der Keeper wird nur angefasst, wenn `off()` mit einem Event-Namen oder einem Namens-Array aufgerufen wird. Der Aufräum-Aufruf, den jeder als „alles weg\" liest, ist genau der, der nichts wegräumt. Zusätzlich fehlt jede Bulk-Operation: `unretain(ε,\"*\")` behandelt `\"*\"` als gewöhnlichen Namen und leert nichts. Wer Event-Namen dynamisch erzeugt hat (`item:${id}`), kommt ohne Zugriff auf `ε[Symbol.for(\"eventize\")].keeper.eventNames` nicht mehr an die eigenen Payloads heran.","recommendation":"`off(ε)` und `off(ε,\"*\")` auf `keeper.eventNames.clear()` + `keeper.events.clear()` erweitern — der Store wird in diesem Pfad ohnehin komplett geleert, die Asymmetrie ist nicht begründet. Alternativ oder ergänzend `unretain(ε,\"*\")` / `retainClear(ε,\"*\")` als Bulk-Form implementieren. Der Wechsel ist ein Verhaltensbruch für Code, der auf dem Weiterleben der Retains baut, gehört also in den CHANGELOG als Breaking Change.","effort":"S","status":"new"},{"id":"MEM-002","category":"Memory Leaks & Ressourcen","severity":"high","title":"`once()` mit Listener-Objekt degeneriert zu einem unentfernbaren Dauer-Listener","location":"src/eventize-api.ts:386-405, src/EventStore.ts:123-134","description":"Verifiziert: zweimal `once(ε,\"foo\",listenerObject)` (oder die Methodennamen-Form `once(ε,\"foo\",\"handler\",obj)`) auf dasselbe Objekt — der Store kollabiert beide via `insertOrFindSimilarListener` zu **einem** EventListener mit `refCount = 2`. Beide `once()`-Aufrufe setzen nacheinander `callAfterApply`, der zweite überschreibt den ersten. Nach dem ersten Emit läuft nur ein `unsubscribe`, senkt `refCount` von 2 auf 1 — und der eigene `unsubscribeCalled`-Guard verhindert, dass der überlebende Handle jemals weiter dekrementiert. Ergebnis im Test: der Listener feuerte bei drei aufeinanderfolgenden Emits dreimal und blieb subscribed. `once()` ist dann kein `once` mehr, sondern ein `on()`, dessen zurückgegebene Handles ihn nicht mehr lösen können. Nur ein `off(ε, listenerObject)` von außen wird ihn los.","recommendation":"Den refCount-Kollaps und die Einmal-Semantik entkoppeln. Zwei Wege: (a) `once()`-Registrierungen von `findSimilarListener` ausnehmen, so dass jede eine eigene EventListener-Instanz bekommt — deckt sich mit dem Verhalten von Funktions-Listenern, die bereits korrekt sind; oder (b) `callAfterApply` zu einer Liste machen und beim Feuern **alle** hinterlegten Unsubscribes ausführen, statt den letzten gewinnen zu lassen. Variante (a) ist die kleinere Änderung und die ehrlichere Semantik.","effort":"M","status":"new"},{"id":"MEM-003","category":"Memory Leaks & Ressourcen","severity":"high","title":"`off(ε, eventName, listenerObject)` entfernt die Methodennamen-Form nicht","location":"src/EventStore.ts:63-80 (removeSimilarListenersFromArray), docs/off.md:18","description":"Verifiziert: nach `on(ε,\"foo\",\"foo\",lo)` und anschließendem `off(ε,\"foo\",lo)` steht die Subscription unverändert auf 1. Der Filter in `removeSimilarListenersFromArray` prüft `listener.eventName === eventName && listener.listener === listenerObject` — bei der Methodennamen-Form ist `listener.listener` aber der String `\"foo\"`, das Objekt steckt in `listener.listenerObject`. Der Vergleich kann nie greifen. Für die Listener-Objekt-Form `on(ε,\"foo\",lo)` passt er zufällig, weil dort das Objekt tatsächlich in `listener` liegt. `docs/off.md:18` und `README.md` führen `off(emitter, eventName, listenerObject)` ohne Einschränkung als den Weg auf, ein Listener-Objekt von einem einzelnen Event zu lösen, und `docs/off.md:211` stellt beide Formen ausdrücklich gleich. Wer dem Handbuch folgt, glaubt aufgeräumt zu haben und hält Listener-Objekt samt allem, was daran hängt, am Emitter fest.","recommendation":"Die zweite Bedingung um den `listenerObject`-Vergleich ergänzen: `listener.eventName === eventName && (listener.listener === listenerObject || listener.listenerObject === listenerObject)`. Der `off.spec.ts` fehlt genau dieser Fall — Regressionstest für beide Formen mitliefern.","effort":"S","status":"new"},{"id":"BUG-001","category":"Bugs & Korrektheitsrisiken","severity":"high","title":"`retain(ε, \"*\")` plus Wildcard-Subscribe endet im Stack Overflow","location":"src/EventKeeper.ts:59-78 (replayTo)","description":"Verifiziert, reproduzierbar in vier Zeilen: `retain(ε,\"*\")` legt `\"*\"` als gewöhnlichen Namen in `eventNames` ab. Ein späteres `on(ε,\"*\",fn)` ruft `replayTo(\"*\")`, das über den `isCatchEmAll`-Zweig alle bekannten Namen durchläuft — darunter `\"*\"` selbst — und sich damit unbegrenzt selbst aufruft. Ergebnis: `RangeError: Maximum call stack size exceeded`, der den gesamten Prozess mitnimmt. `emit()` und `_duckEmit()` weisen `\"*\"` beide mit einer expliziten Fehlermeldung ab, `retain()` reicht es kommentarlos durch. Die Kombination ist untypisch, aber sie steht in keiner Doku als verboten, und der Absturz gibt keinerlei Hinweis auf die Ursache.","recommendation":"`retain()` / `unretain()` / `retainClear()` `\"*\"` genauso behandeln wie `emit()`: mit derselben Fehlermeldung ablehnen, dass der Wildcard subscribe-only ist. Zusätzlich `EventKeeper.replayTo` gegen den rekursiven Fall härten, indem der Catch-em-all-Zweig `isCatchEmAll(name)` überspringt — die Guard-Klausel kostet nichts und schützt vor jedem künftigen Weg, auf dem `\"*\"` doch in die Menge gerät.","effort":"S","status":"new"},{"id":"CORR-001","category":"Bugs & Korrektheitsrisiken","severity":"high","title":"Retained Event wird beim Listener-Objekt-Dedup ein zweites Mal ausgeliefert","location":"src/subscribeTo.ts:21, src/EventStore.ts:123-134 (insertOrFindSimilarListener)","description":"Weiterhin belegt und jetzt mit Laufzeit-Nachweis: `retain(ε,\"foo\"); emit(ε,\"foo\",\"RETAINED\")`, danach zweimal `on(ε,\"foo\",lo)` — der Listener empfängt `\"RETAINED\"` zweimal, obwohl der Store nur eine Subscription führt (`refCount = 2`). `registerEventListener` ruft `keeper.replayTo()` unbedingt, auch wenn `store.add()` gar keinen neuen Listener eingefügt, sondern nur den Zähler eines bestehenden erhöht hat. Der TODO in `src/subscribeTo.ts:21` benennt exakt diese Lücke. In Reducer- oder Zähl-Patterns führt das zu doppelt verbuchten Werten.","recommendation":"`store.add()` mitteilen lassen, ob eingefügt oder dedupliziert wurde (Rückgabe-Flag oder Identitätsvergleich `el === neuerListener`), und `replayTo` nur im Einfüge-Fall aufrufen. Den TODO-Kommentar mit dem Fix entfernen und einen Spec-Fall in `retain.spec.ts` ergänzen.","effort":"S","status":"unchanged"},{"id":"BUILD-001","category":"Projektaufbau & Build","severity":"high","title":"Fehlgeschlagenes Release meldet dem CI trotzdem Erfolg","location":"scripts/publishPackage.cjs:11-13, 26-40","description":"Zwei Pfade in `publishPackage.cjs` beenden den Prozess mit Code 0, ohne veröffentlicht zu haben. Erstens: schlägt `npm show \u003cpkg\u003e versions --json` fehl (Registry-Timeout, Netzwerkfehler, Auth-Problem), landet der Code im `else`-Zweig, schreibt eine Meldung nach stderr und ruft `process.exit` nie auf — Node beendet regulär mit 0, der Deploy-Job in `main.yml` wird grün, das Release existiert nicht. Zweitens: `process.exit(!error ? 0 : error)` übergibt im Fehlerfall ein Error-Objekt an `process.exit`; Node ≥ 20 wirft dafür `ERR_INVALID_ARG_TYPE`, so dass der echte Publish-Fehler in stderr von einem irreführenden TypeError verdeckt wird.","recommendation":"Im `npm show`-Fehlerzweig `process.exit(1)` setzen und `process.exit(!error ? 0 : 1)` schreiben; `error.code` gehört ins Log, nicht in den Exit-Code. Bei der Gelegenheit auf `execFileSync` mit `stdio: \"inherit\"` umstellen — die Callback-Kaskade ist der eigentliche Grund, warum diese Pfade unbemerkt durchrutschen.","effort":"S","status":"new"},{"id":"MEM-004","category":"Memory Leaks & Ressourcen","severity":"medium","title":"`onceAsync()` hinterlässt eine Subscription, die niemand mehr lösen kann","location":"src/eventize-api.ts:422-429","description":"Verifiziert: `onceAsync(ε,\"never\")` registriert einen Listener und gibt ein Promise zurück — sonst nichts. Feuert das Event nie, bleiben Listener, `resolve`-Closure und der gesamte await-Continuation-Frame des Aufrufers am Emitter hängen, solange dieser lebt. Es gibt weder ein Unsubscribe-Handle noch einen `AbortSignal`-Parameter noch ein Timeout. Genau das Muster, das in Komponenten-Lebenszyklen (Unmount vor Event) und in abgebrochenen Requests entsteht — und der einzige Ausweg, `off(ε, …)`, braucht eine Referenz, die der Aufrufer nie bekommen hat.","recommendation":"Einen optionalen zweiten Parameter `{signal?: AbortSignal}` einführen, der bei `abort` den internen `once()`-Handle löst und das Promise rejected (`AbortError`, wie `fetch`). Das ist additiv und bricht keinen bestehenden Aufruf. Minimallösung ohne API-Änderung: die Unsubscribe-Funktion als Property am zurückgegebenen Promise mitgeben und dokumentieren.","effort":"M","status":"new"},{"id":"MEM-005","category":"Memory Leaks & Ressourcen","severity":"medium","title":"EventKeeper wächst bei dynamischen Event-Namen unbegrenzt","location":"src/EventKeeper.ts:21-53","description":"Verifiziert: 1000 Runden `retain(ε, \"item-\"+n); emit(ε, \"item-\"+n, payload)` hinterlassen 1000 Einträge in `eventNames` und 1000 in `events` — keine Obergrenze, kein Eviction, kein LRU. Für den Listener-Store wurde dieselbe Klasse von Leck in v4.3.0 gefunden und behoben (leere `namedListeners`-Buckets werden seitdem gelöscht, in den Tests I/K/L bestätigt); der Keeper hat diese Behandlung nie bekommen. Er ist zudem die teurere Hälfte, weil er nicht nur Schlüssel hält, sondern die vollständigen Emit-Argumente. Für die typische Nutzung mit einer Handvoll fester Event-Namen ist das folgenlos — für pro-Entity erzeugte Namen ist es ein wachsender Speicherfriedhof.","recommendation":"Kein Eviction einbauen (eine Event-Bibliothek soll nicht raten, was der Nutzer noch braucht), sondern die Kosten sichtbar und beherrschbar machen: `getRetainedCount(ε)` analog zu `getSubscriptionCount()` exportieren, die Bulk-Clear-Form aus MEM-001 nachliefern und in `docs/retain.md` einen Absatz ergänzen, dass `retain()` mit dynamisch erzeugten Namen den Aufrufer in die Pflicht nimmt.","effort":"M","status":"new"},{"id":"MEM-006","category":"Memory Leaks & Ressourcen","severity":"medium","title":"Verbrauchte Unsubscribe-Handles halten Emitter und Listener-Objekt am Leben","location":"src/eventize-api.ts:32-41 (makeUnsubscribe)","description":"Verifiziert: nach dem Aufruf zeigt `unsubscribe.listener.listenerObject` weiterhin auf das Listener-Objekt, und die Closure hält `host`. Der EventListener ist nur mit `isRemoved = true` markiert, nicht entkoppelt. Ein einzelner Handle ist belanglos; das übliche `const subs = []; subs.push(on(…))`-Muster mit anschließendem `subs.forEach(u =\u003e u())` ist es nicht — solange das Array lebt, hält es Emitter, Listener-Funktionen und Listener-Objekte aller je registrierten Subscriptions am Leben, obwohl alle längst abgemeldet sind.","recommendation":"In `removeByEventListener` und `removeListenerFromArray` nach dem Setzen von `isRemoved` die Felder `listener`, `listenerObject` und `callAfterApply` auf `null` setzen. `isEqual()` und `apply()` prüfen `isRemoved` bereits vor jedem Zugriff, die Felder sind ab diesem Punkt tot. Dafür müssen `listener` und `listenerObject` ihr `readonly` verlieren — ein interner Klassenvertrag, kein öffentlicher.","effort":"S","status":"new"},{"id":"BUG-002","category":"Bugs & Korrektheitsrisiken","severity":"medium","title":"`once()` mit einem Listener-Objekt ohne passende Methode verbraucht sich trotzdem","location":"src/EventListener.ts:119-135","description":"Verifiziert: `once(ε,\"foo\",{})` gefolgt von `emit(ε,\"foo\")` meldet den Listener ab, obwohl nichts aufgerufen wurde — das Objekt hat weder eine `foo`-Methode noch ein `emit`. Wird die Methode danach nachgereicht, feuert nichts mehr. Im `LISTENER_IS_OBJ`-Zweig steht `callAfterApply()` außerhalb der `typeof func === \"function\"`-Prüfung und läuft auch dann, wenn der Fallback-Pfad `emit()` ebenfalls ins Leere lief. Für spät initialisierte Listener-Objekte — ein durchaus übliches Muster — verpufft das `once()` still.","recommendation":"`callAfterApply` nur auslösen, wenn tatsächlich eine Methode oder der `emit`-Fallback lief. Dazu muss die interne `emit`-Hilfsfunktion melden, ob sie etwas aufgerufen hat (Rückgabe `boolean` statt `void`) — die Änderung ist auf `EventListener.ts` beschränkt.","effort":"S","status":"new"},{"id":"API-001","category":"Öffentliche API","severity":"medium","title":"`once()` bricht den `UnsubscribeFunc`-Vertrag","location":"src/eventize-api.ts:390-405, src/types.ts:126-128","description":"`UnsubscribeFunc` ist deklariert als Funktion **mit** `.listener` bzw. `.listeners`. `on()` liefert das über `makeUnsubscribe`; `once()` verpackt den Handle in eine eigene Closure und gibt sie mit `as UnsubscribeFunc` zurück, ohne die Properties durchzureichen. Verifiziert: `Object.keys(on(…))` ergibt `[\"listener\"]`, bei `once(…)` und `once(…, [a,b])` jeweils `[]`. TypeScript verspricht ein Feld, das zur Laufzeit `undefined` ist — `off(ε, unsub.listener)` als Cleanup-Weg schlägt lautlos fehl, ohne dass der Compiler warnt. Das ist derselbe `as`-Cast, den `strictNullChecks: false` (TYPE-001) nicht auffangen kann.","recommendation":"In `once()` die Properties an die äußere Closure weiterreichen: `Object.assign(unsubscribe, Array.isArray(listeners) ? {listeners} : {listener: listeners})` — dieselbe Zeile, die `makeUnsubscribe` bereits enthält. Alternativ `makeUnsubscribe` um einen Guard-Parameter erweitern und den Idempotenz-Wrapper dorthin ziehen, dann gibt es nur noch eine Stelle, die den Vertrag erfüllt.","effort":"S","status":"new"},{"id":"PERF-001","category":"Performance","severity":"medium","title":"Unsubscribe scannt die gesamte Event-Namen-Map, obwohl der Bucket bekannt ist","location":"src/EventStore.ts:217-245","description":"`removeByEventListener` durchläuft `this.namedListeners.forEach(…)` über **alle** Event-Namen, um einen Listener zu entfernen, dessen `eventName` er als Feld direkt vor sich hat — ein Multi-Event-`on()` erzeugt pro Name eine eigene EventListener-Instanz, jede liegt in genau einem Bucket. `removeByEventNameAndListenerObject` macht dasselbe, obwohl der Event-Name sogar als Parameter hereinkommt und die innere Filterfunktion ohnehin darauf prüft. Für einen Emitter mit vielen Event-Namen kostet jedes Unsubscribe O(Anzahl Namen) statt O(1) — bei zyklischem Auf- und Abbau vieler Subscriptions summiert sich das quadratisch.","recommendation":"Beide Methoden über `listener.isCatchEmAll ? this.catchEmAllListeners : this.namedListeners.get(listener.eventName)` bzw. `.get(eventName)` direkt adressieren und den vollen Scan nur als Fallback behalten, falls der Bucket fehlt. Der bestehende Test „does not leak with many unique event names (1000 add/remove cycles)\" in `EventStore.spec.ts:129` deckt den Pfad bereits ab und schützt den Umbau.","effort":"M","status":"new"},{"id":"PKG-001","category":"Projektaufbau & Build","severity":"medium","title":"`audit.html` wird ins veröffentlichte npm-Paket gepackt","location":".npmignore, package.json (kein `files`-Feld)","description":"`npm pack --dry-run` listet 30 Dateien, darunter `audit.html` mit 39,8 kB — gut ein Drittel des Tarballs (112,2 kB gepackt). Ein interner Qualitätsreport samt Backlog und Schwachstellenliste geht damit an jeden Konsumenten des Pakets. Ursache ist der Allowlist-Ansatz, der fehlt: `package.json` hat kein `files`-Feld, also entscheidet die `.npmignore`-Denylist, und die kennt nur, was zum Zeitpunkt ihres Schreibens existierte.","recommendation":"Ein `files`-Feld in `package.json` setzen — `[\"lib\", \"docs\", \"skills\", \"README.md\", \"CHANGELOG.md\", \"LICENSE\"]` — und die `.npmignore` löschen. Eine Allowlist kann nicht veralten; jede neue Datei im Repo-Root ist damit standardmäßig draußen statt standardmäßig drin. Deckt zugleich DX-002 vollständig ab.","effort":"S","status":"new"},{"id":"BUILD-002","category":"Projektaufbau & Build","severity":"medium","title":"Release-Job installiert mit `npm i` statt `npm ci`","location":".github/workflows/main.yml (deploy-Job)","description":"Der `test`-Job installiert korrekt mit `npm ci`, der `deploy`-Job daneben mit `npm i`. Das darf das Lockfile verändern und zieht potenziell andere Versionen als die, gegen die soeben getestet wurde — veröffentlicht wird also ein Artefakt aus einem Baum, den kein Test je gesehen hat. Bei einer Bibliothek mit null Runtime-Dependencies ist das Risiko klein, aber `tsup`, `typescript` und die Banner-Skripte bestimmen die Ausgabe unmittelbar.","recommendation":"`npm i` durch `npm ci` ersetzen. Besser noch: das `lib/`-Verzeichnis als Artefakt aus dem `test`-Job übernehmen (`actions/upload-artifact` / `download-artifact`), statt im Deploy-Job ein zweites Mal zu bauen — dann ist veröffentlicht, was getestet wurde, und nicht bloß etwas Gleichartiges.","effort":"S","status":"new"},{"id":"TEST-001","category":"Testabdeckung & Teststrategie","severity":"medium","title":"Coverage wird gemessen, aber nirgends abgesichert","location":"jest.config.ts, .github/workflows/*.yml","description":"Der aktuelle Stand ist gut — 414 Tests, 96,13 % Statements, 94,32 % Branches — nur schützt ihn nichts. `jest.config.ts` hat weder `collectCoverageFrom` noch `coverageThreshold`, und keiner der beiden Workflows ruft Jest mit `--coverage` auf. Coverage kann also unbemerkt fallen, und niemand erfährt es. Bei einer Bibliothek, deren Verhaltensversprechen fast vollständig aus den Specs erwachsen, ist das die empfindlichste offene Flanke der Testinfrastruktur.","recommendation":"`collectCoverageFrom: [\"src/**/*.ts\", \"!src/**/*.spec.ts\", \"!src/__test-utils__/**\"]` und einen `coverageThreshold` knapp unter dem Ist-Stand setzen (etwa 95/93/92/95), damit die Schwelle bindet statt zu dekorieren. `npm test` in beiden Workflows um `-- --coverage` erweitern.","effort":"S","status":"new"},{"id":"TYPE-001","category":"Typsicherheit (TS)","severity":"medium","title":"`strictNullChecks: false` hebelt `strict: true` aus","location":"tsconfig.json:16-17","description":"Weiterhin unverändert: `\"strict\": true` steht direkt neben `\"strictNullChecks\": false`, was die wichtigste der von `strict` aktivierten Prüfungen wieder abschaltet. Sichtbare Folgen im Code: `EventKeeper.replayTo` dereferenziert `this.events.get(eventName)` ohne Prüfung, `detectListenerType` kann `undefined` liefern, ohne dass der Rückgabetyp es zeigt (ARCH-003), und der `as UnsubscribeFunc`-Cast in `once()` verdeckt fehlende Properties (API-001). Da die Konsumenten ihre eigene `strictNullChecks`-Einstellung mitbringen, trifft die Nachlässigkeit vor allem die eigene Entwicklung — dort aber an genau den Stellen, an denen dieser Lauf Defekte gefunden hat.","recommendation":"Schrittweise umstellen: `strictNullChecks: true` setzen, die Fehlerliste erzeugen, `EventKeeper.replayTo`, `detectListenerType` und die Rückgabetypen von `getListenersForEventName` sauber typisieren. Der Umfang ist überschaubar (\u003c 800 Zeilen Produktivcode) und die entstehenden Fehler zeigen mit hoher Trefferquote auf die Stellen, die bereits im Backlog stehen.","effort":"M","status":"carried-over"},{"id":"ARCH-001","category":"Architektur & Struktur","severity":"medium","title":"Modul-globale Zähler koppeln alle Emitter über Realm-Grenzen hinweg","location":"src/EventKeeper.ts:14 (nextOrderId), src/EventListener.ts:48 (lastId)","description":"Weiterhin belegt: beide Zähler sind Modul-globale `let`-Variablen. `lastId` bestimmt die Sekundärsortierung gleicher Priorität, `nextOrderId` die Replay-Reihenfolge retained Events. Werden ESM- und CJS-Build im selben Prozess geladen — was das Dual-Format-Paket ausdrücklich erlaubt —, laufen zwei unabhängige Zählerpaare, und die Ordnungsgarantie gilt nur noch innerhalb einer Instanz. Verifiziert wurde die monotone globale Vergabe (`id 16 → 17` für zwei Emitter). Praktisch selten, aber es ist genau der Zustand, den `Symbol.for(\"eventize\")` beim Marker bewusst vermeidet.","recommendation":"Entweder konsequent den `Symbol.for`-Weg gehen und die Zähler in einem realm-weiten Registry-Objekt halten, oder die Grenze dokumentieren: eine Zeile in `AGENTS.md` unter „Architecture invariants\", dass Sortierstabilität pro geladener Modulinstanz gilt. Die Dokumentation ist hier die ehrlichere und billigere Lösung.","effort":"S","status":"carried-over"},{"id":"DX-002","category":"Developer Experience","severity":"medium","title":"`.npmignore` listet überwiegend Dateien, die es nicht mehr gibt","location":".npmignore","description":"Von 22 Einträgen zeigen `rollup`, `.eslintignore`, `.eslintrc.yaml`, `.travis.yml`, `.size-snapshot.json` und `BACKLOG.md` auf nichts — Überbleibsel früherer Toolchains. Gleichzeitig fehlen die Einträge, die zählen würden: `audit.html` und `coverage/` sind nicht gelistet, ersteres wird tatsächlich ausgeliefert (PKG-001). Eine Denylist, die vergangene Dateien blockiert und gegenwärtige durchlässt, ist genau die Fehlerart, gegen die eine Allowlist immun ist.","recommendation":"Mit PKG-001 in einem Zug erledigen: `files`-Allowlist in `package.json`, `.npmignore` ersatzlos löschen.","effort":"S","status":"carried-over"},{"id":"MEM-007","category":"Memory Leaks & Ressourcen","severity":"low","title":"`getListenersForEventName` ist ein Instanzfeld statt einer Prototyp-Methode","location":"src/EventStore.ts:140-147","description":"Verifiziert: die Funktion liegt als eigene Property auf jeder `EventStore`-Instanz, nicht auf dem Prototyp — als einzige der Klasse, alle übrigen sind reguläre Methoden. Da pro eventisiertem Objekt ein Store entsteht, bedeutet das eine überflüssige Closure je Emitter. Bei einer Handvoll Emittern irrelevant, bei zehntausenden (Entity-Systeme, Szenengraphen — das Anwendungsfeld, aus dem dieses Paket stammt) messbar. Ein `this`-Binding braucht die Funktion nicht: sie wird ausschließlich intern über `this.` aufgerufen.","recommendation":"In eine gewöhnliche Methode umwandeln. Rein mechanisch, kein Aufrufer außerhalb der Klasse.","effort":"S","status":"new"},{"id":"TEST-002","category":"Testabdeckung & Teststrategie","severity":"low","title":"Kein Spec deckt die in diesem Lauf verifizierten Leak-Pfade ab","location":"src/off.spec.ts, src/once.spec.ts, src/retain.spec.ts","description":"Die Testsuite ist mit 414 Fällen dicht, aber sechs reproduzierbare Defekte dieses Audits (MEM-001, MEM-002, MEM-003, BUG-001, BUG-002, API-001) sind sämtlich ungetestet — sie liegen alle in derselben blinden Zone: dem Zusammenspiel von refCount-Dedup, `callAfterApply` und dem Keeper. Jeder Einzelfall lässt sich in unter zehn Zeilen prüfen, `getSubscriptionCount()` liefert die Zusicherung.","recommendation":"Eine `src/lifecycle.spec.ts` anlegen, die pro Fix aus diesem Backlog einen Fall enthält: Subscription-Zähler nach jeder `off()`-Variante, Keeper-Größe nach `off(ε)`, mehrfaches `once()` auf dasselbe Listener-Objekt, `retain(ε,\"*\")`. Die Datei wird nebenbei zur ausführbaren Beschreibung dessen, was Aufräumen in dieser Bibliothek bedeutet.","effort":"M","status":"new"},{"id":"IMPL-001","category":"Implementierungsstand","severity":"low","title":"`definePublicPropertyRO` / `definePublicPropertiesRO` sind toter Code","location":"src/utils.ts:26-49","description":"Beide Funktionen werden nirgends im Projekt aufgerufen — weder im Produktivcode noch in Specs — und `index.ts` exportiert sie nicht. Das schlägt sich unmittelbar in der Coverage nieder: `utils.ts` steht bei 50 % Funktions- und 70,37 % Statement-Abdeckung, während jede andere Kerndatei bei oder nahe 100 % liegt. Die einzige tatsächlich genutzte Variante ist `defineHiddenPropertyRO`.","recommendation":"Beide löschen. Sie sind nicht Teil der öffentlichen API, der Verlust ist über git jederzeit rekonstruierbar, und `utils.ts` springt damit auf volle Abdeckung.","effort":"S","status":"new"},{"id":"BUILD-003","category":"Projektaufbau & Build","severity":"low","title":"Die beiden Workflows sind auseinandergelaufen","location":".github/workflows/dev.yml vs. main.yml","description":"`dev.yml` verwendet `actions/checkout@v3` und `actions/setup-node@v3` auf Node 18, `main.yml` die v4-Actions auf Node 24. Die v3-Actions laufen auf einer abgekündigten Node-16-Runner-Umgebung und erzeugen bei jedem Lauf Deprecation-Warnungen. Bei identischen Schrittlisten in beiden Dateien ist die Divergenz reine Drift, keine Absicht — und sie kaschiert, dass gegen genau eine Node-Version getestet wird, während `engines` `\u003e=18.16` verspricht (DX-003).","recommendation":"Beide auf `@v4` heben und die gemeinsame Schrittfolge in eine Matrix über Node 18/20/24 ziehen; `dev.yml` und `main.yml` unterscheiden sich dann nur noch im Trigger und im Deploy-Job.","effort":"S","status":"new"},{"id":"TYPE-002","category":"Typsicherheit (TS)","severity":"low","title":"ESLint schaltet mehrere Typdisziplin-Regeln pauschal ab","location":"eslint.config.mjs:55-68","description":"Unverändert: 14 `@typescript-eslint`-Regeln stehen auf `0`, darunter `no-explicit-any`, `ban-ts-comment` und `no-non-null-assertion`. Ein Teil ist an dieser Codebasis begründbar — die Dispatch-Logik arbeitet konstruktionsbedingt mit `unknown` und `any` —, aber die Liste enthält auch Altlasten für Regeln, die es unter diesen Namen nicht mehr gibt (`ban-ts-ignore`, `interface-name-prefix`, `no-var-requires`).","recommendation":"Die toten Einträge entfernen und die verbleibenden von `0` auf `warn` mit einem Kommentar versehen, warum sie in dieser Codebasis nicht greifen können. Eine abgeschaltete Regel mit Begründung ist eine Entscheidung, eine ohne ist ein Zufall.","effort":"S","status":"carried-over"},{"id":"TYPE-003","category":"Typsicherheit (TS)","severity":"low","title":"Vier `@ts-expect-error` tragen den diskriminierten Switch","location":"src/EventListener.ts:108, 114, 120, 129","description":"Unverändert: `EventListener.apply` schaltet über den numerischen `listenerType` und muss TypeScript an vier Stellen überstimmen, weil eine Zahl kein Discriminator ist, aus dem sich `listener` verengen ließe. Die Kommentare erklären jeweils sauber, warum der Zugriff sicher ist — aber vier unterdrückte Fehler in einer 138-Zeilen-Datei sind der Preis für eine Modellierung, die es nicht sein müsste.","recommendation":"`EventListener` als diskriminierte Union über ein String-Literal-Feld modellieren (`kind: \"func\" | \"named\" | \"obj\"`) mit korrekt typisiertem `listener` je Variante. Dann verengt der Switch von selbst und alle vier Unterdrückungen entfallen. Der numerische `listenerType` bleibt als internes Feld erhalten, solange `isSimilar()` ihn vergleicht.","effort":"M","status":"carried-over"},{"id":"TEST-003","category":"Testabdeckung & Teststrategie","severity":"low","title":"Specs nutzen 81-mal `@ts-ignore` statt `@ts-expect-error`","location":"src/on.spec.ts, src/off.spec.ts, src/eventize.spec.ts u. a.","description":"Unverändert im Verhältnis: 81 `@ts-ignore` gegenüber 13 `@ts-expect-error`. Der Unterschied ist an dieser Stelle wesentlich — `@ts-expect-error` schlägt fehl, sobald der Fehler verschwindet, und wird damit selbst zum Test der Typen. `@ts-ignore` schweigt in beiden Richtungen: wenn eine Typänderung einen bisher abgelehnten Aufruf plötzlich erlaubt, merkt es niemand. Bei einer Bibliothek, deren Typ-Ebene ein zentrales Feature ist (typisierte Event-Maps, `NonTypedEmitter`-Weiche), verschenkt das 81 kostenlose Assertions. Die 13 vorhandenen `@ts-expect-error` in `documented-quirks.spec.ts` und `typed-events.spec.ts` zeigen, dass die Technik im Projekt bereits etabliert ist.","recommendation":"Mechanisch ersetzen und die Suite laufen lassen; jede Stelle, die danach bricht, ist ein Fund. Als ESLint-Regel absichern: `@typescript-eslint/ban-ts-comment` mit `{\"ts-ignore\": true, \"ts-expect-error\": false}` für `**/*.spec.ts` — steht aktuell auf `0` (TYPE-002).","effort":"M","status":"carried-over"},{"id":"DX-001","category":"Developer Experience","severity":"low","title":"Vier Relativimports tragen `.js`-Endungen gegen die eigene Konvention","location":"src/types.ts:1-3, src/getSubscriptionCount.ts:4","description":"`AGENTS.md` legt unter „Conventions\" fest: „Relative imports carry no extension — tsup writes the output extensions.\" Vier Importe halten sich nicht daran. Alle vier sind Type-Only-Importe und damit folgenlos für die Ausgabe — es ist ein Konsistenz-, kein Korrektheitsproblem. Es bleibt im Backlog, weil eine Regel, die in der eigenen Agenten-Dokumentation steht und im eigenen Code gebrochen wird, jede künftige Berufung darauf schwächt.","recommendation":"Die vier Endungen entfernen. Als Regel absichern, damit es nicht erneut driftet: `@typescript-eslint/consistent-type-imports` ist bereits aktiv, `import/extensions` ließe sich ergänzen.","effort":"S","status":"carried-over"},{"id":"DX-003","category":"Developer Experience","severity":"low","title":"`engines.node` verspricht mehr, als getestet wird","location":"package.json:27, .github/workflows/main.yml","description":"Unverändert: `\"node\": \"\u003e=18.16\"` deckt vier Major-Versionen ab, die Pipeline prüft `dev.yml` gegen 18 und `main.yml` gegen 24 — 20 und 22 laufen nie. Die Bibliothek hat keine Runtime-Dependencies und nutzt nur ES2022-Sprachmittel, das Risiko ist entsprechend gering; die Zusage bleibt trotzdem ungedeckt.","recommendation":"Mit BUILD-003 zusammen erledigen: Node-Matrix `[18, 20, 22, 24]` im Test-Job. Kostet ein paar Minuten CI und macht aus der Behauptung eine Prüfung.","effort":"S","status":"carried-over"},{"id":"ARCH-002","category":"Architektur & Struktur","severity":"low","title":"Verwaister TODO-Kommentar in EventStore","location":"src/EventStore.ts:47","description":"`// TODO removeSimilarListener()` steht ohne Bezug zwischen zwei Funktionsdefinitionen. Die Funktion existiert unter dem Namen `removeSimilarListenersFromArray` direkt darunter — was der Kommentar noch fordert, ist nicht erkennbar. Der zweite TODO im Projekt (`src/subscribeTo.ts:21`) ist dagegen substanziell und als CORR-001 im Backlog.","recommendation":"Löschen. Ein TODO, dessen Absicht sich nicht mehr rekonstruieren lässt, ist Rauschen.","effort":"S","status":"carried-over"},{"id":"ARCH-003","category":"Architektur & Struktur","severity":"low","title":"`detectListenerType` kann implizit `undefined` liefern","location":"src/EventListener.ts:36-46","description":"Unverändert: der Switch deckt `function`, `string`, `symbol` und `object` ab und hat keinen `default`-Zweig — für `number`, `boolean`, `bigint` oder `undefined` fällt er auf `undefined` durch. Der Rückgabetyp wird als `number` inferiert, weil `strictNullChecks: false` das `undefined` verschluckt (TYPE-001). Praktisch fängt `subscribeTo` falsche Listener vorher ab, weshalb der Zweig nie erreicht wird — der Typ lügt trotzdem, und mit aktivem `strictNullChecks` wäre es sofort ein Fehler.","recommendation":"Einen `default`-Zweig ergänzen, der wirft oder einen expliziten Sentinel liefert, und den Rückgabetyp annotieren. Ein Kandidat für den ersten Schritt der TYPE-001-Umstellung.","effort":"S","status":"carried-over"},{"id":"DEP-001","category":"Dependencies","severity":"low","title":"`@types/sinon` hinkt fünf Majors hinter `sinon` her","location":"package.json:46,56","description":"Unverändert und deutlicher geworden: `sinon@^21.0.0` gegen `@types/sinon@^17.0.4`, aktuell wären 22.x. Da sinon ab Version 17 eigene Typdefinitionen mitbringt, ist das Paket nicht bloß veraltet, sondern überflüssig — und schlimmer als überflüssig, weil ein `@types`-Paket die mitgelieferten Typen überschreibt und in den Specs Signaturen vortäuscht, die fünf Majors alt sind.","recommendation":"`@types/sinon` ersatzlos entfernen und `npm run cbt` laufen lassen. Falls dabei Typfehler auftauchen, sind es echte — bislang von veralteten Typen verdeckt.","effort":"S","status":"carried-over"},{"id":"DEP-002","category":"Dependencies","severity":"low","title":"14 Dev-Dependencies veraltet, drei mit Major-Sprung","location":"package.json devDependencies","description":"`npm outdated` meldet 14 Pakete. Die Mehrzahl sind Minor-Rückstände (jest 30.0.5 → 30.4.2, prettier 3.6.2 → 3.9.6, ts-jest, tsup, typescript-eslint), drei sind Majors: eslint 9 → 10, typescript 5.9 → 7.0 und globals 16 → 17. `npm audit` meldet null Schwachstellen — es geht um Aktualität, nicht um Sicherheit. Bei null Runtime-Dependencies ist die Angriffsfläche des veröffentlichten Pakets davon ohnehin unberührt.","recommendation":"Die Minors sammelweise ziehen (`npm update`), dann `npm run cbt`. Die drei Majors getrennt und einzeln — besonders TypeScript 7, dessen nativer Compiler das Verhalten von `attw`, `ts-jest` und den generierten `.d.ts` neu vermisst. Dependabot ist im Repo aktiv (siehe Commit a0ba6bc), aber ohne eingecheckte `.github/dependabot.yml`; die Konfiguration gehört ins Repo, damit sie überprüfbar ist.","effort":"S","status":"carried-over"},{"id":"MEM-008","category":"Memory Leaks & Ressourcen","severity":"info","title":"Retained Events halten die Emit-Argumente per Referenz","location":"src/eventize-api.ts:58, src/EventKeeper.ts:49-53","description":"Verifiziert: `keeper.events.get(name).args[0]` ist identisch mit dem übergebenen Objekt — der Keeper legt keine Kopie an. Das ist die einzig sinnvolle Implementierung (eine Event-Bibliothek darf Payloads nicht klonen), hat aber eine Konsequenz, die nirgends steht: ein einziges `retain()` auf ein Event, das einmal einen großen Buffer, ein DOM-Element oder einen Objektgraphen transportiert hat, hält diesen bis zum nächsten Emit desselben Events, bis `retainClear()` oder bis zum Ende des Emitters am Leben.","recommendation":"Einen Absatz in `docs/retain.md` unter „Notes\" ergänzen: retained Payloads sind starke Referenzen, `retainClear()` ist das Gegenmittel, und bei großen Nutzlasten ist es sinnvoll. Kein Codefix — die Dokumentation ist der Fix.","effort":"S","status":"new"},{"id":"API-002","category":"Öffentliche API","severity":"info","title":"Retained State lässt sich von außen nicht inspizieren","location":"src/getSubscriptionCount.ts, src/index.ts","description":"`getSubscriptionCount()` existiert ausdrücklich, um Aufräumen verifizieren zu können — die README nennt es „useful for debugging, testing, or verifying that cleanup actually happened\". Für die zweite Hälfte des Emitter-Zustands gibt es kein Gegenstück: wie viele Events retained sind, welche Namen eine Retain-Policy tragen und wie viel daran hängt, ist ohne Zugriff auf `ε[Symbol.for(\"eventize\")].keeper` nicht feststellbar. Genau dieser blinde Fleck macht MEM-001 und MEM-005 in fremdem Code unsichtbar.","recommendation":"`getRetainedCount(ε)` und `getRetainedEventNames(ε)` analog zu `getSubscriptionCount()` exportieren — beide sind Einzeiler auf dem bestehenden Keeper und schließen die Diagnoselücke, die dieser Audit an mehreren Stellen umgehen musste.","effort":"S","status":"new"},{"id":"INFO-001","category":"Konsistenz","severity":"info","title":"Priority-Legacy-Aliase bleiben Teil der öffentlichen Oberfläche","location":"src/Priority.ts:10-14, src/types.ts:309-321","description":"`AAA`, `BB`, `C` und `Default` stehen weiterhin neben den sprechenden Namen `Max`/`Critical`/`High`/`Normal`/`Low`/`Min` und sind über `EventizePriority` fest im exportierten Interface verankert. Der Kommentar markiert sie als Legacy, aber nichts warnt beim Gebrauch, und `C: 1e3` hat kein modernes Gegenstück — der Wert liegt zwischen `High` (1e6) und `Normal` (0), ein Alias ist es also nicht.","recommendation":"Für v6 sammeln: `@deprecated`-JSDoc an die vier Felder, damit Editoren sie durchstreichen, und im CHANGELOG als Entfernungskandidaten ankündigen. Solange `C` keinen Nachfolger hat, gehört ein `Medium: 1e3` daneben.","effort":"S","status":"carried-over"},{"id":"INFO-002","category":"Architektur & Struktur","severity":"info","title":"Die Argument-Heuristik von `_subscribeTo` ist nur durch Kommentare strukturiert","location":"src/subscribeTo.ts:39-56","description":"Achtzehn Überladungen von `on()` werden in einer Kaskade aus Längenprüfungen und `typeof`-Tests auf vier Variablen destrukturiert. Der Code ist korrekt und durch die Specs breit abgedeckt, aber die Zuordnung Überladung → Zweig existiert nur im Kopf des Lesers; `AGENTS.md` weist eigens darauf hin, dass `subscribeTo` und `types.ts` im Gleichschritt geändert werden müssen. Das ist die Stelle, an der eine künftige API-Erweiterung am ehesten still danebengreift.","recommendation":"Über jeden der drei Zweige einen Einzeiler setzen, der die Überladungsnummern aus `eventize-api.ts` nennt (`// (4) catch-all: on(priority, listener[, obj])`). Der Kommentarblock in `eventize-api.ts:128-138` nummeriert bereits — die Nummern nur an der zweiten Stelle sichtbar machen, die sie betrifft.","effort":"S","status":"carried-over"}],"acknowledged":[]}</script>
+<script id="audit-data" type="application/json">
+{
+  "summary": {
+    "project": "@spearwolf/eventize",
+    "version": "6.0.0",
+    "stack": ["TypeScript 5.9 (auf <7 gepinnt)", "ESM + CJS (tsup)", "Jest 30 / ts-jest", "ESLint 10 flat", "Node >= 18.16", "0 Runtime-Dependencies"],
+    "date": "2026-07-26",
+    "previousDate": "2026-07-25",
+    "previousScore": 39.5,
+    "score": 80.5,
+    "scoreDelta": 41,
+    "theme": "light",
+    "bySeverity": {"critical": 0, "high": 1, "medium": 6, "low": 5, "info": 2},
+    "byCategory": {
+      "Bugs & Korrektheitsrisiken": 4,
+      "Testabdeckung & Teststrategie": 2,
+      "Konsistenz": 2,
+      "Projektaufbau & Build": 1,
+      "Typsicherheit (TS)": 1,
+      "Performance": 1,
+      "Dependencies": 1,
+      "Developer Experience": 1,
+      "Architektur & Struktur": 1
+    },
+    "resolvedCount": 33,
+    "improvedCount": 0,
+    "newCount": 12,
+    "carriedOverCount": 2,
+    "unchangedCount": 0,
+    "deltaCause": "mixed",
+    "deltaExplanation": "Der Sprung von 39,5 auf 80,5 ist überwiegend Codefortschritt, teils Prüftiefen-Effekt. Code-Anteil: 33 von 35 Altbefunden wurden einzeln per Quelltext-Beleg oder Laufzeit-Sonde gegen lib/index.mjs als erledigt nachgewiesen; Release v6.0.0 hat die gesamte Ressourcen-Familie geschlossen. Der Coverage-Anteil wirkte in die Gegenrichtung: dieser Lauf fuhr andere Sonden als der Vorlauf (Prototypen-Dispatch, bucket-übergreifende Reihenfolge, Wildcard-off statt Leak-Zähler) und fand dabei vier Verhaltensfehler, die der Vorlauf nicht sah — ohne sie stünde der Score bei 91,5.",
+    "scoreHistory": [
+      {"date": "2026-05-14", "score": 85.5},
+      {"date": "2026-07-25", "score": 39.5},
+      {"date": "2026-07-26", "score": 80.5}
+    ],
+    "methodology": {
+      "filesRead": "Alle 16 Produktivdateien unter src/; package.json, tsconfig.json, jest.config.ts, eslint.config.mjs, tsup.config.js, .gitignore, .prettierrc.yaml, .editorconfig; beide GitHub-Workflows; scripts/publishPackage.cjs, scripts/createBanner.mjs; src/__test-utils__/expect2ImplEventizeApi.ts. Aus README.md, AGENTS.md, CHANGELOG.md, docs/*.md und skills/using-eventize/** die für die Findings maßgeblichen Abschnitte gezielt.",
+      "sampled": "Spec-Dateien über Testtitel-Listen und gezielte Greps (27 Suites, 538 Tests); vollständig gelesen nur emit-ducktyping.spec.ts, on.spec.ts, off.spec.ts an den Finding-Stellen.",
+      "notRead": "lib/ als Quelltext (Build-Ausgabe, per AGENTS.md ausgeschlossen) — nur als Laufzeit-Prüfstand geladen; docs-assets/; coverage/ (nur maschinell für die Funktionsabdeckung ausgewertet); das Vorgänger-audit.html bis nach Abschluss der frischen Analyse.",
+      "executed": "npm run cbt (alles grün: 538 Tests, 98,88 % Statements / 97,15 % Branches / 95,27 % Funktionen); npx tsc --noEmit (fehlerfrei); npx tsc --showConfig; npx attw --pack (4/4 grün); npm outdated; npm audit (0 Schwachstellen); npm pack --dry-run; drei eigene Node-Skripte mit 16 Sonden gegen lib/index.mjs, davon 9 zur Re-Verifikation von Altbefunden.",
+      "matching": "Primär Kategorie + überlappende Location, sekundär Titelähnlichkeit. 33 Altbefunde entfallen, davon 5 kontextbedingt (MEM-005 und MEM-008 via docs/lifecycle.md:14 und docs/retain.md:110; ARCH-001 via AGENTS.md 'Counters are per module instance'; ARCH-003 und TYPE-002 an Ort und Stelle begründet)."
+    }
+  },
+  "findings": [
+    {
+      "id": "BUG-001",
+      "category": "Bugs & Korrektheitsrisiken",
+      "severity": "high",
+      "status": "new",
+      "title": "Dispatch an Listener-Objekte trifft geerbte Object.prototype-Methoden",
+      "location": "src/EventListener.ts:216",
+      "effort": "M",
+      "description": "apply() liest den Member ohne Prototypen-Schranke: apply(listener, listener[eventName], …). Ein Event-Name, der mit einem Object.prototype-Member kollidiert — toString, valueOf, constructor, hasOwnProperty, isPrototypeOf, propertyIsEnumerable, toLocaleString — findet die geerbte Funktion und ruft sie auf. Nachgemessen am gebauten Paket: once(ε, {}) gefolgt von emit(ε, 'toString') setzt den Subscription-Zähler von 1 auf 0 — das once() ist verbrannt, ohne dass je eine Nutzer-Methode lief. emitAsync(ε, 'toString') liefert zusätzlich ['[object Object]'] in die Aggregation. Besonders unangenehm bei Catch-all-Listener-Objekten, die per Definition jeden Event-Namen sehen. Die Bibliothek verteidigt sich an genau dieser Stelle bereits gegen Primitive: isObjListener (EventListener.ts:40) existiert laut eigenem Kommentar, damit on(ε, 'toFixed', 42) nicht an Number.prototype dispatcht — gegen Object.prototype greift dieselbe Überlegung nicht.",
+      "recommendation": "Vor dem Dispatch prüfen, ob der gefundene Member nicht identisch mit dem gleichnamigen Object.prototype-Member ist: const fn = listener[eventName]; if (typeof fn === 'function' && fn !== Object.prototype[eventName]). Das lässt eigene Overrides zu und schließt nur die unbeabsichtigte Vererbung aus. Specs für alle sieben kollidierenden Namen, je einmal für on() und once(). Verhaltensänderung, also CHANGELOG-Eintrag."
+    },
+    {
+      "id": "BUG-002",
+      "category": "Bugs & Korrektheitsrisiken",
+      "severity": "medium",
+      "status": "new",
+      "title": "Duck-typed emit() dispatcht ebenfalls an Object.prototype",
+      "location": "src/eventize-api.ts:106",
+      "effort": "S",
+      "description": "_duckEmitOne() liest target[eventName] mit derselben fehlenden Schranke wie BUG-001, nur auf dem Pfad für nicht-eventisierte Ziele. Gemessen: emitAsync({}, 'toString') liefert ['[object Object]'], emitAsync({}, 'constructor') liefert [{}] — der Object-Konstruktor wird als gewöhnliche Funktion aufgerufen und sein Ergebnis aggregiert. Ein Plugin- oder Bridge-Layer, das Event-Namen aus externen Daten bezieht (JSON-Keys, Message-Types, DOM-Attribute), trifft das ohne Vorwarnung. AGENTS.md führt als Invariante, dass beide Dispatch-Pfade im Gleichschritt bleiben müssen — ein Fix nur an einer Stelle würde genau diese Invariante brechen.",
+      "recommendation": "Dieselbe Prüfung wie in BUG-001 einsetzen und beide Pfade in einem Commit ändern. Der bestehende Spec-Block 'plain object without a matching method' in emit-ducktyping.spec.ts ist die passende Stelle für die neuen Fälle."
+    },
+    {
+      "id": "BUG-003",
+      "category": "Bugs & Korrektheitsrisiken",
+      "severity": "medium",
+      "status": "new",
+      "title": "off(ε, '*', listenerObject) ist ein stiller No-Op",
+      "location": "src/EventStore.ts:268, src/eventize-api.ts:519",
+      "effort": "M",
+      "description": "off() setzt forceRemove, sobald ein Event-Name mit einem Listener-Objekt kommt, und leitet damit auf removeByEventNameAndListenerObject(). Diese Methode sucht ausschließlich in namedListeners — Wildcard-Listener liegen aber in catchEmAllListeners. Gemessen: nach on(ε, '*', fn, ctx) steht der Subscription-Zähler auf 1, nach off(ε, '*', ctx) immer noch auf 1, erst off(ε, '*') räumt ihn ab. Der Aufruf, der wörtlich 'melde dieses Objekt vom Wildcard ab' bedeutet, tut nichts und meldet nichts. docs/off.md:18 dokumentiert die benannte Schwester-Form als funktionierend, was die Erwartung zusätzlich stützt. Kein Spec fixiert das Verhalten in irgendeine Richtung.",
+      "recommendation": "Produktentscheidung nötig (siehe Offene Fragen): entweder '*' in dieser Branch auf catchEmAllListeners umleiten, oder die Kombination als Aufruferfehler werfen lassen. In beiden Fällen ein Spec und eine Zeile in der off.md-Tabelle."
+    },
+    {
+      "id": "BUG-004",
+      "category": "Bugs & Korrektheitsrisiken",
+      "severity": "medium",
+      "status": "new",
+      "title": "Zugesagte Reihenfolge bei Prioritätsgleichheit gilt nicht bucket-übergreifend",
+      "location": "src/EventStore.ts:324",
+      "effort": "M",
+      "description": "skills/using-eventize/references/api-details.md:72 sagt zu: 'Equal priorities keep insertion order.' Innerhalb eines Buckets stimmt das — sortByPriorityAndId bricht Gleichstand über die aufsteigende id. Der Merge in forEach() vergleicht dagegen nur cur.priority >= catchEmAllListeners[j].priority und sieht die id nie. Gemessen: Wildcard zuerst registriert, benannter Listener danach, beide auf Priority.Normal — der benannte läuft zuerst. In der umgekehrten Registrierungsreihenfolge sieht das Ergebnis korrekt aus, weshalb der Fehler nur in einer von zwei Richtungen sichtbar wird und in Tests leicht durchrutscht.",
+      "recommendation": "Produktentscheidung nötig (siehe Offene Fragen): entweder im Merge bei Gleichstand die id vergleichen und echte Registrierungsreihenfolge herstellen — Breaking Change für Code, der sich auf die heutige Bevorzugung verlässt —, oder die Zusage in api-details.md auf 'innerhalb eines Buckets' einschränken und die Bevorzugung benannter Listener explizit dokumentieren. So oder so mit Spec und CHANGELOG-Eintrag."
+    },
+    {
+      "id": "TEST-001",
+      "category": "Testabdeckung & Teststrategie",
+      "severity": "medium",
+      "status": "new",
+      "title": "Fünf Delegationen der inject- und Klassen-Oberfläche sind ungetestet",
+      "location": "src/eventize.ts:93, 99, 140, 151, 159",
+      "effort": "M",
+      "description": "Aus coverage-final.json: die Funktionen inject().off, inject().emitAsync sowie Eventize.once, Eventize.off und Eventize.emitAsync werden von keinem Test aufgerufen — Funktionsabdeckung der Datei 77,27 %, während das Projekt sonst bei 95,27 % liegt. Die Lücke wirkt geschlossen, ist es aber nicht: expect2ImplEventizeApi (src/__test-utils__/expect2ImplEventizeApi.ts:3-30) prüft ausschließlich typeof obj.x === 'function', also Vorhandensein, nie Delegation. AGENTS.md führt 'Three API surfaces, one implementation — never fork logic into a surface' als Architektur-Invariante; genau diese fünf Delegationen könnten brechen, ohne dass ein Test rot wird.",
+      "recommendation": "expect2ImplEventizeApi von einer Existenzprüfung zu einer tabellengetriebenen Verhaltens-Suite ausbauen, die dieselben Fälle einmal je Oberfläche fährt (freie Funktionen, inject, Klasse). Die functions-Schwelle in jest.config.ts anschließend anheben."
+    },
+    {
+      "id": "TEST-002",
+      "category": "Testabdeckung & Teststrategie",
+      "severity": "medium",
+      "status": "new",
+      "title": "Kein Test läuft gegen das gebaute Dual-Format-Paket",
+      "location": "jest.config.ts:49-51",
+      "effort": "M",
+      "description": "testMatch ist auf **/src/** beschränkt, und kein Spec importiert lib/index.mjs oder lib/index.js. Das Paket liefert ESM und CJS aus; attw --pack prüft davon ausschließlich die Typen, nicht das Laufzeitverhalten. Ausgerechnet die in AGENTS.md festgehaltene Invariante 'Counters are per module instance' ist eine Eigenschaft des Build-Artefakts, nicht der Quellen — sie ist derzeit durch nichts abgesichert. Auch die in AGENTS.md dokumentierte Falle, dass der ts-jest-Cache außerhalb des Repos liegt und Typfehler verdecken kann, greift eine Suite gegen das fertige Artefakt nicht.",
+      "recommendation": "Eine kleine Smoke-Suite, die beide Artefakte lädt, die Export-Oberfläche gegen eine erwartete Namensliste prüft und je einen emit/on-Round-Trip fährt. In cbt nach build einhängen — als eigenes Jest-Projekt oder als schlichtes Node-Skript, damit testMatch unangetastet bleibt."
+    },
+    {
+      "id": "BUILD-001",
+      "category": "Projektaufbau & Build",
+      "severity": "medium",
+      "status": "new",
+      "title": "tsconfig ohne include/exclude, moduleResolution fällt auf classic",
+      "location": "tsconfig.json:1-31",
+      "effort": "S",
+      "description": "npx tsc --showConfig löst module auf es6 und moduleResolution auf classic auf — den Legacy-Algorithmus, der node_modules gar nicht konsultiert. Weil weder include noch exclude gesetzt sind, zieht das Programm außerdem lib/index.d.ts und lib/index.d.mts ein, also generierte Build-Ausgabe: welche Dateien geprüft werden, hängt davon ab, ob zuletzt gebaut oder gecleant wurde. Aktuell läuft tsc --noEmit fehlerfrei durch, der Befund ist also latent und nicht akut — aber die Konfiguration beschreibt nicht, wie das Paket tatsächlich aufgelöst wird, und ein Fehler würde je nach Build-Zustand mal auftreten und mal nicht.",
+      "recommendation": "\"moduleResolution\": \"bundler\" setzen (bildet ab, wie tsup und die meisten Consumer auflösen, und verträgt sich mit der Extension-losen Import-Konvention), \"include\": [\"src\"] ergänzen und \"typecheck\": \"tsc --noEmit\" in cbt aufnehmen. Vor dem Verifizieren npx jest --clearCache — genau der in AGENTS.md beschriebene Fall einer tsconfig-Änderung."
+    },
+    {
+      "id": "TYPE-001",
+      "category": "Typsicherheit (TS)",
+      "severity": "low",
+      "status": "new",
+      "title": "noUncheckedIndexedAccess ist aus, obwohl EventStore roh indiziert",
+      "location": "tsconfig.json:2-30",
+      "effort": "M",
+      "description": "strict, strictNullChecks und noPropertyAccessFromIndexSignature sind aktiv — noUncheckedIndexedAccess und exactOptionalPropertyTypes nicht. EventStore rechnet an mehreren Stellen roh mit Indizes: arr[mid] in der Binärsuche (EventStore.ts:26) sowie namedListeners[i] und catchEmAllListeners[j] in der Merge-Schleife (EventStore.ts:322-331). Der Compiler typisiert diese Zugriffe heute als immer definiert. Die Schleifen sind korrekt gegen ihre Längen geführt, es liegt also kein aktueller Defekt vor — aber die schärfste verfügbare Absicherung für genau die Stelle, an der BUG-004 sitzt, ist abgeschaltet.",
+      "recommendation": "noUncheckedIndexedAccess aktivieren und den Fallout in EventStore.ts auflösen (voraussichtlich wenige lokale Bindings). exactOptionalPropertyTypes getrennt bewerten, das trifft eher types.ts."
+    },
+    {
+      "id": "PERF-001",
+      "category": "Performance",
+      "severity": "low",
+      "status": "new",
+      "title": "EventStore.forEach() alloziert bei jedem emit() zwei Arrays",
+      "location": "src/EventStore.ts:306-307",
+      "effort": "S",
+      "description": "Beide Buckets werden per slice(0) kopiert, damit ein Listener sich während seines eigenen Callbacks ab- oder anmelden kann, ohne den Lauf zu stören. Die Absicht ist richtig, der Zuschnitt zu breit: die Kopie entsteht auch für den leeren Catch-all-Bucket, also im häufigsten Fall überhaupt — reine Allokation ohne Nutzen, und zwar auf dem heißesten Pfad einer Bibliothek, deren Verkaufsargument synchrone Zustellgeschwindigkeit ist.",
+      "recommendation": "Nur den Bucket kopieren, der tatsächlich durchlaufen wird, und die Kopie bei Länge 0 überspringen. Ohne Benchmark-Harness (siehe Optimierungspotenzial) ist der Gewinn allerdings nicht belegbar — die Reihenfolge sollte Harness vor Optimierung sein."
+    },
+    {
+      "id": "CONS-001",
+      "category": "Konsistenz",
+      "severity": "low",
+      "status": "new",
+      "title": "Typ-Import als Wert-Import in getSubscriptionCount",
+      "location": "src/getSubscriptionCount.ts:4",
+      "effort": "S",
+      "description": "import {EventizedObject} from './types' — EventizedObject ist ein Interface und wird ausschließlich in Typposition verwendet. Jedes andere Modul unter src/ schreibt an dieser Stelle import type, einschließlich des unmittelbar benachbarten getRetainedCount.ts, das dieselbe Konstruktion korrekt macht. Esbuild entfernt das Binding beim Bundling, es entsteht also kein Laufzeitschaden — ein Stilbruch, keine Fehlfunktion.",
+      "recommendation": "Auf import type umstellen. Dauerhaft absichern lässt sich das nur über verbatimModuleSyntax (siehe Optimierungspotenzial) oder die ESLint-Regel consistent-type-imports."
+    },
+    {
+      "id": "DEP-001",
+      "category": "Dependencies",
+      "severity": "low",
+      "status": "new",
+      "title": "sinon und @types/sinon je ein Major zurück",
+      "location": "package.json:56, 65",
+      "effort": "S",
+      "description": "Installiert sind sinon 21.1.2 und @types/sinon 21.0.1, aktuell ist jeweils 22.x. Beide sind reine devDependencies, npm audit meldet null Schwachstellen, und die Versionen laufen erfreulicherweise wieder synchron — der Vorlauf hatte hier fünf Major Abstand bemängelt. Der Rückstand ist damit Wartung, kein Risiko. TypeScript bleibt bewusst unter 7 (in AGENTS.md und CHANGELOG begründet) und gehört ausdrücklich nicht zu diesem Punkt.",
+      "recommendation": "sinon und @types/sinon gemeinsam auf 22.x heben. Genutzt wird ausschließlich fake() aus der stabilen Kern-API, ein Bruch ist unwahrscheinlich. Dependabot ist bereits konfiguriert (.github/dependabot.yml)."
+    },
+    {
+      "id": "DX-001",
+      "category": "Developer Experience",
+      "severity": "low",
+      "status": "new",
+      "title": "docs/off.md beschreibt die Wildcard-Form mit Listener-Objekt nicht",
+      "location": "docs/off.md:12-18",
+      "effort": "S",
+      "description": "Die Übersichtstabelle führt off(emitter, '*') und off(emitter, eventName, listenerObject) je einzeln auf, ihre Kombination aber nicht. Genau diese Kombination ist der stille No-Op aus BUG-003. Wer die beiden dokumentierten Zeilen kombiniert, landet zwangsläufig bei einer falschen Erwartung — die Doku ist hier nicht dünn, sondern naheliegend falsch extrapolierbar.",
+      "recommendation": "Zeile ergänzen, sobald BUG-003 entschieden ist — der Text hängt an der Entscheidung und sollte nicht vorab geschrieben werden."
+    },
+    {
+      "id": "INFO-001",
+      "category": "Konsistenz",
+      "severity": "info",
+      "status": "carried-over",
+      "title": "Priority-Legacy-Aliase bleiben Teil der öffentlichen Oberfläche",
+      "location": "src/Priority.ts:14-17, src/types.ts:332-339",
+      "effort": "S",
+      "description": "AAA, BB, C und Default werden weiterhin exportiert. Gegenüber dem Vorlauf hat sich die Lage verbessert, ohne den Befund aufzuheben: alle vier tragen jetzt @deprecated mit dem Hinweis 'Slated for removal in a future major', und tsup trägt die Doc-Kommentare seit der removeComments-Ausnahme in tsup.config.js:16 auch in die publizierten Declarations, sodass Editoren die Warnung tatsächlich anzeigen. Die Aliase sind damit markiert, aber unverändert benutzbar.",
+      "recommendation": "Keine Maßnahme in diesem Zyklus. Entfernung gehört in den nächsten Major, mit Migrationsnotiz im CHANGELOG."
+    },
+    {
+      "id": "INFO-002",
+      "category": "Architektur & Struktur",
+      "severity": "info",
+      "status": "carried-over",
+      "title": "Die Argument-Heuristik von _subscribeTo ist nur durch Kommentare strukturiert",
+      "location": "src/subscribeTo.ts:50-71",
+      "effort": "M",
+      "description": "_subscribeTo dekodiert sämtliche on()-Überladungen positional in einer if/else-if-Kette, deren Fälle allein durch Kommentare den Überladungsnummern (1)-(4) zugeordnet sind. AGENTS.md hält fest, dass subscribeTo und types.ts im Gleichschritt geändert werden müssen — diese Kopplung existiert ausschließlich als Konvention, nicht als Struktur. Die Spec-Abdeckung der Ecken ist gut (on.spec.ts, 779 Zeilen), was das Risiko deutlich dämpft.",
+      "recommendation": "Keine Maßnahme empfohlen. Eine Umstellung auf eine deklarative Shape-Tabelle wäre eleganter, aber der Umbau eines fehlerfrei getesteten Parsers ohne konkreten Anlass ist die schlechtere Wette."
+    }
+  ],
+  "acknowledged": []
+}
+</script>
 
 <script>
-(function () {
-  var tbody = document.getElementById('tbody');
-  var fsev = document.getElementById('fsev');
-  var fcat = document.getElementById('fcat');
-  var fstat = document.getElementById('fstat');
-  var countEl = document.getElementById('count');
-  var emptyEl = document.getElementById('empty');
+(function(){
+  var data = JSON.parse(document.getElementById('audit-data').textContent);
+  var findings = data.findings.slice();
+  var order = {critical:0, high:1, medium:2, low:3, info:4};
+  findings.sort(function(a,b){ return order[a.severity] - order[b.severity]; });
 
-  function apply() {
-    var s = fsev.value, c = fcat.value, st = fstat.value, n = 0;
-    var rows = tbody.querySelectorAll('tr.row');
-    for (var i = 0; i < rows.length; i++) {
-      var r = rows[i];
-      var d = r.nextElementSibling;
-      var ok = (s === 'all' || r.dataset.sev === s) &&
-               (c === 'all' || r.dataset.cat === c) &&
-               (st === 'all' || r.dataset.status === st);
-      r.hidden = !ok;
-      if (!ok) { d.hidden = true; r.classList.remove('open'); }
-      else { d.hidden = !r.classList.contains('open'); n++; }
-    }
-    countEl.textContent = n + ' von ' + rows.length + ' Findings';
-    emptyEl.hidden = n !== 0;
-  }
+  var tbody = document.getElementById('backlog');
+  var emptyMsg = document.getElementById('emptyMsg');
+  var catSel = document.getElementById('catFilter');
+  var statusSel = document.getElementById('statusFilter');
 
-  function toggle(r) {
-    var d = r.nextElementSibling;
-    var open = r.classList.toggle('open');
-    d.hidden = !open;
-  }
-
-  tbody.addEventListener('click', function (e) {
-    var r = e.target.closest('tr.row');
-    if (r) toggle(r);
-  });
-  tbody.addEventListener('keydown', function (e) {
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    var r = e.target.closest('tr.row');
-    if (r) { e.preventDefault(); toggle(r); }
+  Object.keys(data.summary.byCategory).forEach(function(c){
+    var o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    catSel.appendChild(o);
   });
 
-  fsev.addEventListener('change', apply);
-  fcat.addEventListener('change', apply);
-  fstat.addEventListener('change', apply);
-  apply();
+  var state = {sev:'all', cat:'all', status:'all'};
+
+  function esc(s){
+    return String(s).replace(/[&<>"]/g, function(ch){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch];
+    });
+  }
+
+  function render(){
+    while(tbody.firstChild) tbody.removeChild(tbody.firstChild);
+    var shown = 0;
+    findings.forEach(function(f){
+      if(state.sev !== 'all' && f.severity !== state.sev) return;
+      if(state.cat !== 'all' && f.category !== state.cat) return;
+      if(state.status !== 'all' && f.status !== state.status) return;
+      shown++;
+
+      var tr = document.createElement('tr');
+      tr.className = 'row';
+      tr.innerHTML =
+        '<td class="id">' + esc(f.id) + '</td>' +
+        '<td><span class="pill p-' + f.severity + '">' + esc(f.severity) + '</span></td>' +
+        '<td>' + esc(f.title) +
+          '<span class="status s-' + f.status + '">' + esc(f.status) + '</span></td>' +
+        '<td>' + esc(f.category) + '</td>' +
+        '<td class="loc">' + esc(f.location) + '</td>' +
+        '<td class="eff">' + esc(f.effort) + '</td>';
+      tbody.appendChild(tr);
+
+      var dt = document.createElement('tr');
+      dt.className = 'detail';
+      dt.hidden = true;
+      dt.innerHTML = '<td colspan="6"><div class="dd">' +
+        '<h4>Problem</h4><p>' + esc(f.description) + '</p>' +
+        '<h4>Empfehlung</h4><p>' + esc(f.recommendation) + '</p>' +
+        '</div></td>';
+      tbody.appendChild(dt);
+
+      tr.addEventListener('click', function(){ dt.hidden = !dt.hidden; });
+    });
+    emptyMsg.hidden = shown > 0;
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('button.f'), function(btn){
+    btn.addEventListener('click', function(){
+      Array.prototype.forEach.call(document.querySelectorAll('button.f'), function(b){
+        b.setAttribute('aria-pressed', String(b === btn));
+      });
+      state.sev = btn.getAttribute('data-sev');
+      render();
+    });
+  });
+  catSel.addEventListener('change', function(){ state.cat = catSel.value; render(); });
+  statusSel.addEventListener('change', function(){ state.status = statusSel.value; render(); });
+
+  render();
 })();
 </script>
+</body>
+</html>
