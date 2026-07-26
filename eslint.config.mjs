@@ -120,6 +120,17 @@ export default defineConfig(
         2,
         {'ts-ignore': true, 'ts-expect-error': false},
       ],
+
+      // Capturing `this` inside a listener is what several specs assert:
+      // eventize binds the listener object as the invocation context, and
+      // the only way to check that is to hand `this` out to the assertion.
+      // Not an alias in the `const self = this` sense the rule targets.
+      '@typescript-eslint/no-this-alias': 0,
+
+      // `interface Foo extends Eventize {}` merged with `class Foo` is the
+      // composition fixture under test, not an oversight — the members come
+      // from `eventize.inject(this)` at construction time.
+      '@typescript-eslint/no-unsafe-declaration-merging': 0,
     },
   },
 );

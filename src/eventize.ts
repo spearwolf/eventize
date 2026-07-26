@@ -122,6 +122,12 @@ export interface Eventize<
   TEvents extends EventMap = DefaultEventMap,
 > extends EventizeApi<TEvents> {}
 
+// The interface declaration above grafts `EventizeApi<TEvents>`'s tuned
+// public overloads onto this class. The rule guards against an interface
+// promising members that have no runtime implementation — every member of
+// `EventizeApi` is implemented below, the merge only replaces the loose
+// implementation-shape signatures with the public ones.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Eventize<TEvents extends EventMap = DefaultEventMap> {
   constructor() {
     eventize<TEvents>(this);
