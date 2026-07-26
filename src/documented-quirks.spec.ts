@@ -59,8 +59,11 @@ describe('documented quirks', () => {
       if (!('listeners' in unsubscribe)) return;
 
       expect(unsubscribe.listeners).toHaveLength(1);
-      expect(unsubscribe.listeners[0].priority).toBe(Priority.Default);
-      expect(Number.isNaN(unsubscribe.listeners[0].priority)).toBe(false);
+      const [firstListener] = unsubscribe.listeners;
+      expect(firstListener).toBeDefined();
+      if (firstListener === undefined) return;
+      expect(firstListener.priority).toBe(Priority.Default);
+      expect(Number.isNaN(firstListener.priority)).toBe(false);
     });
 
     it('keeps a priority-less tuple in the right place in the call order', () => {

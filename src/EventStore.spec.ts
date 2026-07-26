@@ -313,4 +313,50 @@ describe('EventStore', () => {
       expect(() => b.remove(target, null)).not.toThrow();
     });
   });
+
+  // Both buckets are dense in every reachable code path — add()/remove() never
+  // leave a hole behind. These two tests break that invariant on purpose (by
+  // growing `.length` past the real entries, which is enough to create holes
+  // without needing a cast) to pin two specific defensive throws. This is not
+  // general hole-tolerance for the class: findSimilarListener/isSimilar die
+  // on a hole with their own uncaught TypeError (`b.listenerType`) for the
+  // LISTENER_IS_OBJ/LISTENER_IS_NAMED_FUNC path, removeByEventNameAndListenerObject
+  // and removeByListener the same way through isEqual, and removeListenerFromArray
+  // (used by removeByListener) walks holes silently via its `!== undefined`
+  // guard rather than throwing at all. Only add()'s no-similar-listener path
+  // and forEach()'s merge loop are pinned here.
+  describe('pins the two defensive branches that throw on a holey bucket', () => {
+    it('findInsertIndex throws instead of silently choosing an insert position', () => {
+      const store = new EventStore();
+      const bucket = store.getListenersForEventName('foo');
+      bucket.length = 3; // three holes, no real listeners
+
+      // A function listener is LISTENER_IS_FUNC, which isSimilarListenerType()
+      // excludes — findSimilarListener() returns undefined without ever
+      // calling Array.prototype.find over the holey bucket, so add() falls
+      // straight through to findInsertIndex() and hits *that* throw. Swap
+      // this for `new EventListener('foo', 0, {})` (LISTENER_IS_OBJ) and the
+      // test still throws, but earlier and elsewhere: find() visits holes
+      // (unlike forEach), so isSimilar() receives `b === undefined` and dies
+      // on `b.listenerType` before findInsertIndex ever runs. The assertion
+      // below is specific to the message this throw produces — it is not
+      // simply "add() throws on a holey bucket".
+      expect(() => store.add(new EventListener('foo', 0, () => {}))).toThrow(
+        'EventStore: findInsertIndex encountered a hole',
+      );
+    });
+
+    it('forEach() throws instead of silently dispatching a truncated prefix', () => {
+      const store = new EventStore();
+      const namedBucket = store.getListenersForEventName('foo');
+      namedBucket.length = 2; // holes only
+      store.catchEmAllListeners.length = 2; // holes only
+
+      const seen: EventListener[] = [];
+      expect(() => store.forEach('foo', (l) => seen.push(l))).toThrow(
+        'EventStore: forEach encountered a hole',
+      );
+      expect(seen).toHaveLength(0);
+    });
+  });
 });

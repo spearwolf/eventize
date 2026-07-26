@@ -23,7 +23,17 @@ const findInsertIndex = (
   let hi = arr.length;
   while (lo < hi) {
     const mid = (lo + hi) >>> 1;
-    if (sortByPriorityAndId(item, arr[mid]) < 0) {
+    // mid is always within [lo, hi) ⊆ [0, arr.length), so arr[mid] is defined
+    // for every dense array this is called with. The old code trusted that
+    // and let a hole surface as a TypeError from inside
+    // sortByPriorityAndId(item, undefined); this throws explicitly instead of
+    // picking hi = mid for it — a hole is a corrupted array, not a value the
+    // search should silently place.
+    const midItem = arr[mid];
+    if (midItem === undefined) {
+      throw new Error('EventStore: findInsertIndex encountered a hole');
+    }
+    if (sortByPriorityAndId(item, midItem) < 0) {
       hi = mid;
     } else {
       lo = mid + 1;
@@ -59,8 +69,11 @@ const removeListenerFromArray = (
   listenerObject: unknown,
 ) => {
   for (let i = listeners.length - 1; i >= 0; i--) {
-    if (listeners[i].isEqual(listener, listenerObject)) {
-      listeners[i].detach();
+    // i walks strictly inside [0, listeners.length), so listeners[i] is
+    // always defined here — the undefined branch exists for the compiler.
+    const current = listeners[i];
+    if (current !== undefined && current.isEqual(listener, listenerObject)) {
+      current.detach();
       listeners.splice(i, 1);
     }
   }
@@ -347,17 +360,30 @@ export class EventStore {
       let i = 0;
       let j = 0;
       while (i < iLen || j < jLen) {
-        if (i < iLen) {
-          const cur = namedListeners[i];
-          if (j >= jLen || cur.priority >= catchEmAllListeners[j].priority) {
-            fn(cur);
-            ++i;
-            continue;
-          }
+        // cur/other are defined exactly when i < iLen / j < jLen — the ternary
+        // re-expresses those bounds checks so the compiler can see it too.
+        const cur = i < iLen ? namedListeners[i] : undefined;
+        const other = j < jLen ? catchEmAllListeners[j] : undefined;
+        if (
+          cur !== undefined &&
+          (other === undefined || cur.priority >= other.priority)
+        ) {
+          fn(cur);
+          ++i;
+          continue;
         }
-        if (j < jLen) {
-          fn(catchEmAllListeners[j]);
+        if (other !== undefined) {
+          fn(other);
           ++j;
+        } else {
+          // cur/other read as undefined here for one of two reasons: the
+          // loop is legitimately done (i >= iLen and j >= jLen, in which case
+          // the while-condition above already exits first), or one of the
+          // snapshots is holey below its own length. A hole is a corrupted
+          // array — the same call made in findInsertIndex above — so this
+          // throws rather than silently dispatching a truncated prefix and
+          // dropping every real listener still queued behind the hole.
+          throw new Error('EventStore: forEach encountered a hole');
         }
       }
     }

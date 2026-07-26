@@ -89,9 +89,14 @@ describe('onceAsync()', () => {
       // resolving must detach the very handler that was attached — removing
       // some other function would leave this one on the signal forever
       expect(removeSpy).toHaveBeenCalledTimes(1);
+      expect(addSpy).toHaveBeenCalledTimes(1);
+      const [addCall] = addSpy.mock.calls;
+      expect(addCall).toBeDefined();
+      if (addCall === undefined) return;
+      const [, handler] = addCall;
       expect(removeSpy).toHaveBeenCalledWith(
         'abort',
-        addSpy.mock.calls[0][1] as EventListenerOrEventListenerObject,
+        handler as EventListenerOrEventListenerObject,
       );
 
       // aborting after the fact must not produce an unhandled rejection
