@@ -314,6 +314,38 @@ describe('lifecycle', () => {
     });
   });
 
+  // The retention window of a once() is set by what a dispatch actually
+  // called. An event name that only matches an inherited Object.prototype
+  // member calls nothing, so the subscription stays — and keeps holding the
+  // listener object — until it is either answered or released by hand.
+  describe('a once() whose event name only matches Object.prototype', () => {
+    it('stays subscribed, so the emitter keeps holding the listener object', () => {
+      const obj = eventize();
+      const listenerObject = {};
+
+      const unsubscribe = once(obj, 'toString', listenerObject) as any;
+      emit(obj, 'toString');
+
+      expect(getSubscriptionCount(obj)).toBe(1);
+      expect(unsubscribe.listener.listener).toBe(listenerObject);
+
+      unsubscribe();
+      expect(getSubscriptionCount(obj)).toBe(0);
+      expect(unsubscribe.listener.listener).toBeNull();
+    });
+
+    it('is released by the emit() fallback when the object has one', () => {
+      const obj = eventize();
+      const listenerObject = {emit: fake()};
+
+      once(obj, 'toString', listenerObject);
+      emit(obj, 'toString');
+
+      expect(listenerObject.emit.calledOnceWith('toString')).toBe(true);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+  });
+
   describe('wildcard', () => {
     it('retain(ε, "*") is rejected, so a wildcard subscribe cannot recurse', () => {
       const obj = eventize();

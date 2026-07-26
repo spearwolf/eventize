@@ -1,5 +1,12 @@
 import {EventListener} from './EventListener';
-import {emitAsync, eventize, on} from './index';
+import {
+  emit,
+  emitAsync,
+  eventize,
+  getSubscriptionCount,
+  on,
+  once,
+} from './index';
 import {
   EVENT_CATCH_EM_ALL,
   LISTENER_IS_NAMED_FUNC,
@@ -105,6 +112,164 @@ describe('EventListener', () => {
     });
   });
 
+  // Every object inherits toString, valueOf, constructor and friends, so an
+  // event name colliding with one of them found a callable member on *any*
+  // listener object — dispatching to code the subscriber never wrote, feeding
+  // its result into the emitAsync aggregation and consuming a once(). Same
+  // reasoning as the primitive guard above, one prototype up.
+  describe('inherited Object.prototype members', () => {
+    const inheritedMethodNames = Object.getOwnPropertyNames(
+      Object.prototype,
+    ).filter(
+      (name) =>
+        typeof (Object.prototype as Record<string, unknown>)[name] ===
+        'function',
+    );
+
+    it('sees all seven names the audit listed', () => {
+      expect(inheritedMethodNames).toEqual(
+        expect.arrayContaining([
+          'toString',
+          'toLocaleString',
+          'valueOf',
+          'constructor',
+          'hasOwnProperty',
+          'isPrototypeOf',
+          'propertyIsEnumerable',
+        ]),
+      );
+    });
+
+    describe.each(inheritedMethodNames)('%s', (eventName) => {
+      it('is not invoked on a named listener-object subscription', () => {
+        const listener = new EventListener(eventName, 0, {});
+        const callAfterApply = jest.fn();
+        listener.callAfterApply = callAfterApply;
+        const returnValue = jest.fn();
+        expect(() => listener.apply(eventName, [], returnValue)).not.toThrow();
+        expect(callAfterApply).not.toHaveBeenCalled();
+        expect(returnValue).not.toHaveBeenCalled();
+      });
+
+      it('is not invoked through a wildcard listener-object subscription', () => {
+        const listener = new EventListener(EVENT_CATCH_EM_ALL, 0, {});
+        const callAfterApply = jest.fn();
+        listener.callAfterApply = callAfterApply;
+        const returnValue = jest.fn();
+        expect(() => listener.apply(eventName, [], returnValue)).not.toThrow();
+        expect(callAfterApply).not.toHaveBeenCalled();
+        expect(returnValue).not.toHaveBeenCalled();
+      });
+    });
+
+    it('collects nothing from an inherited member through emitAsync()', async () => {
+      const obj = eventize();
+      on(obj, 'toString', {});
+      await expect(emitAsync(obj, 'toString')).resolves.toBeUndefined();
+    });
+
+    it('collects nothing from the Object constructor through emitAsync()', async () => {
+      const obj = eventize();
+      on(obj, 'constructor', {});
+      await expect(emitAsync(obj, 'constructor')).resolves.toBeUndefined();
+    });
+
+    it('does not consume a once() that only the prototype would have answered', () => {
+      const obj = eventize();
+      once(obj, 'toString', {});
+      emit(obj, 'toString');
+      expect(getSubscriptionCount(obj)).toBe(1);
+    });
+
+    it('does not consume a wildcard once() either', () => {
+      const obj = eventize();
+      once(obj, {});
+      emit(obj, 'toString');
+      expect(getSubscriptionCount(obj)).toBe(1);
+    });
+
+    // The guard tests function identity, so a target that defines its own
+    // method under that name dispatches as normal — that is the shape saying
+    // "yes, here".
+    it('still dispatches to an own override', () => {
+      const toString = jest.fn(() => 'own');
+      const listener = new EventListener('toString', 0, {toString});
+      const returnValue = jest.fn();
+      listener.apply('toString', [1, 2], returnValue);
+      expect(toString.mock.calls[0]).toEqual([1, 2]);
+      expect(returnValue).toHaveBeenCalledWith('own');
+    });
+
+    it('still dispatches to a class override on the prototype chain', () => {
+      const calls: unknown[][] = [];
+      class Handler {
+        toString(...args: unknown[]) {
+          calls.push(args);
+          return 'from class';
+        }
+      }
+      const listener = new EventListener('toString', 0, new Handler());
+      const returnValue = jest.fn();
+      listener.apply('toString', ['x'], returnValue);
+      expect(calls).toEqual([['x']]);
+      expect(returnValue).toHaveBeenCalledWith('from class');
+    });
+
+    // The flip side of testing identity rather than ownership: re-declaring
+    // the *same function* under its own name is indistinguishable from
+    // inheriting it, so it is skipped as well. Pinned because the docs promise
+    // "your own method still dispatches" and this is the one shape where an own
+    // property does not.
+    it('skips an own property that is Object.prototype’s own function', () => {
+      const listener = new EventListener('toString', 0, {
+        toString: Object.prototype.toString,
+      });
+      const returnValue = jest.fn();
+      listener.apply('toString', [], returnValue);
+      expect(returnValue).not.toHaveBeenCalled();
+    });
+
+    it('skips a prototype-chain alias of the same function too', () => {
+      class Weird {}
+      Weird.prototype.toString = Object.prototype.toString;
+      const listener = new EventListener('toString', 0, new Weird());
+      const returnValue = jest.fn();
+      listener.apply('toString', [], returnValue);
+      expect(returnValue).not.toHaveBeenCalled();
+    });
+
+    it('reaches the emit() fallback when only the prototype matched', () => {
+      const obj = {emit: jest.fn()};
+      const listener = new EventListener(EVENT_CATCH_EM_ALL, 0, obj);
+      listener.apply('toString', [666]);
+      expect(obj.emit.mock.calls[0]).toEqual(['toString', 666]);
+    });
+
+    it('consumes a once() when the emit() fallback answered instead', () => {
+      const obj = {emit: jest.fn()};
+      const listener = new EventListener(EVENT_CATCH_EM_ALL, 0, obj);
+      const callAfterApply = jest.fn();
+      listener.callAfterApply = callAfterApply;
+      listener.apply('toString', []);
+      expect(callAfterApply).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps a null-prototype listener object working', () => {
+      const listenerObject = Object.create(null) as Record<string, unknown>;
+      const foo = jest.fn();
+      listenerObject['foo'] = foo;
+
+      const named = new EventListener('foo', 0, listenerObject);
+      named.apply('foo', [7]);
+      expect(foo.mock.calls[0]).toEqual([7]);
+
+      const inherited = new EventListener('toString', 0, listenerObject);
+      const returnValue = jest.fn();
+      expect(() => inherited.apply('toString', [], returnValue)).not.toThrow();
+      expect(returnValue).not.toHaveBeenCalled();
+    });
+  });
+
   describe('method name as listener', () => {
     it('no-ops when there is no listener object to read the method off', () => {
       const listener = new EventListener('foo', 0, 'handler', null);
@@ -128,6 +293,16 @@ describe('EventListener', () => {
       const listener = new EventListener('foo', 0, 'handler', target);
       listener.apply('foo', [null, 'plah!', 666]);
       expect(target.handler.mock.calls[0]).toEqual([null, 'plah!', 666]);
+    });
+
+    // The prototype guard on the listener-object path stops deliberately at
+    // this one: `on(ε, 'evt', 'toString', obj)` names the method, so the
+    // inherited hit is the caller's choice, not an accident.
+    it('reads an inherited Object.prototype method when the call names it', () => {
+      const listener = new EventListener('evt', 0, 'toString', {});
+      const returnValue = jest.fn();
+      listener.apply('evt', [], returnValue);
+      expect(returnValue).toHaveBeenCalledWith('[object Object]');
     });
   });
 

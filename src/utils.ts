@@ -14,6 +14,45 @@ export const isEventName = (eventName: unknown): eventName is EventName => {
   }
 };
 
+const objectPrototype = Object.prototype as Record<EventName, unknown>;
+
+/**
+ * The member an event name resolves to on a dispatch target — with one range of
+ * names taken out: anything identical to the same-named member of
+ * `Object.prototype`. Every object inherits `toString`, `valueOf`,
+ * `constructor`, `hasOwnProperty` and friends (plus V8's `__defineGetter__`
+ * family), so an event named after one of them used to find a callable member
+ * on *any* listener object and on *any* duck-typed target: it dispatched to
+ * code nobody subscribed, fed `'[object Object]'` into the `emitAsync()`
+ * aggregation and consumed a `once()` while no user method ever ran. This is
+ * `isObjListener()`'s reasoning about primitives, one prototype up.
+ *
+ * Function identity is the whole test, which is what keeps it narrow: a target
+ * that defines its own method under that name — own property or anywhere on its
+ * prototype chain — resolves as normal, and a `Object.create(null)` target has
+ * nothing to subtract. The literal edge follows from the same rule rather than
+ * contradicting it: aliasing the inherited function under its own name
+ * (`{toString: Object.prototype.toString}`) is skipped too, because there is no
+ * way to tell that apart from inheriting it, and no reason to want it.
+ * Callability stays the caller's question; the dispatch paths both decide it
+ * with their own `typeof === 'function'` test.
+ *
+ * Deliberately not applied to the method-name form `on(ε, 'evt', 'toString',
+ * obj)`: there the inherited hit is the caller's own choice.
+ */
+export const dispatchableMember = (
+  target: Record<EventName, unknown>,
+  eventName: EventName,
+): unknown => {
+  const member = target[eventName];
+  // The `undefined` shortcut is the common case — an event name matches no
+  // member at all — and it skips a second property read on the hottest path in
+  // the library. Behaviour is identical: `undefined` was never callable, so
+  // whether it came from the target or from Object.prototype changes nothing.
+  if (member === undefined) return undefined;
+  return member === objectPrototype[eventName] ? undefined : member;
+};
+
 export const hasConsole = typeof console !== 'undefined';
 
 // `console.warn` is non-optional in lib.dom, so a truthiness test on it reads

@@ -22,7 +22,7 @@ import type {
   SubscribeArgs,
   UnsubscribeFunc,
 } from './types';
-import {isEventName} from './utils';
+import {dispatchableMember, isEventName} from './utils';
 
 const afterApply = (callback?: () => void) => (listener: EventListener) => {
   listener.callAfterApply = () => {
@@ -103,7 +103,12 @@ const _duckEmitOne = (
     );
   }
   const target = obj as Record<EventName, unknown>;
-  const fn = target[eventName];
+  // Same prototype boundary as the listener-object path in EventListener.ts —
+  // the two dispatch paths have to agree on what counts as a match, or the
+  // emitAsync() aggregation diverges between them. An event name out of
+  // external data (a JSON key, a message type) collides with
+  // Object.prototype on every plain object.
+  const fn = dispatchableMember(target, eventName);
   if (typeof fn === 'function') {
     const retVal = (fn as (...a: any[]) => any).apply(obj, args);
     if (retVal != null) returnValue?.(retVal);

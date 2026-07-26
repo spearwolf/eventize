@@ -5,7 +5,7 @@ import {
 } from './constants';
 
 import type {EventName, EventArgs, ListenerObjectType} from './types';
-import {isCatchEmAll, isEventName} from './utils';
+import {dispatchableMember, isCatchEmAll, isEventName} from './utils';
 
 type EmitFnType = Function | undefined;
 type CallAfterApplyFnType = (() => void) | undefined;
@@ -212,9 +212,17 @@ export class EventListener {
     if (!isObjListener(listener)) return;
 
     if (this.isCatchEmAll || this.eventName === eventName) {
+      // dispatchableMember, not a raw `listener[eventName]`: a name colliding
+      // with an Object.prototype member found the inherited function on any
+      // object at all. Skipping it leaves the `emit()` fallback below as the
+      // next link in the chain, which is what an unanswered name should reach.
       const didCall =
-        apply(listener, listener[eventName], args, returnValue) ||
-        emit(eventName, listener, args, returnValue);
+        apply(
+          listener,
+          dispatchableMember(listener, eventName),
+          args,
+          returnValue,
+        ) || emit(eventName, listener, args, returnValue);
       if (didCall && this.callAfterApply) this.callAfterApply();
     }
   }

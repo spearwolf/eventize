@@ -66,7 +66,7 @@ How each function treats a target that was never eventized — the single most c
 | Functions | On a non-eventized target |
 | --- | --- |
 | `on`, `once`, `onceAsync`, `retain` | **auto-eventize** it, then proceed |
-| `emit`, `emitAsync` (v5+) | **duck-type**: `obj[eventName](…args)`, else `obj.emit(eventName, …args)`, else no-op |
+| `emit`, `emitAsync` (v5+) | **duck-type**: `obj[eventName](…args)`, else `obj.emit(eventName, …args)`, else no-op — an inherited `Object.prototype` member is not a match (pitfall 11) |
 | `off`, `getSubscriptionCount`, `getRetainedCount`, `getRetainedEventNames` | **permissive**: silent no-op / `0` / `[]`, even for `null` |
 | `retainClear`, `unretain` | **throw** `"object is not eventized"` |
 
@@ -84,6 +84,7 @@ How each function treats a target that was never eventized — the single most c
 8. **`emitAsync()` resolves `undefined`, not `[]`**, when nothing was collected. `null`/`undefined` returns are dropped; arrays of promises are flattened via `Promise.all`.
 9. **`off(ε, name)` unretains that event** — it drops the stored value *and* the retain policy, so later emits aren't retained until `retain()` is called again. Scalar and array forms behave alike for strings and symbols since v5.1; before that, `off(ε, [aSymbol])` left retained state untouched. Since v6.0.0 the bulk forms `off(ε)` and `off(ε, '*')` do the same for *every* retained name — up to v5.1.0 they cleared only listeners and still replayed old payloads to later subscribers.
 10. **Events emitted before `retain()` are not stored.** Retain starts recording from the call onwards.
+11. **Event names inherited from `Object.prototype` dispatch to nothing.** `toString`, `toLocaleString`, `valueOf`, `constructor`, `hasOwnProperty`, `isPrototypeOf`, `propertyIsEnumerable` (and V8's `__defineGetter__` family) are skipped on both dispatch paths when the target only inherits them — a listener-object subscription and a duck-typed `emit()` alike. Until v6.1.0 they hit the inherited function: `emitAsync(ε, 'toString')` collected `'[object Object]'` and `once(ε, 'toString', {})` was consumed without calling anything. Write your own `toString` method — on the object or on its class — and it dispatches as normal; the comparison is against `Object.prototype`'s function by identity, so the one own property that is still skipped is an alias of that very function (`{toString: Object.prototype.toString}`). A skipped name falls through to the `.emit()` fallback. The method-name form `on(ε, 'evt', 'toString', obj)` is exempt — it names what it wants.
 
 ## Idiomatic shape
 

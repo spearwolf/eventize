@@ -50,11 +50,40 @@ live in
 [`docs/lifecycle.md#migrating-from-v5`](../../../docs/lifecycle.md#migrating-from-v5)
 rather than being duplicated here.
 
+One more runtime change rides along in `v6.1.0`, filed as a **fix** rather
+than a breaking change — the behaviour it removes dispatched to code the
+subscriber never wrote — but a `v5.1.0` consumer meets it in the same upgrade
+and it is not visible to the type checker:
+
+- **An event name that only matches an inherited `Object.prototype` member
+  dispatches to nothing.** `toString`, `toLocaleString`, `valueOf`,
+  `constructor`, `hasOwnProperty`, `isPrototypeOf`, `propertyIsEnumerable`
+  and V8's `__defineGetter__` family used to resolve to the function every
+  object inherits — on both dispatch paths. `emit(ε, 'toString')` called it on
+  every listener-object subscribed to that name and on every wildcard
+  listener-object, `emitAsync(ε, 'toString')` collected `'[object Object]'`,
+  `emitAsync({}, 'constructor')` collected `[{}]` from the `Object`
+  constructor invoked as a plain function, and `emit(ε, '__defineGetter__')`
+  threw a `TypeError` from deep inside the dispatch. A `once()` in any of
+  those shapes was consumed without calling a handler — except for the two
+  `__define*` names, where the throw came before the auto-unsubscribe ran and
+  the subscription survived by accident; it now survives everywhere, so an
+  emitter holds such a subscription until it is answered or released. Grep for
+  event names taken from external data (JSON keys, message types, DOM
+  attributes) — that is where the collision happens by accident. If a name of
+  this kind was doing real work, spell the method out with the method-name
+  form (`on(ε, 'toString', 'toString', obj)`), which is deliberately exempt,
+  or define the method on the target: a target's own method under that name
+  dispatches as normal, unless it is literally an alias of
+  `Object.prototype`'s function.
+
 ## v4 → v5: `emit()` stopped throwing
 
 `emit()` and `emitAsync()` no longer throw `"object is not eventized"` on a non-eventized target. They duck-type instead:
 
-1. `obj[eventName]` is a function → call it with `this === obj`.
+1. `obj[eventName]` is a function the object itself provides → call it with
+   `this === obj`. Since v6.1.0 a member inherited from `Object.prototype`
+   doesn't count (see the v5 → v6 note above).
 2. Else `obj.emit` is a function → call `obj.emit(eventName, …args)`.
 3. Else silent no-op.
 

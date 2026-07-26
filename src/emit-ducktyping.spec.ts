@@ -89,6 +89,97 @@ describe('emit() duck-typing on non-eventized targets (v5+)', () => {
     });
   });
 
+  // An event name coming out of external data — a JSON key, a message type, a
+  // DOM attribute — hits Object.prototype on *every* plain object. The named
+  // member lookup ignores what the target merely inherits, exactly as the
+  // eventized listener-object path does.
+  describe('event names colliding with Object.prototype', () => {
+    const inheritedMethodNames = Object.getOwnPropertyNames(
+      Object.prototype,
+    ).filter(
+      (name) =>
+        typeof (Object.prototype as Record<string, unknown>)[name] ===
+        'function',
+    );
+
+    it.each(inheritedMethodNames)(
+      'does not dispatch to the inherited %s',
+      (eventName) => {
+        const emitFn = fake();
+        const target = {emit: emitFn};
+
+        expect(() => emit(target, eventName)).not.toThrow();
+        // The name found nothing, so the fallback chain continues.
+        expect(emitFn.calledOnceWith(eventName)).toBe(true);
+      },
+    );
+
+    it('is a silent no-op without an emit() fallback', () => {
+      const target = {};
+
+      expect(() => emit(target, 'toString', 'a')).not.toThrow();
+    });
+
+    it('still calls an own override of an inherited member', () => {
+      const toString = fake();
+      const emitFn = fake();
+      const target = {toString, emit: emitFn};
+
+      emit(target, 'toString', 'X');
+
+      expect(toString.calledOnceWith('X')).toBe(true);
+      expect(emitFn.called).toBe(false);
+    });
+
+    it('still calls a class override of an inherited member', () => {
+      const seen: unknown[][] = [];
+      class Adapter {
+        toString(...args: unknown[]) {
+          seen.push(args);
+          return '';
+        }
+      }
+
+      emit(new Adapter(), 'toString', 1, 2);
+
+      expect(seen).toEqual([[1, 2]]);
+    });
+
+    // Identity, not ownership: an own property holding the very same function
+    // is skipped here too, so both dispatch paths agree on the edge as well.
+    it('skips an own property aliasing the inherited function', () => {
+      const emitFn = fake();
+      const target = {toString: Object.prototype.toString, emit: emitFn};
+
+      emit(target, 'toString');
+
+      expect(emitFn.calledOnceWith('toString')).toBe(true);
+    });
+
+    it('skips a prototype-chain alias of the inherited function', () => {
+      const emitFn = fake();
+      class Weird {
+        emit = emitFn;
+      }
+      Weird.prototype.toString = Object.prototype.toString;
+
+      emit(new Weird(), 'toString');
+
+      expect(emitFn.calledOnceWith('toString')).toBe(true);
+    });
+
+    it('works on a null-prototype target', () => {
+      const target = Object.create(null) as Record<string, unknown>;
+      const foo = fake();
+      target['foo'] = foo;
+
+      emit(target, 'foo', 3);
+      expect(foo.calledOnceWith(3)).toBe(true);
+
+      expect(() => emit(target, 'toString')).not.toThrow();
+    });
+  });
+
   describe('array event names', () => {
     it('dispatches each event in order via duck-typing', () => {
       const calls: string[] = [];
@@ -274,6 +365,14 @@ describe('emitAsync() duck-typing on non-eventized targets (v5+)', () => {
     const result = await emitAsync(target, ['a', 'b']);
 
     expect(result).toEqual(['A', 'B']);
+  });
+
+  it('aggregates nothing from an inherited Object.prototype member', async () => {
+    await expect(emitAsync({}, 'toString')).resolves.toBeUndefined();
+  });
+
+  it('does not call the Object constructor for the event name "constructor"', async () => {
+    await expect(emitAsync({}, 'constructor')).resolves.toBeUndefined();
   });
 
   it("throws on '*' wildcard", async () => {

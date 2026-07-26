@@ -246,9 +246,11 @@ Eventize splits its API into four families by how each function treats a target 
 
 `emit` / `emitAsync` fire events. On an eventized target they dispatch to subscribed listeners. On a non-eventized object (v5+) they fall back to duck-typing — the same pattern that already powers listener-object dispatch:
 
-1. If `obj[eventName]` is a function → call it with the args (with `this === obj`).
+1. If `obj[eventName]` is a function the object actually provides → call it with the args (with `this === obj`).
 2. Else if `obj.emit` is a function → call `obj.emit(eventName, ...args)`.
 3. Otherwise → silently no-op.
+
+Step 1 ignores a member that is identical to `Object.prototype`'s member of the same name, so an event called `toString`, `valueOf`, `constructor`, `hasOwnProperty`, `isPrototypeOf`, `propertyIsEnumerable` or `toLocaleString` does not dispatch to the function every object inherits — it moves on to step 2. Define your own `toString` — on the object or on its class — and it is called as normal, because the check compares the resolved member against `Object.prototype`'s function by identity rather than going by the name. The one own property that is still skipped is an alias of that same function, `{toString: Object.prototype.toString}`. The same boundary applies to listener-object dispatch on an eventized target.
 
 That lets you point `emit()` at adapters, mocks, or plain method-bags without ceremony. `null` / `undefined` / non-object targets silently no-op. **`'*'` still throws** — it remains subscribe-only.
 
