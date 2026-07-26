@@ -267,8 +267,9 @@ export interface SubscribeFunc<TEvents extends EventMap = DefaultEventMap> {
   (priority: number, listenerObject: ListenerObjectType): UnsubscribeFunc;
 }
 
-export interface EventizeApi<TEvents extends EventMap = DefaultEventMap>
-  extends EventizedObject<TEvents> {
+export interface EventizeApi<
+  TEvents extends EventMap = DefaultEventMap,
+> extends EventizedObject<TEvents> {
   on: SubscribeFunc<TEvents>;
   once: SubscribeFunc<TEvents>;
 

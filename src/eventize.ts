@@ -118,8 +118,9 @@ export const eventize: EventizerFuncAPI = (() => {
   return e;
 })();
 
-export interface Eventize<TEvents extends EventMap = DefaultEventMap>
-  extends EventizeApi<TEvents> {}
+export interface Eventize<
+  TEvents extends EventMap = DefaultEventMap,
+> extends EventizeApi<TEvents> {}
 
 export class Eventize<TEvents extends EventMap = DefaultEventMap> {
   constructor() {
