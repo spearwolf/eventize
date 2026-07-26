@@ -1,4 +1,3 @@
-/* eslint-env jest */
 import {EventKeeper} from './EventKeeper';
 import type {EventName} from './types';
 

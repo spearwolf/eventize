@@ -1,4 +1,3 @@
-/* eslint-env jest */
 import {EventListener} from './EventListener';
 import {EventStore} from './EventStore';
 

@@ -1,4 +1,3 @@
-/* eslint-env jest */
 import {eventize} from './index';
 
 describe('eventize.is()', () => {
