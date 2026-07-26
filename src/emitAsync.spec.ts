@@ -5,7 +5,7 @@ describe('emitAsync()', () => {
     const o = eventize();
 
     on(o, 'foo', () => 123);
-    on(o, 'foo', (): object => null);
+    on(o, 'foo', (): object | null => null);
     on(o, 'foo', () => 'abc');
     on(o, 'foo', (): unknown => undefined);
     on(o, 'foo', () => Promise.resolve('xyz'));

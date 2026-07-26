@@ -1,4 +1,5 @@
 import type {EventKeeper} from './EventKeeper';
+import type {EventListener} from './EventListener';
 import type {EventStore} from './EventStore';
 import type {NAMESPACE} from './constants';
 

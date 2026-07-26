@@ -54,6 +54,24 @@ describe('EventListener', () => {
     });
   });
 
+  describe('a listener that is not a listener', () => {
+    // `typeof null === 'object'`, so a null listener used to be tagged
+    // LISTENER_IS_OBJ — and apply() then dereferenced it. It has no type now,
+    // which makes apply() a no-op. Unreachable through on()/once(), which
+    // reject a falsy listener outright.
+    it('gives null no listener type and makes apply() a no-op', () => {
+      const listener = new EventListener('foo', 0, null);
+      expect(listener.listenerType).toBeUndefined();
+      expect(() => listener.apply('foo', [1, 2, 3])).not.toThrow();
+    });
+
+    it('gives undefined no listener type either', () => {
+      const listener = new EventListener('foo', 0, undefined);
+      expect(listener.listenerType).toBeUndefined();
+      expect(() => listener.apply('foo', [1, 2, 3])).not.toThrow();
+    });
+  });
+
   describe('function as listener without context', () => {
     it('call() calls the listener function', () => {
       const fn = jest.fn();

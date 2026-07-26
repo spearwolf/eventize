@@ -16,8 +16,14 @@ export const isEventName = (eventName: unknown): eventName is EventName => {
 
 export const hasConsole = typeof console !== 'undefined';
 
+// `console.warn` is non-optional in lib.dom, so a truthiness test on it reads
+// as always-true to the compiler (TS2774). The typeof form keeps the same
+// runtime guard for hosts whose console is narrower than the type claims.
 export const warn = hasConsole
-  ? console[console.warn ? 'warn' : 'log'].bind(console, LOG_NAMESPACE)
+  ? console[typeof console.warn === 'function' ? 'warn' : 'log'].bind(
+      console,
+      LOG_NAMESPACE,
+    )
   : () => {};
 
 type PropertyKey = string | symbol;

@@ -37,7 +37,15 @@ const emit = (
 ): boolean =>
   apply(listener, listener.emit, [eventName].concat(args), returnValue);
 
-const detectListenerType = (listener: unknown) => {
+/**
+ * Returns the LISTENER_IS_* tag for a listener, or undefined for a type that
+ * cannot be one. `_subscribeTo()` rejects those before they reach here, so the
+ * undefined branch is unreachable in practice — but the type must say so
+ * rather than lie about it.
+ *
+ * `typeof null === 'object'`, hence the explicit null check.
+ */
+const detectListenerType = (listener: unknown): number | undefined => {
   switch (typeof listener) {
     case 'function':
       return LISTENER_IS_FUNC;
@@ -45,7 +53,9 @@ const detectListenerType = (listener: unknown) => {
     case 'symbol':
       return LISTENER_IS_NAMED_FUNC;
     case 'object':
-      return LISTENER_IS_OBJ;
+      return listener === null ? undefined : LISTENER_IS_OBJ;
+    default:
+      return undefined;
   }
 };
 
@@ -56,20 +66,20 @@ export class EventListener {
   readonly id: number;
   readonly eventName: EventName;
   readonly isCatchEmAll: boolean;
-  readonly priority: number | undefined;
+  readonly priority: number;
   // Not readonly: detach() nulls these on removal so a retained unsubscribe
   // handle can't keep the emitter graph alive. Nothing inside this package
   // writes to them outside detach(), and consumers have no reason to either.
   listener: unknown;
   listenerObject: ListenerObjectType;
-  readonly listenerType: number;
+  readonly listenerType: number | undefined;
   callAfterApply: CallAfterApplyFnType;
   isRemoved: boolean;
   refCount: number;
 
   constructor(
     eventName: EventName,
-    priority: number | undefined,
+    priority: number,
     listener: unknown,
     listenerObject: ListenerObjectType = null,
   ) {
@@ -114,9 +124,13 @@ export class EventListener {
     this.callAfterApply = undefined;
   }
 
+  // `args` defaults rather than staying `EventArgs | undefined`: the two
+  // internal helpers below would otherwise have to thread the undefined
+  // through, and `emit()` would concat it into the argument list as a literal
+  // `undefined`. Every caller (_emitOne, EventKeeper.replayTo) passes an array.
   apply(
     eventName: EventName,
-    args?: EventArgs,
+    args: EventArgs = [],
     returnValue?: ReturnValue,
   ): void {
     if (this.isRemoved) return;

@@ -96,16 +96,19 @@ describe('getRetainedCount() / getRetainedEventNames()', () => {
   });
 
   it('is safe on null, undefined and primitives at runtime', () => {
-    // This project builds with `strictNullChecks: false` (tsconfig.json), so
-    // `null` and `undefined` are assignable to `object` and need no
-    // `@ts-expect-error` here — only actual primitives do. Don't "fix" that
-    // by adding directives TS would then flag as unused.
+    // The signature says `object`, so every one of these is a type error —
+    // that is the point. They document what an untyped or typo'd JS call site
+    // can still push through at runtime, and that it degrades to a zero/empty
+    // answer instead of throwing.
+    // @ts-expect-error null is not an `object` under strictNullChecks
     expect(getRetainedCount(null)).toBe(0);
+    // @ts-expect-error undefined is not an `object` under strictNullChecks
     expect(getRetainedCount(undefined)).toBe(0);
-    // @ts-expect-error the signature says `object`; a number is the value a
-    // typo'd or untyped call site can still pass through at runtime
+    // @ts-expect-error a number is not an `object`
     expect(getRetainedCount(42)).toBe(0);
+    // @ts-expect-error see above
     expect(getRetainedEventNames(null)).toEqual([]);
+    // @ts-expect-error see above
     expect(getRetainedEventNames(undefined)).toEqual([]);
     // @ts-expect-error see above
     expect(getRetainedEventNames('nope')).toEqual([]);

@@ -14,7 +14,7 @@
     "noUnusedParameters": true,
     "noPropertyAccessFromIndexSignature": true,
     "strict": true,
-    "strictNullChecks": false,
+    "strictNullChecks": true,
     "useUnknownInCatchVariables": true,
     "noFallthroughCasesInSwitch": false,
     "downlevelIteration": false,

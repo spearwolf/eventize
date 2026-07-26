@@ -38,7 +38,7 @@ const makeUnsubscribe = (
   return Object.assign(
     unsubscribe,
     Array.isArray(listeners) ? {listeners} : {listener: listeners},
-  ) as UnsubscribeFunc;
+  );
 };
 
 const _emitOne = (

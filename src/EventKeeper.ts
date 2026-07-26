@@ -73,8 +73,9 @@ export class EventKeeper {
     sortedEvents: KeeperEvent[] = [],
   ): KeeperEvent[] {
     if (!isCatchEmAll(eventName)) {
-      if (this.events.has(eventName)) {
-        const {order, args} = this.events.get(eventName);
+      const event = this.events.get(eventName);
+      if (event != null) {
+        const {order, args} = event;
         sortedEvents.push({
           order,
           replay: () => eventListener.apply(eventName, args),

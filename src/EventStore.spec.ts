@@ -4,6 +4,12 @@ import {EventStore} from './EventStore';
 
 import {EVENT_CATCH_EM_ALL} from './constants';
 
+// A stand-in listener for the fixtures that only care about bookkeeping, not
+// about dispatch. It has to be a *real* listener value: a `null` listener has
+// no listener type at all, so the store never treats two of them as similar
+// and the refCount-dedup these fixtures exercise would never trigger.
+const NOOP = 'noop';
+
 describe('EventStore', () => {
   describe('add()', () => {
     let store: EventStore;
@@ -14,14 +20,14 @@ describe('EventStore', () => {
 
     it('adding a named listener adds the listener to namedListeners store', () => {
       expect(store.namedListeners.get('a')).toBe(undefined);
-      store.add(new EventListener('a', 0, null));
+      store.add(new EventListener('a', 0, NOOP));
       expect(store.namedListeners.get('a')).toHaveLength(1);
       expect(store.getSubscriptionCount()).toBe(1);
     });
 
     it('adding a catch-em-all listener adds the listener to the catchEmAllListeners array', () => {
       expect(store.catchEmAllListeners).toHaveLength(0);
-      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, null));
+      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, NOOP));
       expect(store.catchEmAllListeners).toHaveLength(1);
       expect(store.getSubscriptionCount()).toBe(1);
     });
@@ -30,11 +36,11 @@ describe('EventStore', () => {
   describe('without previously added catch-em-all listeners', () => {
     const store = new EventStore();
     const origListener = [
-      new EventListener('a', -7, null),
-      new EventListener('a', 0, null),
-      new EventListener('a', 666, null),
-      new EventListener('b', 0, null),
-      new EventListener('a', 0, null),
+      new EventListener('a', -7, NOOP),
+      new EventListener('a', 0, NOOP),
+      new EventListener('a', 666, NOOP),
+      new EventListener('b', 0, NOOP),
+      new EventListener('a', 0, NOOP), // similar to [1] — deduped into it
     ].map((listener) => store.add(listener));
 
     it('catchEmAllListeners store should be empty', () => {
@@ -56,10 +62,10 @@ describe('EventStore', () => {
   describe('without previously added named listeners', () => {
     const store = new EventStore();
     const origListener = [
-      new EventListener(EVENT_CATCH_EM_ALL, -7, null),
-      new EventListener(EVENT_CATCH_EM_ALL, 0, null),
-      new EventListener(EVENT_CATCH_EM_ALL, 666, null),
-      new EventListener(EVENT_CATCH_EM_ALL, 0, null),
+      new EventListener(EVENT_CATCH_EM_ALL, -7, NOOP),
+      new EventListener(EVENT_CATCH_EM_ALL, 0, NOOP),
+      new EventListener(EVENT_CATCH_EM_ALL, 666, NOOP),
+      new EventListener(EVENT_CATCH_EM_ALL, 0, NOOP), // similar to [1]
     ].map((listener) => store.add(listener));
 
     it('catchEmAllListeners should not be empty', () => {

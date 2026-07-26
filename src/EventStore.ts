@@ -32,8 +32,6 @@ const findInsertIndex = (
   return lo;
 };
 
-const cloneArray = <T>(arr: Array<T>): Array<T> => arr?.slice(0);
-
 const removeItemFromArray = (arr: Array<any>, item: any) => {
   const idx = arr.indexOf(item);
   if (idx > -1) {
@@ -41,7 +39,8 @@ const removeItemFromArray = (arr: Array<any>, item: any) => {
   }
 };
 
-const isSimilarListenerType = (listenerType: number) =>
+// An undefined tag is similar to nothing — both comparisons already say so.
+const isSimilarListenerType = (listenerType: number | undefined) =>
   listenerType === LISTENER_IS_OBJ || listenerType === LISTENER_IS_NAMED_FUNC;
 
 const removeListenerFromArray = (
@@ -84,7 +83,7 @@ const removeSimilarListenersFromArray = (
   }
 };
 
-const removeAll = (fromArray: Array<EventListener>) => {
+const removeAll = (fromArray: Array<EventListener> | undefined) => {
   if (fromArray) {
     // Detach-then-truncate: for the duration of this loop the array still
     // holds detached listeners. Harmless while the body only detaches; adding
@@ -96,7 +95,7 @@ const removeAll = (fromArray: Array<EventListener>) => {
 
 const isSimilar = (
   a: {
-    listenerType: number;
+    listenerType: number | undefined;
     priority: number;
     eventName: string | symbol;
     listenerObject: any;
@@ -286,8 +285,10 @@ export class EventStore {
   }
 
   forEach(eventName: EventName, fn: (listener: EventListener) => void): void {
-    const catchEmAllListeners = cloneArray(this.catchEmAllListeners);
-    const namedListeners = cloneArray(this.namedListeners.get(eventName));
+    // Snapshot both buckets: a listener may unsubscribe (or subscribe) from
+    // inside its own callback, and the walk below must not see that mutation.
+    const catchEmAllListeners = this.catchEmAllListeners.slice(0);
+    const namedListeners = this.namedListeners.get(eventName)?.slice(0);
     if (
       eventName === EVENT_CATCH_EM_ALL ||
       !namedListeners ||
