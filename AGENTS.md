@@ -6,7 +6,9 @@ Canonical guide for coding agents in this repo. `CLAUDE.md` is a symlink to this
 
 ## Verification
 
-`npm run cbt` — clean → build → `attw --pack` → test with coverage → lint → format check. Run it before declaring a task done; it is the only gate that catches dual-format type breakage, and the only local run where the `coverageThreshold` actually binds.
+`npm run cbt` — clean → build → `typecheck` (`tsc --noEmit`) → `attw --pack` → test with coverage → lint → format check. Run it before declaring a task done. `typecheck` is the gate that catches dual-format type breakage cache-independently: esbuild (the JS bundle) and tsup's dts pass (the `.d.ts` rollup) never type-check, and `attw --pack` only checks that already-emitted declarations resolve, not the source — `tsc --noEmit -p tsconfig.json` against `include: ["src"]` is what actually reads every file under `src/`, unaffected by the ts-jest transform cache described below. `cbt` is also the only local run where the `coverageThreshold` actually binds.
+
+`typecheck` and the test compile don't type-check under the same module resolution, and that's fine only by accident of this codebase's import style. `tsc --noEmit` honors `tsconfig.json` as written — `module: esnext`, `moduleResolution: bundler`. ts-jest's compile path forces `module: commonjs` on every non-ESM run regardless of that setting, and since `bundler` only pairs with `commonjs` on TypeScript ≥ 6 while this project pins TypeScript at 5.9.x, it silently substitutes `moduleResolution: node10` for the actual test compile (`ts-compiler.js`'s `resolveCompatibleModuleResolution`, closing ts-jest#4198). The two paths agree here only because every import in `src/` is relative and extension-free, which resolves identically under `bundler` and `node10`; a `nodenext`-style subpath import or a `paths` remap would not, and `typecheck` passing would no longer guarantee the test compile does too.
 
 Narrower loops while working: `npm test -- src/once.spec.ts`, `npm test -- -t "retains the last value"`, `npm run watch`. Bare `npm test` collects no coverage on purpose — a threshold applied to one spec file fails for the wrong reason.
 

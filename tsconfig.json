@@ -1,5 +1,8 @@
 {
+  "include": ["src"],
   "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "experimentalDecorators": false,
     "emitDecoratorMetadata": false,
     "importHelpers": true,
@@ -14,6 +17,8 @@
     "noUnusedParameters": true,
     "noPropertyAccessFromIndexSignature": true,
     "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "isolatedModules": true,
     "strict": true,
     "strictNullChecks": true,
     "useUnknownInCatchVariables": true,

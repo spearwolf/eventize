@@ -43,11 +43,12 @@
     "test": "cross-env NODE_ENV=test jest",
     "test:coverage": "cross-env NODE_ENV=test jest --coverage",
     "watch": "cross-env NODE_ENV=test jest --watch",
+    "typecheck": "tsc --noEmit",
     "checkPkgTypes": "npx attw --pack",
     "lint": "eslint",
     "format:check": "prettier --check 'src/**/*.{ts,js,json,md}'",
     "format:write": "prettier --write 'src/**/*.{ts,js,json,md}'",
-    "cbt": "run-s -sn clean build checkPkgTypes test:coverage lint format:check"
+    "cbt": "run-s -sn clean build typecheck checkPkgTypes test:coverage lint format:check"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.2",
