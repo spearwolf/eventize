@@ -102,7 +102,6 @@ export interface EventizedObject<TEvents extends EventMap = DefaultEventMap> {
 export type NonTypedEmitter<T> =
   T extends EventizedObject<infer M> ? (string extends keyof M ? T : never) : T;
 
-export type ListenerType = unknown;
 export type ListenerObjectType = object | null | undefined;
 export type ListenerFuncType = (...args: EventArgs) => void;
 

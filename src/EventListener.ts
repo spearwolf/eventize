@@ -1,5 +1,4 @@
 import {
-  EVENT_CATCH_EM_ALL,
   LISTENER_IS_FUNC,
   LISTENER_IS_NAMED_FUNC,
   LISTENER_IS_OBJ,
@@ -134,19 +133,23 @@ export class EventListener {
     this.refCount = 1;
   }
 
-  /** In the test for equality, the priority is not considered */
+  /**
+   * In the test for equality, the priority is not considered.
+   *
+   * Two shapes only: the listener instance itself — which is what
+   * `EventStore.removeSimilarListenersFromArray()` hands in — or the
+   * `(listener, listenerObject)` pair a subscription was registered with.
+   *
+   * There used to be two more. A match on the numeric `id` let
+   * `off(ε, unsub.listener.id)` remove a subscription while skipping the
+   * reference count every documented removal path honours, and an event-name
+   * branch was unreachable: `EventStore.remove()` routes a name with no
+   * listener object to `removeByEventName()`, and `off()` sets `forceRemove`
+   * for a name *with* one, so the only caller of `isEqual()` on that path
+   * never sees a string or symbol here.
+   */
   isEqual(listener: unknown, listenerObject: unknown = null): boolean {
     if (listener === this) return true;
-    const typeofListener = typeof listener;
-    if (typeofListener === 'number' && listener === this.id) return true;
-    if (
-      listenerObject === null &&
-      (typeofListener === 'string' || typeofListener === 'symbol')
-    ) {
-      if (listener === EVENT_CATCH_EM_ALL) return true;
-      if (listener === this.eventName) return true;
-      return false;
-    }
     return this.listener === listener && this.listenerObject === listenerObject;
   }
 

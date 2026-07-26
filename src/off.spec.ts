@@ -804,6 +804,22 @@ describe('off()', () => {
 
       expect(fn.called).toBeFalsy();
     });
+
+    it('off(ε, <listener id>) is a no-op', () => {
+      const ε = eventize();
+      const listenerObject = {foo: fake()};
+
+      const unsubscribe = on(ε, 'foo', listenerObject);
+      // @ts-expect-error .listener is not on the multi-event arm of the union
+      off(ε, unsubscribe.listener.id);
+
+      // it used to detach the listener outright, skipping the reference count
+      // that off(ε, unsubscribe.listener) and unsubscribe() both honour
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      emit(ε, 'foo');
+      expect(listenerObject.foo.callCount).toBe(1);
+    });
   });
 
   describe('by event name and listener object', () => {
