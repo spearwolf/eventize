@@ -28,6 +28,16 @@ These are the things that bite. Everything else is readable from the source.
 
 **`subscribeTo` and `types.ts` move in lockstep.** `_subscribeTo` decodes the overloaded `on()` shapes positionally (event name(s), optional priority, listener function or method-name + listener object, or a bare listener object). Changing the API means changing `SubscribeArgs` _and_ the parsing; the spec files exercise the corner cases.
 
+**Counters are per module instance.** `EventListener.lastId` (secondary sort
+among equal priorities) and `EventKeeper.nextOrderId` (replay order of
+retained events) are module-global `let` variables. Loading the ESM and the
+CJS build in the same process — which the dual-format package permits —
+gives you two independent counter pairs, so ordering stability is guaranteed
+per loaded module instance, not per realm. This is deliberate: the
+`Symbol.for('eventize')` marker is realm-wide because identity must be, the
+counters are not because sorting only ever compares listeners on the same
+emitter, and one emitter comes from one module instance.
+
 ## Known asymmetries
 
 Verified quirks that look like bugs but are load-bearing or simply undocumented. Don't "fix" them without a CHANGELOG entry.

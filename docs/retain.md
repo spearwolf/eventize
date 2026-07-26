@@ -102,6 +102,33 @@ console.log(result); // => { ready: true }
 `retainClear(ε, '*')` drops the values and keeps the policies. An array
 containing `'*'` is treated as the wildcard, whatever else it lists.
 
+### Retained payloads are strong references
+
+The keeper stores the emit arguments as they were passed — no copy, no clone.
+An event library must not clone payloads, so this is the only sensible
+implementation, but it means a single `retain()` on an event that once
+carried a large buffer, a DOM node or an object graph keeps that object alive
+until the next emit of the same event, until `retainClear()`, or until the
+emitter itself is collected. For large payloads, `retainClear(ε, eventName)`
+is the antidote and worth calling deliberately.
+
+### Dynamically generated event names
+
+`retain()` with per-entity names — `item:${id}` — is supported, and cleanup is
+the caller's job. There is no eviction, no cap and no LRU: an event library
+does not get to guess what you still need. What it gives you instead is
+visibility and a bulk switch:
+
+```js
+getRetainedCount(emitter);        // how many events hold a value
+getRetainedEventNames(emitter);   // which names carry a policy
+unretain(emitter, '*');           // drop every policy and value
+retainClear(emitter, '*');        // drop the values, keep the policies
+```
+
+A thousand `retain(ε, 'item-' + n)` rounds leave a thousand entries with their
+full payloads. That is not a leak in the library; it is a ledger you opened.
+
 ---
 
 ## `retainClear(emitter, eventName | eventName[])`

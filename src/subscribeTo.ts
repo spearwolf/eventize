@@ -48,9 +48,11 @@ const _subscribeTo = (
   let listenerObject: ListenerObjectType;
 
   if (len >= 2 && len <= 3 && typeOfFirstArg === 'number') {
+    // (4) catch-all with priority: on(priority, listener[, listenerObject])
     eventName = EVENT_CATCH_EM_ALL;
     [priority, listener, listenerObject] = args;
   } else if (len >= 3 && len <= 4 && typeof args[1] === 'number') {
+    // (1)-(3) with an explicit priority: on(eventNames, priority, …)
     [eventName, priority, listener, listenerObject] = args;
   } else {
     priority = Priority.Default;
@@ -59,8 +61,10 @@ const _subscribeTo = (
       typeOfFirstArg === 'symbol' ||
       Array.isArray(args[0])
     ) {
+      // (1)-(3) at default priority: on(eventNames, listener|methodName|obj[, obj])
       [eventName, listener, listenerObject] = args;
     } else {
+      // (4) catch-all at default priority: on(listener|obj[, listenerObject])
       eventName = EVENT_CATCH_EM_ALL;
       [listener, listenerObject] = args;
     }
