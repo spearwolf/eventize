@@ -1,511 +1,228 @@
 # Remediation-Plan — @spearwolf/eventize
 
-Quelle: ./audit.html vom 2026-07-26 (Score 80,5) · Branch: `main` · erstellt: 2026-07-26
-Baseline: clean ✓ · build ✓ · attw 4/4 ✓ · test 538/538 ✓ (Coverage 98,88 / 97,15 / 95,27 / 99) · lint ✓ · format ✓
-Scope: 7 von 14 Findings (1 high, 3 medium, 3 low) + 3 Punkte aus »Optimierungspotenzial« · 8 Pakete
-
-## Scope
-
-**Enthalten:** BUG-001, BUG-002, BUG-003, BUG-004, TYPE-001, PERF-001, CONS-001 sowie aus dem
-Optimierungspotenzial: Konformitäts-Suite über alle drei Oberflächen, `verbatimModuleSyntax` aktivieren,
-CI-Duplikat auflösen.
-
-**Auf Wunsch des Nutzers ausgenommen** (2026-07-26): TEST-001, TEST-002, BUILD-001, DEP-001, DX-001,
-INFO-001, INFO-002. Zwei Berührungspunkte sind unvermeidbar und deshalb hier festgehalten:
-
-- **TEST-001** ist als Finding draußen, sein Inhalt kommt über die Konformitäts-Suite (Paket 3) trotzdem
-  zum Zug — die fünf ungetesteten Delegationen sind genau das, was diese Suite abdeckt.
-- **DX-001** ist als Finding draußen, aber Paket 5 ändert das Verhalten, das `docs/off.md` beschreibt.
-  Die fehlende Tabellenzeile wird dort mitgeschrieben, weil eine Verhaltensänderung ohne Doku-Update
-  gegen die Documentation-Obligations in `AGENTS.md` verstößt. Nicht als eigener Punkt geführt.
-
-**Nicht aus dem Audit übernommen** (im Optimierungspotenzial genannt, nicht angefordert):
-Benchmark-Harness, `Object.freeze(Priority)`.
-
-## Entscheidungen
-
-- **BUG-003 — `off(ε, '*', listenerObject)` meldet ab** (2026-07-26). `'*'` wird in dieser Branch auf
-  `catchEmAllListeners` umgeleitet; der Aufruf entfernt genau die Wildcard-Subscriptions dieses
-  Listener-Objekts. Nicht werfen, nicht als No-Op dokumentieren.
-- **BUG-004 — die Zusage wird eingeschränkt, der Code bleibt** (2026-07-26). »Equal priorities keep
-  insertion order« gilt künftig ausdrücklich nur innerhalb eines Buckets; die Bevorzugung benannter
-  Listener bei Prioritätsgleichheit wird selbst zur dokumentierten Zusage und per Spec gepinnt.
-- **PERF-001 — ohne Benchmark-Harness umsetzen** (2026-07-26). Die weggefallene Allokation ist
-  beweisbar keine Verschlechterung; ein Harness wird nicht nachgerüstet.
-- **Versionierung — minor statt major** (2026-07-26). `v6.0.0` existiert nur im git und ist nicht auf
-  npm veröffentlicht, es gibt also keinen Consumer, der sich auf das heutige Verhalten verlässt.
-  Pakete schreiben unter `## Unreleased`; der Abschluss konsolidiert zu `v6.1.0`.
-- **`verbatimModuleSyntax` ist unmöglich, ESLint `consistent-type-imports` tritt an seine Stelle**
-  (2026-07-26). `ts-jest` erzwingt auf dem CJS-Pfad `module: commonjs`; darunter ist unter
-  `verbatimModuleSyntax` **jeder** ESM-Import in einer `.ts`-Datei ein Fehler (TS1295/TS1287), nicht nur
-  der Konventionsverstoß — nachgeprüft mit
-  `npx tsc --noEmit --module commonjs --verbatimModuleSyntax src/index.ts`. Das Flag bindet also
-  entweder nirgends oder es zerlegt alle 27 Suiten. Die Regel `consistent-type-imports` erreicht
-  dasselbe Ziel, bindet über `lint` sicher im `cbt`-Gate und greift zusätzlich in den Spec-Dateien.
-  Modulsystem, `tsconfig.json` und Jest-Setup bleiben unangetastet.
-- **Named-Func-Pfad bleibt unangetastet** (2026-07-26). `on(ε, 'evt', 'toString', obj)` benennt die
-  Methode ausdrücklich — dort ist der Prototypen-Treffer die Wahl des Aufrufers, nicht ein Unfall.
-  Die Schranke aus Paket 4 gilt nur für den Listener-Objekt- und den Duck-Typing-Pfad.
+Quelle: ./audit.html vom 2026-07-26 (Score 77.5) · Branch: `main` · erstellt: 2026-07-26
+Baseline: build ✓ · checkPkgTypes ✓ · test 28 Suiten / 642 Tests ✓ · lint ✓ · format ✓ · `tsc --noEmit -p tsconfig.json` ✓ (Exit 0, ts-jest-Cache vorher geleert)
+Scope: 8 von 20 Findings, vom Nutzer namentlich benannt (2 high, 2 medium, 4 low) · 5 Pakete
+Ausgenommen: DX-002, DX-003, TEST-002, CI-001, CI-002, DEP-001, DEP-002, INFO-001…005 — nicht angefordert, bleiben für das nächste Audit liegen.
 
 ## Vorbestehende Fehler
 
-Keine. Die Baseline ist auf allen sechs Gate-Stufen grün; jeder rote Lauf ab hier gehört zum Paket,
-das gerade läuft.
+Keine. Die Baseline ist auf ganzer Breite grün — jeder rote Lauf ab hier gehört dem laufenden Paket.
 
-## Pakete
+## Entscheidungen
 
-### [x] 1. CI-Gate auf `npm run cbt` zusammenführen
-
-- Findings: Optimierungspotenzial »CI-Duplikat auflösen«
-- Ziel: Beide Workflows rufen dasselbe Gate auf, das lokal gilt, statt fünf Schritte doppelt zu listen.
-- Dateien: `.github/workflows/dev.yml`, `.github/workflows/main.yml`
-- Modell: günstigste Stufe
-- Verify: `npm run cbt` (belegt, dass das Gate selbst grün ist) + Diff-Review; ein lokaler YAML-Linter
-  existiert im Projekt nicht.
-- Commit: `ci: run the cbt gate instead of duplicating its steps`
-- Hash: `9c2ce4a`
-- Review: Erfüllung bestätigt, keine Qualitätsbefunde. Kosmetisch notiert: fünf sprechende Step-Namen
-  werden zu einem generischen »Run cbt gate« — bewusst, der Job-Name trägt den Kontext.
-
-**Optimierungspotenzial · CI-Duplikat** — `dev.yml` und `main.yml` listen dieselben fünf Schritte
-einzeln auf. Ein Job, der `npm run cbt` aufruft, hält lokale und entfernte Gate-Definition automatisch
-deckungsgleich — genau das Auseinanderlaufen, das der Vorlauf als BUILD-003 gemeldet hatte und das
-jetzt behoben, aber nicht strukturell verhindert ist.
-
-Umsetzung: In beiden Workflows die fünf Einzelschritte (`npm test -- --coverage`, `npm run build`,
-`npm run lint`, `npm run format:check`, `npm run checkPkgTypes`) durch einen Schritt `npm run cbt`
-ersetzen. Die Node-Matrix (18, 20, 22, 24), `npm ci`, `actions/checkout@v4`, `actions/setup-node@v4`
-mit `cache: 'npm'` und der komplette `deploy`-Job in `main.yml` bleiben unverändert. `cbt` beginnt mit
-`clean`, das Build-Artefakte entfernt — der `deploy`-Job baut ohnehin selbst, und er läuft in einem
-eigenen Runner-Job.
-
-### [x] 2. Typ-Import-Konvention als Lint-Regel erzwingen
-
-- Findings: CONS-001, Optimierungspotenzial »`verbatimModuleSyntax` aktivieren« (auf ESLint umgestellt,
-  siehe Entscheidungen)
-- Ziel: Die Typ-Import-Konvention wird eine erzwungene Regel statt einer Gewohnheit, und die Verstöße
-  dagegen verschwinden.
-- Dateien: `eslint.config.mjs`, `src/getSubscriptionCount.ts`, `src/subscribeTo.ts`, plus Fallout
-- Modell: mittlere Stufe
-- Verify: `npx jest --clearCache && npm run cbt`
-- Commit: `chore(lint): enforce type-only imports via consistent-type-imports (CONS-001)`
-- Hash: `4454811`
-- Erster Versuch BLOCKIERT (`verbatimModuleSyntax` vs. ts-jest), nach Nutzerentscheidung neu beauftragt.
-- Die Regel fand **fünf** Treffer statt der einen aus CONS-001; vier davon hat das Audit nicht gesehen:
-  `getSubscriptionCount.ts:1` (EventStore), `subscribeTo.ts` (EventStore), `eventize-api.ts:1`
-  (EventListener), `getRetainedCount.ts:1` (EventKeeper), `composition-over-inheritance.spec.ts:3`
-  (Eventize). Jeder einzeln gegen echte Wert-/Typverwendung geprüft, Review bestätigt.
-- Konfiguration: `prefer: 'type-imports'` + `fixStyle: 'separate-type-imports'` — separate
-  `import type`-Zeilen statt Inline-Qualifier, deckungsgleich mit der Konvention in `src/`.
-- Review: Erfüllung bestätigt, keine Qualitätsbefunde.
-- Nebenbefund (nicht in diesem Lauf): `tsconfig.json` setzt weder `module` noch `moduleResolution`, also
-  gilt `tsc -p` faktisch `module: ES6` / `moduleResolution: classic`, während ts-jest `CommonJS`
-  erzwingt. Diese Diskrepanz ist die Ursache des Blockers und gehört zu BUILD-001 (ausgenommen).
-
-**CONS-001 · low · src/getSubscriptionCount.ts:4** — Typ-Import als Wert-Import in getSubscriptionCount
-`import {EventizedObject} from './types'` — EventizedObject ist ein Interface und wird ausschließlich in
-Typposition verwendet. Jedes andere Modul unter `src/` schreibt an dieser Stelle `import type`,
-einschließlich des unmittelbar benachbarten `getRetainedCount.ts`, das dieselbe Konstruktion korrekt
-macht. Esbuild entfernt das Binding beim Bundling, es entsteht also kein Laufzeitschaden — ein
-Stilbruch, keine Fehlfunktion.
-Empfehlung: Auf `import type` umstellen. Dauerhaft absichern lässt sich das nur über
-`verbatimModuleSyntax` (siehe Optimierungspotenzial) oder die ESLint-Regel `consistent-type-imports`.
-
-**Optimierungspotenzial · verbatimModuleSyntax** — Macht die Typ-Import-Konvention des Repos zu einer
-Compiler-Regel statt zu einer Gewohnheit — CONS-001 wäre dann nicht auffindbar, sondern unmöglich.
-
-Umsetzung: `@typescript-eslint/consistent-type-imports` in `eslint.config.mjs` auf `error` setzen —
-`verbatimModuleSyntax` fällt weg, siehe Entscheidungen. Die Regel greift auch in Spec-Dateien; falls die
-Konfiguration `src/**/*.spec.ts` in einem eigenen Block behandelt, muss die Regel dort ebenfalls gelten.
-Danach `npm run lint` und **jeden** gemeldeten Treffer auflösen, keine Suppression, keine
-`--fix`-Änderung, die ungeprüft bleibt. Bekannt sind zwei:
-
-- `src/getSubscriptionCount.ts:4` — `import {EventizedObject} from './types'`, reine Typposition
-  (CONS-001).
-- `src/subscribeTo.ts:1` — `import {EventKeeper, KeeperEvent} from './EventKeeper'`; `KeeperEvent` ist
-  ein Typ, `EventKeeper` wird als Wert gebraucht. Aufteilen in Wert- und Typ-Import. Diese zweite
-  Instanz hat das Audit nicht gesehen — sie zählt als Fallout desselben Findings, nicht als neues.
-
-`tsconfig.json` bleibt unangetastet, ebenso `moduleResolution` und `include` — BUILD-001 ist
-ausdrücklich nicht im Scope. Vor dem Verifizieren trotzdem `npx jest --clearCache`.
-
-### [x] 3. Konformitäts-Suite über alle drei Oberflächen
-
-- Findings: Optimierungspotenzial »Konformitäts-Suite über alle drei Oberflächen« (deckt inhaltlich
-  TEST-001 mit ab, das als Finding ausgenommen ist)
-- Ziel: Dieselben Verhaltensfälle laufen einmal je Oberfläche, damit »drei Oberflächen, eine
-  Implementierung« geprüft ist statt behauptet.
-- Dateien: `src/__test-utils__/expect2ImplEventizeApi.ts`, neue Spec-Datei unter `src/`,
-  `jest.config.ts`
-- Modell: mittlere Stufe
-- Verify: `npm run cbt`
-- Commit: `test: exercise all three API surfaces against the same behaviour table`
-- Hash: `7a263b2`
-- Neue Datei `src/api-surfaces.spec.ts`: 9 Verhaltensfälle × 3 Oberflächen = 27 Tests, Gesamtsuite
-  538 → 565. `apiSurfaces` (Tabelle mit `create()`-Factory pro Oberfläche) liegt in
-  `expect2ImplEventizeApi.ts`; der bestehende Export blieb unverändert, beide Aufrufstellen laufen ohne
-  Änderung weiter.
-- Funktionsabdeckung `src/eventize.ts`: 77,27 % → 100 %, unabhängig nachgemessen. Alle fünf zuvor
-  ungetesteten Delegationen laufen.
-- Schwellen `jest.config.ts`: statements 97→99, branches 93→97, functions 93→99, lines 97→99
-  (gemessen 99,81 / 97,15 / 99,21 / 100, jeweils abgerundet).
-- Review: Erfüllung bestätigt, zwei **kleine** Befunde, bewusst nicht nachgearbeitet:
-  - `new (class extends Eventize {})()` statt `new Eventize()` — unnötige Indirektion, funktional gleich.
-  - Die `as unknown as ConformityApi`-Casts entkoppeln `ConformityApi` vom echten Rückgabetyp von
-    `eventize.inject()` / `new Eventize()`; driftet eine Signatur, meldet TS das nicht. Die Suite prüft
-    dann weiterhin Laufzeitverhalten, was hier der Zweck ist.
-- Nebenbefund (nicht in diesem Lauf): `format:check` erfasst `jest.config.ts` nicht, dessen Glob endet
-  bei `src/**`. Die Datei ist unformatiert und das Gate sieht es nicht.
-
-**Optimierungspotenzial · Konformitäts-Suite** — `expect2ImplEventizeApi` prüft heute nur, dass die
-Methoden existieren. Eine tabellengetriebene Suite, die dieselben Verhaltensfälle einmal je Oberfläche
-fährt, würde TEST-001 nicht nur schließen, sondern die Invariante »eine Implementierung« dauerhaft
-absichern, statt sie zu behaupten.
-
-Hintergrund aus TEST-001 (Finding selbst ausgenommen, die Messung gilt): Aus `coverage-final.json` sind
-`inject().off`, `inject().emitAsync` sowie `Eventize.once`, `Eventize.off` und `Eventize.emitAsync` von
-keinem Test aufgerufen — `src/eventize.ts` liegt bei 77,27 % Funktionsabdeckung gegen 95,27 % im
-Projektschnitt. Die Zeilen sind `src/eventize.ts:93, 99, 140, 151, 159`.
-`expect2ImplEventizeApi` (`src/__test-utils__/expect2ImplEventizeApi.ts:3-30`) prüft ausschließlich
-`typeof obj.x === 'function'`, also Vorhandensein, nie Delegation.
-
-Umsetzung: Eine tabellengetriebene Suite, die je Fall über drei Oberflächen iteriert — freie Funktionen
-(`on(ε, …)`), `eventize.inject(obj)`-Methoden und `class Eventize`. Jeder Fall braucht einen frischen
-Emitter, also arbeitet die Suite mit einer Factory pro Oberfläche, nicht mit einem geteilten Objekt.
-Abzudeckende Fälle mindestens: `on` + `emit` mit Argumenten, `once` (feuert genau einmal),
-`onceAsync`, `off` in der bulk- und in der namensbezogenen Form, `emitAsync`-Aggregation,
-`retain` + Replay an einen späteren Subscriber, `unretain`, `retainClear`. Die fünf oben genannten
-Delegationen müssen dabei tatsächlich laufen.
-`expect2ImplEventizeApi` darf als Existenzprüfung bleiben oder erweitert werden — alle bestehenden
-Aufrufstellen müssen weiter funktionieren, ohne dass Spec-Dateien umgeschrieben werden.
-Danach die Schwellen in `jest.config.ts` anheben: `functions` und alles andere, das gestiegen ist, auf
-den neuen gemessenen Wert **abgerundet auf die nächste ganze Zahl darunter** — nie exakt auf den
-Messwert, das macht die Schwelle brüchig. Aktuell: statements 97, branches 93, functions 93, lines 97.
-
-### [x] 4. Object.prototype-Schranke in beiden Dispatch-Pfaden
-
-- Findings: BUG-001, BUG-002
-- Ziel: Ein Event-Name, der auf ein geerbtes `Object.prototype`-Member trifft, dispatcht nicht mehr
-  dorthin — auf beiden Pfaden, in einem Commit.
-- Dateien: `src/EventListener.ts`, `src/eventize-api.ts`, `src/EventListener.spec.ts`,
-  `src/emit-ducktyping.spec.ts`, `CHANGELOG.md`, `skills/using-eventize/`
-- Modell: stärkste Stufe
-- Verify: `npm run cbt`
-- Commit: `fix(dispatch): don't dispatch to inherited Object.prototype members (BUG-001, BUG-002)`
-- Hash: `cae8ef4`
-- Roter Lauf belegt: 42 von 126 Tests in den drei betroffenen Suiten fielen vor dem Fix. Der Reviewer
-  hat das per Gegenprobe reproduziert (Quelländerung zurückgedreht → dieselben 42).
-- Fix: neues `dispatchableMember(target, eventName)` in `src/utils.ts` — liefert den Member, außer er ist
-  **identisch** mit `Object.prototype[eventName]`. Beide Dispatch-Pfade (`EventListener.apply()`
-  LISTENER_IS_OBJ-Zweig, `_duckEmitOne()`) lesen darüber; ein Early Return bei `undefined` spart den
-  zweiten Property-Read auf dem heißen Pfad.
-- Die Schranke deckt **11** Namen, nicht die sieben des Audits: dazu kommen V8s `__defineGetter__`,
-  `__defineSetter__`, `__lookupGetter__`, `__lookupSetter__`. Die beiden `__define*` warfen vorher einen
-  `TypeError` mitten im Dispatch — vom Audit nicht gemessen.
-- Suite 565 → 621 (56 neue Fälle). Alle vier Randbedingungen per Spec gehalten und vom Reviewer
-  einzeln nachgemessen; der Named-Func-Pfad ist unangetastet und die Grenze in beiden Richtungen gepinnt.
-- Doku: `CHANGELOG.md` (`## Unreleased`), `README.md`, `AGENTS.md`, `docs/lifecycle.md`,
-  `skills/using-eventize/SKILL.md`, `references/api-details.md`, `references/migration.md`.
-- Zwei Review-Runden über kleine Befunde, alle faktischer Natur (falsche Aussage zu den `__`-Namen, die
-  Zusage »own or subclass override« hielt für identisch zugewiesene Aliase nicht, überholte Zahlen, ein
-  einseitig gepinnter Spec). Nach Runde 2 abgeschlossen; was danach auffiel, steht hier:
-- **Offene Nebenbefunde für das nächste Audit** (bewusst nicht in diesem Lauf):
-  - Die Schranke ist realm-lokal. Ein Objekt aus `vm.runInNewContext` dispatcht weiter an sein eigenes
-    `Object.prototype.toString` — symmetrisch auf beiden Pfaden, also keine Divergenz, nur eine Lücke.
-  - Nur `Object.prototype` ist geschützt. `on(ε, 'has', new Map())` dispatcht an `Map.prototype.has`,
-    ebenso `push` bei einem Array oder `getTime` bei einem Date.
-  - Ein klasseneigener `constructor` bleibt ein Treffer: `emit(new Foo(), 'constructor')` wirft
-    `TypeError: Class constructor Foo cannot be invoked without 'new'`. Vorbestehend.
-  - Vier Doku-Stellen stempeln »v6.1.0« (`SKILL.md`, `docs/lifecycle.md`, `migration.md` zweimal). Fällt
-    die Semver-Bewertung im Abschluss anders aus, sind sie falsch.
-  - `docs/lifecycle.md` sagt in der Einleitung »This describes the **v6.0.0** state« — im Abschluss
-    mitzuziehen.
-  - `format:check` erfasst weder `jest.config.ts` noch eine der Markdown-Dateien; sein Glob endet bei
-    `src/**`.
-
-**BUG-001 · high · src/EventListener.ts:216** — Dispatch an Listener-Objekte trifft geerbte
-Object.prototype-Methoden
-`apply()` liest den Member ohne Prototypen-Schranke: `apply(listener, listener[eventName], …)`. Ein
-Event-Name, der mit einem `Object.prototype`-Member kollidiert — `toString`, `valueOf`, `constructor`,
-`hasOwnProperty`, `isPrototypeOf`, `propertyIsEnumerable`, `toLocaleString` — findet die geerbte
-Funktion und ruft sie auf. Nachgemessen am gebauten Paket: `once(ε, {})` gefolgt von
-`emit(ε, 'toString')` setzt den Subscription-Zähler von 1 auf 0 — das `once()` ist verbrannt, ohne dass
-je eine Nutzer-Methode lief. `emitAsync(ε, 'toString')` liefert zusätzlich `['[object Object]']` in die
-Aggregation. Besonders unangenehm bei Catch-all-Listener-Objekten, die per Definition jeden Event-Namen
-sehen. Die Bibliothek verteidigt sich an genau dieser Stelle bereits gegen Primitive: `isObjListener`
-(`EventListener.ts:40`) existiert laut eigenem Kommentar, damit `on(ε, 'toFixed', 42)` nicht an
-`Number.prototype` dispatcht — gegen `Object.prototype` greift dieselbe Überlegung nicht.
-Empfehlung: Vor dem Dispatch prüfen, ob der gefundene Member nicht identisch mit dem gleichnamigen
-`Object.prototype`-Member ist: `const fn = listener[eventName]; if (typeof fn === 'function' && fn !==
-Object.prototype[eventName])`. Das lässt eigene Overrides zu und schließt nur die unbeabsichtigte
-Vererbung aus. Specs für alle sieben kollidierenden Namen, je einmal für `on()` und `once()`.
-Verhaltensänderung, also CHANGELOG-Eintrag.
-
-**BUG-002 · medium · src/eventize-api.ts:106** — Duck-typed emit() dispatcht ebenfalls an
-Object.prototype
-`_duckEmitOne()` liest `target[eventName]` mit derselben fehlenden Schranke wie BUG-001, nur auf dem
-Pfad für nicht-eventisierte Ziele. Gemessen: `emitAsync({}, 'toString')` liefert `['[object Object]']`,
-`emitAsync({}, 'constructor')` liefert `[{}]` — der Object-Konstruktor wird als gewöhnliche Funktion
-aufgerufen und sein Ergebnis aggregiert. Ein Plugin- oder Bridge-Layer, das Event-Namen aus externen
-Daten bezieht (JSON-Keys, Message-Types, DOM-Attribute), trifft das ohne Vorwarnung. `AGENTS.md` führt
-als Invariante, dass beide Dispatch-Pfade im Gleichschritt bleiben müssen — ein Fix nur an einer Stelle
-würde genau diese Invariante brechen.
-Empfehlung: Dieselbe Prüfung wie in BUG-001 einsetzen und beide Pfade in einem Commit ändern. Der
-bestehende Spec-Block »plain object without a matching method« in `emit-ducktyping.spec.ts` ist die
-passende Stelle für die neuen Fälle.
-
-Umsetzung: Zuerst die fehlschlagenden Specs schreiben und rot sehen, dann fixen. Randbedingungen, die
-erhalten bleiben müssen: ein **eigener** Override (`{toString() {…}}`) dispatcht weiter; die
-`emit()`-Fallback-Kette (`listener.emit(eventName, …)`) bleibt erreichbar, wenn der Namens-Treffer
-wegfällt; ein `once()` überlebt einen Dispatch, der nur den Prototypen getroffen hätte, genau wie es
-seit v6.0.0 einen Dispatch ohne Treffer überlebt; `Object.create(null)` als Listener-Objekt bleibt
-funktionsfähig. Der Named-Func-Pfad (`EventListener.ts:203`) wird **nicht** angefasst — siehe
-Entscheidungen. Doku: Eintrag unter `## Unreleased` in `CHANGELOG.md` und die Dispatch-Semantik in
-`skills/using-eventize/SKILL.md` bzw. `references/api-details.md` (Abschnitt »Listener-object
-dispatch«) nachziehen.
-
-### [x] 5. `off(ε, '*', listenerObject)` meldet die Wildcard-Subscriptions ab
-
-- Findings: BUG-003
-- Ziel: Der Aufruf, der wörtlich »melde dieses Objekt vom Wildcard ab« bedeutet, tut das auch.
-- Dateien: `src/EventStore.ts`, `src/off.spec.ts`, `docs/off.md`, `CHANGELOG.md`,
-  `skills/using-eventize/references/api-details.md`
-- Modell: stärkste Stufe
-- Verify: `npm run cbt`
-- Commit: `fix(off): detach a listener object from wildcard subscriptions (BUG-003)`
-- Hash: `611006a`
-- Roter Lauf belegt: 9 von 67 Tests in `src/off.spec.ts` fielen vor dem Fix; der Reviewer hat per
-  Gegenprobe 10 gezählt (der zehnte in `lifecycle.spec.ts`).
-- Fix: `EventStore.removeByEventNameAndListenerObject()` zweigt bei `isCatchEmAll(eventName)` auf
-  `catchEmAllListeners` ab und filtert dort mit demselben `removeSimilarListenersFromArray()` wie der
-  benannte Zweig. Suite 621 → 633.
-- Alle drei Grenzen gepinnt und vom Reviewer am Code nachgeprüft. Befund zu Grenze 3, wie verlangt am
-  Code erhoben statt vermutet: **der benannte Zweig konsultiert `refCount` gar nicht** — er trifft per
-  Identität und macht direkt `detach()` + `splice()`, während `unsub()` und `off(ε, unsub.listener)` über
-  `removeByEventListener()` dekrementieren. Die Wildcard-Form zieht jetzt mit dem benannten Zweig gleich.
-  Handles einer refCount-2-Registrierung werden dadurch inert, nicht kaputt: `detach()` setzt
-  `isRemoved`, worauf `removeByEventListener()` sofort aussteigt.
-- Doku: `CHANGELOG.md`, `docs/off.md` (Signaturzeile — inhaltlich DX-001 —, Beispiel, Retained-Liste),
-  `docs/lifecycle.md`, `AGENTS.md` (»Known asymmetries«), `README.md`, `SKILL.md`, `api-details.md`.
-- Eine Review-Runde über drei Textstellen, die der Fix falsch gemacht hatte: ein Quellkommentar in
-  `EventStore.ts`, der Catch-em-all-Listener aus diesem Pfad für unerreichbar erklärte, eine
-  Versionsangabe in `docs/off.md` und die Zusage »the one form that carries both« in `docs/lifecycle.md`.
-- **Offene Nebenbefunde für das nächste Audit** (bewusst nicht in diesem Lauf):
-  - `off(ε, ['*'], obj)` bleibt der stille No-Op, den BUG-003 für die Skalar-Form beschrieb: die
-    Array-Form fällt aus `forceRemove` heraus (`typeof listener !== 'string'`), landet in
-    `removeByListener(['*'], obj)` und entfernt nichts. Typseitig erlaubt, nirgends dokumentiert.
-  - `off(ε, '*', someString)` matcht jetzt Listener, deren `listener`/`listenerObject` dieser String ist
-    — symmetrisch zum benannten Zweig, auf beiden Seiten ungetestet.
-  - Zwei vorbestehend ungedeckte Branches in `EventStore.ts`: `if (listener.isRemoved) return;` in
-    `removeByEventListener()` und `if (j < jLen)` in der Merge-Schleife von `forEach()`.
-
-**BUG-003 · medium · src/EventStore.ts:268, src/eventize-api.ts:519** — `off(ε, '*', listenerObject)`
-ist ein stiller No-Op
-`off()` setzt `forceRemove`, sobald ein Event-Name mit einem Listener-Objekt kommt, und leitet damit auf
-`removeByEventNameAndListenerObject()`. Diese Methode sucht ausschließlich in `namedListeners` —
-Wildcard-Listener liegen aber in `catchEmAllListeners`. Gemessen: nach `on(ε, '*', fn, ctx)` steht der
-Subscription-Zähler auf 1, nach `off(ε, '*', ctx)` immer noch auf 1, erst `off(ε, '*')` räumt ihn ab.
-Der Aufruf, der wörtlich »melde dieses Objekt vom Wildcard ab« bedeutet, tut nichts und meldet nichts.
-`docs/off.md:18` dokumentiert die benannte Schwester-Form als funktionierend, was die Erwartung
-zusätzlich stützt. Kein Spec fixiert das Verhalten in irgendeine Richtung.
-Empfehlung (entschieden, siehe Entscheidungen): `'*'` in dieser Branch auf `catchEmAllListeners`
-umleiten. Dazu ein Spec und eine Zeile in der `off.md`-Tabelle.
-
-Umsetzung: Erst der fehlschlagende Spec in `src/off.spec.ts`, rot gesehen, dann der Fix. Der
-Wildcard-Fall geht in `catchEmAllListeners` statt in `this.namedListeners.get('*')`; die
-Reference-Count-Semantik von `removeSimilarListenersFromArray()` bleibt dieselbe wie im benannten Fall.
-**Retained State bleibt unberührt**: das ist eine gezielte Listener-Entfernung, nicht die bulk-Form
-`off(ε, '*')`, die seit v6.0.0 alles räumt. Diese Grenze per Spec pinnen (`getRetainedCount(ε)` bleibt
-unverändert), sonst driftet sie beim nächsten Umbau. Zu prüfen und per Spec festzuhalten ist außerdem,
-dass benannte Subscriptions desselben Objekts von `off(ε, '*', ctx)` **nicht** mitentfernt werden —
-dafür gibt es `off(ε, ctx)`.
-Doku: neue Zeile `off(emitter, '*', listenerObject)` in der Signaturtabelle von `docs/off.md` (das ist
-inhaltlich DX-001, siehe Scope), dieselbe Zeile in der `off()`-Shapes-Tabelle von
-`skills/using-eventize/references/api-details.md`, Eintrag unter `## Unreleased` in `CHANGELOG.md`.
-Falls `AGENTS.md` unter »Known asymmetries« eine Aussage berührt ist, dort mitziehen.
-
-### [x] 6. `EventStore.forEach()` kopiert nur den Bucket, den es durchläuft
-
-- Findings: PERF-001
-- Ziel: Kein `slice(0)` mehr für einen Bucket, der nicht durchlaufen wird oder leer ist.
-- Dateien: `src/EventStore.ts`, ggf. `src/EventStore.spec.ts`
-- Modell: mittlere Stufe
-- Verify: `npm run cbt`
-- Commit: `perf(store): only snapshot the listener bucket forEach() walks (PERF-001)`
-- Hash: `713fc36`
-- Umbau: `forEach()` entscheidet vor dem Kopieren, welcher Bucket gebraucht wird. Im häufigsten Fall —
-  benanntes Event ohne Wildcard-Subscriber — entsteht statt zwei Kopien nur noch eine; der Merge-Zweig
-  kopiert weiter beide, weil er beide durchläuft. Zweig-Auswahl beweisbar äquivalent: `!namedBucket` traf
-  auch vorher nur `undefined`, ein leeres Array ist truthy.
-- Der Reviewer hat den Umbau über einen Differentialtest mit 4000 randomisierten Reentrancy-Szenarien
-  gegen `git show HEAD:src/EventStore.ts` abgesichert — identische Aufrufreihenfolge, identischer
-  Rest-Subscription-Count. Der Harness war validiert: er findet einen eingebauten Live-Array-Rückfall.
-- Ein **wichtiger** Befund, behoben: die zuerst geschriebenen drei Reentrancy-Tests für den
-  Catch-all-Zweig blieben grün, wenn man den Kopierschutz entfernte — sie beschrieben Verhalten, das
-  `isRemoved`, die Array-Trunkierung von `off(ε, '*')` und die eingefrorene `length` von
-  `Array.prototype.forEach` ohnehin garantieren. Zwei neue Tests treffen jetzt das unterscheidende
-  Szenario (Element verschwindet unter dem Cursor / Element davor verschwindet), beide per Mutant als
-  rot belegt, unabhängig nachgefahren: genau 2 von 638 fallen. Die drei alten bleiben, kennzeichnen aber
-  im Kommentar, was sie wirklich zeigen. Suite 633 → 638.
-- Kein CHANGELOG-Eintrag: »Purely internal refactor« nach der Obligations-Tabelle.
-- Offener Nebenbefund: `if (j < jLen)` in der Merge-Schleife (`EventStore.ts:358`) bleibt ungedeckt —
-  ein unerreichbarer False-Arm, vorbestehend.
-
-**PERF-001 · low · src/EventStore.ts:306-307** — `EventStore.forEach()` alloziert bei jedem `emit()`
-zwei Arrays
-Beide Buckets werden per `slice(0)` kopiert, damit ein Listener sich während seines eigenen Callbacks
-ab- oder anmelden kann, ohne den Lauf zu stören. Die Absicht ist richtig, der Zuschnitt zu breit: die
-Kopie entsteht auch für den leeren Catch-all-Bucket, also im häufigsten Fall überhaupt — reine
-Allokation ohne Nutzen, und zwar auf dem heißesten Pfad einer Bibliothek, deren Verkaufsargument
-synchrone Zustellgeschwindigkeit ist.
-Empfehlung: Nur den Bucket kopieren, der tatsächlich durchlaufen wird, und die Kopie bei Länge 0
-überspringen. (Der Benchmark-Harness wird laut Entscheidung nicht nachgerüstet — die Änderung tritt
-ohne Messung an, weil eine weggefallene Allokation keine Verschlechterung sein kann.)
-
-Umsetzung: Die drei Zweige von `forEach()` (nur Catch-all, nur benannt, Merge) entscheiden **vor** dem
-Kopieren, welcher Bucket gebraucht wird. Der Reentrancy-Schutz muss in allen drei Zweigen erhalten
-bleiben: wer während seines Callbacks ab- oder anmeldet, darf den laufenden Walk nicht verändern. Vor
-dem Umbau prüfen, ob die bestehenden Specs Reentrancy für alle drei Zweige abdecken — nur benannt, nur
-Wildcard, beide gemischt. Fehlt einer, wird er ergänzt, bevor der Umbau kommt. Kein Verhaltens- und
-kein API-Wechsel, also kein CHANGELOG-Eintrag nötig; das Feld »Purely internal refactor« der
-Documentation-Obligations-Tabelle trifft zu.
-
-### [x] 7. `noUncheckedIndexedAccess` aktivieren
-
-- Findings: TYPE-001
-- Ziel: Die rohen Indexzugriffe in `EventStore` sind vom Compiler gedeckt statt vom Zutrauen.
-- Dateien: `tsconfig.json`, `src/EventStore.ts`, ggf. Fallout in weiteren `src/`-Dateien
-- Modell: mittlere Stufe
-- Verify: `npx jest --clearCache && npm run cbt`
-- Commit: `chore(ts): enable noUncheckedIndexedAccess (TYPE-001)`
-- Hash: `96daaec`
-- Fallout an fünf Stellen, alle ohne Suppression aufgelöst: `findInsertIndex`, `removeListenerFromArray`,
-  die Merge-Schleife in `forEach()` sowie zwei Spec-Dateien (`documented-quirks.spec.ts`,
-  `onceAsync.spec.ts`), die die Empfehlung nicht genannt hatte.
-- Das Flag bindet im Gate, obwohl `cbt` kein eigenes `tsc --noEmit` fährt: ts-jest meldet die
-  Diagnostics: ein künstlich eingebauter TS2322 bricht die Suite mit 0 Tests ab. Nachgewiesen, nicht
-  angenommen.
-- Reihenfolge-Äquivalenz der umgeschriebenen Merge-Schleife bewiesen: 14400 Differentialfälle gegen
-  `git show HEAD:src/EventStore.ts` (Bucket-Längen 0–3 beidseitig, Prioritäten frei kombiniert samt
-  Gleichstand über die Bucket-Grenze, drei Registrierungsreihenfolgen, drei Event-Namen), davon 4563 im
-  Merge-Zweig — identische Aufrufreihenfolge. `lib/index.d.ts` und `.d.mts` byte-identisch zum
-  HEAD-Build. Der Differentialtest war nicht blind: `>=` → `>` lässt ihn fallen, während die
-  Projekt-Suite das nur mit **einem** Test fängt — BUG-004s Dünnheit bestätigt.
-- Zwei Review-Runden. Bemerkenswert die zweite: der Reviewer hat seinen eigenen Vorschlag aus Runde 1
-  widerlegt. Das dort empfohlene `else break;` gegen die Endlosschleife wirft in **keinem** von 49
-  Lochmustern, wo HEAD in allen 49 warf, und lieferte stattdessen stumm ein gekürztes Präfix, das echte
-  Listener hinter dem Loch verschluckt. Jetzt wirft die Schleife
-  (`EventStore: forEach encountered a hole`), bei identischer Coverage. Ebenso wirft `findInsertIndex`
-  statt eine Einfügeposition zu erfinden — über 7 Lochmuster geprüft: alt und neu werfen in genau
-  denselben 5, nur der Fehlertyp ändert sich.
-- Zwei neue Tests pinnen die beiden Abwehrzweige. Sie bauen einen Zustand, den die Klasse nie
-  herstellt — der Coverage-Druck ist aber echt: ohne sie fallen die Branches auf 96,95 % gegen Schwelle
-  97. Unter diesem Flag braucht jede handgeschriebene Merge-Schleife einen toten Laufzeitzweig, weil
-  TypeScript `arr[i]` nicht aus `i < len` verengt; Suppressions verbietet der Plan, das Absenken der
-  Schwelle verbietet `AGENTS.md`.
-- Abweichung vom Prozess, bewusst: Runde 2 ging an denselben Implementierer statt an einen frischen eine
-  Stufe höher. Der Auftrag war keine Wiederholung, sondern vollständig vorgeschrieben (`break` → `throw`,
-  Test umdrehen, drei Textstellen), und die vorigen Runden waren im ersten Versuch erfolgreich.
-- Kein CHANGELOG-Eintrag: `.d.ts` identisch, `tsconfig.json` wird nicht mitpubliziert.
-- Offener Nebenbefund: vier weitere lochempfindliche Pfade in `EventStore` sterben unverändert mit einem
-  `TypeError` aus fremder Hand (`isSimilar` zweimal, `remove(name, obj)`, `remove(obj)`), und
-  `remove(fn)` schluckt Löcher still. Die Klasse verteidigt sich also an zwei Stellen, nicht überall.
-
-**TYPE-001 · low · tsconfig.json:2-30** — `noUncheckedIndexedAccess` ist aus, obwohl EventStore roh
-indiziert
-`strict`, `strictNullChecks` und `noPropertyAccessFromIndexSignature` sind aktiv —
-`noUncheckedIndexedAccess` und `exactOptionalPropertyTypes` nicht. `EventStore` rechnet an mehreren
-Stellen roh mit Indizes: `arr[mid]` in der Binärsuche (`EventStore.ts:26`) sowie `namedListeners[i]` und
-`catchEmAllListeners[j]` in der Merge-Schleife (`EventStore.ts:322-331`). Der Compiler typisiert diese
-Zugriffe heute als immer definiert. Die Schleifen sind korrekt gegen ihre Längen geführt, es liegt also
-kein aktueller Defekt vor — aber die schärfste verfügbare Absicherung für genau die Stelle, an der
-BUG-004 sitzt, ist abgeschaltet.
-Empfehlung: `noUncheckedIndexedAccess` aktivieren und den Fallout in `EventStore.ts` auflösen
-(voraussichtlich wenige lokale Bindings). `exactOptionalPropertyTypes` getrennt bewerten, das trifft
-eher `types.ts`.
-
-Umsetzung: Läuft **nach** Paket 6, damit die Strictness die endgültige Form von `forEach()` deckt.
-`"noUncheckedIndexedAccess": true` setzen, `npx tsc --noEmit`, Fallout über lokale Bindings mit
-Nullish-Behandlung auflösen — keine `!`-Assertions und keine Suppressions; wo eine Invariante den
-Zugriff sicher macht, gehört sie in den Code, nicht in ein Ausrufezeichen. Laufzeitverhalten darf sich
-nicht ändern, die 538 Tests sind der Zeuge. `exactOptionalPropertyTypes` ist **nicht** Teil dieses
-Pakets. Vor dem Verifizieren `npx jest --clearCache`.
-
-### [x] 8. Die Reihenfolge-Zusage auf Bucket-Ebene einschränken
-
-- Findings: BUG-004
-- Ziel: Die Doku sagt, was der Code tut, und ein Spec hält beide Registrierungsrichtungen fest.
-- Dateien: `skills/using-eventize/references/api-details.md`, `AGENTS.md`, `src/EventStore.spec.ts`
-  (oder die passende bestehende Spec-Datei), `CHANGELOG.md`
-- Modell: mittlere Stufe
-- Verify: `npm run cbt`
-- Commit: `docs(order): scope the equal-priority guarantee to a single bucket (BUG-004)`
-- Hash: `890c044`
-- `EventStore.forEach()` unangetastet, wie entschieden. Zwei neue Specs halten beide
-  Registrierungsrichtungen bei Prioritätsgleichheit fest; Mutationsmessung `>=` → `>` in der
-  Merge-Schleife: 1 → 3 fallende Tests. Suite 640 → 642.
-- Der Reviewer hat die eingeschränkte Zusage gegen den Code geprüft, auch für mehrere Listener gleicher
-  Priorität in beiden Buckets (keine Verschränkung: alle benannten laufen vor allen Wildcards derselben
-  Priorität) und für `±Infinity`. Sie hält.
-- Eine Review-Runde über drei Textstellen. Bemerkenswert: die Begründung »die Asymmetrie überlebte, weil
-  nur eine Richtung unter Test war« war falsch — die bestehende Sammel-Fixture in `EventStore.spec.ts`
-  fährt die Wildcard-zuerst-Richtung längst, sie war nur implizit gepinnt und nicht benannt.
-- Offener Nebenbefund: `NaN` als Priorität bricht die Zusage in beiden Hälften. `on(ε, 'foo', NaN, fn)`
-  typecheckt, und bei zwei `NaN`-Prioritäten läuft die Wildcard zuerst, weil `cur.priority >=
-  other.priority` falsch ist. `src/subscribeTo.ts` dokumentiert `NaN` schon als Gift für
-  `sortByPriorityAndId`; eine Laufzeitprüfung gibt es nicht.
-
-**BUG-004 · medium · src/EventStore.ts:324** — Zugesagte Reihenfolge bei Prioritätsgleichheit gilt nicht
-bucket-übergreifend
-`skills/using-eventize/references/api-details.md:72` sagt zu: »Equal priorities keep insertion order.«
-Innerhalb eines Buckets stimmt das — `sortByPriorityAndId` bricht Gleichstand über die aufsteigende
-`id`. Der Merge in `forEach()` vergleicht dagegen nur
-`cur.priority >= catchEmAllListeners[j].priority` und sieht die `id` nie. Gemessen: Wildcard zuerst
-registriert, benannter Listener danach, beide auf `Priority.Normal` — der benannte läuft zuerst. In der
-umgekehrten Registrierungsreihenfolge sieht das Ergebnis korrekt aus, weshalb der Fehler nur in einer
-von zwei Richtungen sichtbar wird und in Tests leicht durchrutscht.
-Empfehlung (entschieden, siehe Entscheidungen): Die Zusage in `api-details.md` auf »innerhalb eines
-Buckets« einschränken und die Bevorzugung benannter Listener explizit dokumentieren. Kein Code-Wechsel
-in `forEach()`. Mit Spec und CHANGELOG-Eintrag.
-
-Umsetzung: Der Merge in `EventStore.forEach()` bleibt wie er ist. `api-details.md:72` präzisieren:
-Gleichstand hält die Registrierungsreihenfolge **innerhalb** eines Buckets (benannt bzw. Wildcard); bei
-Prioritätsgleichheit **über** die Bucket-Grenze läuft der benannte Listener zuerst, unabhängig davon,
-wer früher registriert wurde. In `AGENTS.md` unter »Known asymmetries« eine Zeile ergänzen, damit die
-nächste Änderung an `forEach()` weiß, dass das eine Zusage ist. Specs für **beide**
-Registrierungsrichtungen (Wildcard zuerst, benannt zuerst) bei gleicher Priorität — genau die
-Asymmetrie, die der Vorlauf nicht sah. Eintrag unter `## Unreleased` in `CHANGELOG.md` als
-Klarstellung, nicht als Verhaltensänderung.
+- **Ein unbrauchbarer Listener wirft** (2026-07-26). Die offene Frage des Reports ist zugunsten von »werfen« entschieden: `on(ε, 'foo', 5)` schlägt künftig fehl wie `on(ε, 'foo', 0)` heute schon. Breaking Change, gehört in die CHANGELOG-Bruchliste. Betrifft BUG-005.
+- **Eine NaN-Priorität wirft ebenfalls** (2026-07-26). Das Audit empfahl primär den stillen Fallback auf `Priority.Normal`, nannte »werfen« aber als Alternative unter der Bedingung »mit demselben Argument wie bei BUG-005 und im selben Durchgang« — genau der vorliegende Fall. Betrifft BUG-006.
+- **`Number.isFinite()` ist die falsche Prüfung** (2026-07-26, aus dem Code verifiziert). `Priority.Max` ist `Number.POSITIVE_INFINITY`, `Priority.Min` ist `Number.NEGATIVE_INFINITY` (`src/Priority.ts:4,10`). Die im Audit-Text zu BUG-006 vorgeschlagene `Number.isFinite`-Prüfung würde beide zurückweisen und damit dokumentierte API brechen — der Fließtext desselben Findings verlangt ausdrücklich das Gegenteil (»Priority.Max und Priority.Min bleiben unangetastet«). Die Prüfung muss NaN-spezifisch sein (`Number.isNaN`), nicht Endlichkeits-basiert.
+- **`include: ["src"]`, `moduleResolution: "bundler"`** (2026-07-26, aus dem Audit übernommen). Nicht `nodenext`, weil das Dateierweiterungen an relativen Imports verlangte und die in AGENTS.md festgeschriebene Konvention bräche.
 
 ## Abschluss
 
-Alle acht Pakete erledigt, keines blockiert. 8 Paket-Commits plus dieser Abschluss-Commit, alle auf
-`main`, ohne GPG-Signatur.
+**Ergebnis:** 8 Findings, 5 Pakete, 5 Commits plus Abschluss-Commit. Kein Paket blockiert, kein Stash. Voller `cbt` grün: 29 Suiten / 677 Tests (Baseline 28 / 642), Coverage 99.82 / 98.02 / 99.23 / 100, `attw` 4/4, `typecheck` Exit 0. Branch-Deckung 97.63 → 98.02, `coverageThreshold.branches` 97 → 97.5 **angehoben**, nie gesenkt.
 
-**Verify-Lauf über den übergebenen Baum:** `npx jest --clearCache && npx tsc --noEmit && npm run cbt` —
-grün auf allen Stufen. 642 Tests in 28 Suiten (Baseline 538), Coverage 99,82 / 97,63 / 99,21 / 100 gegen
-Schwellen 99 / 97 / 99 / 99 (Baseline-Schwellen waren 97 / 93 / 93 / 97), `attw --pack` 4/4, lint und
-`format:check` sauber. Kein vorbestehender Fehler, also auch kein übernommener.
+**Semver: `6.1.0` → `6.2.0`, Minor trotz zweier Breaking Changes.** Die Oberfläche trägt zwei Brüche (`on()`/`once()` weisen unbrauchbare Listener und NaN-Prioritäten werfend zurück, wo sie vorher still registrierten) — nach strenger Semver ein Major. Verifiziert, was dagegen steht: `npm view @spearwolf/eventize dist-tags` liefert `latest: 5.1.0`, in der Registry endet alles bei `5.1.0`, **kein einziges 6.x wurde je veröffentlicht**; lokal getaggt ist nur `v6.0.0`, `v6.1.0` existiert allein in `package.json` und im CHANGELOG. Der Major-Sprung, den ein Konsument tatsächlich nimmt, ist `5 → 6`, und er bekommt v6.0.0s neun Brüche, v6.1.0s zwei und diese beiden in einem Install. Innerhalb von 6.x kann niemand brechen, weil nie ein 6.x ausgeliefert wurde. Dasselbe Argument hat das Projekt für `v6.1.0` schon einmal schriftlich geführt; es steht jetzt im Header von `v6.2.0`. **Wird ein 6.x veröffentlicht, bevor die nächsten Brüche landen, gilt dieses Argument nicht mehr** — dann ist der nächste Bruch ein Major.
 
-**Semver: `6.0.0` → `6.1.0`.** Nach der Bewertungstabelle wäre der Lauf **major** — Paket 4 und Paket 5
-ändern Default-Verhalten, auf das Aufrufer sich verlassen konnten, und Paket 4 nimmt zwei Namen den Wurf
-weg. Minor ist es auf ausdrückliche Entscheidung des Nutzers (2026-07-26) und weil sie tragfähig ist:
-`v6.0.0` ist im git getaggt, hat die npm-Registry aber nie erreicht. Die letzte veröffentlichte Version
-ist `v5.1.0`, `v6.1.0` wird das erste `6.x`, das ein Consumer sieht — der Major-Sprung, den er nimmt, ist
-`5 → 6`, und `v6.0.0`s neun Breaking Changes kommen zusammen mit diesen beiden bei ihm an.
+**Was im Abschluss nachgezogen wurde:** die fünf `## Unreleased`-Einträge zu `## v6.2.0` konsolidiert, ein Docs-Eintrag für den `once()`-Pin ergänzt, die Versionsanker gesetzt, die frühere Pakete bewusst offengelassen hatten (`docs/lifecycle.md:5`, `SKILL.md` Pitfall 12, `api-details.md`, zwei README-Absätze), `package-lock.json` von `6.0.0` nachgezogen, und zwei Rückverweise in den Abschnitten `v6.0.0` und `v6.1.0` entschärft, die auf `v6.1.0` als »das erste 6.x, das ein Konsument sieht« zeigten — jetzt versionsnummernfrei formuliert, damit die nächste Anhebung sie nicht wieder bricht. Der fehlende `off(ε, '*', listenerObject)`-Eintrag in `migration.md` ist ergänzt statt die Zählung gesenkt.
 
-**CHANGELOG:** `## Unreleased` zu `## \`v6.1.0\`` konsolidiert, mit Einleitungsabsatz im Stil der Datei.
-Zwei Folgekorrekturen: die Zusage im `v6.0.0`-Abschnitt, ein Consumer springe von `v5.1.0` direkt
-dorthin, stimmt nicht mehr, und `docs/lifecycle.md` beschrieb sich als »the v6.0.0 state«.
+**Nicht angefasst:** `audit.html`. Wer sich selbst benotet, hat immer bestanden — die Verifikation der behobenen Findings gehört in einen Folgelauf von `js-ts-project-audit`.
 
-**Nicht ausgeführt:** kein Push, kein Tag, kein Pull Request, kein `npm publish`. Der `v6.1.0`-Tag und
-die Veröffentlichung gehören dem Nutzer.
+### Nebenbefunde für das nächste Audit
 
-### Offene Nebenbefunde
+Während der Umsetzung aufgefallen, bewusst außerhalb dieses Laufs gehalten:
 
-Elf Punkte fielen während der Umsetzung auf und waren bewusst nicht Teil dieses Laufs. Sie stehen bei den
-Paketen, unter denen sie entdeckt wurden, und gehören ins nächste Audit — nicht in `audit.html`, das
-dieser Lauf nicht anfasst.
+1. **`findSimilarListener()` lässt `on()` auf eine fremde `once()`-Registrierung aufsatteln**, obwohl beide verschiedene Lebensdauern haben: das verbrauchte `on()`-Handle senkt einen Zähler, dessen Freigabelogik einem nie aufgerufenen fremden Handle gehört. Folge ist der einzige verbliebene Weg, auf dem ein verbrauchtes Handle den Emitter noch hält. Verhaltensänderung; der Pin in `src/lifecycle.spec.ts` fällt laut um, sollte ihn jemand beiläufig einbauen.
+2. **`tsconfig.json` setzt kein `noEmit`** — das Flag sitzt allein im `typecheck`-Skript. Ein `npx tsc -p tsconfig.json` ohne Flag schreibt `.js` neben jede Quelldatei unter `src/`. Im Review zweimal versehentlich ausgelöst.
+3. **`hasConsole` in `utils.ts`** hat nach Paket 4 außerhalb des eigenen Moduls keinen Verwender mehr, bleibt aber exportiert.
+4. **`migration.md:64`** verspricht »Worked before/after snippets for the four runtime changes« in `docs/lifecycle.md`; dort stehen drei. Vorbestehend.
+5. **`npm run format:check` deckt nur `src/**` ab.** Sämtliche Markdown-Änderungen dieses Laufs — CHANGELOG, README, `docs/`, `skills/` — laufen durch kein Format-Gate.
+6. **`coverageThreshold` hinkt der Deckung hinterher**: gemessen 99.82 / 98.02 / 99.23 / 100 gegen Schwellen 99 / 97.5 / 99 / 99. `AGENTS.md` verlangt, die Zahlen anzuheben, wenn die Deckung steigt.
+7. **`SKILL.md` Pitfall 5** nennt für werfende Listener nur die `on()`-Seite; die `once()`-Konsequenz steht seit diesem Lauf in `docs/lifecycle.md`.
+8. Vorbestehend ungedeckte Zweige, alle außerhalb des Scopes: `EventListener.ts:186,217`, `EventStore.ts:251`, `getSubscriptionCount.ts:10`, `utils.ts:61-62`.
 
-Aus dem Scope ausgenommen blieben außerdem TEST-002, BUILD-001, DEP-001, INFO-001 und INFO-002.
-TEST-001 ist über Paket 3 inhaltlich erledigt, DX-001 über Paket 5 — beide ohne eigenen Findings-Status.
+## Pakete
+
+### [x] 1. Typprüfung ins Gate holen und tsconfig schärfen
+
+- Findings: BUILD-001, BUILD-002, TYPE-002
+- Ziel: `cbt` prüft Typen cache-unabhängig, und zwar genau die Dateien unter `src/` unter dem Auflösungsverfahren, unter dem das Paket konsumiert wird.
+- Dateien: `tsconfig.json`, `package.json`, `AGENTS.md`, `CHANGELOG.md`
+- Modell: mittlere Stufe
+- Verify: `npx jest --clearCache && npm run cbt`
+- Commit: `build(ts): add a cache-independent typecheck to cbt and tighten tsconfig (BUILD-001, BUILD-002, TYPE-002)`
+- Hash: `4cda1ae`
+
+**Verlauf.** Alle drei Findings vom Reviewer als behoben bestätigt, `cbt` grün (28 Suiten / 642 Tests, Coverage unverändert 99.82/97.63/99.21/100, attw 4/4). Eine Runde war nötig — nicht wegen des Codes, sondern wegen einer falsch attribuierten Begründung.
+
+Die im Plan befürchtete TS5095-Kollision tritt **nicht** ein, aber aus einem anderen Grund als der Implementierer zunächst annahm. Verifiziert von beiden Seiten an `node_modules/ts-jest/dist/legacy/compiler/ts-compiler.js`: ts-jest erzwingt auf dem Nicht-ESM-Pfad `module: commonjs` sehr wohl bedingungslos (Zeile 143, unabhängig vom tsconfig-Wert); die Entschärfung liegt eine Ebene tiefer in `resolveCompatibleModuleResolution()` (Zeile 202-217), die erkennt, dass `bundler` mit `commonjs` unter TypeScript < 6 ungültig wäre, und für den Testlauf still auf `node10` zurückfällt (ts-jest#4198). **Konsequenz:** `typecheck` und der Testlauf kompilieren dieselben Dateien unter unterschiedlicher Modulauflösung. Dass beide übereinstimmen, ist ein Zufall der ausschließlich relativen, erweiterungsfreien Importe — per `tsc --traceResolution` gegen beide Verfahren empirisch bestätigt, die Traces für alle `src/`-Importe sind byte-identisch (Abweichungen nur bei bare specifiers wie `tslib`). Ein `nodenext`-Subpath-Import oder ein `paths`-Remap würde das brechen. Als Absatz in `AGENTS.md`, `## Verification`, festgehalten.
+
+**Nebenbefund (nicht Teil dieses Laufs).** `tsconfig.json` setzt kein `noEmit`; das Flag sitzt allein im `typecheck`-Skript. Ein `npx tsc -p tsconfig.json` ohne Flag schreibt darum `.js` neben jede `.ts`-Datei unter `src/` — im Review einmal versehentlich ausgelöst und wieder aufgeräumt. Kandidat für das nächste Audit.
+
+Reihenfolge: erst BUILD-001, dann BUILD-002, dann TYPE-002 — sonst prüft der neue Schritt die falschen Dateien unter dem falschen Verfahren.
+
+**Bekannte Kollisionsgefahr, vorher prüfen.** `jest.config.ts` konfiguriert ts-jest mit `tsconfig: './tsconfig.json'`, und ts-jest erzwingt auf seinem CJS-Pfad `module: 'commonjs'` — das ist im Vorlauf dieses Projekts bereits aufgeschlagen und hat `verbatimModuleSyntax` unmöglich gemacht (siehe `CHANGELOG.md`, `v6.1.0`). `moduleResolution: 'bundler'` ist unter `module: 'commonjs'` **kein gültiger Wert** (TS5095). Trifft das zu, ist der Ausweg ein eigener `tsconfig`-Override für ts-jest in `jest.config.ts` (`module: 'commonjs'` + `moduleResolution: 'node'` nur für den Testpfad), damit `tsconfig.json` selbst sagen darf, was für die Produktion gilt. Nicht raten — erst reproduzieren, dann entscheiden, und den Befund im Report nennen.
+
+Die beiden neuen Flags aus TYPE-002 gelten über denselben Weg auch für die Kompilierung der Spec-Dateien. Das ist gewollt und laut Audit heute kostenlos, muss aber im Verify sichtbar sein — deshalb `--clearCache` davor. `jest.config.ts` selbst bleibt außerhalb von `include`; ts-jest kompiliert es über seinen eigenen Pfad und braucht keinen Eintrag.
+
+Kein CHANGELOG-Bruchvermerk nötig — an der Laufzeit ändert sich nichts. Ein kurzer Eintrag unter `## Unreleased` genügt, im Ton der vorhandenen Einträge. Den `cbt`-Absatz in `AGENTS.md` nachziehen: er behauptet die cache-unabhängige Typprüfung heute schon, künftig darf er es.
+
+**BUILD-001 · medium · tsconfig.json:1-31** — tsconfig ohne include/exclude, moduleResolution fällt auf classic
+
+Weiterhin belegt: `tsc --showConfig` meldet `moduleResolution: 'classic'` und `module: 'es6'`, weil beide Optionen ungesetzt sind. 'classic' ist TypeScripts Verfahren aus der Zeit vor Node — es modelliert nicht, wie dieses Paket tatsächlich aufgelöst wird, weder von einem Bundler noch von Nodes ESM-Loader. Dass heute nichts bricht, liegt allein daran, dass jeder Import in `src/` relativ und ohne Erweiterung ist; TypeScript selbst weist im Fehlerfall darauf hin ('Did you mean to set the moduleResolution option to nodenext?'). Ohne `include`/`exclude` zieht `tsc` außerdem alles unter dem Projekt-Root ein: `tsc --listFilesOnly` zeigt `jest.config.ts` und die beiden generierten `lib/index.d.*ts` im Programm. Solange kein Script `tsc` aufruft, bleibt das folgenlos — mit BUILD-002 wird es das nicht mehr.
+
+Empfehlung: `"include": ["src"]` setzen sowie `"module": "esnext"` und `"moduleResolution": "bundler"` ergänzen. Beides ist verifiziert: `tsc --noEmit -p tsconfig.json --module esnext --moduleResolution bundler` läuft heute fehlerfrei. 'bundler', nicht 'nodenext' — letzteres verlangt Dateierweiterungen an relativen Imports und widerspräche damit der in AGENTS.md festgeschriebenen Konvention 'Relative imports carry no extension'. `jest.config.ts` bleibt außerhalb von `include`; ts-jest kompiliert es über seinen eigenen Pfad.
+
+**BUILD-002 · high · package.json:47, tsup.config.js:1-21** — cbt enthält keine cache-unabhängige Typprüfung
+
+AGENTS.md nennt `cbt` 'the only gate that catches dual-format type breakage' und schildert einen Vorfall, in dem ein grünes `cbt` eine Änderung durchgelassen hat, die 13 von 25 Spec-Suiten brach — überlebt hat der Fehler im ts-jest-Cache unter `/tmp/jest_rs`, den `npm run clean` nicht anfasst. Der Negativtest dieses Laufs zeigt, dass das Gate diese Klasse gar nicht abdeckt: ein absichtliches `export const __typeError: number = "definitely a string"` in `src/utils.ts` hat `npm run build` vollständig fehlerfrei passiert — ESM-Bundle, CJS-Bundle und der DTS-Rollup, Exit 0. esbuild typprüft nicht, tsups dts-Pass ebenso wenig, und `attw --pack` prüft die bereits emittierten Deklarationen auf Auflösbarkeit, nicht den Quelltext. Damit ist die einzige Typprüfung der gesamten Kette die von ts-jest, durch exakt den Cache, vor dem dieselbe Datei warnt. Auf einem frischen CI-Runner greift sie; lokal, wo die Warnung gebraucht wird, ist sie ungedeckt.
+
+Empfehlung: Ein Script `"typecheck": "tsc --noEmit"` anlegen und in die `cbt`-Kette aufnehmen, sinnvollerweise zwischen `build` und `checkPkgTypes`. `tsc --noEmit -p tsconfig.json` läuft heute fehlerfrei durch, die Aufnahme kostet also nichts außer Laufzeit und ist gegen den ts-jest-Cache immun. Zusammen mit BUILD-001 umsetzen: erst include/exclude und moduleResolution korrigieren, damit der neue Schritt genau die Dateien prüft, die er prüfen soll, und unter dem Auflösungsverfahren, unter dem das Paket tatsächlich konsumiert wird. Danach den Absatz in AGENTS.md nachziehen, der `cbt` beschreibt — er darf dann sagen, was er heute schon behauptet.
+
+**TYPE-002 · low · tsconfig.json:2-30** — exactOptionalPropertyTypes und isolatedModules sind aus, obwohl beide heute fehlerfrei durchlaufen
+
+Die tsconfig ist mit `noUncheckedIndexedAccess`, `noPropertyAccessFromIndexSignature`, `noUnusedLocals` und `noImplicitOverride` überdurchschnittlich streng — zwei naheliegende Flags fehlen. Verifiziert mit je einem eigenen Lauf: `tsc --noEmit -p tsconfig.json --exactOptionalPropertyTypes` endet mit Exit 0, dasselbe mit `--isolatedModules`. Beide sind heute also kostenlos zu haben. `exactOptionalPropertyTypes` ist inhaltlich relevant, weil `OnceAsyncOptions.signal` optional ist und die Implementierung in `eventize-api.ts:480-504` sorgfältig zwischen 'nicht übergeben' und 'übergeben, aber nullish' unterscheidet — genau die Trennung, die das Flag im Typsystem erzwingt. `isolatedModules` spiegelt, dass esbuild jede Datei einzeln transpiliert, und fängt Re-Export-Muster ab, die tsup still falsch emittieren könnte.
+
+Empfehlung: Beide Flags in `tsconfig.json` auf `true` setzen; ein Codewechsel ist nicht nötig, die Läufe oben sind der Beleg. Sinnvoll im selben Commit wie BUILD-001 und BUILD-002, weil erst der dort eingeführte `typecheck`-Schritt dafür sorgt, dass ein späterer Verstoß auch auffällt — heute würde ein Bruch dieser Flags nur über ts-jest sichtbar.
+
+---
+
+### [x] 2. once() mit werfendem Listener festnageln
+
+- Findings: TEST-003
+- Ziel: Das tragende, aber ungeprüfte Verhalten »ein werfender `once()`-Listener bleibt abonniert« bekommt Specs und einen Satz in der Doku.
+- Dateien: `src/emit-throwing-listener.spec.ts`, `docs/lifecycle.md`
+- Modell: mittlere Stufe
+- Verify: `npm test -- src/emit-throwing-listener.spec.ts && npm run lint && npm run format:check`
+- Commit: `test(once): pin that a throwing once() listener stays subscribed (TEST-003)`
+- Hash: `e1211e5`
+
+**Verlauf.** Eine Runde, kein Befund. Verhalten exakt wie im Finding beschrieben, kein Produktivcode angefasst. Zwei Fälle in `describe('once() with a throwing listener', …)`: der werfende Listener bleibt abonniert und feuert erneut (`getSubscriptionCount(ε)` bleibt 1), und derselbe Listener wird nach einem wurffreien Dispatch korrekt freigegeben (Zähler auf 0, weiterer Emit erreicht ihn nicht mehr). Der Reviewer hat gegengeprüft, dass beide Assertions bei der naheliegenden Regression — `callAfterApply()` in ein `try/finally` zu ziehen — tatsächlich rot würden, statt danebenzustehen. Doku-Satz sitzt im bestehenden Block in `docs/lifecycle.md`.
+
+Reines Festnageln, **kein Codewechsel**. Zeigt sich beim Schreiben der Specs ein anderes Verhalten als beschrieben, ist das ein Fund für das nächste Audit und kein Anlass, hier Produktivcode anzufassen — dann Paket blockieren und berichten.
+
+**TEST-003 · low · src/emit-throwing-listener.spec.ts:1-108, src/EventListener.ts:191-197** — once() mit werfendem Listener ist von keinem Spec festgenagelt
+
+`emit-throwing-listener.spec.ts` deckt fünf Fälle für `emit()` und zwei für `emitAsync()` ab, aber ausschließlich mit `on()`. Für `once()` gilt: `callAfterApply()` läuft in `EventListener.apply()` erst nach dem apply-Aufruf, also nie, wenn der Listener wirft. Sonde: ein werfender `once()`-Listener bleibt abonniert und feuert beim nächsten `emit()` erneut — nach zwei Emits stehen zwei Aufrufe und eine weiterhin lebende Subscription. Das ist eine plausible Folge aus 'released only when the dispatch actually called something' (`docs/lifecycle.md:262`), aber der dort beschriebene Fall ist der Dispatch, der nichts fand, nicht der, der etwas fand und explodierte. Es ist außerdem die Konstellation, in der ein one-shot ohne aufbewahrtes Handle dauerhaft hängen bleibt.
+
+Empfehlung: Zwei Fälle in `emit-throwing-listener.spec.ts` ergänzen: ein `once()`-Listener, der wirft, bleibt abonniert und feuert erneut; derselbe Listener, der beim zweiten Mal nicht wirft, wird dann korrekt abgemeldet. Dazu ein Satz in `docs/lifecycle.md` im bestehenden 'A once() releases itself only when the dispatch actually called something'-Block, der die werfende Variante ausdrücklich einschließt. Kein Codewechsel — das Verhalten ist tragend, nur ungeprüft.
+
+---
+
+### [x] 3. Verbrauchtes Unsubscribe-Handle gibt den Emitter frei
+
+- Findings: MEM-001
+- Ziel: Ein aufbewahrtes, bereits aufgerufenes Handle hält weder Emitter noch `EventStore`, `EventKeeper` oder retained Payloads am Leben.
+- Dateien: `src/eventize-api.ts`, `src/lifecycle.spec.ts`, ggf. `package.json` und `.github/workflows/*` (Test-Kommando mit `--expose-gc`), `docs/lifecycle.md`, `CHANGELOG.md`
+- Modell: stärkste Stufe
+- Verify: `npm test -- src/lifecycle.spec.ts && npm test && npm run typecheck && npm run lint && npm run format:check`
+- Commit: `fix(api): release the emitter when a consumed unsubscribe handle is kept (MEM-001)`
+- Hash: `23ae941`
+
+**Verlauf.** Zwei Runden. Roter Lauf vor dem Fix nachgewiesen: zwei GC-Assertionen fallen, die Kontrollgruppe bleibt im selben Lauf grün. Der Reviewer hat gegengeprüft, indem er den Fix in einer Scratchpad-Kopie zurückdrehte — dieselben Fälle fallen, die übrigen 36 nicht. Suite 642 → 649 Tests, `cbt` grün, `eventize-api.ts` 100 % in allen vier Spalten.
+
+**Der Fix.** `makeUnsubscribe()` führte den Consumed-Zustand in einem separaten `let isConsumed`; `host` blieb dadurch für die Lebensdauer des Handles in der Closure. Jetzt ist das Capture selbst der Flag: `heldHost` wird beim ersten Aufruf genullt, der Null-Test ersetzt den Boolean. `heldListeners` fiel ganz weg — sein Nullen hätte nie etwas freigegeben, weil `Object.assign` dieselben Referenzen als `.listener`/`.listeners` auf das Handle legt. Single-Shot-Garantie intakt, per Spec über Reference Counting, Multi-Event-Handle und doppelt aufgerufenes `once()`-Handle bestätigt.
+
+**Abweichung 1 — `--expose-gc` nicht am Testkommando, sondern zur Laufzeit.** `src/__test-utils__/gc.ts` beschafft den Collector über `v8.setFlagsFromString('--expose-gc')` + `vm.runInNewContext('gc')` und setzt die Flag zurück. Der im Plan vorgesehene Weg wäre **nicht bloß umständlich, sondern kaputt gewesen**: `NODE_OPTIONS=--expose-gc` lässt Node 18 gar nicht erst starten (`--expose-gc is not allowed in NODE_OPTIONS`), und 18 steht in beiden Workflow-Matrizen und in `engines`. Die Laufzeit-Variante braucht null Änderungen an `package.json` und `.github/` und kann nicht still überspringen — schlägt die Beschaffung fehl, wirft der Import und die Suite fällt laut um. Gegen Node 18/20/22/24/25.9 verifiziert.
+
+**Abweichung 2 — die naheliegende GC-Schleife wäre falsch gewesen.** `gc(); await; deref()` ist innerhalb eines Jobs immer rot, auch für ein frisch weggeworfenes Objekt ohne Bibliotheksbezug: `new WeakRef(t)` und `t.deref()` legen den Referenten in die »kept objects«-Menge des laufenden Jobs. Richtig ist `await` → `gc()` → `deref()`. Steht als Kommentar in `gc.ts`, samt Node-Caveat zu `setFlagsFromString`.
+
+**Doku-Korrektur, die über MEM-001 hinausgeht.** Die Zusage »ein verbrauchtes Handle hält nichts mehr« war auch nach dem Fix zu breit. Der Emitter geht beim ersten Aufruf immer — die Listener-Referenzen erst, wenn der Listener den Store tatsächlich verlässt. Und es gibt zwei Formen, in denen der überlebende Listener zum Emitter zurückführt: sein `callAfterApply` (die Closure eines nie aufgerufenen `once()`-Handles, auf das ein späteres `on()` dedupt hat), oder ein Listener-Objekt, das der Emitter selbst ist — in allen drei dedup-fähigen Schreibweisen `on(ε, 'foo', ε)`, `on(ε, 'foo', 'method', ε)` und `on(ε, ε)`. Der Rückweg sitzt je nach Form in `.listener.listener` **oder** `.listener.listenerObject`. `on(ε, 'foo', fn, ε)` ist dagegen harmlos: Funktionslistener deduppen nie. Ein gewöhnliches `refCount`-2-Paar gibt den Emitter sehr wohl frei — es liegt nicht am Zähler, sondern daran, worauf der überlebende Listener zeigt. Als `WARNING`-Block in `docs/lifecycle.md` mit dem Ausweg `off(ε, listenerObject)`, in `AGENTS.md` und im CHANGELOG unter »What this does not claim«. Ein Ist-Pin hält beide Seiten in einem Fall.
+
+**Nebenbefund (nicht Teil dieses Laufs).** `findSimilarListener()` lässt ein `on()` auf eine fremde `once()`-Registrierung aufsatteln, obwohl beide verschiedene Lebensdauern haben: das verbrauchte `on()`-Handle senkt einen Zähler, dessen Freigabelogik einem nie aufgerufenen fremden Handle gehört. Der Vollfix — Listener mit gesetztem `callAfterApply` beim Dedup überspringen — wäre eine Verhaltensänderung und gehört ins nächste Audit. Der neue Pin fällt laut um, sollte ihn jemand beiläufig einbauen; vom Reviewer simuliert und bestätigt.
+
+**Test zuerst.** Der GC-Test wird geschrieben, rot gesehen und erst dann behoben. Ohne rot gesehenen Test weiß niemand, ob er den Fehler überhaupt fängt — bei einer GC-Assertion mit `WeakRef` gilt das doppelt, weil ein falsch aufgesetzter Test aus Zufall grün wird.
+
+Aufbau: Kontrollgruppe (Handle nach Aufruf weggeworfen → Emitter einsammelbar) und Prüfgruppe (Handle aufbewahrt → Emitter muss ebenfalls einsammelbar sein). Dazu die Zweitsonde aus dem Finding: ein retained Payload überlebt heute, obwohl das aufbewahrte Handle zu einem völlig anderen Event gehört.
+
+`global.gc()` braucht `--expose-gc`. Lokal verifiziert: `NODE_OPTIONS=--expose-gc` genügt (Node 25.9). Die CI-Matrix fährt aber 18/20/22/24 — vor dem Commit prüfen, ob `--expose-gc` dort in der NODE_OPTIONS-Allowlist liegt; ist das unklar, die überall tragfähige Form wählen (Jest direkt über `node --expose-gc ./node_modules/jest/bin/jest.js`). Der Test darf **nicht** still übersprungen werden, wenn `global.gc` fehlt — ein Spec, das in CI nichts prüft, ersetzt die Lücke durch eine unsichtbare. Ändert sich das Test-Kommando, beide Workflows unter `.github/` mitziehen.
+
+Die öffentlichen Eigenschaften `.listener` / `.listeners` des Handles bleiben unangetastet — sie sind laut `docs/off.md` Teil der API und zeigen auf entkoppelte `EventListener` ohne Rückverweis auf den Emitter.
+
+`docs/lifecycle.md:226` behauptet das Zielverhalten heute schon; nach dem Fix stimmt der Satz. Prüfen, ob er trotzdem präziser gefasst gehört. CHANGELOG-Eintrag unter `## Unreleased` als **Fix**, kein Bruch.
+
+**MEM-001 · high · src/eventize-api.ts:39-53** — Aufgebrauchtes Unsubscribe-Handle hält den kompletten Emitter fest
+
+`makeUnsubscribe()` schließt über `host` (den Emitter) und `listeners` und gibt beide nach dem Aufruf nie frei — `isConsumed` wird gesetzt, die Referenzen bleiben. Ein GC-Lauf unter `--expose-gc` mit `WeakRef` und Kontrollgruppe zeigt: wird das Handle nach dem Aufruf weggeworfen, ist der Emitter einsammelbar; wird es aufbewahrt, ist er es nicht. Mit ihm hängen `EventStore`, `EventKeeper` und jeder zurückgehaltene Payload fest — eine zweite Sonde belegt, dass ein 8-KB-Puffer unter `retain()` überlebt, obwohl das aufbewahrte Handle zu einem völlig anderen Event gehört. Das widerspricht `docs/lifecycle.md:226` direkt: 'Calling a handle whose listener has actually been removed from the store releases every reference it was holding.' Der `EventListener` selbst wird korrekt entkoppelt — `detach()` nullt seine Felder, und das Listener-Objekt ist nachweislich einsammelbar. Es ist die Closure des Handles, die hält. Die Stelle wiegt schwer, weil dieselbe Datei das Aufbewahren von Handles als sicheres Muster empfiehlt und der Teardown-Beispielcode in `docs/lifecycle.md` genau ein Array aufbewahrter Handles durchläuft, ohne es zu leeren.
+
+Empfehlung: `host` und `listeners` in `makeUnsubscribe()` nach dem `off()`-Aufruf auf `null` setzen und den `isConsumed`-Test durch einen Null-Test auf `host` ersetzen. Die öffentlichen Eigenschaften `.listener` / `.listeners` bleiben unangetastet — sie zeigen auf entkoppelte `EventListener` ohne Rückverweis auf den Emitter und sind laut `docs/off.md` Teil der API. Dazu eine Assertion in `src/lifecycle.spec.ts`, die mit `WeakRef` und `global.gc()` prüft, dass ein aufbewahrtes, verbrauchtes Handle den Emitter nicht mehr hält (Jest mit `--expose-gc`, alternativ `FinalizationRegistry`). Der Satz in `docs/lifecycle.md:226` stimmt danach — heute stimmt er nicht.
+
+---
+
+### [x] 4. on() weist unbrauchbare Listener und NaN-Prioritäten zurück
+
+- Findings: BUG-005, BUG-006
+- Ziel: Was `on()` nicht dispatchen kann, kommt nicht mehr in den Store — es wirft, statt eine tote Subscription anzulegen oder still falsch einzusortieren.
+- Dateien: `src/subscribeTo.ts`, `src/EventListener.ts` (nur der Kommentar), die passende Spec-Datei, `skills/using-eventize/references/api-details.md`, `CHANGELOG.md`, ggf. `README.md` / `docs/`
+- Modell: stärkste Stufe
+- Verify: `npm test && npm run typecheck && npm run lint && npm run format:check`
+- Commit: `fix(on): reject unusable listeners and NaN priorities instead of registering them (BUG-005, BUG-006)`
+- Hash: `6d2a67d`
+
+**Verlauf.** Zwei Runden. Rote Läufe für beide Findings getrennt nachgewiesen, je 6 rote Fälle, Kontrollgruppen im selben Lauf grün. Suite 649 → 668, Branch-Coverage 97.63 → 98.01, `subscribeTo.ts` auf 100 in allen vier Spalten.
+
+**Der Filter ist nicht zu scharf** — das war hier das teurere Risiko. Der Reviewer hat 44 gültige `on()`-Schreibweisen ausführend gegen den neuen Code geprüft: Funktion, Methodenname als String und als Symbol, Listener-Objekt, Klassen-Instanz, `Object.create(null)`, Array und `Proxy` als Listener-Objekt, Funktion als listenerObject, alle Wildcard- und Positionsvarianten, Tupel mit und ohne Priorität, `once()`, `inject()`, `class Eventize`, Retain-Replay. Neu zurückgewiesen wird exakt {truthy number, boolean, bigint}. `Priority.Max`/`Min`/`Normal`, `0`, die Legacy-Aliase, negative und gebrochene Werte sowie der id-Tiebreak bei zwei `Max` sind ausführend als gültig bestätigt — genau die Fälle, die das im Audit vorgeschlagene `Number.isFinite` gekippt hätte.
+
+**Abweichungen, alle vom Reviewer geprüft und tragfähig:**
+1. Der Falsy-Test bleibt **vor** dem Typtest: `!listener || detectListenerType(listener) === undefined`. Ein reiner Typfilter hätte `''` neu *akzeptiert*, weil ein leerer Methodenname einen Tag bekommt, heute aber verworfen wird. So ist die Änderung ausschließlich verschärfend.
+2. Der geworfene Text bleibt `subscribeTo() called with insufficient arguments` — er steht so in `api-details.md` und ist für `0` im Listener-Slot schon heute der Wortlaut. Nur das begleitende `console.warn` ist dreiwertig geworden: `null` → »insufficient arguments«, kein Tag → »cannot be a listener«, sonst → »an empty method name«. Der dritte Zweig ist beweisbar nur `''`; `document.all` fällt über `== null` in den ersten.
+3. Die Tupel-Zurückweisung ist **atomar** — `on(ε, ['a', ['b', NaN], 'c'], fn)` hinterlässt nichts. Das Audit legt dazu nichts fest; die Entscheidung folgt `retain()`, nicht `emit()`, und steht als Klausel in der Asymmetrieliste von `AGENTS.md`.
+4. Die beiden `if (hasConsole)`-Wrapper sind entfernt: `warn` ist in `utils.ts` bereits eine No-op ohne `console`, der Wrapper war ein nie-falscher Branch. Ohne ihn wäre die Branch-Deckung durch den neuen Wurfpfad auf 97.36 gefallen.
+5. `coverageThreshold.branches` 97 → 97.5 bei gemessenen 98.01 — **angehoben**, nicht gesenkt, gemäß der Politik im Kommentar von `jest.config.ts`.
+6. Ein bestehender Spec in `EventListener.spec.ts` fuhr über `on(obj, 'toFixed', 42 as any)`, also über genau die Eingabe, die jetzt wirft. Er registriert den `EventListener` nun direkt am Store; der geprüfte Dispatch-Pfad ist derselbe. Keine Abschwächung — ein Zählanker und eine Positivkontrolle, die über denselben Pfad `['COLLECTED']` einsammelt, belegen die Nicht-Vakuität im Spec selbst.
+
+**Doku.** Beide Brüche stehen in der CHANGELOG-Bruchliste mit Mechanismus, Blast Radius und Ausweg; dazu README, `docs/lifecycle.md`, `skills/using-eventize/SKILL.md`, `api-details.md` und `migration.md`. Die Upgrade-Pfade zählen jetzt elf statt neun Brüche gegen v5.1.0. Überall, wo der Ausweg `Number.isNaN(p) ? Priority.Normal : p` steht, steht auch, dass ein `[name, priority]`-Tupel den Guard an seinem eigenen zweiten Element braucht. Eine erfundene Versionsnummer `v6.2.0`, die in zwei Skill-Dateien stand und nebenbei eine unbegründete Minor-für-Breaking-Entscheidung mitlieferte, ist restlos raus — die Zielversion wird beim Abschluss bewertet.
+
+**Nebenbefunde (nicht Teil dieses Laufs).**
+- `docs/lifecycle.md:5` datiert den beschriebenen Zustand auf v6.1.0. Das stimmt seit diesem Paket nicht mehr und braucht die Zielversion, sobald sie feststeht — **Aufgabe des Abschluss-Commits**, zusammen mit den Versionsankern in `SKILL.md` Punkt 12 und `api-details.md`, die als einzige Pitfalls ohne Anker dastehen.
+- `migration.md:64` verspricht »Worked before/after snippets for the four runtime changes« in `lifecycle.md`; dort stehen drei. Die Zahl war schon vor diesem Paket schief. Nächstes Audit.
+- `hasConsole` in `utils.ts` hat nach Abweichung 4 außerhalb des eigenen Moduls keinen Verwender mehr, bleibt aber exportiert. Nächstes Audit.
+- Vorbestehend ungedeckte Zweige, alle außerhalb dieses Pakets: `EventListener.ts:186,217`, `EventStore.ts:251`, `getSubscriptionCount.ts:10`, `utils.ts:61-62`.
+
+**Test zuerst**, für beide Findings getrennt, jeweils rot gesehen.
+
+Zwei **Breaking Changes**, beide vom Nutzer entschieden (siehe »Entscheidungen«). Beide gehören mit Migrationshinweis in die CHANGELOG-Bruchliste unter `## Unreleased`, im Ton der vorhandenen Einträge — die nennen Mechanismus, Blast Radius und Ausweg.
+
+Zu BUG-005: Der Filter ist `detectListenerType()` — durch darf nur, was einen Tag bekommt (Funktion, String, Symbol, Nicht-Null-Objekt). Alles andere nimmt denselben Zweig wie heute ein falsy Wert. Danach ist der `undefined`-Zweig in `EventListener.apply()` tatsächlich unerreichbar; der Kommentar in `src/EventListener.ts:78-82`, der das heute schon behauptet, wird damit wahr — prüfen, ob er trotzdem umformuliert gehört. `skills/using-eventize/references/api-details.md:21` sagt bereits, `on()` ohne auflösbaren Listener werfe; nach dem Fix stimmt auch das. Achtung Coverage: wird ein Zweig echt unerreichbar, kann die `coverageThreshold` in `jest.config.ts` kippen — Schwellen **nicht** senken, sondern den toten Zweig entfernen oder die Zahlen anheben.
+
+Zu BUG-006: Die Prüfung ist **NaN-spezifisch**, nicht `Number.isFinite` — `Priority.Max`/`Min` sind `±Infinity` und müssen weiter funktionieren (siehe »Entscheidungen«). Der Tupel-Zweig `on(ε, [['foo', NaN]], fn)` folgt derselben Regel; sein `??` in `src/subscribeTo.ts:104` hält heute nur `undefined` aus der Arithmetik, nicht NaN. Ein Spec, der `Priority.Max` und `Priority.Min` weiterhin als gültig festnagelt, gehört dazu.
+
+**BUG-005 · medium · src/subscribeTo.ts:74-79, src/EventListener.ts:78-82** — on() akzeptiert jeden truthy Nicht-Listener und registriert eine tote Subscription
+
+`_subscribeTo()` prüft nur `if (!listener)`. Ein truthy Wert, der kein Listener sein kann, kommt durch: `on(ε, 'foo', 5)` legt einen `EventListener` an, `getSubscriptionCount(ε)` meldet 1, und jedes `emit(ε, 'foo')` läuft still ins Leere — `detectListenerType()` liefert `undefined`, `apply()` fällt durch alle drei Zweige und kehrt zurück. Dieselbe Eingabe mit `0` statt `5` wirft dagegen ('subscribeTo() called with insufficient arguments'), weil `0` falsy ist: der realistische Weg hinein, ein durchgereichter numerischer Wert am Listener-Slot, verhält sich je nach Zahlenwert entgegengesetzt. Die tote Subscription lässt sich nur per `off()` wieder loswerden und verfälscht bis dahin jede Teardown-Assertion auf `getSubscriptionCount(ε) === 0` — genau die Prüfung, die `docs/lifecycle.md` empfiehlt. Zwei Stellen im Projekt behaupten das Gegenteil: `EventListener.ts:78-82` nennt den `undefined`-Zweig 'unreachable in practice, because _subscribeTo() rejects those before they reach here', und `skills/using-eventize/references/api-details.md:21` sagt, `on()` ohne auflösbaren Listener werfe.
+
+Empfehlung: Die Prüfung von Truthiness auf Typ umstellen: durchlassen darf nur, was `detectListenerType()` einen Tag gibt — Funktion, String, Symbol oder Nicht-Null-Objekt. Alles andere nimmt denselben Zweig wie heute ein falsy Wert. Das macht den `undefined`-Zweig in `EventListener.apply()` tatsächlich unerreichbar, statt es nur zu behaupten, und bringt `api-details.md:21` in Deckung mit dem Code. Da die Änderung eine bisher stillschweigend akzeptierte Eingabe zurückweist, gehört sie in die CHANGELOG-Bruchliste — siehe Offene Fragen zur Alternative 'warnen statt werfen'. **→ Entschieden: werfen.**
+
+**BUG-006 · low · src/EventStore.ts:12-43, src/subscribeTo.ts:51-57** — NaN als Priorität verschiebt den Listener still an eine willkürliche Stelle
+
+`sortByPriorityAndId()` rechnet `b.priority - a.priority`; mit NaN ist jeder Vergleich false, wodurch `findInsertIndex()` die Binärsuche konsequent nach rechts laufen lässt und den Listener an einer Stelle einsetzt, die von der Bucket-Größe abhängt statt von der Priorität. Sonde: `on(ε,'foo',10,…)`, `on(ε,'foo',NaN,…)`, `on(ε,'foo',5,…)` dispatcht als ten, nan, five — der NaN-Listener landet zwischen zwei Prioritäten, zu denen er in keiner Ordnungsrelation steht. Kein Fehler, keine Warnung. Der Code kennt das Problem bereits: `subscribeTo.ts:96-104` begründet ausführlich, warum bei `[name, priority]`-Tupeln `??` statt `||` verwendet wird, nämlich um genau dieses NaN aus der Arithmetik herauszuhalten. Der direkte Weg — `on(ε, 'foo', Number(cfg.prio), fn)` mit unparsbarem `cfg.prio` — ist ungeschützt geblieben.
+
+Empfehlung: In `_subscribeTo()` nach dem positionalen Dekodieren auf NaN prüfen und werfen — mit demselben Argument wie bei BUG-005 und im selben Durchgang. `Priority.Max` und `Priority.Min` bleiben unangetastet: `Infinity` ist ordnungsfähig, die Sonde bestätigt korrekte Sortierung und stabile id-Tiebreaks bei zwei Listenern auf `Priority.Max`. **→ Entschieden: werfen, Prüfung NaN-spezifisch statt `Number.isFinite`.**
+
+---
+
+### [x] 5. eventize() auf eingefrorenem Objekt meldet die Ursache
+
+- Findings: BUG-007
+- Ziel: Statt eines undurchsichtigen `TypeError` aus `Object.defineProperty` nennt der Fehler Grund und Ausweg.
+- Dateien: `src/asEventized.ts`, die passende Spec-Datei, `docs/lifecycle.md`, `CHANGELOG.md`
+- Modell: mittlere Stufe
+- Verify: `npm test && npm run typecheck && npm run lint && npm run format:check`
+- Commit: `fix(eventize): report why a non-extensible object cannot be eventized (BUG-007)`
+- Hash: `78c8c10`
+
+**Verlauf.** Eine Runde. Roter Lauf nachgewiesen und vom Reviewer selbst reproduziert: Datei auf den Vorstand zurückgesetzt, exakt 5 von 7 Fällen rot, dieselben zwei grün. Neue Spec-Datei `src/asEventized.spec.ts` mit 9 Fällen, Suite 668 → 677.
+
+Die Prüfung sitzt **hinter** dem `isEventized()`-Guard, ein bereits eventisiertes und danach eingefrorenes Objekt läuft also nicht in den neuen Zweig — als Spec festgenagelt. `Object.isExtensible()` deckt alle drei Ursachen ab: `freeze()`, `preventExtensions()` und `seal()`; alle drei haben einen eigenen Fall.
+
+**Ein Befund aus dem Review, der die Zusage rettete.** Der Fix warf zunächst `new Error(...)`, während die native Ursache ein `TypeError` war — damit wäre »kein Verhaltenswechsel, nur die Meldung« für Aufrufercode falsch gewesen, der per `instanceof TypeError` unterscheidet. Jetzt `new TypeError(...)`, mit eigenem Spec-Fall auf die Klasse. Die Zusage stimmt.
+
+`class Eventize` erreicht den neuen Zweig praktisch nie: der Konstruktor besteht aus genau einer Anweisung, `eventize<TEvents>(this)`, und `this` ist vorher nicht greifbar. Per Code-Inspektion bestätigt, als Spec-Fall ehrlich so formuliert statt verschwiegen.
+
+**Test zuerst**, rot gesehen. Reine Diagnosequalität, kein Verhaltenswechsel: der Aufruf schlägt vorher wie nachher fehl — der Spec prüft die Meldung, nicht das Ob. CHANGELOG-Eintrag als **Fix** unter `## Unreleased`; kein Bruch, weil der Aufruf nie funktioniert hat.
+
+`Object.isExtensible()` deckt beide Fälle ab — `Object.freeze()` und `Object.preventExtensions()`. Ein bereits eventisiertes Objekt, das danach eingefroren wurde, darf nicht fälschlich in den neuen Zweig laufen; prüfen, ob `asEventized()` an dieser Stelle einen bestehenden Marker vorher erkennt, und den Fall als Spec festnageln.
+
+**BUG-007 · low · src/asEventized.ts:14-19, src/utils.ts:71-81** — eventize() auf einem eingefrorenen Objekt wirft einen undurchsichtigen TypeError
+
+`defineHiddenPropertyRO()` ruft `Object.defineProperty()` ohne Vorprüfung. Auf einem eingefrorenen oder mit `preventExtensions()` versiegelten Objekt wirft das: 'TypeError: Cannot define property Symbol(eventize), object is not extensible'. Die Meldung nennt weder eventize noch den eigentlichen Grund — dass ein Emitter ein Slot braucht und ein eingefrorenes Objekt keines aufnehmen kann. Weder README noch `docs/lifecycle.md` erwähnen die Einschränkung, kein Spec nagelt sie fest. Getroffen wird, wer `Object.freeze()` defensiv auf Konfigurations- oder Store-Objekte anwendet und diese anschließend eventisieren will — und die Bibliothek wirbt ausdrücklich damit, auf beliebigen bestehenden Objekten zu funktionieren.
+
+Empfehlung: In `asEventized()` vor dem `defineProperty` `Object.isExtensible(obj)` prüfen und andernfalls mit einer eigenen Meldung werfen, die Ursache und Ausweg nennt, etwa 'eventize() cannot attach to a non-extensible object — eventize before freezing, or eventize a wrapper'. Dazu ein Spec-Fall und eine Zeile in `docs/lifecycle.md` unter 'What an emitter holds'. Reine Diagnosequalität, kein Verhaltenswechsel: der Aufruf schlägt vorher wie nachher fehl.

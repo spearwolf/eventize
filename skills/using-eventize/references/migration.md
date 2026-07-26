@@ -72,10 +72,11 @@ live in
 [`docs/lifecycle.md#migrating-from-v5`](../../../docs/lifecycle.md#migrating-from-v5)
 rather than being duplicated here.
 
-One more runtime change rides along in `v6.1.0`, filed as a **fix** rather
-than a breaking change — the behaviour it removes dispatched to code the
-subscriber never wrote — but a `v5.1.0` consumer meets it in the same upgrade
-and it is not visible to the type checker:
+Two more runtime changes ride along in `v6.1.0`, both filed as **fixes**
+rather than breaking changes — one stopped dispatching to code the subscriber
+never wrote, the other made a call do the one thing its arguments ask for —
+but a `v5.1.0` consumer meets both in the same upgrade and neither is visible
+to the type checker:
 
 - **An event name that only matches an inherited `Object.prototype` member
   dispatches to nothing.** `toString`, `toLocaleString`, `valueOf`,
@@ -98,6 +99,20 @@ and it is not visible to the type checker:
   or define the method on the target: a target's own method under that name
   dispatches as normal, unless it is literally an alias of
   `Object.prototype`'s function.
+- **`off(ε, '*', listenerObject)` now detaches that object's wildcard
+  subscriptions.** It used to remove nothing and report nothing: `off()`
+  routes a name-plus-object pair into the named buckets, and a wildcard
+  listener has never lived there. Every shape that puts an object on the
+  wildcard was affected — `on(ε, '*', obj)`, the bare catch-all `on(ε, obj)`,
+  `on(ε, '*', fn, ctx)` and `on(ε, '*', 'method', ctx)`. Grep for the call:
+  code that used it as a working cleanup step was leaking the subscription,
+  and code that had settled for the blunt workarounds (`off(ε, '*')`, which
+  wipes the emitter, or `off(ε, obj)`, which also drops the object's *named*
+  subscriptions) can now narrow to what it actually meant. Named
+  subscriptions of the same object survive this call, retained state is
+  untouched — `'*'` can never carry any — and reference counting is not
+  consulted, so one call releases a `refCount`-2 registration outright,
+  exactly as `off(ε, 'foo', obj)` always has.
 
 ## v4 → v5: `emit()` stopped throwing
 
