@@ -45,7 +45,7 @@ import {eventize, on, once, onceAsync, emit, emitAsync,
 | `onceAsync(ε, name, {signal}?)` | promise resolving on next emit; the optional `AbortSignal` unsubscribes and rejects | `Promise<firstArg>` |
 | `emit(ε, name, …args)` | sync dispatch | `void` |
 | `emitAsync(ε, name, …args)` | dispatch + collect non-null returns | `Promise<any[] \| undefined>` |
-| `off(ε, …)` | unsubscribe; also clears retain for named events, and all retained state on `off(ε)` / `off(ε, '*')` | `void` |
+| `off(ε, …)` | unsubscribe; also clears retain for named events, and all retained state on `off(ε)` / `off(ε, '*')` / any array holding a `'*'` or a nullish element | `void` |
 | `retain(ε, name)` | replay last value to new subscribers | `void` |
 | `retainClear(ε, name)` | drop stored value, keep policy | `void` |
 | `unretain(ε, name)` | drop value and policy | `void` |

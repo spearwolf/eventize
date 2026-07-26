@@ -142,6 +142,19 @@ const hasWildcard = (eventNames: unknown): boolean =>
     ? eventNames.some((name) => name === EVENT_CATCH_EM_ALL)
     : eventNames === EVENT_CATCH_EM_ALL;
 
+// True for exactly the `off()` arguments that make EventStore.remove() empty
+// the whole registry. Mirrors that method's *effective* behaviour, not just
+// its condition: its array branch forwards every element back into itself with
+// a null listenerObject, so a `null`, `undefined` or `'*'` element lands in the
+// wipe-everything branch — an array is bulk if any single element would be.
+// Testing only for `'*'` here is what left `off(ε, [null])` emptying the store
+// while the keeper kept every retained value, and `off(ε, ['foo', null])`
+// dropping one name's retained state out of a total wipe.
+const isBulkRemoval = (listener: unknown): boolean =>
+  Array.isArray(listener)
+    ? listener.some((item) => item == null || item === EVENT_CATCH_EM_ALL)
+    : listener === EVENT_CATCH_EM_ALL;
+
 // ---------------------------------------------------------------------------
 // on() — overloads ordered specific → generic.
 //
@@ -508,16 +521,17 @@ export function off(
     (listenerType === 'string' || listenerType === 'symbol');
   store.remove(listener, listenerObject, forceRemove);
 
-  // off(ε), off(ε, '*') and off(ε, ['*', …]) wipe the store completely; the
-  // keeper follows. It has to run before the array/name branches below, because
-  // isEventName('*') is true and '*' would otherwise take the name path — which
-  // clears nothing, since retain() rejects '*' and it can never be an entry.
-  // hasWildcard() covers the array form the way EventStore.remove() does by
-  // recursing into its own wipe branch, and the way unretain()/retainClear()
-  // already treat a wildcard anywhere in an array as "all retained events".
-  // Leaving retained payloads behind after "remove everything" kept them
-  // strongly referenced and still replayed them to later subscribers.
-  if (listener == null || (listenerObject == null && hasWildcard(listener))) {
+  // off(ε), off(ε, '*') and any array whose elements make the store wipe
+  // itself — ['*', …], [null], ['foo', undefined] — clear the keeper too. This
+  // has to run before the array/name branches below, because isEventName('*')
+  // is true and '*' would otherwise take the name path, which clears nothing:
+  // retain() rejects '*' and it can never be an entry.
+  // isBulkRemoval() reproduces what EventStore.remove() does to the listeners,
+  // and matches how unretain()/retainClear() already read a wildcard anywhere
+  // in an array as "all retained events". Leaving retained payloads behind
+  // after "remove everything" kept them strongly referenced and still replayed
+  // them to later subscribers.
+  if (listener == null || (listenerObject == null && isBulkRemoval(listener))) {
     keeper.removeAll();
     return;
   }

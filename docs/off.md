@@ -11,7 +11,7 @@
 | `off(emitter)`                            | Unsubscribes **all** listeners from the emitter, and clears **all** retained state. |
 | `off(emitter, '*')`                       | Same as above — all listeners (named and wildcard), all retained state. |
 | `off(emitter, eventName)`                 | Unsubscribes all listeners for a specific event (string or symbol), and unretains it. |
-| `off(emitter, [eventName1, eventName2])`  | Same, for several events at once. A `'*'` anywhere in the array makes it the bulk form. |
+| `off(emitter, [eventName1, eventName2])`  | Same, for several events at once. A `'*'`, `null` or `undefined` anywhere in the array makes it the bulk form. |
 | `off(emitter, listenerFunc)`              | Unsubscribes a specific listener function from all events.          |
 | `off(emitter, listenerFunc, context)`     | Unsubscribes a listener function with a specific context.           |
 | `off(emitter, listenerObject)`            | Unsubscribes all listeners associated with an object.               |
@@ -62,6 +62,16 @@ A `'*'` anywhere in an array counts as the bulk form, on the keeper exactly as i
 off(ε, ['*']);        // identical to off(ε, '*')
 off(ε, ['*', 'foo']); // also identical — the 'foo' is redundant, not narrowing
 ```
+
+A `null` or `undefined` element does the same, for the same reason: each element is processed on its own, and a nullish one means "everything" just as the bare `off(ε, undefined)` does. Since v6.0.0 the keeper follows the store here too — before, these forms emptied the registry and left every retained value in place.
+
+```javascript
+off(ε, [null]);         // identical to off(ε)
+off(ε, ['foo', null]);  // also identical — the 'foo' narrows nothing
+```
+
+> [!WARNING]
+> A list of event names assembled at runtime — `off(ε, names.map((n) => lookup[n]))` — wipes the entire emitter the moment one lookup misses. Filter the array before passing it.
 
 ## Removing listeners by event name
 

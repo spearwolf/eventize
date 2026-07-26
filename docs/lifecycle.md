@@ -25,7 +25,7 @@ on(ε, 'foo', (received) => {
 
 ## What each `off()` form releases
 
-`off()` always touches the store; whether it also touches the keeper's retained state depends on the exact form. The "everything" forms (`off(ε)`, `off(ε, undefined)`, `off(ε, '*')`, and any array containing `'*'`) wipe both halves — store and keeper — since v6.0.0. Beyond those, the distinction that trips people up runs the other way from what you'd guess: **`off(ε, eventName, listenerObject)` — the one form that carries both an event name and a listener object — reaches the keeper and unretains that name, even though it only removes a single listener's subscription.** The remaining forms follow whether they carry a *concrete* event name at all: the two bare-name forms (`off(ε, eventName)`, `off(ε, [eventName, …])`) unretain; the listener-only forms do not.
+`off()` always touches the store; whether it also touches the keeper's retained state depends on the exact form. The "everything" forms (`off(ε)`, `off(ε, undefined)`, `off(ε, '*')`, and any array containing a `'*'`, a `null` or an `undefined`) wipe both halves — store and keeper — since v6.0.0. Beyond those, the distinction that trips people up runs the other way from what you'd guess: **`off(ε, eventName, listenerObject)` — the one form that carries both an event name and a listener object — reaches the keeper and unretains that name, even though it only removes a single listener's subscription.** The remaining forms follow whether they carry a *concrete* event name at all: the two bare-name forms (`off(ε, eventName)`, `off(ε, [eventName, …])`) unretain; the listener-only forms do not.
 
 | Form                                       | Listeners removed                                          | Retained state                                                                          |
 | ------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
@@ -33,6 +33,7 @@ on(ε, 'foo', (received) => {
 | `off(ε, undefined)`                         | all — same branch as `off(ε)`, **not** a no-op               | every value and every policy dropped                                                       |
 | `off(ε, '*')`                                | all (same as `off(ε)`)                                       | every value and every policy dropped                                                       |
 | `off(ε, ['*', …])` — wildcard anywhere in the array | all (the store recurses into its own wipe branch)       | every value and every policy dropped — the other names in the array add nothing            |
+| `off(ε, [null, …])` / `off(ε, [undefined, …])` — nullish anywhere in the array | all (same recursion, same wipe branch) | every value and every policy dropped — the other names in the array add nothing            |
 | `off(ε, eventName)`                          | every listener for that name                                  | value **and** policy dropped for that name — same as `unretain(ε, eventName)`             |
 | `off(ε, [eventName, …])` — no `'*'` in the array | every listener for each listed name                        | value and policy dropped for each listed name (string and symbol names alike)              |
 | `off(ε, listenerFunc[, context])`            | that function (with that context, if given), from every event | **untouched**                                                                              |
@@ -42,6 +43,8 @@ on(ε, 'foo', (received) => {
 
 > [!DANGER]
 > **`off(ε, undefined)` is not a no-op.** `undefined == null`, so it takes the exact same branch as the bare `off(ε)` and removes **every** listener on the emitter. Cleanup code that forwards a possibly-missing handle property straight through — `off(ε, maybeHandle.listener)` — wipes the whole emitter the moment that property is `undefined`, instead of doing nothing. Guard the call, or pass the handle itself and let it no-op safely on repeat calls.
+>
+> **Wrapping it in an array does not contain it.** `EventStore.remove()` forwards each element back into itself, so `off(ε, [null])`, `off(ε, [undefined])` and `off(ε, ['foo', undefined])` each hit the same wipe branch — one nullish element takes the whole emitter, and since v6.0.0 the retained state with it. An event-name list assembled at runtime is the realistic way in: `off(ε, ids.map((id) => nameFor(id)))` empties the emitter as soon as one lookup returns `undefined`. Filter the array first.
 
 The row worth pausing on is `off(ε, eventName, listenerObject)`: it narrowly removes one listener object's subscription to that name, but it drops the retained value and policy for the name *entirely*. Any sibling listener still subscribed to that name keeps running on future emits exactly as before — nothing is unsubscribed out from under it — but the *next* listener to subscribe to that name gets no replay, because the retained state it would have replayed from is gone.
 

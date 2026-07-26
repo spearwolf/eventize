@@ -994,6 +994,46 @@ describe('off()', () => {
       expect(late.callCount).toBe(0);
     });
 
+    it.each([[[null]], [[undefined]]])(
+      'off(ε, %p) wipes the keeper, matching the store wipe it performs',
+      (names) => {
+        const obj = eventize();
+        retain(obj, ['foo', 'bar']);
+        emit(obj, 'foo', 1);
+        emit(obj, 'bar', 2);
+        on(obj, 'foo', fake());
+        on(obj, 'bar', fake());
+
+        // EventStore.remove() forwards each element back into itself with a
+        // null listenerObject, so a nullish element lands in the wipe-all
+        // branch and takes every listener with it.
+        off(obj, names);
+
+        expect(getSubscriptionCount(obj)).toBe(0);
+        expect(getRetainedCount(obj)).toBe(0);
+        expect(getRetainedEventNames(obj)).toEqual([]);
+      },
+    );
+
+    it("off(ε, ['foo', null]) clears everything, not just the named one", () => {
+      const obj = eventize();
+      retain(obj, ['foo', 'bar']);
+      emit(obj, 'foo', 1);
+      emit(obj, 'bar', 2);
+      on(obj, 'foo', fake());
+      on(obj, 'bar', fake());
+
+      off(obj, ['foo', null]);
+
+      expect(getSubscriptionCount(obj)).toBe(0);
+      expect(getRetainedCount(obj)).toBe(0);
+
+      // the partial wipe used to leave 'bar' pinned and still replaying
+      const late = fake();
+      on(obj, 'bar', late);
+      expect(late.callCount).toBe(0);
+    });
+
     it('leaves a multi-event unsubscribe handle on the name path', () => {
       const obj = eventize();
       retain(obj, 'keep');
