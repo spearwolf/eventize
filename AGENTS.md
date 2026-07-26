@@ -14,6 +14,8 @@ Narrower loops while working: `npm test -- src/once.spec.ts`, `npm test -- -t "r
 
 Coverage is gated, not merely measured: `jest.config.ts` carries a global `coverageThreshold`, and both workflows run `npm test -- --coverage`. Raise the numbers when coverage rises; never lower them to make a build pass.
 
+**TypeScript is pinned below 7, on purpose.** `ts-jest` — which compiles every spec — declares `peerDependencies.typescript: ">=4.3 <7"` (checked across its six most recent releases; its `next` dist-tag is an *older* prerelease than `latest`, not a forward path). `typescript-eslint` is tighter still, capping at `<6.1.0`. Before retrying this upgrade, check both packages' current peer range with `npm view <pkg> peerDependencies`; do not force the install with `--legacy-peer-deps`, `--force`, or an `overrides` entry to get past a real peer conflict — that trades a known state (outdated TypeScript) for an unverified one (a compiler nothing in the toolchain has agreed to support). See `CHANGELOG.md` under `## Unreleased` for the full record.
+
 ## Architecture invariants
 
 These are the things that bite. Everything else is readable from the source.
