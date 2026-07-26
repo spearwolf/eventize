@@ -108,6 +108,16 @@ export default defineConfig(
           objectLiteralTypeAssertions: 'allow-as-parameter',
         },
       ],
+
+      // Type-only imports stay separate `import type` statements, matching
+      // the convention already used throughout src/ — CONS-001.
+      '@typescript-eslint/consistent-type-imports': [
+        2,
+        {
+          prefer: 'type-imports',
+          fixStyle: 'separate-type-imports',
+        },
+      ],
     },
   },
   {

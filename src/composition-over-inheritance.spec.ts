@@ -1,6 +1,7 @@
 import {expect2ImplEventizeApi} from './__test-utils__/expect2ImplEventizeApi';
 
-import {emit, eventize, Eventize, on} from './index';
+import {emit, eventize, on} from './index';
+import type {Eventize} from './index';
 
 describe('composition over inheritance', () => {
   interface Foo extends Eventize {}

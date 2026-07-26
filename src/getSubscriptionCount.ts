@@ -1,7 +1,7 @@
-import {EventStore} from './EventStore';
+import type {EventStore} from './EventStore';
 import {NAMESPACE} from './constants';
 import {isEventized} from './isEventized';
-import {EventizedObject} from './types';
+import type {EventizedObject} from './types';
 
 export const getSubscriptionCount = (o: object): number => {
   if (isEventized(o)) {

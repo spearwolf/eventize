@@ -1,4 +1,4 @@
-import {EventListener} from './EventListener';
+import type {EventListener} from './EventListener';
 import {asEventized} from './asEventized';
 import {EVENT_CATCH_EM_ALL, NAMESPACE} from './constants';
 import {isEventized} from './isEventized';

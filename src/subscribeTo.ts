@@ -1,6 +1,7 @@
-import {EventKeeper, KeeperEvent} from './EventKeeper';
+import {EventKeeper} from './EventKeeper';
+import type {KeeperEvent} from './EventKeeper';
 import {EventListener} from './EventListener';
-import {EventStore} from './EventStore';
+import type {EventStore} from './EventStore';
 import {Priority} from './Priority';
 import {EVENT_CATCH_EM_ALL} from './constants';
 import type {EventArgs, EventName, ListenerObjectType} from './types';

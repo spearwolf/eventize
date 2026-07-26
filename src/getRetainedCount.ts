@@ -1,4 +1,4 @@
-import {EventKeeper} from './EventKeeper';
+import type {EventKeeper} from './EventKeeper';
 import {NAMESPACE} from './constants';
 import {isEventized} from './isEventized';
 import type {EventizedObject, EventName} from './types';
