@@ -36,15 +36,32 @@ const afterApply = (callback?: () => void) => (listener: EventListener) => {
 // which unsubscribed the *other* handle's registration. Cleanup code that
 // calls a stored handle defensively ("call it again, it's a no-op") is exactly
 // the shape that hit it, and `docs/off.md` promised that no-op.
+//
+// The nulled `host` capture *is* the consumed flag, and that is what stops a
+// handle kept after its call from pinning the emitter — with it the store, the
+// keeper and every retained payload (MEM-001). A separate boolean would leave
+// `host` in the closure forever. `listeners` stays captured on purpose: the
+// handle object carries the very same references under `.listener` /
+// `.listeners` for its whole life, so nulling the closure copy would release
+// nothing and only buy a branch that can never be taken.
+//
+// What this releases is what *this closure* held, which is not the same as
+// "a consumed handle holds nothing". When the call merely decremented a shared
+// reference count, `.listener` stays populated — and such a listener can still
+// reach the emitter: its `callAfterApply` may be another, unconsumed handle's
+// closure (an `on()` that deduped onto a `once()` whose event never fired), or
+// the listener object may be the emitter itself. Only the call that takes the
+// count to zero detaches. Pinned in `src/lifecycle.spec.ts`.
 const makeUnsubscribe = (
   host: EventizedObject,
   listeners: EventListener | Array<EventListener>,
 ): UnsubscribeFunc => {
-  let isConsumed = false;
+  let heldHost: EventizedObject | null = host;
   const unsubscribe = () => {
-    if (isConsumed) return;
-    isConsumed = true;
-    off(host, listeners);
+    const target = heldHost;
+    if (target === null) return;
+    heldHost = null;
+    off(target, listeners);
   };
   return Object.assign(
     unsubscribe,
