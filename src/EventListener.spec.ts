@@ -11,6 +11,7 @@ import {
   EVENT_CATCH_EM_ALL,
   LISTENER_IS_NAMED_FUNC,
   LISTENER_IS_OBJ,
+  NAMESPACE,
 } from './constants';
 
 const bar = Symbol('bar');
@@ -105,10 +106,33 @@ describe('EventListener', () => {
 
     it('collects nothing from a primitive listener through emitAsync()', async () => {
       const obj = eventize();
-      // Only reachable from untyped JS — _subscribeTo() rejects falsy
-      // listeners, and 42 is truthy.
-      on(obj, 'toFixed', 42 as any);
+      // No longer reachable through on(): _subscribeTo() rejects anything
+      // detectListenerType() gives no tag, truthy or not. Registering the
+      // listener by hand is what still puts a primitive in front of a real
+      // dispatch, which is the case this asserts.
+      obj[NAMESPACE].store.add(new EventListener('toFixed', 0, 42), true);
+      // Anchors the assertion below: without this, the same expectation would
+      // stay green if the listener had never landed in the bucket the dispatch
+      // reads. The sibling case underneath proves the path does collect.
+      expect(getSubscriptionCount(obj)).toBe(1);
       await expect(emitAsync(obj, 'toFixed', 2)).resolves.toBeUndefined();
+    });
+
+    it('collects from a real listener registered the same way', async () => {
+      const obj = eventize();
+      obj[NAMESPACE].store.add(
+        new EventListener('toFixed', 0, {toFixed: () => 'COLLECTED'}),
+        true,
+      );
+      await expect(emitAsync(obj, 'toFixed', 2)).resolves.toEqual([
+        'COLLECTED',
+      ]);
+    });
+
+    it('is no longer reachable through on() at all', () => {
+      const obj = eventize();
+      expect(() => on(obj, 'toFixed', 42 as any)).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
     });
   });
 

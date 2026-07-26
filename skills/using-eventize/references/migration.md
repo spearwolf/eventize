@@ -1,6 +1,6 @@
 # eventize — migration notes
 
-## v5 → v6: nine breaking changes
+## v5 → v6: eleven breaking changes
 
 Against the last released version, `v5.1.0`. Most are runtime changes on
 signatures that don't change shape, so grep for the call patterns rather
@@ -43,6 +43,28 @@ compile errors instead.
   now dispatches to nothing instead of throwing.** Only reachable by
   constructing the class yourself, which the runtime bundles don't even
   export.
+- **`on()` / `once()` throw on a listener they cannot dispatch to.** The
+  slot used to be checked for truthiness only, so `on(ε, 'foo', 5)`
+  registered a listener no `emit()` could ever reach — it counted towards
+  `getSubscriptionCount(ε)` and needed an explicit `off()` to remove. The
+  same call with `0` threw, because `0` is falsy. Only a function, a string,
+  a symbol or a non-null object passes now. Grep for values forwarded into
+  the listener position from config or from a wrapper's arguments; every
+  documented spelling of `on()` is unaffected.
+- **`on()` / `once()` throw on a `NaN` priority.** `NaN` is a `number`, so it
+  passed as a priority and then made every comparison in the insertion sort
+  false — the listener landed wherever the bucket size put it, silently. The
+  check covers all four positions a priority can occupy, `[name, priority]`
+  tuples included, and it rejects the whole call either way: a `NaN` in one
+  tuple registers none of the names in that call, and a `NaN` at call level
+  throws even when every tuple carries its own priority to override it —
+  `on(ε, [['a', 5], ['b', 7]], NaN, fn)` used to subscribe both names at
+  their tuple priorities. `Priority.Max` / `Priority.Min` (`±Infinity`) stay
+  valid: the test is `Number.isNaN`, not a finiteness test. The realistic way
+  in is arithmetic on unvalidated input — `on(ε, 'foo', Number(cfg.prio), fn)`
+  — so validate before the call: `Number.isNaN(p) ? Priority.Normal : p`, and
+  apply the same guard inside a tuple, which the call-level value does not
+  cover.
 
 Worked before/after snippets for the four runtime changes, plus how to
 verify a migration with `getRetainedCount(ε)` / `getSubscriptionCount(ε)`,

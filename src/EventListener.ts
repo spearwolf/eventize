@@ -72,16 +72,19 @@ const emit = (
 
 /**
  * Returns the LISTENER_IS_* tag for a listener, or undefined for a type that
- * cannot be one. `_subscribeTo()` rejects those before they reach here, so the
- * undefined branch is unreachable in practice — but the type must say so
- * rather than lie about it.
+ * cannot be one. This is also the filter `_subscribeTo()` applies: a value with
+ * no tag never reaches the store, so a listener that arrives here always has
+ * one and the undefined branch of `apply()` is unreachable through the public
+ * API. It stays reachable by constructing an `EventListener` directly, which is
+ * why `apply()` keeps its guards — the constructor is internal, not a
+ * precondition anyone else honours.
  *
  * `typeof null === 'object'`, hence the explicit null check.
  *
  * The tag is what `EventStore.isSimilar()` compares. It is deliberately *not*
  * what `apply()` dispatches on — see the note there.
  */
-const detectListenerType = (listener: unknown): number | undefined => {
+export const detectListenerType = (listener: unknown): number | undefined => {
   switch (typeof listener) {
     case 'function':
       return LISTENER_IS_FUNC;

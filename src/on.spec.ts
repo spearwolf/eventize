@@ -2,7 +2,14 @@ import {fake} from 'sinon';
 
 import {EVENT_CATCH_EM_ALL} from './constants';
 
-import {eventize, Priority, getSubscriptionCount, on, emit} from './index';
+import {
+  eventize,
+  Priority,
+  getSubscriptionCount,
+  on,
+  once,
+  emit,
+} from './index';
 
 describe('on()', () => {
   // ---------------------------------------------------------------------------------------------
@@ -774,6 +781,178 @@ describe('on()', () => {
       const obj = eventize();
       // @ts-expect-error - intentionally calling with insufficient args
       expect(() => on(obj)).toThrow(/insufficient arguments/);
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // A truthy value that can never be dispatched used to be registered anyway:
+  // `on(ε, 'foo', 5)` created an EventListener with no listenerType, every
+  // emit() fell through all three branches of apply(), and the dead entry could
+  // only be removed with off(). The same call with `0` threw, because `0` is
+  // falsy — so a numeric value forwarded into the listener slot behaved
+  // opposite ways depending on its value.
+  describe('an unusable listener', () => {
+    it('rejects a truthy non-listener instead of registering a dead subscription', () => {
+      const obj = eventize();
+      expect(() => on(obj, 'foo', 5 as any)).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects the same value at the catch-all listener slot', () => {
+      const obj = eventize();
+      expect(() => on(obj, 42 as any)).toThrow(Error);
+      expect(() => on(obj, 7, 42 as any)).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects booleans and bigints too', () => {
+      const obj = eventize();
+      expect(() => on(obj, 'foo', true as any)).toThrow(Error);
+      expect(() => on(obj, 'foo', 1n as any)).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects an unusable listener behind an explicit priority', () => {
+      const obj = eventize();
+      expect(() => on(obj, 'foo', Priority.High, 5 as any)).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('registers nothing for an array of event names', () => {
+      const obj = eventize();
+      expect(() => on(obj, ['foo', 'bar'], 5 as any)).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects it in once() as well', () => {
+      const obj = eventize();
+      expect(() => once(obj, 'foo', 5 as any)).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('still rejects a falsy non-listener the way it always did', () => {
+      const obj = eventize();
+      expect(() => on(obj, 'foo', 0 as any)).toThrow(/insufficient arguments/);
+      // '' is falsy but would pass a type-only filter as a method name — it
+      // was rejected before this change and stays rejected.
+      expect(() => on(obj, 'foo', '' as any, {})).toThrow(
+        /insufficient arguments/,
+      );
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('leaves every usable spelling alone', () => {
+      const calls: string[] = [];
+      const listenerObject = {foo: () => calls.push('object')};
+      const methodHost = {handler: () => calls.push('method')};
+
+      const obj = eventize();
+      on(obj, 'foo', () => calls.push('func'));
+      on(obj, 'foo', 'handler', methodHost);
+      on(obj, 'foo', listenerObject);
+      on(obj, Priority.Low, () => calls.push('catch-all'));
+      on(obj, ['foo', 'bar'], () => calls.push('array'));
+      on(obj, [['foo', Priority.High]], () => calls.push('tuple'));
+      on(obj, {foo: () => calls.push('bare-object')});
+      on(obj, 'foo', Symbol.iterator, {});
+
+      expect(getSubscriptionCount(obj)).toBe(9);
+
+      emit(obj, 'foo');
+      expect(calls).toEqual([
+        'tuple',
+        'func',
+        'method',
+        'object',
+        'array',
+        'bare-object',
+        'catch-all',
+      ]);
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // NaN is a number, so it passed the positional decoding as a priority — and
+  // then poisoned it: `b.priority - a.priority` is NaN for every comparison, so
+  // findInsertIndex() walked the binary search all the way right and the
+  // listener landed at a position determined by the bucket size instead of by
+  // its priority. No error, no warning, just the wrong call order.
+  describe('a NaN priority', () => {
+    it('rejects NaN as an explicit priority', () => {
+      const obj = eventize();
+      expect(() => on(obj, 'foo', NaN, () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects NaN as a catch-all priority', () => {
+      const obj = eventize();
+      expect(() => on(obj, NaN, () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects NaN arriving through Number() of an unparsable value', () => {
+      const obj = eventize();
+      const cfg = {prio: 'high-ish'};
+      expect(() => on(obj, 'foo', Number(cfg.prio), () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects NaN inside a [name, priority] tuple', () => {
+      const obj = eventize();
+      expect(() => on(obj, [['foo', NaN]], () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('registers nothing when one tuple in a longer list carries NaN', () => {
+      const obj = eventize();
+      expect(() => on(obj, ['a', ['b', NaN], 'c'], () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects it in once() as well', () => {
+      const obj = eventize();
+      expect(() => once(obj, 'foo', NaN, () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    // Priority.Max and Priority.Min are ±Infinity. Infinity is order-capable,
+    // so the check has to be NaN-specific — Number.isFinite() would reject
+    // both and break documented API.
+    it('keeps Priority.Max, Priority.Min and Priority.Normal valid', () => {
+      const obj = eventize();
+      const calls: string[] = [];
+
+      on(obj, 'foo', Priority.Min, () => calls.push('min'));
+      on(obj, 'foo', Priority.Normal, () => calls.push('normal'));
+      on(obj, 'foo', Priority.Max, () => calls.push('max'));
+
+      expect(getSubscriptionCount(obj)).toBe(3);
+      emit(obj, 'foo');
+      expect(calls).toEqual(['max', 'normal', 'min']);
+    });
+
+    it('keeps ±Infinity valid inside a tuple, and keeps id tiebreaks stable', () => {
+      const obj = eventize();
+      const calls: string[] = [];
+
+      on(obj, [['foo', Priority.Max]], () => calls.push('max-1'));
+      on(obj, [['foo', Priority.Max]], () => calls.push('max-2'));
+      on(obj, [['foo', Priority.Min]], () => calls.push('min'));
+
+      emit(obj, 'foo');
+      expect(calls).toEqual(['max-1', 'max-2', 'min']);
+    });
+
+    it('keeps a priority-less tuple falling back to the call-level priority', () => {
+      const obj = eventize();
+      const calls: string[] = [];
+
+      // @ts-expect-error a one-element tuple is not an EventNameWithPriority
+      on(obj, [['foo']], Priority.High, () => calls.push('tuple'));
+      on(obj, 'foo', Priority.Normal, () => calls.push('plain'));
+
+      emit(obj, 'foo');
+      expect(calls).toEqual(['tuple', 'plain']);
     });
   });
 });

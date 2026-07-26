@@ -58,7 +58,7 @@ See [`docs/off.md`](./off.md) for the full signature reference and [`docs/retain
 
 ## Migrating from v5
 
-Nine breaking changes against the last released version, `v5.1.0`. Most are
+Eleven breaking changes against the last released version, `v5.1.0`. Most are
 runtime behavior changes on signatures that don't change shape, so the type
 checker won't find the call sites — grep for the patterns below instead. Two
 are type-only (a wrong type binding fixed, a dead type export removed) and
@@ -157,13 +157,15 @@ unchanged.
 
 ### Smaller breaking changes
 
-Five more, each narrow enough not to need a worked snippet:
+Seven more, each narrow enough not to need a worked snippet:
 
 - **`on(ε, eventName, methodName, listenerObject)` with a missing or `null` listener object now dispatches to nothing instead of throwing.** `on(ε, 'foo', 'handler', null)` used to throw `TypeError: Cannot read properties of null` the moment the event fired; it now silently does nothing until a real listener object is supplied later, matching how the same branch already tolerated a listener object with no matching method. Code that caught the `TypeError` as a signal no longer sees it — check with `getSubscriptionCount(ε)` instead if that mattered.
 - **`off(ε, <numeric listener id>)` no longer removes anything.** Passing `unsub.listener.id` — the internal `EventListener`'s numeric id — used to detach the listener outright, skipping the reference count every documented removal path honours. It was never documented and had no test. Use `unsub()` or `off(ε, unsub.listener)` instead; both go through the same reference-counted path.
 - **`UnsubscribeFunc.listener` / `.listeners` are now typed as this package's `EventListener`, not the DOM global of the same name.** `src/types.ts` referenced the name without importing it, so it silently bound to `lib.dom`'s `EventListener` (`(evt: Event) => void`) in the published declarations. Code that annotated `const l: EventListener = unsub.listener` against the DOM type now gets a type error — that annotation was already wrong, it just had no way to know. No runtime change.
 - **`export type ListenerType` is gone.** It was `export type ListenerType = unknown` — an alias nothing in the package referenced. Replace an import of it with `unknown` directly.
-- **An `EventListener` built directly with a `null` or `undefined` listener now dispatches to nothing instead of throwing.** Only reachable by constructing `EventListener` yourself; `on()` / `once()` reject a falsy listener before one is ever built, and the runtime bundles don't export the class at all (`src/index.ts` re-exports it as a type only). No action needed unless code somehow holds a reference to the class itself.
+- **An `EventListener` built directly with a `null` or `undefined` listener now dispatches to nothing instead of throwing.** Only reachable by constructing `EventListener` yourself; `on()` / `once()` reject such a listener before one is ever built, and the runtime bundles don't export the class at all (`src/index.ts` re-exports it as a type only). No action needed unless code somehow holds a reference to the class itself.
+- **`on()` / `once()` throw on a listener they cannot dispatch to.** The slot used to be tested for truthiness alone, so `on(ε, 'foo', 5)` registered a subscription no `emit()` could ever reach: it counted towards `getSubscriptionCount(ε)`, survived every dispatch, and came off only with an explicit `off()`. The same call with `0` threw, because `0` is falsy — the same mistake behaved in opposite ways depending on the number. Only a function, a string, a symbol or a non-null object passes now; the message is the familiar `subscribeTo() called with insufficient arguments`. Every documented spelling of `on()` is unaffected, so the call sites to grep for are the ones that forward a value into the listener position — a config field, a wrapper's `arguments`, an argument that slipped a place.
+- **`on()` / `once()` throw on a `NaN` priority.** `NaN` is a `number`, so it passed the positional decoding and then poisoned the ordering: `b.priority - a.priority` is `NaN` for every pair, every comparison is false, and the listener was inserted at a position decided by the size of the bucket rather than by any priority relation — no error, no warning, just the wrong call order. All four positions a priority can occupy are covered, `[name, priority]` tuples included; a `NaN` in one tuple registers none of the names in that call, and a `NaN` at call level rejects even when every tuple carries its own priority. `Priority.Max` and `Priority.Min` are `±Infinity` and stay valid — the test is `Number.isNaN`, not a finiteness test. Validate before the call rather than after: `on(ε, 'foo', Number.isNaN(p) ? Priority.Normal : p, fn)` expresses what the old behaviour merely pretended to do. A tuple carries its own priority and needs its own guard — `on(ε, [['a', Number.isNaN(p) ? Priority.Normal : p]], fn)`; the call-level value is not a fallback for a tuple that spells one out.
 
 ### Verifying a migration actually worked
 

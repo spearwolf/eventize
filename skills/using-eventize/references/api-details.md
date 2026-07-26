@@ -18,7 +18,7 @@ on(ε, listener)                         // wildcard function, same as on(ε, '*
 on(ε, Priority.Low, listener)           // wildcard with priority
 ```
 
-Parsing is positional (`_subscribeTo` in `src/subscribeTo.ts`): a leading `number` means "wildcard with priority"; a `number` in second position means "named event with priority"; a leading `string`/`symbol`/array means a named subscription; anything else is treated as a wildcard listener. Calling `on()` without a resolvable listener throws `"subscribeTo() called with insufficient arguments"`.
+Parsing is positional (`_subscribeTo` in `src/subscribeTo.ts`): a leading `number` means "wildcard with priority"; a `number` in second position means "named event with priority"; a leading `string`/`symbol`/array means a named subscription; anything else is treated as a wildcard listener. Calling `on()` without a resolvable listener throws `"subscribeTo() called with insufficient arguments"` — and "resolvable" is a type test, not a truthiness test: only a function, a string, a symbol or a non-null object gets through, so `on(ε, 'foo', 5)` throws where it used to register a subscription that could never dispatch. A `NaN` priority throws too (`"subscribeTo() called with a NaN priority"`), in every position a priority can occupy, including inside a `[name, priority]` tuple, where a single `NaN` rejects the whole call without registering any of the names. `Priority.Max` and `Priority.Min` are `±Infinity` and stay valid — the check is `Number.isNaN`, not `Number.isFinite`.
 
 `once()` with several event names removes the listener after the **first** of them fires.
 
