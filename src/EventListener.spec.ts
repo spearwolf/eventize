@@ -1,5 +1,6 @@
 /* eslint-env jest */
 import {EventListener} from './EventListener';
+import {emitAsync, eventize, on} from './index';
 import {
   EVENT_CATCH_EM_ALL,
   LISTENER_IS_NAMED_FUNC,
@@ -73,6 +74,35 @@ describe('EventListener', () => {
       const listener = new EventListener('foo', 0, undefined);
       expect(listener.listenerType).toBeUndefined();
       expect(() => listener.apply('foo', [1, 2, 3])).not.toThrow();
+    });
+
+    // A primitive is non-nullish, and its prototype is full of methods whose
+    // names an event can collide with — `(42).toFixed` is a real function.
+    // Reaching it would dispatch to `Number.prototype`, feed its result into
+    // the emitAsync aggregation and consume a once(). detectListenerType()
+    // gives a primitive no listener type; the dispatch has to agree.
+    it('does not dispatch to a prototype member of a primitive listener', () => {
+      const listener = new EventListener('toFixed', 0, 42);
+      expect(listener.listenerType).toBeUndefined();
+      const returnValue = jest.fn();
+      listener.apply('toFixed', [2], returnValue);
+      expect(returnValue).not.toHaveBeenCalled();
+    });
+
+    it('does not consume a once() through a primitive listener', () => {
+      const listener = new EventListener('toString', 0, true);
+      const callAfterApply = jest.fn();
+      listener.callAfterApply = callAfterApply;
+      listener.apply('toString', []);
+      expect(callAfterApply).not.toHaveBeenCalled();
+    });
+
+    it('collects nothing from a primitive listener through emitAsync()', async () => {
+      const obj = eventize();
+      // Only reachable from untyped JS — _subscribeTo() rejects falsy
+      // listeners, and 42 is truthy.
+      on(obj, 'toFixed', 42 as any);
+      await expect(emitAsync(obj, 'toFixed', 2)).resolves.toBeUndefined();
     });
   });
 

@@ -21,12 +21,25 @@ type ReturnValue = (retVal: any) => void;
 type ObjListener = Record<EventName, unknown> & {emit?: EmitFnType};
 
 /**
- * Narrows anything a member can be read off. Non-nullish is the entire runtime
- * precondition for property access, so the predicate asserts nothing the check
- * doesn't establish; whatever comes back stays `unknown` until `apply()` has
- * seen it is a function.
+ * Narrows a *listener object* — the thing a method-name subscription reads its
+ * method off. Non-nullish is the entire runtime precondition for property
+ * access, so the predicate asserts nothing the check doesn't establish; what
+ * comes back stays `unknown` until `apply()` has seen it is a function. A
+ * function qualifies on purpose: `on(ε, 'foo', 'reset', SomeClass)` is a
+ * supported shape.
  */
 const canReadMembers = (obj: unknown): obj is ObjListener => obj != null;
+
+/**
+ * Narrows a *listener* that is itself the dispatch target. Stricter than
+ * `canReadMembers()` by exactly the primitives, and it has to be: every
+ * primitive carries a prototype whose method names an event can collide with,
+ * so `on(ε, 'toFixed', 42)` would otherwise dispatch to `Number.prototype`,
+ * feed the result into the `emitAsync()` aggregation and consume a `once()`.
+ * This is the same test `detectListenerType()` makes for LISTENER_IS_OBJ.
+ */
+const isObjListener = (obj: unknown): obj is ObjListener =>
+  obj != null && typeof obj === 'object';
 
 /**
  * Returns true when `func` was actually callable and got invoked. Takes
@@ -193,7 +206,7 @@ export class EventListener {
     }
 
     // LISTENER_IS_OBJ
-    if (!canReadMembers(listener)) return;
+    if (!isObjListener(listener)) return;
 
     if (this.isCatchEmAll || this.eventName === eventName) {
       const didCall =
