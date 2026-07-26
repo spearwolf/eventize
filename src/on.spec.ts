@@ -17,7 +17,7 @@ describe('on()', () => {
         'foo',
         7,
         function () {
-          // @ts-ignore
+          // @ts-expect-error
           context = this;
         },
         listenerObject,
@@ -35,22 +35,22 @@ describe('on()', () => {
         expect(context).toBe(listenerObject);
       });
       it('priority is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.priority).toBe(7);
       });
       it('eventName is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.eventName).toBe('foo');
       });
       it('isCatchEmAll is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
     });
     describe('on( eventName, priority, listenerFuncName, listenerObject )', () => {
       const listenerObject = {
         foo(...args: Array<any>) {
-          // @ts-ignore
+          // @ts-expect-error
           this.args = args;
         },
       };
@@ -62,19 +62,19 @@ describe('on()', () => {
         expect(getSubscriptionCount(obj)).toBe(1);
       });
       it('emit() calls the listener', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(listenerObject.args).toEqual(['bar', 666]);
       });
       it('priority is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.priority).toBe(9);
       });
       it('eventName is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.eventName).toBe('foo');
       });
       it('isCatchEmAll is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
     });
@@ -88,15 +88,15 @@ describe('on()', () => {
         expect(listenerFunc.calledWith('plah', 669)).toBeTruthy();
       });
       it('priority is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.priority).toBe(11);
       });
       it('eventName is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.eventName).toBe('foo');
       });
       it('isCatchEmAll is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
     });
@@ -113,15 +113,15 @@ describe('on()', () => {
       const unsubscribe = obj.on('foo', 13, listener);
 
       it('priority is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.priority).toBe(13);
       });
       it('eventName is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.eventName).toBe('foo');
       });
       it('isCatchEmAll is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
 
@@ -142,7 +142,7 @@ describe('on()', () => {
       const unsubscribe = obj.on(
         'foo',
         function () {
-          // @ts-ignore
+          // @ts-expect-error
           context = this;
         },
         listenerObject,
@@ -160,15 +160,15 @@ describe('on()', () => {
         expect(context).toBe(listenerObject);
       });
       it('priority is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.priority).toBe(Priority.Default);
       });
       it('eventName is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.eventName).toBe('foo');
       });
       it('isCatchEmAll is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
     });
@@ -182,15 +182,15 @@ describe('on()', () => {
         expect(listenerFunc.calledWith('plah', 669)).toBeTruthy();
       });
       it('priority is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.priority).toBe(Priority.Default);
       });
       it('eventName is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.eventName).toBe('foo');
       });
       it('isCatchEmAll is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
     });
@@ -207,7 +207,7 @@ describe('on()', () => {
         Foo,
         7,
         function () {
-          // @ts-ignore
+          // @ts-expect-error
           context = this;
         },
         listenerObject,
@@ -222,22 +222,22 @@ describe('on()', () => {
         expect(context).toBe(listenerObject);
       });
       it('priority is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.priority).toBe(7);
       });
       it('eventName is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.eventName).toBe(Foo);
       });
       it('isCatchEmAll is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
     });
     describe('on( eventName, priority, listenerFuncName, listenerObject )', () => {
       const listenerObject = {
         foo(...args: Array<any>) {
-          // @ts-ignore
+          // @ts-expect-error
           this.args = args;
         },
       };
@@ -246,19 +246,19 @@ describe('on()', () => {
       obj.emit(Foo, 'bar', 666);
 
       it('emit() calls the listener', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(listenerObject.args).toEqual(['bar', 666]);
       });
       it('priority is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.priority).toBe(9);
       });
       it('eventName is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.eventName).toBe(Foo);
       });
       it('isCatchEmAll is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
     });
@@ -272,15 +272,15 @@ describe('on()', () => {
         expect(listenerFunc.calledWith('plah', 669)).toBeTruthy();
       });
       it('priority is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.priority).toBe(11);
       });
       it('eventName is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.eventName).toBe(Foo);
       });
       it('isCatchEmAll is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
     });
@@ -297,15 +297,15 @@ describe('on()', () => {
       const unsubscribe = obj.on(Foo, 13, listener);
 
       it('priority is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.priority).toBe(13);
       });
       it('eventName is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.eventName).toBe(Foo);
       });
       it('isCatchEmAll is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
 
@@ -326,7 +326,7 @@ describe('on()', () => {
       const unsubscribe = obj.on(
         Foo,
         function () {
-          // @ts-ignore
+          // @ts-expect-error
           context = this;
         },
         listenerObject,
@@ -341,15 +341,15 @@ describe('on()', () => {
         expect(context).toBe(listenerObject);
       });
       it('priority is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.priority).toBe(Priority.Default);
       });
       it('eventName is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.eventName).toBe(Foo);
       });
       it('isCatchEmAll is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
     });
@@ -363,15 +363,15 @@ describe('on()', () => {
         expect(listenerFunc.calledWith('plah', 669)).toBeTruthy();
       });
       it('priority is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.priority).toBe(Priority.Default);
       });
       it('eventName is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.eventName).toBe(Foo);
       });
       it('isCatchEmAll is correct', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(unsubscribe.listener.isCatchEmAll).toBe(false);
       });
     });
@@ -383,12 +383,12 @@ describe('on()', () => {
       const listenerFunc = fake();
       const obj = eventize.inject();
       const context: Array<object> = [];
-      // @ts-ignore
+      // @ts-expect-error
       const {listeners} = obj.on(
         ['foo', 'fu'],
         7,
         function () {
-          // @ts-ignore
+          // @ts-expect-error
           context.push(this);
         },
         listenerObject,
@@ -420,23 +420,23 @@ describe('on()', () => {
       const mockFunc = fake();
       const listenerObject = {
         foo(...args: Array<any>) {
-          // @ts-ignore
+          // @ts-expect-error
           this.context = this;
-          // @ts-ignore
+          // @ts-expect-error
           this.args = args;
           mockFunc(...args);
         },
       };
       const obj = eventize.inject();
-      // @ts-ignore
+      // @ts-expect-error
       const {listeners} = obj.on(['foo', 'fu'], 9, 'foo', listenerObject);
       obj.emit(['foo', 'fu'], 'bar', 666);
 
       it('emit() calls the listener', () => {
         expect(mockFunc.callCount).toBe(2);
-        // @ts-ignore
+        // @ts-expect-error
         expect(listenerObject.args).toEqual(['bar', 666]);
-        // @ts-ignore
+        // @ts-expect-error
         expect(listenerObject.context).toBe(listenerObject);
       });
       it('priorities are correct', () => {
@@ -455,7 +455,7 @@ describe('on()', () => {
     describe('on( eventName*, priority, listenerFunc )', () => {
       const listenerFunc = fake();
       const obj = eventize.inject();
-      // @ts-ignore
+      // @ts-expect-error
       const {listeners} = obj.on(['foo', 'bar'], 11, listenerFunc);
       obj.emit(['foo', 'bar'], 'plah', 669);
 
@@ -481,7 +481,7 @@ describe('on()', () => {
       const listenerFuncBar = fake();
       const obj = eventize.inject();
 
-      // @ts-ignore
+      // @ts-expect-error
       const {listeners} = obj.on(['foo', 'bar'], 13, {
         foo: listenerFuncFoo,
         bar: listenerFuncBar,
@@ -514,11 +514,11 @@ describe('on()', () => {
       const listenerFunc = fake();
       const obj = eventize.inject();
       const contexts: object = [];
-      // @ts-ignore
+      // @ts-expect-error
       const {listeners} = obj.on(
         ['foo', 'bar'],
         function fooBar(...args: any[]) {
-          // @ts-ignore
+          // @ts-expect-error
           contexts.push(this);
           listenerFunc(...args);
         },
@@ -544,16 +544,16 @@ describe('on()', () => {
         expect(listeners[1].isCatchEmAll).toBe(false);
       });
       it('emit() calls the listener with correct context', () => {
-        // @ts-ignore
+        // @ts-expect-error
         expect(contexts[0]).toBe(listenerObject);
-        // @ts-ignore
+        // @ts-expect-error
         expect(contexts[1]).toBe(listenerObject);
       });
     });
     describe('on( eventName*, listenerFunc )', () => {
       const listenerFunc = fake();
       const obj = eventize.inject();
-      // @ts-ignore
+      // @ts-expect-error
       const {listeners} = obj.on(['foo', 'bar'], listenerFunc);
 
       obj.emit(['foo', 'bar'], 'plah', 669);
@@ -578,7 +578,7 @@ describe('on()', () => {
     describe('on( eventName*, listenerFunc ) supports [ [eventName, PRIO], .. ]', () => {
       const listenerFunc = fake();
       const obj = eventize.inject();
-      // @ts-ignore
+      // @ts-expect-error
       const {listeners} = obj.on(
         [
           ['foo', 500],
@@ -616,7 +616,7 @@ describe('on()', () => {
     const unsubscribe = obj.on(
       7,
       function () {
-        // @ts-ignore
+        // @ts-expect-error
         context = this;
       },
       listenerObject,
@@ -631,15 +631,15 @@ describe('on()', () => {
       expect(context).toBe(listenerObject);
     });
     it('priority is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.priority).toBe(7);
     });
     it('eventName is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.eventName).toBe(EVENT_CATCH_EM_ALL);
     });
     it('isCatchEmAll is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.isCatchEmAll).toBe(true);
     });
   });
@@ -653,15 +653,15 @@ describe('on()', () => {
       expect(listenerFunc.calledWith('plah', 669)).toBeTruthy();
     });
     it('priority is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.priority).toBe(11);
     });
     it('eventName is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.eventName).toBe(EVENT_CATCH_EM_ALL);
     });
     it('isCatchEmAll is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.isCatchEmAll).toBe(true);
     });
   });
@@ -671,7 +671,7 @@ describe('on()', () => {
     const obj = eventize.inject();
     let context: object;
     const unsubscribe = obj.on(function () {
-      // @ts-ignore
+      // @ts-expect-error
       context = this;
     }, listenerObject);
     obj.on(listenerFunc, listenerObject);
@@ -684,15 +684,15 @@ describe('on()', () => {
       expect(context).toBe(listenerObject);
     });
     it('priority is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.priority).toBe(Priority.Default);
     });
     it('eventName is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.eventName).toBe(EVENT_CATCH_EM_ALL);
     });
     it('isCatchEmAll is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.isCatchEmAll).toBe(true);
     });
   });
@@ -706,15 +706,15 @@ describe('on()', () => {
       expect(listenerFunc.calledWith('plah', 669)).toBeTruthy();
     });
     it('priority is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.priority).toBe(Priority.Default);
     });
     it('eventName is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.eventName).toBe(EVENT_CATCH_EM_ALL);
     });
     it('isCatchEmAll is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.isCatchEmAll).toBe(true);
     });
   });
@@ -728,15 +728,15 @@ describe('on()', () => {
       expect(listenerFunc.calledWith('plah', 667)).toBeTruthy();
     });
     it('priority is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.priority).toBe(13);
     });
     it('eventName is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.eventName).toBe(EVENT_CATCH_EM_ALL);
     });
     it('isCatchEmAll is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.isCatchEmAll).toBe(true);
     });
   });
@@ -750,15 +750,15 @@ describe('on()', () => {
       expect(listenerFunc.calledWith('plah', 667)).toBeTruthy();
     });
     it('priority is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.priority).toBe(Priority.Default);
     });
     it('eventName is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.eventName).toBe(EVENT_CATCH_EM_ALL);
     });
     it('isCatchEmAll is correct', () => {
-      // @ts-ignore
+      // @ts-expect-error
       expect(unsubscribe.listener.isCatchEmAll).toBe(true);
     });
   });

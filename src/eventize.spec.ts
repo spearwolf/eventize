@@ -20,7 +20,7 @@ describe('class extends Eventize', () => {
 describe('eventize(eventizer) returns unmodified eventizer', () => {
   const eventizer = eventize();
   const magicNumber = Math.random();
-  // @ts-ignore
+  // @ts-expect-error
   eventizer[NAMESPACE].magicNumber = magicNumber;
   const eObj2 = eventize(eventizer);
 
@@ -28,7 +28,7 @@ describe('eventize(eventizer) returns unmodified eventizer', () => {
     expect(eObj2).toBe(eventizer);
   });
   it('magicNumber exists and is the same', () => {
-    // @ts-ignore
+    // @ts-expect-error
     expect(eObj2[NAMESPACE].magicNumber).toBe(magicNumber);
   });
 });
