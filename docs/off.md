@@ -15,7 +15,7 @@
 | `off(emitter, listenerFunc)`              | Unsubscribes a specific listener function from all events.          |
 | `off(emitter, listenerFunc, context)`     | Unsubscribes a listener function with a specific context.           |
 | `off(emitter, listenerObject)`            | Unsubscribes all listeners associated with an object.               |
-| `off(emitter, eventName, listenerObject)` | Unsubscribes a listener object from a specific event only.          |
+| `off(emitter, eventName, listenerObject)` | Unsubscribes a listener object from a specific event only — but still unretains that event, whole, even if other listeners for it survive. |
 
 > [!NOTE]
 > Calling `off()` on a non-eventized object (or on `null`/`undefined`) is a no-op — it returns silently. This makes `off()` safe in cleanup paths without first checking `isEventized()`.

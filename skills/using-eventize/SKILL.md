@@ -54,7 +54,7 @@ import {eventize, on, once, onceAsync, emit, emitAsync,
 | `getSubscriptionCount(obj)` | listener count, `0` for non-eventized | `number` |
 | `getRetainedCount(obj)` | count of events holding a retained value, `0` for non-eventized | `number` |
 | `getRetainedEventNames(obj)` | every name carrying a retain policy (fired or not), `[]` for non-eventized | `EventName[]` |
-| `Priority` | `Max Critical High Normal Low Min` (higher runs first) | object |
+| `Priority` | `Max Critical High Medium Normal Low Min` (higher runs first) | object |
 | `EVENT_CATCH_EM_ALL` | the wildcard name, `'*'` | `string` |
 
 Event names are `string` or `symbol`. Anywhere a name is accepted, an array of names works too.

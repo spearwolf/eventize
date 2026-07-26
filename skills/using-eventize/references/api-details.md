@@ -90,9 +90,9 @@ A wildcard listener-object counts as a **single** subscription in `getSubscripti
 | `off(ε, listenerFunc)` | that function, across all events |
 | `off(ε, listenerFunc, ctx)` | that function bound to that context |
 | `off(ε, listenerObject)` | every subscription of that object |
-| `off(ε, eventName, listenerObject)` | that object, on that event only |
+| `off(ε, eventName, listenerObject)` | that object, on that event only — **and** the event's retain value + policy, even when sibling listeners for the name survive |
 
-Non-eventized targets, `null`, and `undefined` are silent no-ops, so `off()` is safe in teardown without an `isEventized()` guard.
+A **target** that is non-eventized, `null` or `undefined` is a silent no-op, so `off()` is safe in teardown without an `isEventized()` guard. The **second argument** is the opposite: `off(ε, undefined)` and `off(ε, null)` take the same branch as the bare `off(ε)` and wipe every listener and all retained state. Forwarding a possibly-missing handle property — `off(ε, maybe?.listener)` — empties the emitter instead of doing nothing.
 
 Called from inside a listener, `off()` takes effect immediately for the running dispatch: listeners already invoked are unaffected, listeners not yet reached are skipped.
 

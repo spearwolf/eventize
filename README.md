@@ -13,7 +13,7 @@ A tiny, clever, and dependency-free library for synchronous event-driven program
 Written entirely in TypeScript and targeting modern `ES2022`, it offers a type-safe developer experience without sacrificing performance or adding bloat.
 
 Zero runtime dependencies, `sideEffects: false`, tree-shakeable. The ESM
-build is about 27.2 kB unminified.
+build is about 27.5 kB unminified.
 
 ### Features
 
