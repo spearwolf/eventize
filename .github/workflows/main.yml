@@ -27,20 +27,8 @@ jobs:
       - run: npm ci
         name: Install dependencies
 
-      - run: npm test -- --coverage
-        name: Run tests
-
-      - run: npm run build
-        name: Run build
-
-      - run: npm run lint
-        name: Check linting
-
-      - run: npm run format:check
-        name: Check formatting
-
-      - run: npm run checkPkgTypes
-        name: Check package type definitions
+      - run: npm run cbt
+        name: Run cbt gate
 
   deploy:
     name: Deploy package
