@@ -120,7 +120,7 @@ export const subscribeToDeferred = (
   store: EventStore,
   keeper: EventKeeper,
   args: EventArgs,
-  noDedup = false,
+  noDedup: boolean,
 ): {
   listeners: EventListener | Array<EventListener>;
   publishRetained: () => void;

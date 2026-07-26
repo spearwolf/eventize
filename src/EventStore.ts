@@ -43,17 +43,26 @@ const removeItemFromArray = (arr: Array<any>, item: any) => {
 const isSimilarListenerType = (listenerType: number | undefined) =>
   listenerType === LISTENER_IS_OBJ || listenerType === LISTENER_IS_NAMED_FUNC;
 
+// Removes *every* match, not just the first. One bucket can hold several
+// listeners that are equal by this test: two once() registrations (exempt from
+// dedup since v6.0.0), two on() calls at differing priorities (priority is part
+// of the similarity key, so they never collapse), or the same function
+// subscribed twice (functions never dedup). off(ε, listenerObject) promises to
+// remove all of them, and splicing only the first left the rest subscribed and
+// still firing. Walking backwards keeps the indices of the entries not yet
+// visited valid across the splice; each removed listener is detached in the
+// same step, so the array never holds a detached entry for a later isEqual to
+// read nulled fields from.
 const removeListenerFromArray = (
   listeners: Array<EventListener>,
   listener: unknown,
   listenerObject: unknown,
 ) => {
-  const idx = listeners.findIndex((item) =>
-    item.isEqual(listener, listenerObject),
-  );
-  if (idx > -1) {
-    listeners[idx].detach();
-    listeners.splice(idx, 1);
+  for (let i = listeners.length - 1; i >= 0; i--) {
+    if (listeners[i].isEqual(listener, listenerObject)) {
+      listeners[i].detach();
+      listeners.splice(i, 1);
+    }
   }
 };
 

@@ -210,6 +210,54 @@ describe('off()', () => {
     });
   });
 
+  // off(ε, listenerObject) promises "every subscription of that object", and
+  // removeListenerFromArray used to splice only the first findIndex match per
+  // bucket. Anything that can put two similar listeners into one bucket — two
+  // once() calls (v6.0.0), or two on() calls at differing priorities (always) —
+  // left the rest subscribed and still firing.
+  describe('by object, with duplicate registrations in one bucket', () => {
+    it('off(ε, listenerObject) removes every once() subscription of that object', () => {
+      const obj = eventize();
+      const listenerObject = {foo: fake()};
+
+      once(obj, 'foo', listenerObject);
+      once(obj, 'foo', listenerObject);
+      expect(getSubscriptionCount(obj)).toBe(2);
+
+      off(obj, listenerObject);
+
+      expect(getSubscriptionCount(obj)).toBe(0);
+      emit(obj, 'foo');
+      expect(listenerObject.foo.callCount).toBe(0);
+    });
+
+    it('the same holds for the catch-all once() form', () => {
+      const obj = eventize();
+      const listenerObject = {foo: fake()};
+
+      once(obj, listenerObject);
+      once(obj, listenerObject);
+      expect(getSubscriptionCount(obj)).toBe(2);
+
+      off(obj, listenerObject);
+
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('removes multiple on() registrations of one object at differing priorities', () => {
+      const obj = eventize();
+      const listenerObject = {foo: fake()};
+
+      on(obj, 'foo', 1, listenerObject);
+      on(obj, 'foo', 2, listenerObject);
+      expect(getSubscriptionCount(obj)).toBe(2);
+
+      off(obj, listenerObject);
+
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+  });
+
   describe('without arguments', () => {
     const ε = eventize();
 
