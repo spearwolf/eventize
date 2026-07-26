@@ -260,6 +260,8 @@ A handle that is never called keeps its listener (and, transitively, whatever th
 
 > [!NOTE]
 > **A `once()` releases itself only when the dispatch actually called something.** An event name that matches nothing on the listener object leaves the subscription — and the reference to that object — in place, which is what makes a late-bound handler work: supply the method later and the one-shot still fires. Since v6.1.0 that set includes a name whose only match is an inherited `Object.prototype` member (`toString`, `valueOf`, `constructor`, `hasOwnProperty` and friends): `once(ε, 'toString', {})` used to be consumed by the first `emit(ε, 'toString')` without calling any handler, and now stays subscribed. A listener object carrying an `.emit()` method is answered by that fallback and released as before. If such a name might never be answered, keep the handle and call it on teardown — `getSubscriptionCount(ε)` shows the difference.
+>
+> The same rule holds when the call happened but blew up: a `once()` listener that throws is still "called something", but the auto-unsubscribe runs *after* the call returns, and a throw never returns. The subscription survives the exception and fires again on the next matching `emit()` — a one-shot without a kept handle can turn into a repeat-shot the moment it throws. Stop throwing on some later invocation and that invocation's `callAfterApply()` finally runs, releasing it as usual.
 
 ## `onceAsync` and cancellation
 

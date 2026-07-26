@@ -1,6 +1,14 @@
 import {fake} from 'sinon';
 
-import {emit, emitAsync, eventize, on, retain} from './index';
+import {
+  emit,
+  emitAsync,
+  eventize,
+  getSubscriptionCount,
+  on,
+  once,
+  retain,
+} from './index';
 
 describe('emit() with a throwing listener', () => {
   it('propagates the exception to the emit() caller', () => {
@@ -78,6 +86,49 @@ describe('emit() with a throwing listener', () => {
 
     expect(() => emit(ε, 'foo')).toThrow('boom');
     expect(() => emit(ε, 'foo')).toThrow('boom');
+    expect(calls).toBe(2);
+  });
+});
+
+describe('once() with a throwing listener', () => {
+  it('leaves the throwing listener subscribed and fires it again on the next emit()', () => {
+    const ε = eventize();
+    let calls = 0;
+
+    once(ε, 'foo', () => {
+      calls += 1;
+      throw new Error('boom');
+    });
+
+    expect(() => emit(ε, 'foo')).toThrow('boom');
+    expect(getSubscriptionCount(ε)).toBe(1);
+
+    expect(() => emit(ε, 'foo')).toThrow('boom');
+    expect(getSubscriptionCount(ε)).toBe(1);
+    expect(calls).toBe(2);
+  });
+
+  it('unsubscribes once the dispatch completes without throwing', () => {
+    const ε = eventize();
+    let calls = 0;
+    let shouldThrow = true;
+
+    once(ε, 'foo', () => {
+      calls += 1;
+      if (shouldThrow) {
+        throw new Error('boom');
+      }
+    });
+
+    expect(() => emit(ε, 'foo')).toThrow('boom');
+    expect(getSubscriptionCount(ε)).toBe(1);
+
+    shouldThrow = false;
+    emit(ε, 'foo');
+    expect(getSubscriptionCount(ε)).toBe(0);
+    expect(calls).toBe(2);
+
+    emit(ε, 'foo');
     expect(calls).toBe(2);
   });
 });
