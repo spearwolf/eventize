@@ -85,7 +85,15 @@ const _subscribeTo = (
   if (Array.isArray(eventName)) {
     return eventName.map((name) => {
       if (Array.isArray(name)) {
-        return register(name[1])(name[0]);
+        // A tuple without a priority only reaches here from untyped call
+        // sites — `EventNameWithPriority` is a fixed 2-tuple, so the typed API
+        // rejects it. Falling back to the call-level priority is what a
+        // missing override means, and it keeps `undefined` out of the
+        // arithmetic in sortByPriorityAndId, where it becomes NaN: every
+        // comparison against NaN is false, so the binary-search insertion
+        // silently misplaces the listener and priority ordering stops holding.
+        // `??` rather than `||` — 0 is Priority.Normal, not "absent".
+        return register(name[1] ?? priority)(name[0]);
       }
       return register(priority)(name);
     });

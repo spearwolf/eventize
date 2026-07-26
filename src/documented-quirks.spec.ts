@@ -42,6 +42,40 @@ describe('documented quirks', () => {
       expect(calls).toEqual(['plain:2', 'tuple:2']); // Normal beats Low
     });
 
+    // A one-element tuple is not an EventNameWithPriority, so the typed API
+    // rejects it — only untyped JS (or a suppressed call site) produces this
+    // shape. It used to pass `undefined` straight into EventListener.priority,
+    // where `b.priority - a.priority` turns into NaN. Every comparison against
+    // NaN is false, so the binary-search insertion appended the listener
+    // wherever it happened to land and priority ordering quietly stopped
+    // holding — no error, no warning, just the wrong call order.
+    it('falls back to the call-level priority when a tuple carries none', () => {
+      const ε = eventize();
+
+      // @ts-expect-error a one-element tuple is not an EventNameWithPriority
+      const unsubscribe = on(ε, [['foo']], () => {});
+
+      expect('listeners' in unsubscribe).toBe(true);
+      if (!('listeners' in unsubscribe)) return;
+
+      expect(unsubscribe.listeners).toHaveLength(1);
+      expect(unsubscribe.listeners[0].priority).toBe(Priority.Default);
+      expect(Number.isNaN(unsubscribe.listeners[0].priority)).toBe(false);
+    });
+
+    it('keeps a priority-less tuple in the right place in the call order', () => {
+      const ε = eventize();
+      const calls: string[] = [];
+
+      on(ε, 'foo', Priority.Low, () => calls.push('low'));
+      // @ts-expect-error a one-element tuple is not an EventNameWithPriority
+      on(ε, [['foo']], () => calls.push('no-priority'));
+      on(ε, 'foo', Priority.High, () => calls.push('high'));
+
+      emit(ε, 'foo');
+      expect(calls).toEqual(['high', 'no-priority', 'low']);
+    });
+
     it('mixes tuples and bare names in one array', () => {
       const ε = eventize();
       const calls: string[] = [];
