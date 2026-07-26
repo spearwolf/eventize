@@ -515,6 +515,7 @@ off(ε, ['foo', 'bar']);       // several events
 off(ε, listenerFunc);         // that function, across all events
 off(ε, listenerObject);       // every subscription of that object
 off(ε, 'foo', listenerObject); // that object, on 'foo' only
+off(ε, '*', listenerObject);   // that object's wildcard subscription only
 ```
 
 Calling `off()` on a non-eventized object (or on `null`/`undefined`) is a no-op, which makes it safe in cleanup paths without an `isEventized()` check.

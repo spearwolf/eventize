@@ -261,10 +261,27 @@ export class EventStore {
     eventName: EventName,
     listenerObject: unknown,
   ): void {
+    // '*' is not a key in namedListeners — wildcard listeners live in their own
+    // array — so looking there made off(ε, '*', listenerObject) a silent no-op
+    // that removed nothing and reported nothing. Every listener in that array
+    // carries eventName === '*', so the same filter narrows it exactly as it
+    // narrows a named bucket; the array is a fixed member rather than a Map
+    // entry, so there is nothing to delete once it empties. Named subscriptions
+    // of the same object stay — this is the targeted form, off(ε, listenerObject)
+    // is the sweeping one.
+    if (isCatchEmAll(eventName)) {
+      removeSimilarListenersFromArray(
+        this.catchEmAllListeners,
+        eventName,
+        listenerObject,
+      );
+      return;
+    }
+
     // The event name is known, and the filter checks it anyway — no reason to
-    // walk every other bucket. Catch-em-all listeners were never reachable
-    // from this path (they live in their own array, not in namedListeners),
-    // and still aren't.
+    // walk every other bucket. Catch-em-all listeners are not in this one:
+    // they live in the array the branch above handles, which is where they
+    // have always been and where this path only started looking in v6.1.0.
     const bucket = this.namedListeners.get(eventName);
     if (!bucket) return;
     removeSimilarListenersFromArray(bucket, eventName, listenerObject);

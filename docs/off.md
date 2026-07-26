@@ -16,6 +16,7 @@
 | `off(emitter, listenerFunc, context)`     | Unsubscribes a listener function with a specific context.           |
 | `off(emitter, listenerObject)`            | Unsubscribes all listeners associated with an object.               |
 | `off(emitter, eventName, listenerObject)` | Unsubscribes a listener object from a specific event only — but still unretains that event, whole, even if other listeners for it survive. |
+| `off(emitter, '*', listenerObject)`       | Unsubscribes a listener object from the **wildcard** bucket only. Named subscriptions of the same object stay, and retained state is untouched. |
 
 > [!NOTE]
 > Calling `off()` on a non-eventized object (or on `null`/`undefined`) is a no-op — it returns silently. This makes `off()` safe in cleanup paths without first checking `isEventized()`.
@@ -158,6 +159,22 @@ emit(ε, 'foo'); // => "B:foo"
 emit(ε, 'bar'); // => "A:bar"
 ```
 
+Restricted to the wildcard bucket — `'*'` in that same slot means "the wildcard subscription", not "everything":
+
+```javascript
+const service = {foo: () => console.log('foo'), bar: () => console.log('bar')};
+
+on(ε, '*', service); // sees every event
+on(ε, 'foo', service); // and 'foo' a second time, via its own subscription
+
+off(ε, '*', service); // only the wildcard one goes
+
+emit(ε, 'foo'); // => "foo"  (once — the named subscription is still there)
+emit(ε, 'bar'); // (nothing happens)
+```
+
+Until v6.1.0 this call removed nothing at all and said nothing about it: `off()` routed a name-plus-object pair into the named buckets, where a wildcard listener never lives. Reach for `off(ε, service)` when you mean both halves, and `off(ε, '*')` when you mean the whole emitter — the three read almost alike and do quite different things.
+
 ## Interaction with `retain()`
 
 Called with an event name, `off()` also reverses `retain()` for that event — it discards the stored value **and** the retain policy, exactly like [`unretain()`](./retain.md#unretainemitter-eventname--eventname):
@@ -186,7 +203,7 @@ off(ε, SOME_SYMBOL);   // unretains SOME_SYMBOL
 off(ε, [SOME_SYMBOL]); // same
 ```
 
-The bare `off(ε)` and the wildcard `off(ε, '*')` do the same for every retained name at once — see [Removing all listeners](#removing-all-listeners). The listener-only forms (`off(ε, listenerFunc)`, `off(ε, listenerObject)`, the `unsubscribe` handle) never touch retained state; [`docs/lifecycle.md`](./lifecycle.md#what-each-off-form-releases) tabulates all of them.
+The bare `off(ε)` and the wildcard `off(ε, '*')` do the same for every retained name at once — see [Removing all listeners](#removing-all-listeners). The listener-only forms (`off(ε, listenerFunc)`, `off(ε, listenerObject)`, `off(ε, '*', listenerObject)`, the `unsubscribe` handle) never touch retained state; [`docs/lifecycle.md`](./lifecycle.md#what-each-off-form-releases) tabulates all of them.
 
 ## Behavior during emit
 

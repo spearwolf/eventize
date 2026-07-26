@@ -625,6 +625,194 @@ describe('off()', () => {
     });
   });
 
+  // off(ε, '*', listenerObject) used to be a silent no-op: off() sets
+  // forceRemove for a name with a listener object, and that branch only ever
+  // searched namedListeners — where a wildcard listener never lives.
+  describe('by wildcard "*" and listenerObject', () => {
+    it("off(ε, '*', listenerObject) detaches the listener-object form", () => {
+      const ε = eventize();
+      const wildcardObj = {foo: fake()};
+
+      on(ε, '*', wildcardObj);
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      off(ε, '*', wildcardObj);
+
+      expect(getSubscriptionCount(ε)).toBe(0);
+      emit(ε, 'foo');
+      expect(wildcardObj.foo.callCount).toBe(0);
+    });
+
+    it("off(ε, '*', ctx) detaches the function-with-context form", () => {
+      const ε = eventize();
+      const ctx = {};
+      const wildcardFn = fake();
+
+      on(ε, '*', wildcardFn, ctx);
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      off(ε, '*', ctx);
+
+      expect(getSubscriptionCount(ε)).toBe(0);
+      emit(ε, 'foo');
+      expect(wildcardFn.callCount).toBe(0);
+    });
+
+    it("off(ε, '*', ctx) detaches the method-name form", () => {
+      const ε = eventize();
+      const ctx = {onAny: fake()};
+
+      on(ε, '*', 'onAny', ctx);
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      off(ε, '*', ctx);
+
+      expect(getSubscriptionCount(ε)).toBe(0);
+      emit(ε, 'foo');
+      expect(ctx.onAny.callCount).toBe(0);
+    });
+
+    it("off(ε, '*', obj) detaches the bare catch-all form on(ε, obj)", () => {
+      const ε = eventize();
+      const wildcardObj = {foo: fake()};
+
+      // on(ε, obj) registers under EVENT_CATCH_EM_ALL, exactly as on(ε, '*',
+      // obj) does — same bucket, same event name, same removal.
+      on(ε, wildcardObj);
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      off(ε, '*', wildcardObj);
+
+      expect(getSubscriptionCount(ε)).toBe(0);
+    });
+
+    it("off(ε, '*', ctx) leaves other objects' wildcard subscriptions alone", () => {
+      const ε = eventize();
+      const objA = {foo: fake()};
+      const objB = {foo: fake()};
+
+      on(ε, '*', objA);
+      on(ε, '*', objB);
+
+      off(ε, '*', objA);
+
+      expect(getSubscriptionCount(ε)).toBe(1);
+      emit(ε, 'foo');
+      expect(objA.foo.callCount).toBe(0);
+      expect(objB.foo.callCount).toBe(1);
+    });
+
+    // Boundary 1: the targeted wildcard form is not the sweeping
+    // off(ε, listenerObject) — a named subscription of the same object stays.
+    it("off(ε, '*', ctx) keeps a named subscription of the same object", () => {
+      const ε = eventize();
+      const listenerObject = {foo: fake(), bar: fake()};
+
+      on(ε, '*', listenerObject);
+      on(ε, 'foo', listenerObject);
+      expect(getSubscriptionCount(ε)).toBe(2);
+
+      off(ε, '*', listenerObject);
+
+      expect(getSubscriptionCount(ε)).toBe(1);
+      emit(ε, 'foo');
+      expect(listenerObject.foo.callCount).toBe(1);
+      emit(ε, 'bar');
+      expect(listenerObject.bar.callCount).toBe(0);
+    });
+
+    it('off(ε, listenerObject) is the form that takes both', () => {
+      const ε = eventize();
+      const listenerObject = {foo: fake()};
+
+      on(ε, '*', listenerObject);
+      on(ε, 'foo', listenerObject);
+
+      off(ε, listenerObject);
+
+      expect(getSubscriptionCount(ε)).toBe(0);
+    });
+
+    // Boundary 2: a targeted listener removal, not the bulk off(ε, '*') that
+    // has wiped the keeper since v6.0.0.
+    it("off(ε, '*', ctx) leaves retained state untouched", () => {
+      const ε = eventize();
+      const wildcardObj = {data: fake()};
+
+      retain(ε, ['data', 'never-emitted']);
+      emit(ε, 'data', 'payload');
+      on(ε, '*', wildcardObj);
+
+      const retainedCountBefore = getRetainedCount(ε);
+      const retainedNamesBefore = getRetainedEventNames(ε);
+      expect(retainedCountBefore).toBe(1);
+      expect(retainedNamesBefore).toEqual(['data', 'never-emitted']);
+
+      off(ε, '*', wildcardObj);
+
+      expect(getSubscriptionCount(ε)).toBe(0);
+      expect(getRetainedCount(ε)).toBe(retainedCountBefore);
+      expect(getRetainedEventNames(ε)).toEqual(retainedNamesBefore);
+
+      // still replayed to a later subscriber, policy still in force
+      const late = fake();
+      on(ε, 'data', late);
+      expect(late.calledWith('payload')).toBeTruthy();
+    });
+
+    // Boundary 3: reference counting behaves exactly as in the named case —
+    // removeSimilarListenersFromArray() detaches outright, refCount is not
+    // consulted, so one off() call releases both on() registrations.
+    it("off(ε, '*', ctx) releases a refCount-2 registration in one call, as the named form does", () => {
+      const wildcardEmitter = eventize();
+      const namedEmitter = eventize();
+      const listenerObject = {foo: fake()};
+
+      on(wildcardEmitter, '*', listenerObject);
+      on(wildcardEmitter, '*', listenerObject); // deduped, refCount = 2
+      on(namedEmitter, 'foo', listenerObject);
+      on(namedEmitter, 'foo', listenerObject); // deduped, refCount = 2
+
+      expect(getSubscriptionCount(wildcardEmitter)).toBe(1);
+      expect(getSubscriptionCount(namedEmitter)).toBe(1);
+
+      off(wildcardEmitter, '*', listenerObject);
+      off(namedEmitter, 'foo', listenerObject);
+
+      expect(getSubscriptionCount(wildcardEmitter)).toBe(0);
+      expect(getSubscriptionCount(namedEmitter)).toBe(0);
+
+      emit(wildcardEmitter, 'foo');
+      emit(namedEmitter, 'foo');
+      expect(listenerObject.foo.callCount).toBe(0);
+    });
+
+    it("off(ε, '*', ctx) removes every once() registration in that bucket", () => {
+      const ε = eventize();
+      const listenerObject = {foo: fake()};
+
+      // once() is exempt from dedup: two listeners, one bucket.
+      once(ε, '*', listenerObject);
+      once(ε, '*', listenerObject);
+      expect(getSubscriptionCount(ε)).toBe(2);
+
+      off(ε, '*', listenerObject);
+
+      expect(getSubscriptionCount(ε)).toBe(0);
+    });
+
+    it("off(ε, '*', ctx) is a no-op when that object has no wildcard subscription", () => {
+      const ε = eventize();
+      const listenerObject = {foo: fake()};
+      const other = {foo: fake()};
+
+      on(ε, 'foo', listenerObject);
+
+      expect(() => off(ε, '*', other)).not.toThrow();
+      expect(getSubscriptionCount(ε)).toBe(1);
+    });
+  });
+
   describe('with array of event names', () => {
     it('off(["foo", "bar"]) removes listeners for multiple events', () => {
       const ε = eventize();

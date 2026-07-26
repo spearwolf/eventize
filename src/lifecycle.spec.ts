@@ -237,6 +237,24 @@ describe('lifecycle', () => {
       expect(getRetainedEventNames(obj)).toEqual([]);
     });
 
+    it("off(ε, '*', listenerObject) leaves retained state untouched, unlike its named sibling", () => {
+      const obj = eventize();
+      retain(obj, 'foo');
+      emit(obj, 'foo', 'payload');
+      const wildcardObj = {foo: fake()};
+      on(obj, '*', wildcardObj);
+      expect(getSubscriptionCount(obj)).toBe(1);
+
+      off(obj, '*', wildcardObj);
+
+      // the wildcard subscription is gone...
+      expect(getSubscriptionCount(obj)).toBe(0);
+      // ...and nothing else is: '*' can never carry retained state, so the
+      // keeper call this form makes has nothing to drop.
+      expect(getRetainedCount(obj)).toBe(1);
+      expect(getRetainedEventNames(obj)).toEqual(['foo']);
+    });
+
     it('retain() holds the payload by reference — no cloning', () => {
       const obj = eventize();
       const payload = {big: 'buffer-or-dom-node'};
