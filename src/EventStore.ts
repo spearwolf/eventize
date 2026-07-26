@@ -318,19 +318,30 @@ export class EventStore {
   }
 
   forEach(eventName: EventName, fn: (listener: EventListener) => void): void {
-    // Snapshot both buckets: a listener may unsubscribe (or subscribe) from
-    // inside its own callback, and the walk below must not see that mutation.
-    const catchEmAllListeners = this.catchEmAllListeners.slice(0);
-    const namedListeners = this.namedListeners.get(eventName)?.slice(0);
+    // Snapshotting protects against a listener unsubscribing (or subscribing)
+    // from inside its own callback — the walk below must not see that
+    // mutation. But slice(0) is itself an allocation, so each branch below
+    // only copies the bucket(s) it actually walks, and skips the copy
+    // entirely when that bucket is empty (nothing to protect a walk over
+    // zero elements from).
+    const namedBucket = this.namedListeners.get(eventName);
+
     if (
       eventName === EVENT_CATCH_EM_ALL ||
-      !namedListeners ||
-      namedListeners.length === 0
+      !namedBucket ||
+      namedBucket.length === 0
     ) {
-      catchEmAllListeners.forEach(fn);
-    } else if (catchEmAllListeners.length === 0) {
-      namedListeners.forEach(fn);
+      if (this.catchEmAllListeners.length > 0) {
+        this.catchEmAllListeners.slice(0).forEach(fn);
+      }
+      return;
+    }
+
+    if (this.catchEmAllListeners.length === 0) {
+      namedBucket.slice(0).forEach(fn);
     } else {
+      const namedListeners = namedBucket.slice(0);
+      const catchEmAllListeners = this.catchEmAllListeners.slice(0);
       const iLen = namedListeners.length;
       const jLen = catchEmAllListeners.length;
       let i = 0;
