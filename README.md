@@ -386,7 +386,7 @@ emit(ε, 'test');
 console.log(calls); // => ["Critical", "Normal", "Low"]
 ```
 
-`Priority` provides `Max`, `Critical`, `High`, `Normal`, `Low`, and `Min`. The legacy aliases `AAA` (= `Critical`), `BB` (= `High`), `C`, and `Default` (= `Normal`) are kept for backwards compatibility.
+`Priority` provides `Max`, `Critical`, `High`, `Medium`, `Normal`, `Low`, and `Min`. The legacy aliases `AAA` (= `Critical`), `BB` (= `High`), `C` (= `Medium`), and `Default` (= `Normal`) are `@deprecated` on `EventizePriority` and slated for removal in a future major — they keep working, but editors now strike them through.
 
 To give each event of a multi-event subscription its own priority, pass `[eventName, priority]` tuples. Tuples and bare names may be mixed freely; a tuple's priority overrides the call-level one for that event:
 

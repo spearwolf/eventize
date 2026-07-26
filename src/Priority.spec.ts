@@ -45,6 +45,18 @@ describe('Priority', () => {
     });
   });
 
+  describe('Medium', () => {
+    it('carries the value the legacy C alias always had', () => {
+      expect(Priority.Medium).toBe(1e3);
+      expect(Priority.C).toBe(Priority.Medium);
+    });
+
+    it('sorts between High and Normal', () => {
+      expect(Priority.High).toBeGreaterThan(Priority.Medium);
+      expect(Priority.Medium).toBeGreaterThan(Priority.Normal);
+    });
+  });
+
   describe('all predefined values should be in correct relationship to each other', () => {
     it('Priority.Max > Priority.Critical', () => {
       expect(Priority.Max > Priority.Critical).toBe(true);

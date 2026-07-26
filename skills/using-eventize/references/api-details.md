@@ -62,13 +62,16 @@ Both the mixed form and typed-emitter support landed in **v5.1** — before that
 | Name | Value | Legacy alias |
 | --- | --- | --- |
 | `Max` | `+Infinity` | — |
-| `Critical` | `1e9` | `AAA` |
-| `High` | `1e6` | `BB` |
-| `Normal` | `0` | `Default` |
+| `Critical` | `1e9` | `AAA` (deprecated) |
+| `High` | `1e6` | `BB` (deprecated) |
+| `Medium` | `1e3` | `C` (deprecated) |
+| `Normal` | `0` | `Default` (deprecated) |
 | `Low` | `-1e4` | — |
 | `Min` | `-Infinity` | — |
 
-`C` (`1e3`) also survives as a legacy alias. Higher runs first; the default is `Normal`. Equal priorities keep insertion order.
+Higher runs first; the default is `Normal`. Equal priorities keep insertion order.
+
+The four legacy aliases (`AAA`, `BB`, `C`, `Default`) are marked `@deprecated` on the exported `EventizePriority` interface, so editors strike them through at the point of use. They are not removed and carry the same values as before — `Medium` exists because `C` (`1e3`) sat between `High` and `Normal` with no speaking name of its own.
 
 ### Listener-object dispatch
 

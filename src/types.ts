@@ -325,13 +325,17 @@ export interface EventizePriority {
   Max: number;
   Critical: number;
   High: number;
+  Medium: number;
   Normal: number;
   Low: number;
   Min: number;
-  // Legacy aliases
+  /** @deprecated Use `Critical`. Slated for removal in a future major. */
   AAA: number;
+  /** @deprecated Use `High`. Slated for removal in a future major. */
   BB: number;
+  /** @deprecated Use `Medium`. Slated for removal in a future major. */
   C: number;
+  /** @deprecated Use `Normal`. Slated for removal in a future major. */
   Default: number;
 }
 
