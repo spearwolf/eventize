@@ -11,6 +11,8 @@ What an emitter holds, and what actually releases it — the two questions that 
 - **`EventStore`** — the listener registry. One bucket per event name, plus a separate bucket for wildcard (`'*'`) listeners.
 - **`EventKeeper`** — the retained-events log. `eventNames` is the set of names carrying a *retain policy*; `events` is the map of names to their last *retained value*. A name can be in the first without being in the second — retain a name, never emit it, and it carries a policy with nothing to replay yet.
 
+That slot needs an extensible object to attach to: `eventize(Object.freeze(obj))`, `eventize(Object.seal(obj))` or `eventize(Object.preventExtensions(obj))` throws a `TypeError` — 'eventize() cannot attach to a non-extensible object — eventize before freezing, or eventize a wrapper' — instead of the same `TypeError` class with the opaque native `defineProperty` message. An object eventized *before* it was frozen is unaffected; the slot already exists by then, and every further call is a no-op that returns the same object.
+
 Retained payloads are held by **strong reference, not cloned**. `retain(ε, 'foo'); emit(ε, 'foo', bigObject)` keeps the exact `bigObject` reference alive in the keeper — a later subscriber gets the same object back, `===`, not a copy — until the value is overwritten, cleared, or the emitter itself is garbage collected. Retaining a large buffer or a DOM node pins it for as long as the keeper does.
 
 ```javascript
