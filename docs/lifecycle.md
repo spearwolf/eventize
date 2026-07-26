@@ -181,7 +181,7 @@ subs.forEach((unsubscribe) => unsubscribe());
 A handle that is never called keeps its listener (and, transitively, whatever the listener closes over) alive for as long as the emitter itself is reachable — the array in the example above is exactly as leaky as any other array of live references if `forEach` is never run.
 
 > [!NOTE]
-> **"Calling a handle releases its references" is qualified by reference counting — for `on()`.** Two `on()` calls for the same `(eventName, priority, listener, context)` share one `EventListener` with `refCount = 2` (see [`docs/off.md` → Reference counting](./off.md#reference-counting)); `once()` is exempt and always registers its own. The *first* handle's `.listener()` call only decrements the count — it does not detach, and does not null the listener reference, until the *last* outstanding handle for that shared listener calls back too:
+> **"Calling a handle releases its references" is qualified by reference counting — for `on()`.** Two `on()` calls for the same `(eventName, priority, listener, context)` share one `EventListener` with `refCount = 2` (see [`docs/off.md` → Reference counting](./off.md#reference-counting)); `once()` is exempt and always registers its own. The *first* handle's call only decrements the count — it does not detach, and does not null the listener reference, until the *last* outstanding handle for that shared listener calls back too:
 >
 > ```javascript
 > const h1 = on(ε, 'foo', service); // shared EventListener, refCount = 1
@@ -189,11 +189,15 @@ A handle that is never called keeps its listener (and, transitively, whatever th
 >
 > h1();
 > // getSubscriptionCount(ε) is still 1 — h1.listener.listener is NOT null yet
+> h1();
+> // still 1 — a consumed handle is inert, it cannot decrement a second time
 > h2();
 > // getSubscriptionCount(ε) is now 0 — only now is the reference released
 > ```
 >
-> Holding on to `h1` after calling it, expecting it to have released `service`, is a retention window in exactly the pattern the "consumed handle" claim above is meant to rule out. If a listener object may be subscribed more than once, only the *last* handle's callback marks the true release point.
+> **Each handle is single-shot (since v6.0.0).** Calling one a second time does nothing at all — it does not decrement the shared count again, and so it cannot take a *sibling* handle's registration down with it. Up to v5.2.0 only `once()` carried that guard: `h1(); h1();` on the pair above dropped the count straight to 0, unsubscribing `h2`'s registration from under it, and the double call is precisely what defensive cleanup code writes.
+>
+> The retention window is what survives. Holding on to `h1` after calling it, expecting it to have released `service`, is exactly the pattern the "consumed handle" claim above is meant to rule out — and the guard does not shorten it, because `h1` is inert while the shared listener is still very much alive. If a listener object may be subscribed more than once, only the *last* handle's call marks the true release point.
 
 > [!NOTE]
 > **`once()` is exempt from de-duplication (since v6.0.0).** Calling `once()` twice for the same event name on the same listener object creates two independent one-shot subscriptions: two firings on the first `emit()`, two retained-value replays if the event is retained, and two handles that each release exactly their own listener. Up to v5.2.0 the second call bumped the first listener's reference count instead, while the auto-unsubscribe hook accounted for a single firing — one emit took the count from 2 to 1 and the surviving handle's idempotence guard stopped it ever reaching 0. That listener fired on every subsequent `emit()` and could only be removed with an external `off(ε, listenerObject)` (`MEM-002`). If you upgrade from v5.x and relied on two `once()` calls collapsing into one, use a single `once()`.

@@ -35,7 +35,7 @@ unsubscribe();
 emit(ε, 'my-event', 'Silent?'); // (nothing happens)
 ```
 
-Calling it more than once is safe — subsequent calls are no-ops.
+Calling it more than once is safe — subsequent calls are no-ops. Each handle is single-shot: once consumed it is inert, so a repeated call cannot decrement a [reference-counted](#reference-counting) subscription twice and unsubscribe a sibling handle's registration along with it.
 
 ## Removing all listeners
 
@@ -212,6 +212,7 @@ const unsub2 = on(ε, 'foo', listener); // same subscription → refCount = 2
 emit(ε, 'foo'); // => "foo"  (once — there is only one underlying listener)
 
 unsub1();       // refCount = 1
+unsub1();       // still 1 — a consumed handle is inert
 emit(ε, 'foo'); // => "foo"  (still active)
 
 unsub2();       // refCount = 0 → removed

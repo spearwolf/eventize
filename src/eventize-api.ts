@@ -30,11 +30,22 @@ const afterApply = (callback?: () => void) => (listener: EventListener) => {
   };
 };
 
+// The handle is idempotent by construction: a second call is inert, not a
+// second `off()`. Without the guard a deduped on() subscription — one
+// EventListener with refCount = 2 — was decremented twice by the same handle,
+// which unsubscribed the *other* handle's registration. Cleanup code that
+// calls a stored handle defensively ("call it again, it's a no-op") is exactly
+// the shape that hit it, and `docs/off.md` promised that no-op.
 const makeUnsubscribe = (
   host: EventizedObject,
   listeners: EventListener | Array<EventListener>,
 ): UnsubscribeFunc => {
-  const unsubscribe = () => off(host, listeners);
+  let isConsumed = false;
+  const unsubscribe = () => {
+    if (isConsumed) return;
+    isConsumed = true;
+    off(host, listeners);
+  };
   return Object.assign(
     unsubscribe,
     Array.isArray(listeners) ? {listeners} : {listener: listeners},
@@ -401,27 +412,18 @@ export function once(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
     args,
     true,
   );
-  const unsubscribeFn = makeUnsubscribe(eventizedObj, listeners);
-  let unsubscribeCalled = false;
-  const unsubscribe = () => {
-    if (!unsubscribeCalled) {
-      unsubscribeFn();
-      unsubscribeCalled = true;
-    }
-  };
-  // The idempotence wrapper would otherwise swallow the .listener /
-  // .listeners properties that UnsubscribeFunc declares and on() delivers.
-  Object.assign(
-    unsubscribe,
-    Array.isArray(listeners) ? {listeners} : {listener: listeners},
-  );
+  // Idempotence and the `.listener` / `.listeners` properties both come out of
+  // makeUnsubscribe() now. once() used to wrap the handle in a guard of its
+  // own — and then re-attach the properties that wrapper had swallowed —
+  // because on()'s handle had no guard to share.
+  const unsubscribe = makeUnsubscribe(eventizedObj, listeners);
   if (Array.isArray(listeners)) {
     listeners.forEach(afterApply(unsubscribe));
   } else {
     afterApply(unsubscribe)(listeners);
   }
   publishRetained();
-  return unsubscribe as UnsubscribeFunc;
+  return unsubscribe;
 }
 
 // ---------------------------------------------------------------------------

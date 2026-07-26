@@ -509,6 +509,44 @@ describe('off()', () => {
       expect(fn0.called).toBeFalsy();
     });
 
+    it('a consumed handle called again does not release a sibling handle', () => {
+      const ε = eventize();
+      const listenerObject = {foo: fake()};
+
+      const unsub1 = on(ε, 'foo', listenerObject);
+      const unsub2 = on(ε, 'foo', listenerObject); // deduped, refCount = 2
+
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      unsub1();
+      expect(getSubscriptionCount(ε)).toBe(1); // refCount 2 -> 1
+
+      unsub1(); // consumed handle: inert, must not decrement again
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      emit(ε, 'foo');
+      expect(listenerObject.foo.callCount).toBe(1);
+
+      unsub2(); // the last outstanding handle releases it
+      expect(getSubscriptionCount(ε)).toBe(0);
+    });
+
+    it('a single handle called twice still reaches zero', () => {
+      const ε = eventize();
+      const listenerObject = {foo: fake()};
+
+      const unsubscribe = on(ε, 'foo', listenerObject);
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      unsubscribe();
+      unsubscribe();
+
+      expect(getSubscriptionCount(ε)).toBe(0);
+
+      emit(ε, 'foo');
+      expect(listenerObject.foo.callCount).toBe(0);
+    });
+
     it('unsubscribe function from on() with multiple event names removes all listeners', () => {
       const ε = eventize();
       const fn0 = fake();
