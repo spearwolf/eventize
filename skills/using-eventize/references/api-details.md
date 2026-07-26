@@ -69,7 +69,7 @@ Both the mixed form and typed-emitter support landed in **v5.1** — before that
 | `Low` | `-1e4` | — |
 | `Min` | `-Infinity` | — |
 
-Higher runs first; the default is `Normal`. Equal priorities keep insertion order.
+Higher runs first; the default is `Normal`. Equal priorities keep insertion order **within a bucket** — named listeners for one event name, or wildcard listeners, sort stably against their own kind by registration order (`sortByPriorityAndId` breaks a priority tie on ascending `id`). Across the named/wildcard split that guarantee does not hold: `EventStore.forEach()` merges the two buckets by comparing priority alone, so at equal priority the named listener always runs before the wildcard one, regardless of which was registered first. Registering the wildcard first makes that visible; registering the named listener first hides it, because insertion order and the tie-break happen to agree.
 
 The four legacy aliases (`AAA`, `BB`, `C`, `Default`) are marked `@deprecated` on the exported `EventizePriority` interface, so editors strike them through at the point of use. They are not removed and carry the same values as before — `Medium` exists because `C` (`1e3`) sat between `High` and `Normal` with no speaking name of its own.
 

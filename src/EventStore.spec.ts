@@ -203,6 +203,58 @@ describe('EventStore', () => {
     });
   });
 
+  // "Equal priorities keep insertion order" holds only within a bucket.
+  // sortByPriorityAndId breaks a priority tie on id, but it only ever
+  // compares listeners of the same kind (findInsertIndex is always called
+  // against one bucket). The merge in forEach() that interleaves a named
+  // bucket with catchEmAllListeners compares priority alone
+  // (`cur.priority >= other.priority`) and never looks at id, so at equal
+  // priority the named listener always runs first — independent of
+  // registration order. This is a documented scope limit, not something to
+  // fix here: see AGENTS.md "Known asymmetries" and
+  // skills/using-eventize/references/api-details.md (BUG-004). Both
+  // registration directions are pinned below, but neither closes a gap: the
+  // wildcard-first direction was already exercised implicitly by the
+  // mixed-priority fixture above ('with named and catch-em-all listeners' —
+  // wildcard '5' registered before named '8', both at priority 0, expects
+  // '8' before '5'). These two cases give that pin its own name and add the
+  // reverse direction next to it, instead of leaving the asymmetry buried in
+  // a fixture built for something else.
+  describe('equal-priority merge across the named/wildcard split favors the named listener', () => {
+    it('runs the named listener first when the wildcard was registered first', () => {
+      const store = new EventStore();
+      const wildcard = store.add(
+        new EventListener(EVENT_CATCH_EM_ALL, 0, 'wildcard'),
+      );
+      const named = store.add(new EventListener('e', 0, 'named'));
+
+      const seen: EventListener[] = [];
+      store.forEach('e', (l) => seen.push(l));
+
+      // Registration order was wildcard, then named — the id-ordered
+      // insertion order would replay the wildcard first. The merge ignores
+      // id across the bucket boundary, so the named listener wins the tie
+      // instead, contradicting registration order.
+      expect(seen).toEqual([named, wildcard]);
+    });
+
+    it('runs the named listener first when the named listener was registered first', () => {
+      const store = new EventStore();
+      const named = store.add(new EventListener('e', 0, 'named'));
+      const wildcard = store.add(
+        new EventListener(EVENT_CATCH_EM_ALL, 0, 'wildcard'),
+      );
+
+      const seen: EventListener[] = [];
+      store.forEach('e', (l) => seen.push(l));
+
+      // Same outcome as above, but this time it agrees with registration
+      // order — which is what makes the guarantee look bucket-spanning when
+      // only this direction is exercised.
+      expect(seen).toEqual([named, wildcard]);
+    });
+  });
+
   describe('removal addresses the bucket directly', () => {
     it('removes a named listener without scanning other buckets', () => {
       const store = new EventStore();
