@@ -6,16 +6,37 @@ import {
 } from './constants';
 
 import type {EventName, EventArgs, ListenerObjectType} from './types';
-import {isCatchEmAll} from './utils';
+import {isCatchEmAll, isEventName} from './utils';
 
 type EmitFnType = Function | undefined;
 type CallAfterApplyFnType = (() => void) | undefined;
 type ReturnValue = (retVal: any) => void;
 
-/** Returns true when `func` was actually callable and got invoked. */
+/**
+ * A dispatch target seen from the inside: event-named members that may or may
+ * not be functions, plus the optional `emit()` fallback spelled out so that
+ * `noPropertyAccessFromIndexSignature` allows `.emit`. Nothing trusts a member
+ * to be callable — `apply()` checks before it invokes.
+ */
+type ObjListener = Record<EventName, unknown> & {emit?: EmitFnType};
+
+/**
+ * Narrows anything a member can be read off. Non-nullish is the entire runtime
+ * precondition for property access, so the predicate asserts nothing the check
+ * doesn't establish; whatever comes back stays `unknown` until `apply()` has
+ * seen it is a function.
+ */
+const canReadMembers = (obj: unknown): obj is ObjListener => obj != null;
+
+/**
+ * Returns true when `func` was actually callable and got invoked. Takes
+ * `unknown` rather than a function type: every call site feeds it a member
+ * read off a listener object, and the callability test below is the only
+ * thing that may decide the question.
+ */
 const apply = (
   context: unknown,
-  func: EmitFnType,
+  func: unknown,
   args: EventArgs,
   returnValue?: ReturnValue,
 ): boolean => {
@@ -31,7 +52,7 @@ const apply = (
 
 const emit = (
   eventName: EventName,
-  listener: {emit: EmitFnType},
+  listener: ObjListener,
   args: EventArgs,
   returnValue?: ReturnValue,
 ): boolean =>
@@ -44,6 +65,9 @@ const emit = (
  * rather than lie about it.
  *
  * `typeof null === 'object'`, hence the explicit null check.
+ *
+ * The tag is what `EventStore.isSimilar()` compares. It is deliberately *not*
+ * what `apply()` dispatches on — see the note there.
  */
 const detectListenerType = (listener: unknown): number | undefined => {
   switch (typeof listener) {
@@ -72,6 +96,8 @@ export class EventListener {
   // writes to them outside detach(), and consumers have no reason to either.
   listener: unknown;
   listenerObject: ListenerObjectType;
+  // Read by EventStore.isSimilar(), which needs a value it can compare with
+  // `===`. Never read by apply() — see the note there.
   readonly listenerType: number | undefined;
   callAfterApply: CallAfterApplyFnType;
   isRemoved: boolean;
@@ -128,6 +154,14 @@ export class EventListener {
   // internal helpers below would otherwise have to thread the undefined
   // through, and `emit()` would concat it into the argument list as a literal
   // `undefined`. Every caller (_emitOne, EventKeeper.replayTo) passes an array.
+  //
+  // The three branches test `listener` directly instead of switching on the
+  // numeric `listenerType`, because a number is not something TypeScript can
+  // narrow a value from — the numeric switch needed four suppressions to reach
+  // the same three shapes. The tests below are the same ones
+  // `detectListenerType()` makes, in the same order, and they cannot disagree
+  // with the tag: `listenerType` is readonly, `listener` is written only by the
+  // constructor and by `detach()`, and a detached listener never gets here.
   apply(
     eventName: EventName,
     args: EventArgs = [],
@@ -137,39 +171,35 @@ export class EventListener {
 
     const {listener, listenerObject} = this;
 
-    switch (this.listenerType) {
-      case LISTENER_IS_FUNC:
-        // @ts-expect-error listenerType discriminant guarantees `listener` is a callable; TS can't infer that from a numeric tag.
-        apply(listenerObject, listener, args, returnValue);
-        if (this.callAfterApply) this.callAfterApply();
-        break;
+    // LISTENER_IS_FUNC
+    if (typeof listener === 'function') {
+      apply(listenerObject, listener, args, returnValue);
+      // Unconditional: a function listener is callable by construction, so the
+      // dispatch above always invoked it. Nothing to survive here.
+      if (this.callAfterApply) this.callAfterApply();
+      return;
+    }
 
-      case LISTENER_IS_NAMED_FUNC: {
-        const didCall = apply(
-          listenerObject,
-          // @ts-expect-error listenerType discriminant guarantees `listener` is a string/symbol method key on `listenerObject`.
-          listenerObject[listener],
-          args,
-          returnValue,
-        );
-        // A once() must survive a dispatch that found no method — late-bound
-        // listener objects are a normal pattern.
-        if (didCall && this.callAfterApply) this.callAfterApply();
-        break;
-      }
+    // LISTENER_IS_NAMED_FUNC
+    if (isEventName(listener)) {
+      const didCall =
+        canReadMembers(listenerObject) &&
+        apply(listenerObject, listenerObject[listener], args, returnValue);
+      // A once() must survive a dispatch that found no method — late-bound
+      // listener objects are a normal pattern, and so is a listener object
+      // that is not there at all.
+      if (didCall && this.callAfterApply) this.callAfterApply();
+      return;
+    }
 
-      case LISTENER_IS_OBJ: {
-        // @ts-expect-error listenerType discriminant guarantees `listener` is an indexable object whose own keys are event names.
-        const func = listener[eventName];
-        if (this.isCatchEmAll || this.eventName === eventName) {
-          const didCall =
-            apply(listener, func, args, returnValue) ||
-            // @ts-expect-error listenerType discriminant guarantees `listener` is an object that may expose an `emit` method.
-            emit(eventName, listener, args, returnValue);
-          if (didCall && this.callAfterApply) this.callAfterApply();
-        }
-        break;
-      }
+    // LISTENER_IS_OBJ
+    if (!canReadMembers(listener)) return;
+
+    if (this.isCatchEmAll || this.eventName === eventName) {
+      const didCall =
+        apply(listener, listener[eventName], args, returnValue) ||
+        emit(eventName, listener, args, returnValue);
+      if (didCall && this.callAfterApply) this.callAfterApply();
     }
   }
 }
