@@ -55,7 +55,7 @@ const _subscribeTo = (
     // (1)-(3) with an explicit priority: on(eventNames, priority, …)
     [eventName, priority, listener, listenerObject] = args;
   } else {
-    priority = Priority.Default;
+    priority = Priority.Normal;
     if (
       typeOfFirstArg === 'string' ||
       typeOfFirstArg === 'symbol' ||
