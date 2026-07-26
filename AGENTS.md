@@ -6,13 +6,13 @@ Canonical guide for coding agents in this repo. `CLAUDE.md` is a symlink to this
 
 ## Verification
 
-`npm run cbt` — clean → build → `attw --pack` → test → lint → format check. Run it before declaring a task done; it is the only gate that catches dual-format type breakage.
+`npm run cbt` — clean → build → `attw --pack` → test with coverage → lint → format check. Run it before declaring a task done; it is the only gate that catches dual-format type breakage, and the only local run where the `coverageThreshold` actually binds.
 
-Narrower loops while working: `npm test -- src/once.spec.ts`, `npm test -- -t "retains the last value"`, `npm run watch`.
+Narrower loops while working: `npm test -- src/once.spec.ts`, `npm test -- -t "retains the last value"`, `npm run watch`. Bare `npm test` collects no coverage on purpose — a threshold applied to one spec file fails for the wrong reason.
 
 **`npm run clean` does not clear the ts-jest cache.** It removes `lib/`, `build/`, `dist/`, `types/` and `tmp/`. ts-jest's transform cache lives outside the repository — `/tmp/jest_rs` on Linux — and survives every clean, every `npm ci`, and every `cbt`. A stale cache serves previously compiled output and hides type errors that a fresh checkout or a CI runner hits immediately. This is not hypothetical: it once produced a green `cbt` for a change that broke 13 of 25 spec suites, and the breakage survived two code reviews because both trusted the green suite. Run `npx jest --clearCache` before verifying any change to dependencies, `tsconfig.json`, or a `.d.ts` boundary.
 
-Coverage is gated, not merely measured: `jest.config.ts` carries a global `coverageThreshold`, and both workflows run `npm test -- --coverage`. Raise the numbers when coverage rises; never lower them to make a build pass.
+Coverage is gated, not merely measured: `jest.config.ts` carries a global `coverageThreshold`, both workflows run `npm test -- --coverage`, and `cbt` runs `test:coverage` so the threshold binds locally too — it used to bind only in CI, which made "the only gate" a claim `cbt` could not back. Raise the numbers when coverage rises; never lower them to make a build pass.
 
 **TypeScript is pinned below 7, on purpose.** `ts-jest` — which compiles every spec — declares `peerDependencies.typescript: ">=4.3 <7"` (checked across its six most recent releases; its `next` dist-tag is an *older* prerelease than `latest`, not a forward path). `typescript-eslint` is tighter still, capping at `<6.1.0`. Before retrying this upgrade, check both packages' current peer range with `npm view <pkg> peerDependencies`; do not force the install with `--legacy-peer-deps`, `--force`, or an `overrides` entry to get past a real peer conflict — that trades a known state (outdated TypeScript) for an unverified one (a compiler nothing in the toolchain has agreed to support). See `CHANGELOG.md` under `## Unreleased` for the full record.
 
