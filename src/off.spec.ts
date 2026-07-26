@@ -878,5 +878,48 @@ describe('off()', () => {
       expect(getRetainedCount(a)).toBe(0);
       expect(getRetainedCount(b)).toBe(1);
     });
+
+    it("off(ε, ['*']) clears retained state like the bare wildcard", () => {
+      const obj = eventize();
+      retain(obj, 'data');
+      emit(obj, 'data', 'payload');
+      on(obj, 'data', fake());
+
+      off(obj, ['*']);
+
+      expect(getSubscriptionCount(obj)).toBe(0);
+      expect(getRetainedCount(obj)).toBe(0);
+      expect(getRetainedEventNames(obj)).toEqual([]);
+    });
+
+    it("off(ε, ['*', name]) clears everything, not just the named one", () => {
+      const obj = eventize();
+      retain(obj, ['foo', 'bar']);
+      emit(obj, 'foo', 1);
+      emit(obj, 'bar', 2);
+
+      off(obj, ['*', 'foo']);
+
+      expect(getRetainedCount(obj)).toBe(0);
+
+      // the partial wipe used to leave 'bar' pinned and still replaying
+      const late = fake();
+      on(obj, 'bar', late);
+      expect(late.callCount).toBe(0);
+    });
+
+    it('leaves a multi-event unsubscribe handle on the name path', () => {
+      const obj = eventize();
+      retain(obj, 'keep');
+      emit(obj, 'keep', 'value');
+      const unsubscribe = on(obj, ['a', 'b'], fake());
+
+      unsubscribe();
+
+      expect(getSubscriptionCount(obj)).toBe(0);
+      // the handle passes EventListener instances, not names — the bulk path
+      // must not trigger, so 'keep' survives
+      expect(getRetainedCount(obj)).toBe(1);
+    });
   });
 });

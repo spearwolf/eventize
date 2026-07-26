@@ -11,7 +11,7 @@
 | `off(emitter)`                            | Unsubscribes **all** listeners from the emitter, and clears **all** retained state. |
 | `off(emitter, '*')`                       | Same as above — all listeners (named and wildcard), all retained state. |
 | `off(emitter, eventName)`                 | Unsubscribes all listeners for a specific event (string or symbol), and unretains it. |
-| `off(emitter, [eventName1, eventName2])`  | Same, for several events at once.                                   |
+| `off(emitter, [eventName1, eventName2])`  | Same, for several events at once. A `'*'` anywhere in the array makes it the bulk form. |
 | `off(emitter, listenerFunc)`              | Unsubscribes a specific listener function from all events.          |
 | `off(emitter, listenerFunc, context)`     | Unsubscribes a listener function with a specific context.           |
 | `off(emitter, listenerObject)`            | Unsubscribes all listeners associated with an object.               |
@@ -55,6 +55,13 @@ emit(ε, 'bar'); // (nothing happens)
 ```
 
 Since v6.0.0 both forms empty the retained-events keeper as well as the listener registry: every retained value and every retain policy is dropped, exactly as [`unretain(ε, '*')`](./retain.md#unretainemitter-eventname--eventname) does. Up to v5.2.0 they left retained state alone, so a subscriber arriving after the "reset" still got the old payload replayed.
+
+A `'*'` anywhere in an array counts as the bulk form, on the keeper exactly as it always has on the listeners — `off(ε, ['*'])` and `off(ε, ['*', 'foo'])` both wipe everything, and the names listed beside the wildcard add nothing:
+
+```javascript
+off(ε, ['*']);        // identical to off(ε, '*')
+off(ε, ['*', 'foo']); // also identical — the 'foo' is redundant, not narrowing
+```
 
 ## Removing listeners by event name
 

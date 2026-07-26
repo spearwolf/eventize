@@ -22,7 +22,7 @@ import type {
   SubscribeArgs,
   UnsubscribeFunc,
 } from './types';
-import {isCatchEmAll, isEventName} from './utils';
+import {isEventName} from './utils';
 
 const afterApply = (callback?: () => void) => (listener: EventListener) => {
   listener.callAfterApply = () => {
@@ -498,13 +498,16 @@ export function off(
     (listenerType === 'string' || listenerType === 'symbol');
   store.remove(listener, listenerObject, forceRemove);
 
-  // off(ε) and off(ε, '*') wipe the store completely; the keeper follows.
-  // The condition mirrors EventStore.remove()'s own "remove everything" branch
-  // exactly. It has to run before the array/name branches below, because
-  // isEventName('*') is true and '*' would otherwise take the name path.
+  // off(ε), off(ε, '*') and off(ε, ['*', …]) wipe the store completely; the
+  // keeper follows. It has to run before the array/name branches below, because
+  // isEventName('*') is true and '*' would otherwise take the name path — which
+  // clears nothing, since retain() rejects '*' and it can never be an entry.
+  // hasWildcard() covers the array form the way EventStore.remove() does by
+  // recursing into its own wipe branch, and the way unretain()/retainClear()
+  // already treat a wildcard anywhere in an array as "all retained events".
   // Leaving retained payloads behind after "remove everything" kept them
   // strongly referenced and still replayed them to later subscribers.
-  if (listener == null || (listenerObject == null && isCatchEmAll(listener))) {
+  if (listener == null || (listenerObject == null && hasWildcard(listener))) {
     keeper.removeAll();
     return;
   }
