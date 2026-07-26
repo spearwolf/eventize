@@ -4069,6 +4069,12 @@ Do not push or publish. Report that the release is staged.
 
 # Phase 4 — Dependencies
 
+**Versioning, clarified 2026-07-26.** Whether a change is breaking no longer decides where it lands. The version bump is decided once, at the end of the backlog, by looking at what actually accumulated. So: never soften a fix to keep a release non-breaking, never defer one to a later release for that reason, and never spend effort arguing whether something "counts" as breaking.
+
+`CHANGELOG.md` entries keep their **BREAKING** markers — those describe the *nature* of a change and are what the final versioning decision will be read off. They no longer imply a release boundary.
+
+Consequence for the tags already placed: `v5.2.0` and `v6.0.0` exist locally and neither is pushed. Work from here lands after `v6.0.0`, so that tag no longer points at `HEAD`. Do not move or delete either tag inside a task — the final versioning step resolves them.
+
 ## Task 28: Minor and patch updates
 
 **Model:** Sonnet
