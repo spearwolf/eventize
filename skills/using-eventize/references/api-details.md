@@ -80,8 +80,8 @@ A wildcard listener-object counts as a **single** subscription in `getSubscripti
 
 | Call | Removes |
 | --- | --- |
-| `off(ε)` | every listener |
-| `off(ε, '*')` | every listener, named and wildcard |
+| `off(ε)` | every listener, **and** every retained value + policy (v6.0.0; before that the keeper survived) |
+| `off(ε, '*')` | every listener, named and wildcard, **and** all retained state |
 | `off(ε, eventName)` | all listeners for that event, **and** its retain value + policy |
 | `off(ε, [name1, name2])` | as above for several events; strings and symbols alike |
 | `off(ε, listenerFunc)` | that function, across all events |

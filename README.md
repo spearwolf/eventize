@@ -501,7 +501,7 @@ subscribing.
 Removes listeners from an emitter — the counterpart to `on()`, for cleanup where you no longer hold the `unsubscribe` function.
 
 ```javascript
-off(ε);                       // all listeners
+off(ε);                       // all listeners — and all retained state
 off(ε, 'foo');                // all listeners for 'foo' (also unretains 'foo')
 off(ε, ['foo', 'bar']);       // several events
 off(ε, listenerFunc);         // that function, across all events
@@ -510,6 +510,8 @@ off(ε, 'foo', listenerObject); // that object, on 'foo' only
 ```
 
 Calling `off()` on a non-eventized object (or on `null`/`undefined`) is a no-op, which makes it safe in cleanup paths without an `isEventized()` check.
+
+Since v6.0.0 the bulk forms `off(ε)` and `off(ε, '*')` also empty the retained-events keeper — every retained value and every retain policy goes with the listeners. Before that they cleared only the listeners, so a subscriber arriving afterwards was still handed the old payload.
 
 📖 **[Full `off()` reference →](./docs/off.md)** — every signature, the interaction with `retain()`, behavior during an active `emit()`, and reference counting.
 

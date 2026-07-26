@@ -8,8 +8,8 @@
 
 | Signature                                 | Description                                                         |
 | ----------------------------------------- | ------------------------------------------------------------------- |
-| `off(emitter)`                            | Unsubscribes **all** listeners from the emitter.                    |
-| `off(emitter, '*')`                       | Same as above — unsubscribes all listeners (named and wildcard).     |
+| `off(emitter)`                            | Unsubscribes **all** listeners from the emitter, and clears **all** retained state. |
+| `off(emitter, '*')`                       | Same as above — all listeners (named and wildcard), all retained state. |
 | `off(emitter, eventName)`                 | Unsubscribes all listeners for a specific event (string or symbol), and unretains it. |
 | `off(emitter, [eventName1, eventName2])`  | Same, for several events at once.                                   |
 | `off(emitter, listenerFunc)`              | Unsubscribes a specific listener function from all events.          |
@@ -46,13 +46,15 @@ on(ε, 'foo', () => console.log('foo'));
 on(ε, 'bar', () => console.log('bar'));
 on(ε, (...args) => console.log('wildcard:', args));
 
-off(ε);        // remove ALL listeners
+off(ε);        // remove ALL listeners and ALL retained state
 // or equivalently:
 off(ε, '*');
 
 emit(ε, 'foo'); // (nothing happens)
 emit(ε, 'bar'); // (nothing happens)
 ```
+
+Since v6.0.0 both forms empty the retained-events keeper as well as the listener registry: every retained value and every retain policy is dropped, exactly as [`unretain(ε, '*')`](./retain.md#unretainemitter-eventname--eventname) does. Up to v5.2.0 they left retained state alone, so a subscriber arriving after the "reset" still got the old payload replayed.
 
 ## Removing listeners by event name
 
@@ -166,6 +168,8 @@ The scalar and array forms behave identically here, for string and symbol event 
 off(ε, SOME_SYMBOL);   // unretains SOME_SYMBOL
 off(ε, [SOME_SYMBOL]); // same
 ```
+
+The bare `off(ε)` and the wildcard `off(ε, '*')` do the same for every retained name at once — see [Removing all listeners](#removing-all-listeners). The listener-only forms (`off(ε, listenerFunc)`, `off(ε, listenerObject)`, the `unsubscribe` handle) never touch retained state; [`docs/lifecycle.md`](./lifecycle.md#what-each-off-form-releases) tabulates all of them.
 
 ## Behavior during emit
 

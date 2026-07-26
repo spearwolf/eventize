@@ -3,6 +3,8 @@ import {fake} from 'sinon';
 import {
   emit,
   eventize,
+  getRetainedCount,
+  getRetainedEventNames,
   getSubscriptionCount,
   off,
   on,
@@ -824,6 +826,57 @@ describe('off()', () => {
 
       expect(unsubscribe.listener.isRemoved).toBe(true);
       expect(unsubscribe.listener.listener).toBeNull();
+    });
+  });
+
+  describe('off(ε) clears retained state', () => {
+    it('drops retained values and policies', () => {
+      const obj = eventize();
+      retain(obj, 'data');
+      emit(obj, 'data', {big: 'payload'});
+      expect(getRetainedCount(obj)).toBe(1);
+
+      off(obj);
+
+      expect(getRetainedCount(obj)).toBe(0);
+      expect(getRetainedEventNames(obj)).toEqual([]);
+    });
+
+    it('a later subscriber receives nothing', () => {
+      const obj = eventize();
+      retain(obj, 'data');
+      emit(obj, 'data', 'payload');
+
+      off(obj);
+
+      const late = fake();
+      on(obj, 'data', late);
+      expect(late.callCount).toBe(0);
+    });
+
+    it("off(ε, '*') behaves the same", () => {
+      const obj = eventize();
+      retain(obj, 'data');
+      emit(obj, 'data', 'payload');
+
+      off(obj, '*');
+
+      expect(getRetainedCount(obj)).toBe(0);
+      expect(getRetainedEventNames(obj)).toEqual([]);
+    });
+
+    it('leaves other emitters alone', () => {
+      const a = eventize();
+      const b = eventize();
+      retain(a, 'x');
+      retain(b, 'x');
+      emit(a, 'x', 1);
+      emit(b, 'x', 2);
+
+      off(a);
+
+      expect(getRetainedCount(a)).toBe(0);
+      expect(getRetainedCount(b)).toBe(1);
     });
   });
 });

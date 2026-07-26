@@ -188,6 +188,7 @@ Fully reverses `retain()`: the stored value is dropped **and** future emissions 
 - Accepts a single name or an array; string and symbol names both work.
 - Unretaining an event that was never retained is a no-op.
 - `unretain(ε, '*')` is the bulk form — it drops **every** policy and **every** stored value. See the wildcard note under [`retain()`](#notes).
+- `off(ε)` and `off(ε, '*')` do the same to retained state since v6.0.0, on top of removing every listener; `off(ε, eventName)` matches `unretain(ε, eventName)` for that one name. Reach for `unretain()` when the listeners are supposed to stay subscribed.
 
 ```javascript
 import {eventize, retain, unretain, emit, on} from '@spearwolf/eventize';

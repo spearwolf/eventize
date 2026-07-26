@@ -2,7 +2,7 @@
 
 [← back to README](../README.md)
 
-What an emitter holds, and what actually releases it — the two questions that matter once an app subscribes and unsubscribes for longer than a single test run. Every claim below has an assertion behind it in [`src/lifecycle.spec.ts`](../src/lifecycle.spec.ts). This describes the **v5.2.0** state; two gaps are called out explicitly below — `off()` not clearing retained state, and `MEM-002` — and both close in v6.0.0.
+What an emitter holds, and what actually releases it — the two questions that matter once an app subscribes and unsubscribes for longer than a single test run. Every claim below has an assertion behind it in [`src/lifecycle.spec.ts`](../src/lifecycle.spec.ts). This describes the **v6.0.0** state, in which `off(ε)` and `off(ε, '*')` clear retained state as well as listeners — a breaking change against v5.2.0, where they cleared only the store. One gap remains open and is called out below: `MEM-002`.
 
 ## What an emitter holds
 
@@ -25,13 +25,13 @@ on(ε, 'foo', (received) => {
 
 ## What each `off()` form releases
 
-`off()` always touches the store; whether it also touches the keeper's retained state depends on the exact form. The distinction that trips people up runs the other way from what you'd guess: **`off(ε, eventName, listenerObject)` — the one form that carries both an event name and a listener object — reaches the keeper and unretains that name, even though it only removes a single listener's subscription.** Every other form's effect on retained state matches whether it carries a *concrete* event name at all: the two bare-name forms (`off(ε, eventName)`, `off(ε, [eventName, …])`) unretain; the listener-only forms and every "everything" form (`off(ε)`, `off(ε, undefined)`, `off(ε, '*')`) do not.
+`off()` always touches the store; whether it also touches the keeper's retained state depends on the exact form. The "everything" forms (`off(ε)`, `off(ε, undefined)`, `off(ε, '*')`) wipe both halves — store and keeper — since v6.0.0. Beyond those, the distinction that trips people up runs the other way from what you'd guess: **`off(ε, eventName, listenerObject)` — the one form that carries both an event name and a listener object — reaches the keeper and unretains that name, even though it only removes a single listener's subscription.** The remaining forms follow whether they carry a *concrete* event name at all: the two bare-name forms (`off(ε, eventName)`, `off(ε, [eventName, …])`) unretain; the listener-only forms do not.
 
 | Form                                       | Listeners removed                                          | Retained state                                                                          |
 | ------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| `off(ε)`                                    | all                                                          | **untouched**                                                                              |
-| `off(ε, undefined)`                         | all — same branch as `off(ε)`, **not** a no-op               | **untouched**                                                                              |
-| `off(ε, '*')`                                | all (same as `off(ε)`)                                       | **untouched**                                                                              |
+| `off(ε)`                                    | all                                                          | every value **and** every policy dropped — same as `unretain(ε, '*')`                     |
+| `off(ε, undefined)`                         | all — same branch as `off(ε)`, **not** a no-op               | every value and every policy dropped                                                       |
+| `off(ε, '*')`                                | all (same as `off(ε)`)                                       | every value and every policy dropped                                                       |
 | `off(ε, eventName)`                          | every listener for that name                                  | value **and** policy dropped for that name — same as `unretain(ε, eventName)`             |
 | `off(ε, [eventName, …])`                     | every listener for each listed name                            | value and policy dropped for each listed name (string and symbol names alike)              |
 | `off(ε, listenerFunc[, context])`            | that function (with that context, if given), from every event | **untouched**                                                                              |
@@ -45,7 +45,7 @@ on(ε, 'foo', (received) => {
 The row worth pausing on is `off(ε, eventName, listenerObject)`: it narrowly removes one listener object's subscription to that name, but it drops the retained value and policy for the name *entirely*. Any sibling listener still subscribed to that name keeps running on future emits exactly as before — nothing is unsubscribed out from under it — but the *next* listener to subscribe to that name gets no replay, because the retained state it would have replayed from is gone.
 
 > [!IMPORTANT]
-> **`off(ε)` and `off(ε, '*')` do not clear retained state in v5.2.0.** Calling the bare or wildcard form only empties the store — every retained value and every retain policy survives untouched. This is arguably surprising given that both forms read as "reset the emitter," and it changes in **v6.0.0**, where the bare and wildcard forms will also clear retained state. If you need retained state gone today, follow `off(ε)` with `unretain(ε, '*')`.
+> **`off(ε)` and `off(ε, '*')` clear retained state as of v6.0.0.** Up to v5.2.0 the bare and wildcard forms only emptied the store: every retained value and every retain policy survived, so the call that reads as "reset the emitter" was precisely the one that pinned the payloads and still replayed them to the next subscriber. Both forms now wipe store and keeper together. Code that relied on retained values surviving a bulk `off(ε)` must re-`retain()` and re-`emit()`, or switch to the targeted `off(ε, eventName)` / `off(ε, [names])` forms, which are unchanged. The explicit `unretain(ε, '*')` after an `off(ε)` is now redundant, not wrong.
 >
 > **`off(ε, eventName, listenerObject)` unretaining the whole name is not scheduled to change.** Unlike the gap above, this branch has been unchanged since the 4.0.0 functional API; fixing it now would be a breaking change to a release that isn't one. Treat it as permanent, not as a bug to wait out.
 
@@ -159,4 +159,4 @@ expect(getRetainedCount(component.ε)).toBe(0);
 expect(getRetainedEventNames(component.ε)).toEqual([]);
 ```
 
-Note the explicit `unretain(ε, '*')` in that snippet — per the table above, unsubscribing alone does not clear retained state in v5.2.0, so a teardown that only calls handles back leaves the keeper exactly as full as it was.
+The explicit `unretain(ε, '*')` is what makes that teardown work without a bulk `off()`: calling the handles back only empties the store, so a teardown that stops there leaves the keeper exactly as full as it was. A single `off(component.ε)` covers both halves in one call.

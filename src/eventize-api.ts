@@ -22,7 +22,7 @@ import type {
   SubscribeArgs,
   UnsubscribeFunc,
 } from './types';
-import {isEventName} from './utils';
+import {isCatchEmAll, isEventName} from './utils';
 
 const afterApply = (callback?: () => void) => (listener: EventListener) => {
   listener.callAfterApply = () => {
@@ -497,6 +497,18 @@ export function off(
     listenerObject != null &&
     (listenerType === 'string' || listenerType === 'symbol');
   store.remove(listener, listenerObject, forceRemove);
+
+  // off(ε) and off(ε, '*') wipe the store completely; the keeper follows.
+  // The condition mirrors EventStore.remove()'s own "remove everything" branch
+  // exactly. It has to run before the array/name branches below, because
+  // isEventName('*') is true and '*' would otherwise take the name path.
+  // Leaving retained payloads behind after "remove everything" kept them
+  // strongly referenced and still replayed them to later subscribers.
+  if (listener == null || (listenerObject == null && isCatchEmAll(listener))) {
+    keeper.removeAll();
+    return;
+  }
+
   if (Array.isArray(listener)) {
     // Only the event-name elements are meaningful to the keeper. Arrays reach
     // this branch from two directions: an explicit off(ε, [name, …]) call, and

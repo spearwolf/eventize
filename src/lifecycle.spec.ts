@@ -137,7 +137,7 @@ describe('lifecycle', () => {
       expect(getRetainedEventNames(obj)).toEqual([]);
     });
 
-    it('off(ε, undefined) also leaves retained state untouched, on its way to wiping every listener', () => {
+    it('off(ε, undefined) also clears retained state, on its way to wiping every listener', () => {
       const obj = eventize();
       retain(obj, 'foo');
       emit(obj, 'foo', 'payload');
@@ -146,11 +146,11 @@ describe('lifecycle', () => {
       off(obj, undefined);
 
       expect(getSubscriptionCount(obj)).toBe(0);
-      expect(getRetainedCount(obj)).toBe(1);
-      expect(getRetainedEventNames(obj)).toEqual(['foo']);
+      expect(getRetainedCount(obj)).toBe(0);
+      expect(getRetainedEventNames(obj)).toEqual([]);
     });
 
-    it('off(ε) — the bare form — leaves retained state untouched', () => {
+    it('off(ε) — the bare form — clears retained state', () => {
       const obj = eventize();
       retain(obj, 'foo');
       emit(obj, 'foo', 'payload');
@@ -159,11 +159,11 @@ describe('lifecycle', () => {
       off(obj);
 
       expect(getSubscriptionCount(obj)).toBe(0);
-      expect(getRetainedCount(obj)).toBe(1);
-      expect(getRetainedEventNames(obj)).toEqual(['foo']);
+      expect(getRetainedCount(obj)).toBe(0);
+      expect(getRetainedEventNames(obj)).toEqual([]);
     });
 
-    it('off(ε, "*") also leaves retained state untouched, just like the bare form', () => {
+    it('off(ε, "*") also clears retained state, just like the bare form', () => {
       const obj = eventize();
       retain(obj, 'foo');
       emit(obj, 'foo', 'payload');
@@ -172,8 +172,20 @@ describe('lifecycle', () => {
       off(obj, '*');
 
       expect(getSubscriptionCount(obj)).toBe(0);
-      expect(getRetainedCount(obj)).toBe(1);
-      expect(getRetainedEventNames(obj)).toEqual(['foo']);
+      expect(getRetainedCount(obj)).toBe(0);
+      expect(getRetainedEventNames(obj)).toEqual([]);
+    });
+
+    it('off(ε) drops every retained value and policy', () => {
+      const obj = eventize();
+      retain(obj, ['a', 'b']);
+      emit(obj, 'a', 1);
+      emit(obj, 'b', 2);
+
+      off(obj);
+
+      expect(getRetainedCount(obj)).toBe(0);
+      expect(getRetainedEventNames(obj)).toEqual([]);
     });
 
     it('off(ε, [names]) drops the retained value and the policy for each listed name', () => {

@@ -45,7 +45,7 @@ import {eventize, on, once, onceAsync, emit, emitAsync,
 | `onceAsync(ε, name, {signal}?)` | promise resolving on next emit; the optional `AbortSignal` unsubscribes and rejects | `Promise<firstArg>` |
 | `emit(ε, name, …args)` | sync dispatch | `void` |
 | `emitAsync(ε, name, …args)` | dispatch + collect non-null returns | `Promise<any[] \| undefined>` |
-| `off(ε, …)` | unsubscribe; also clears retain for named events | `void` |
+| `off(ε, …)` | unsubscribe; also clears retain for named events, and all retained state on `off(ε)` / `off(ε, '*')` | `void` |
 | `retain(ε, name)` | replay last value to new subscribers | `void` |
 | `retainClear(ε, name)` | drop stored value, keep policy | `void` |
 | `unretain(ε, name)` | drop value and policy | `void` |
@@ -82,7 +82,7 @@ How each function treats a target that was never eventized — the single most c
 6. **Listener-objects dedupe, functions don't.** `on(ε, 'foo', listenerObj)` twice yields one listener with refcount 2; each unsubscribe decrements. The same *function* subscribed twice fires twice. Match key: `(eventName, priority, listener, listenerContext)`.
 7. **`off()` mid-emit** skips listeners that haven't run yet in that dispatch.
 8. **`emitAsync()` resolves `undefined`, not `[]`**, when nothing was collected. `null`/`undefined` returns are dropped; arrays of promises are flattened via `Promise.all`.
-9. **`off(ε, name)` unretains that event** — it drops the stored value *and* the retain policy, so later emits aren't retained until `retain()` is called again. Scalar and array forms behave alike for strings and symbols since v5.1; before that, `off(ε, [aSymbol])` left retained state untouched.
+9. **`off(ε, name)` unretains that event** — it drops the stored value *and* the retain policy, so later emits aren't retained until `retain()` is called again. Scalar and array forms behave alike for strings and symbols since v5.1; before that, `off(ε, [aSymbol])` left retained state untouched. Since v6.0.0 the bulk forms `off(ε)` and `off(ε, '*')` do the same for *every* retained name — up to v5.2.0 they cleared only listeners and still replayed old payloads to later subscribers.
 10. **Events emitted before `retain()` are not stored.** Retain starts recording from the call onwards.
 
 ## Idiomatic shape
