@@ -22,10 +22,10 @@ export default {
   // Raise these when coverage rises; never lower them to make a build pass.
   coverageThreshold: {
     global: {
-      statements: 97,
-      branches: 93,
-      functions: 93,
-      lines: 97,
+      statements: 99,
+      branches: 97,
+      functions: 99,
+      lines: 99,
     },
   },
 
