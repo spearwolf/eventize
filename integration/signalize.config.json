@@ -1,4 +1,5 @@
 {
   "repo": "https://github.com/spearwolf/signalize.git",
-  "ref": "v0.31.1"
+  "ref": "359d939a8879467ed0e53b314ade9a2157d734ca",
+  "note": "signalize v0.31.1. The repository carries no release tags — v0.0.1 is the only one that was ever pushed — so the ref is the commit SHA of 'chore: release v0.31.1' on main. GitHub serves a bare SHA to a --depth 1 fetch, verified."
 }

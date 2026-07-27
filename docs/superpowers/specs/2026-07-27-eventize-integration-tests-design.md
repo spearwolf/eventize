@@ -53,7 +53,7 @@ a script guessed is not trustworthy.
 ```
 integration/
   Dockerfile              node:24-slim + git + corepack/pnpm 11
-  signalize.config.json   {repo, ref}  — pinned, default v0.31.1
+  signalize.config.json   {repo, ref}  — pinned to a commit SHA (v0.31.1)
   entrypoint.sh           in-container: patch → wire → install → typecheck → test
   run.mjs                 on-host: build → pack → docker build → docker run ×2
   patches/signalize/      *.patch — semantic migrations only, versioned
@@ -81,6 +81,12 @@ pnpm comes from corepack, honoring signalize's `packageManager: pnpm@11.17.0`.
 
 **The clone happens in the image**, with the ref as a build `ARG`. Changing the ref
 invalidates the layer on its own; nobody has to remember `--no-cache`.
+
+The ref is a **commit SHA**, not a tag. signalize pushes no release tags — `v0.0.1` is
+the only one that exists — so `v0.31.1` names a commit message, not a fetchable ref.
+`git init` + `git fetch --depth 1 origin <sha>` replaces `git clone --branch` because
+that form accepts a tag, a branch *and* a SHA, and GitHub serves bare SHAs to a shallow
+fetch.
 
 **`pnpm install` runs in the image against the unmodified manifest**, i.e. against
 eventize `5.0.0` from the registry, with `--frozen-lockfile`. The v6 tarball is

@@ -18,7 +18,7 @@
 - **No commits, pushes or PRs in signalize.** Patches live in this repo only.
 - Docs and code comments are **English**.
 - `eslint` lints `**/*.{mjs,cjs}` with node globals, so `integration/run.mjs` is inside the `lint` gate. `prettier --check` only covers `src/**`, so `integration/` is not format-gated — match the repo style anyway: single quotes, no bracket spacing (`import {x} from 'y'`).
-- Pinned signalize ref for all tasks: **`v0.31.1`**.
+- Pinned signalize ref for all tasks: **`359d939a8879467ed0e53b314ade9a2157d734ca`** (signalize v0.31.1). Not the tag: the repo has no release tags, `v0.0.1` is the only one ever pushed. GitHub serves a bare SHA to `git fetch --depth 1`, verified.
 - Expected eventize tarball name: **`spearwolf-eventize-6.0.0-dev.tgz`**.
 
 ## File Structure
@@ -73,7 +73,8 @@ Create `integration/signalize.config.json`:
 ```json
 {
   "repo": "https://github.com/spearwolf/signalize.git",
-  "ref": "v0.31.1"
+  "ref": "359d939a8879467ed0e53b314ade9a2157d734ca",
+  "note": "signalize v0.31.1. The repository carries no release tags — v0.0.1 is the only one that was ever pushed — so the ref is the commit SHA of 'chore: release v0.31.1' on main. GitHub serves a bare SHA to a --depth 1 fetch, verified."
 }
 ```
 
@@ -158,7 +159,7 @@ Create `integration/Dockerfile`:
 FROM node:24-slim
 
 ARG SIGNALIZE_REPO=https://github.com/spearwolf/signalize.git
-ARG SIGNALIZE_REF=v0.31.1
+ARG SIGNALIZE_REF=359d939a8879467ed0e53b314ade9a2157d734ca
 
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 
@@ -431,7 +432,7 @@ Run:
 rm -rf tmp/integration/baseline && mkdir -p tmp/integration/baseline
 docker build -t eventize-integration:test integration/
 docker run --rm \
-  -e PHASE=baseline -e EVENTIZE_VERSION=6.0.0-dev -e SIGNALIZE_REF=v0.31.1 \
+  -e PHASE=baseline -e EVENTIZE_VERSION=6.0.0-dev -e SIGNALIZE_REF=359d939a8879467ed0e53b314ade9a2157d734ca \
   -v "$PWD/tmp/integration/spearwolf-eventize-6.0.0-dev.tgz:/opt/eventize/pkg.tgz:ro" \
   -v "$PWD/tmp/integration/baseline:/out" \
   eventize-integration:test
@@ -504,7 +505,7 @@ Run:
 rm -rf tmp/integration/baseline && mkdir -p tmp/integration/baseline
 docker build -t eventize-integration:test integration/
 docker run --rm \
-  -e PHASE=baseline -e EVENTIZE_VERSION=6.0.0-dev -e SIGNALIZE_REF=v0.31.1 \
+  -e PHASE=baseline -e EVENTIZE_VERSION=6.0.0-dev -e SIGNALIZE_REF=359d939a8879467ed0e53b314ade9a2157d734ca \
   -v "$PWD/tmp/integration/spearwolf-eventize-6.0.0-dev.tgz:/opt/eventize/pkg.tgz:ro" \
   -v "$PWD/tmp/integration/baseline:/out" \
   eventize-integration:test
@@ -611,7 +612,7 @@ Run:
 ```bash
 rm -rf tmp/integration/patched && mkdir -p tmp/integration/patched
 docker run --rm \
-  -e PHASE=patched -e EVENTIZE_VERSION=6.0.0-dev -e SIGNALIZE_REF=v0.31.1 \
+  -e PHASE=patched -e EVENTIZE_VERSION=6.0.0-dev -e SIGNALIZE_REF=359d939a8879467ed0e53b314ade9a2157d734ca \
   -v "$PWD/tmp/integration/spearwolf-eventize-6.0.0-dev.tgz:/opt/eventize/pkg.tgz:ro" \
   -v "$PWD/integration/patches/signalize:/opt/patches:ro" \
   -v "$PWD/tmp/integration/patched:/out" \
