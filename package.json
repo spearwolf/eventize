@@ -22,6 +22,7 @@
   "files": [
     "lib",
     "docs",
+    "!docs/superpowers",
     "skills",
     "README.md",
     "CHANGELOG.md",
@@ -42,6 +43,7 @@
     "publish:pkg": "node scripts/publishPackage.cjs",
     "test": "cross-env NODE_ENV=test jest",
     "test:coverage": "cross-env NODE_ENV=test jest --coverage",
+    "test:integrations": "node integration/run.mjs",
     "watch": "cross-env NODE_ENV=test jest --watch",
     "typecheck": "tsc --noEmit",
     "checkPkgTypes": "npx attw --pack",
