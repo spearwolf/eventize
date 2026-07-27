@@ -131,5 +131,37 @@ fi
 record_step assert-version 0 0 install.log
 echo "eventize ${RESOLVED} resolved — assertion passed"
 
+# --- typecheck --------------------------------------------------------------
+# The actual guard. signalize transpiles through SWC, which strips types
+# without checking them, so a green vitest run proves nothing about the type
+# surface. This compiles signalize under module/moduleResolution NodeNext with
+# TypeScript 7 against .d.ts files tsup emitted with TypeScript 5.9 — the only
+# place those two ever meet.
+#
+# --skipLibCheck, and the default tsconfig.json rather than tsconfig.lib.json:
+#   - Without it the run drowns in six TS2307s from unplugin's and
+#     webpack-virtual-modules' own .d.ts files, which reference optional peers
+#     (@farmfe/core, @rspack/core, esbuild, webpack, unloader) that signalize
+#     never installs. That is signalize toolchain noise, not an eventize
+#     finding, and it would mask every real one.
+#   - It does not weaken the measurement: errors in signalize's *own* source,
+#     including every use of an eventize type and a failure to resolve the
+#     module at all, are still reported. Only the internal consistency of
+#     third-party declarations is skipped, and eventize's own declarations are
+#     covered by `attw --pack` in this repo's cbt gate.
+#   - tsconfig.lib.json would dodge the noise too, but it excludes *.spec.ts —
+#     and those spec files are the heaviest eventize consumers in the repo.
+run_step typecheck typecheck.log pnpm exec tsc --noEmit --skipLibCheck
+TSC_RC=$?
+[ "$TSC_RC" -ne 0 ] && note_failure 20
+
+# --- tests ------------------------------------------------------------------
+# No --coverage: signalize's own script runs it, but its thresholds would add
+# a second, unrelated failure on top of every real one.
+run_step test vitest.log pnpm exec vitest run \
+  --reporter=default --reporter=json --outputFile.json="$OUT_DIR/vitest.json"
+VITEST_RC=$?
+[ "$VITEST_RC" -ne 0 ] && note_failure 30
+
 write_result
 exit "$WORST"
