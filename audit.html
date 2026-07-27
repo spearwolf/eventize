@@ -3,487 +3,508 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Projekt-Audit — @spearwolf/eventize v6.2.0</title>
+<title>Projekt-Audit &middot; @spearwolf/eventize</title>
 <style>
   :root{
-    --bg:#fafaf9; --surface:#ffffff; --surface-2:#f5f5f4;
-    --text:#1c1917; --text-2:#57534e; --text-3:#78716c; --faint:#a8a29e;
-    --border:#e7e5e4; --border-2:#d6d3d1;
-    --accent:#4f46e5; --accent-soft:#eef2ff;
+    --bg:#fafaf9; --surface:#ffffff; --surface-2:#f5f5f4; --ink:#1c1917; --ink-2:#57534e;
+    --ink-3:#8a8580; --line:#e7e5e4; --line-2:#d6d3d1; --accent:#4f46e5; --accent-soft:#eef2ff;
     --critical:#dc2626; --high:#ea580c; --medium:#d97706; --low:#2563eb; --info:#78716c;
-    --ok:#15803d;
+    --ok:#15803d; --ok-soft:#f0fdf4;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
-  html{-webkit-text-size-adjust:100%}
   body{
-    margin:0; background:var(--bg); color:var(--text);
-    font-family:ui-sans-serif,-apple-system,"Segoe UI",Inter,Roboto,"Helvetica Neue",sans-serif;
-    font-size:16px; line-height:1.65;
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:ui-sans-serif,-apple-system,"Segoe UI",Inter,Roboto,sans-serif;
+    line-height:1.65; -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:1080px; margin:0 auto; padding:0 24px 96px}
-  a{color:var(--accent)}
-  code,.mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;font-size:.875em}
-  code{background:var(--surface-2); border:1px solid var(--border); border-radius:4px; padding:.08em .34em}
+  .wrap{max-width:1080px; margin:0 auto; padding:48px 24px 96px}
   h1,h2,h3{font-weight:600; line-height:1.25; margin:0}
-  h2{font-size:1.4rem; margin:64px 0 8px; letter-spacing:-.01em}
-  h3{font-size:1.05rem; margin:32px 0 8px}
-  p{margin:.7em 0}
-  .lede{color:var(--text-2)}
-  section>h2+.lede{margin-top:.5em}
+  h1{font-size:2rem; letter-spacing:-.02em}
+  h2{font-size:1.35rem; letter-spacing:-.01em; margin:56px 0 16px; padding-bottom:10px; border-bottom:1px solid var(--line)}
+  h3{font-size:1.05rem; margin:28px 0 8px}
+  p{margin:0 0 14px}
+  a{color:var(--accent)}
+  code,.mono{font-family:var(--mono); font-size:.86em}
+  .muted{color:var(--ink-2)}
+  .small{font-size:.875rem}
+  .xsmall{font-size:.8rem}
 
-  /* ── Header ─────────────────────────────────────────── */
-  header{padding:56px 0 8px; border-bottom:1px solid var(--border); margin-bottom:20px}
-  .eyebrow{font-size:.75rem; letter-spacing:.14em; text-transform:uppercase; color:var(--text-3); margin:0 0 10px}
-  h1{font-size:2.1rem; letter-spacing:-.02em}
-  .badges{display:flex; flex-wrap:wrap; gap:6px; margin:16px 0 0}
-  .badge{font-size:.75rem; padding:3px 9px; border-radius:999px; background:var(--surface); border:1px solid var(--border-2); color:var(--text-2)}
-  .scorebox{display:flex; flex-wrap:wrap; align-items:baseline; gap:16px; margin:28px 0 20px}
-  .score{font-size:3.4rem; font-weight:600; letter-spacing:-.03em; line-height:1}
-  .delta{font-size:1rem; color:var(--ok); font-weight:600}
-  .delta .prev{color:var(--text-3); font-weight:400; margin-left:8px}
-  .diffline{font-size:.94rem; color:var(--text-2); margin:0 0 8px; padding:12px 16px;
-            background:var(--surface); border:1px solid var(--border); border-radius:8px}
-  .diffline b{color:var(--text); font-weight:600}
+  header.head{display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start; justify-content:space-between}
+  .head-main{flex:1 1 380px; min-width:0}
+  .badges{display:flex; flex-wrap:wrap; gap:6px; margin-top:14px}
+  .badge{font-size:.75rem; padding:3px 9px; border-radius:999px; background:var(--surface-2);
+    border:1px solid var(--line); color:var(--ink-2); white-space:nowrap}
+  .badge.v{background:var(--accent-soft); border-color:#c7d2fe; color:#3730a3}
 
-  /* ── Portrait ───────────────────────────────────────── */
-  .domains{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; margin:20px 0 0}
-  .domain{background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:14px 16px}
-  .domain h4{margin:0 0 4px; font-size:.95rem; font-weight:600}
-  .domain p{margin:0 0 8px; font-size:.88rem; color:var(--text-2); line-height:1.55}
-  .chips{display:flex; flex-wrap:wrap; gap:4px}
-  .chip{font-size:.72rem; padding:2px 7px; border-radius:4px; background:var(--surface-2);
-        border:1px solid var(--border); color:var(--text-3); font-family:ui-monospace,monospace}
-  figure{margin:26px 0 0}
-  figure pre{overflow-x:auto; background:var(--surface); border:1px solid var(--border);
-             border-radius:8px; padding:18px; margin:0; font-size:.8rem; line-height:1.5; color:var(--text-2)}
-  figcaption{font-size:.83rem; color:var(--text-3); margin-top:10px; max-width:82ch; line-height:1.6}
+  .scorecard{flex:0 0 auto; background:var(--surface); border:1px solid var(--line);
+    border-radius:14px; padding:20px 26px; text-align:center; min-width:210px}
+  .score-num{font-size:3rem; font-weight:600; letter-spacing:-.03em; line-height:1}
+  .score-label{font-size:.75rem; text-transform:uppercase; letter-spacing:.09em; color:var(--ink-3); margin-bottom:6px}
+  .delta{margin-top:10px; font-size:.875rem}
+  .delta .down{color:var(--high)} .delta .up{color:var(--ok)} .delta .flat{color:var(--ink-3)}
 
-  /* ── Severity / Kategorie ───────────────────────────── */
-  .sevgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:10px; margin:20px 0 0}
-  .sevcard{background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px 14px}
-  .sevcard .n{font-size:1.7rem; font-weight:600; line-height:1.15}
-  .sevcard .l{font-size:.78rem; color:var(--text-3); text-transform:uppercase; letter-spacing:.06em}
-  .bar{height:8px; border-radius:999px; overflow:hidden; display:flex; margin:18px 0 0; background:var(--surface-2)}
-  .bar span{display:block}
-  .catlist{margin:20px 0 0; display:grid}
-  .catrow{display:grid; grid-template-columns:1fr auto; gap:12px; align-items:center;
-          font-size:.9rem; padding:8px 0; border-bottom:1px solid var(--border)}
-  .catrow:last-child{border-bottom:0}
-  .catbar{height:6px; border-radius:999px; background:var(--accent); opacity:.72}
-  .catrow .meter{display:flex; align-items:center; gap:10px}
-  .catrow .cnt{color:var(--text-3); font-variant-numeric:tabular-nums; min-width:1.5em; text-align:right}
+  .diffbar{margin-top:22px; background:var(--surface); border:1px solid var(--line);
+    border-radius:12px; padding:14px 18px; display:flex; flex-wrap:wrap; gap:10px 26px; align-items:baseline}
+  .diffbar b{font-weight:600}
+  .diffbar .sep{color:var(--line-2)}
 
-  /* ── Backlog ────────────────────────────────────────── */
-  .filters{display:flex; flex-wrap:wrap; gap:14px; margin:20px 0 14px; align-items:center}
-  .filters .grp{display:flex; flex-wrap:wrap; gap:5px; align-items:center}
-  .filters .lbl{font-size:.74rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-3); margin-right:2px}
-  button.f{font:inherit; font-size:.82rem; padding:4px 11px; border-radius:999px; cursor:pointer;
-           background:var(--surface); border:1px solid var(--border-2); color:var(--text-2)}
-  button.f:hover{border-color:var(--text-3)}
-  button.f[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:#fff}
-  select.f{font:inherit; font-size:.82rem; padding:4px 8px; border-radius:6px;
-           background:var(--surface); border:1px solid var(--border-2); color:var(--text-2)}
-  .tablewrap{overflow-x:auto; border:1px solid var(--border); border-radius:8px; background:var(--surface)}
-  table{border-collapse:collapse; width:100%; min-width:760px; font-size:.9rem}
-  th{text-align:left; font-weight:600; font-size:.76rem; text-transform:uppercase; letter-spacing:.07em;
-     color:var(--text-3); padding:11px 14px; border-bottom:1px solid var(--border); white-space:nowrap}
-  td{padding:11px 14px; border-bottom:1px solid var(--border); vertical-align:top}
-  tr.item{cursor:pointer}
-  tr.item:hover td{background:var(--surface-2)}
-  tr.item.open td{background:var(--accent-soft)}
-  tr.detail>td{background:var(--surface-2); padding:0 14px 18px}
-  tr.detail .inner{padding-top:4px; max-width:80ch}
-  tr.detail h5{margin:14px 0 2px; font-size:.75rem; text-transform:uppercase; letter-spacing:.08em;
-               color:var(--text-3); font-weight:600}
-  tr.detail p{margin:0; font-size:.92rem; line-height:1.68; color:var(--text-2)}
-  .sev{display:inline-block; font-size:.72rem; font-weight:600; padding:2px 8px; border-radius:4px;
-       text-transform:uppercase; letter-spacing:.05em; color:#fff; white-space:nowrap}
-  .sev.critical{background:var(--critical)} .sev.high{background:var(--high)}
-  .sev.medium{background:var(--medium)} .sev.low{background:var(--low)}
-  .sev.info{background:var(--info)}
-  .st{display:inline-block; font-size:.68rem; padding:2px 7px; border-radius:4px; white-space:nowrap;
-      border:1px solid var(--border-2); color:var(--text-3); background:var(--surface)}
-  .st.new{background:var(--accent); border-color:var(--accent); color:#fff}
-  .st.unchanged{background:var(--surface-2)}
-  .st.improved{background:#dcfce7; border-color:#86efac; color:#14532d}
-  .st.carried-over{opacity:.6}
-  td.id{font-family:ui-monospace,monospace; font-size:.8rem; color:var(--text-3); white-space:nowrap}
-  td.loc{font-family:ui-monospace,monospace; font-size:.78rem; color:var(--text-3); word-break:break-word; min-width:170px}
-  td.ti{font-weight:500; min-width:270px}
-  .eff{font-family:ui-monospace,monospace; font-size:.8rem; color:var(--text-3)}
-  .empty{padding:28px 14px; color:var(--text-3); font-size:.9rem}
-  .chev{display:inline-block; width:9px; color:var(--faint); transition:transform .12s}
-  tr.item.open .chev{transform:rotate(90deg)}
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:20px 22px}
+  .grid{display:grid; gap:14px}
+  .grid.dom{grid-template-columns:repeat(auto-fill,minmax(290px,1fr))}
+  .dom-card h3{margin:0 0 4px; font-size:.98rem}
+  .chips{display:flex; flex-wrap:wrap; gap:5px; margin-top:9px}
+  .chip{font-family:var(--mono); font-size:.72rem; padding:2px 7px; border-radius:5px;
+    background:var(--surface-2); border:1px solid var(--line); color:var(--ink-2)}
 
-  /* ── Listen ─────────────────────────────────────────── */
-  ol.q,ul.o{padding-left:22px; margin:16px 0 0}
-  ol.q li,ul.o li{margin:0 0 15px; color:var(--text-2); max-width:82ch; line-height:1.65}
-  ol.q li b,ul.o li b{color:var(--text)}
-  .method dt{font-weight:600; font-size:.9rem; margin-top:18px}
-  .method dd{margin:2px 0 0; color:var(--text-2); font-size:.92rem; max-width:84ch}
-  .chart{margin:22px 0 8px}
-  .chart svg{max-width:640px; width:100%; height:auto; display:block}
-  footer{margin-top:72px; padding-top:20px; border-top:1px solid var(--border);
-         font-size:.83rem; color:var(--text-3); max-width:82ch}
-  @media (max-width:640px){
-    .wrap{padding:0 16px 64px} h1{font-size:1.6rem} .score{font-size:2.6rem}
-    h2{margin-top:48px}
-  }
+  figure{margin:18px 0 0}
+  figure pre{overflow-x:auto; background:var(--surface); border:1px solid var(--line);
+    border-radius:10px; padding:18px; font-family:var(--mono); font-size:.76rem; line-height:1.5; margin:0}
+  figcaption{font-size:.82rem; color:var(--ink-2); margin-top:9px}
+
+  .sev-rows{display:grid; gap:9px}
+  .sev-row{display:grid; grid-template-columns:88px 1fr 42px; gap:12px; align-items:center}
+  .sev-name{font-size:.85rem; font-weight:500}
+  .track{background:var(--surface-2); border-radius:999px; height:11px; overflow:hidden}
+  .fill{height:100%; border-radius:999px}
+  .sev-count{text-align:right; font-variant-numeric:tabular-nums; font-size:.85rem; color:var(--ink-2)}
+  .c-critical{color:var(--critical)} .bg-critical{background:var(--critical)}
+  .c-high{color:var(--high)} .bg-high{background:var(--high)}
+  .c-medium{color:var(--medium)} .bg-medium{background:var(--medium)}
+  .c-low{color:var(--low)} .bg-low{background:var(--low)}
+  .c-info{color:var(--info)} .bg-info{background:var(--info)}
+
+  .cat-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:8px}
+  .cat{display:flex; justify-content:space-between; gap:10px; padding:8px 12px;
+    background:var(--surface); border:1px solid var(--line); border-radius:8px; font-size:.85rem}
+  .cat b{font-weight:600; font-variant-numeric:tabular-nums}
+
+  .filters{display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 14px; align-items:center}
+  .filters .lab{font-size:.78rem; text-transform:uppercase; letter-spacing:.07em; color:var(--ink-3); margin-right:2px}
+  button.f{font:inherit; font-size:.82rem; padding:5px 12px; border-radius:999px; cursor:pointer;
+    border:1px solid var(--line-2); background:var(--surface); color:var(--ink-2)}
+  button.f:hover{border-color:var(--ink-3)}
+  button.f[aria-pressed="true"]{background:var(--ink); border-color:var(--ink); color:#fff}
+  select.f{font:inherit; font-size:.82rem; padding:5px 10px; border-radius:8px;
+    border:1px solid var(--line-2); background:var(--surface); color:var(--ink-2)}
+
+  table{width:100%; border-collapse:collapse; background:var(--surface);
+    border:1px solid var(--line); border-radius:12px; overflow:hidden}
+  thead th{text-align:left; font-size:.72rem; text-transform:uppercase; letter-spacing:.07em;
+    color:var(--ink-3); font-weight:600; padding:11px 14px; background:var(--surface-2);
+    border-bottom:1px solid var(--line)}
+  tbody tr.row{border-top:1px solid var(--line); cursor:pointer}
+  tbody tr.row:hover{background:var(--surface-2)}
+  tbody td{padding:11px 14px; vertical-align:top; font-size:.9rem}
+  td.id{font-family:var(--mono); font-size:.78rem; color:var(--ink-2); white-space:nowrap}
+  td.sev{white-space:nowrap; font-size:.78rem; font-weight:600; text-transform:uppercase; letter-spacing:.04em}
+  td.loc{font-family:var(--mono); font-size:.75rem; color:var(--ink-2); word-break:break-word; max-width:230px}
+  td.eff{text-align:center; font-family:var(--mono); font-size:.78rem; color:var(--ink-2)}
+  .st{display:inline-block; font-size:.68rem; padding:1px 7px; border-radius:999px;
+    border:1px solid var(--line-2); color:var(--ink-2); background:var(--surface-2);
+    text-transform:uppercase; letter-spacing:.05em; margin-left:7px; vertical-align:1px}
+  .st.new{background:var(--accent-soft); border-color:#c7d2fe; color:#3730a3}
+  .st.improved{background:var(--ok-soft); border-color:#bbf7d0; color:var(--ok)}
+  .st.carried-over{opacity:.72}
+  tr.detail{display:none; border-top:1px dashed var(--line)}
+  tr.detail.open{display:table-row}
+  tr.detail td{padding:4px 14px 20px; background:var(--surface-2)}
+  .det-block{margin-top:12px}
+  .det-block .k{font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-3); margin-bottom:3px}
+  .det-block .v{font-size:.9rem}
+  .arrow{display:inline-block; width:12px; color:var(--ink-3); font-size:.7rem}
+  .empty{padding:26px; text-align:center; color:var(--ink-3); font-size:.9rem}
+
+  ul.tight{margin:0 0 14px; padding-left:20px}
+  ul.tight li{margin-bottom:7px}
+  ol.tight{margin:0 0 14px; padding-left:20px}
+  ol.tight li{margin-bottom:9px}
+
+  .ack{background:var(--surface-2); border:1px dashed var(--line-2); border-radius:12px; padding:18px 20px; opacity:.92}
+  .ack-item{padding:12px 0; border-top:1px solid var(--line)}
+  .ack-item:first-of-type{border-top:none}
+  .ack-item .t{font-weight:600; font-size:.92rem}
+
+  .chart{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:18px; overflow-x:auto}
+  .chart svg{display:block; max-width:100%; height:auto}
 </style>
 </head>
 <body>
 <div class="wrap">
 
-<header>
-  <p class="eyebrow">Projekt-Audit · Folgelauf</p>
-  <h1>@spearwolf/eventize</h1>
-  <div class="badges">
-    <span class="badge">v6.2.0</span>
-    <span class="badge">TypeScript 5.9.3</span>
-    <span class="badge">Library · 0 runtime deps</span>
-    <span class="badge">ESM + CJS · tsup/esbuild</span>
-    <span class="badge">Jest 30 · ts-jest</span>
-    <span class="badge">Node ≥ 18.16</span>
-    <span class="badge">Apache-2.0</span>
+<header class="head">
+  <div class="head-main">
+    <h1>Projekt-Audit &middot; @spearwolf/eventize</h1>
+    <p class="muted small" style="margin-top:6px">Folgelauf &middot; 27. Juli 2026 &middot; Vorlauf 26. Juli 2026</p>
+    <div class="badges">
+      <span class="badge v">6.0.0-dev</span>
+      <span class="badge">TypeScript 5.9</span>
+      <span class="badge">tsup / esbuild</span>
+      <span class="badge">Jest 30 + ts-jest</span>
+      <span class="badge">ESM + CJS</span>
+      <span class="badge">Node &ge; 18.16</span>
+      <span class="badge">0 Runtime-Deps</span>
+      <span class="badge">strict</span>
+    </div>
   </div>
-  <div class="scorebox">
-    <div class="score">81,0</div>
-    <div class="delta">▲ +3,5 <span class="prev">vorher 77,5 · 2026-07-26</span></div>
+  <div class="scorecard">
+    <div class="score-label">Health-Score</div>
+    <div class="score-num">76</div>
+    <div class="delta">
+      <span class="down">&#9660; &minus;5</span>
+      <span class="muted xsmall"><br>vorher 81 (26.07.2026)</span>
+    </div>
   </div>
-  <p class="diffline">
-    <b>8 behoben</b> · <b>0 verbessert</b> · <b>13 neu</b> · <b>12 unverändert übernommen</b> seit dem
-    Audit vom 2026-07-26. Alle acht entfallenen Findings wurden am Code als behoben verifiziert, keines
-    kontextbedingt gestrichen.
-  </p>
 </header>
 
-<!-- ══ Projektportrait ═════════════════════════════════ -->
-<section>
-  <h2>Was das Projekt tut</h2>
-  <p class="lede">
-    <code>@spearwolf/eventize</code> macht ein beliebiges JavaScript- oder TypeScript-Objekt zum
-    <strong>synchronen</strong> Event-Emitter. Ein verstecktes, nicht aufzählbares Symbol-Slot trägt die
-    Listener-Registry und das Protokoll zurückgehaltener Events — deshalb werden ein leeres <code>{}</code>,
-    eine bestehende Instanz und eine Klasse über denselben Codepfad zu Emittern. Listener laufen sofort und in
-    Prioritätsreihenfolge; die Bibliothek zielt auf Game-Loops, Echtzeit-Pipelines und alles, wo eine Microtask
-    zwischen Emit und Reaktion schon zu spät ist.
-  </p>
-  <p class="lede">
-    Ausgeliefert wird dual als ESM und CJS, ohne eine einzige Laufzeit-Abhängigkeit. Generische Event-Maps sind
-    optional: Wer sie angibt, bekommt geprüfte Event-Namen und Argument-Tupel, wer nicht, behält das
-    vollständige Duck-Typing der v4-Ära.
-  </p>
-
-  <div class="domains">
-    <div class="domain">
-      <h4>Dispatch</h4>
-      <p>Löst einen Event-Namen auf ein aufrufbares Member auf und ruft es. Trägt die
-      <code>Object.prototype</code>-Grenze, an der ein bloß geerbtes <code>toString</code> nicht als Treffer gilt.</p>
-      <div class="chips"><span class="chip">EventListener.ts</span><span class="chip">utils.ts</span><span class="chip">eventize-api.ts:72-157</span></div>
-    </div>
-    <div class="domain">
-      <h4>Listener-Registry</h4>
-      <p>Prioritätssortierte Ablage per Binärsuche, referenzgezählte Deduplizierung, vier Entfernungswege
-      (Name, Funktion, Objekt, Instanz) und der Merge von benanntem Bucket und Wildcard-Bucket.</p>
-      <div class="chips"><span class="chip">EventStore.ts</span></div>
-    </div>
-    <div class="domain">
-      <h4>Retained Events</h4>
-      <p>Retain-Policies, gespeicherte Werte und ihre geordnete Wiedergabe an neue Abonnenten — nach
-      abgeschlossener Registrierung, damit die Emissionsreihenfolge erhalten bleibt.</p>
-      <div class="chips"><span class="chip">EventKeeper.ts</span><span class="chip">eventize-api.ts:652-716</span></div>
-    </div>
-    <div class="domain">
-      <h4>Subscription-Dekodierung</h4>
-      <p>Positionsweises Auflösen der vierzehn <code>on()</code>-Argumentformen, Prioritätsauflösung je Event
-      und die Validierung, die entscheidet, was überhaupt Listener werden darf.</p>
-      <div class="chips"><span class="chip">subscribeTo.ts</span></div>
-    </div>
-    <div class="domain">
-      <h4>API-Oberflächen</h4>
-      <p>Drei Zugänge auf einer Implementierung: freistehende Funktionen, <code>eventize.inject(obj)</code>
-      und <code>class Eventize</code>. Keine Oberfläche darf eigene Logik führen.</p>
-      <div class="chips"><span class="chip">eventize-api.ts</span><span class="chip">eventize.ts</span><span class="chip">index.ts</span></div>
-    </div>
-    <div class="domain">
-      <h4>Typ-Ebene</h4>
-      <p>Event-Maps, das Phantom-Brand für Invarianz und die <code>NonTypedEmitter</code>-Bedingung, die
-      typisierte Emitter zwingt, die typisierten Overloads zu nehmen statt in die lose Variante zu fallen.</p>
-      <div class="chips"><span class="chip">types.ts</span></div>
-    </div>
-  </div>
-
-  <figure>
-<pre>
-  src/index.ts                              öffentliche Oberfläche
-        │
-        ├── eventize.ts ─────────┐          inject() · class Eventize
-        │                        ▼
-        └──────────────► eventize-api.ts    on · once · emit · off · retain
-                             │    │
-              ┌──────────────┘    └───────────────┐
-              ▼                                   ▼
-        subscribeTo.ts ─────────────────────► EventStore.ts   (Registry)
-              │                                   ▲
-              └──────────────────────────► EventKeeper.ts     (Retained)
-                                                  │
-                                          EventListener.ts    (Dispatch)
-                                                  │
-                                     utils.ts · constants.ts
-</pre>
-    <figcaption>
-      Abhängigkeitsrichtung von der Oberfläche nach innen. Beide oberen Kästen delegieren in dieselbe
-      <code>eventize-api.ts</code> — das ist die Invariante »drei Oberflächen, eine Implementierung«.
-      <code>subscribeTo.ts</code> ist der einzige Weg, auf dem ein Listener in den <code>EventStore</code>
-      gelangt, und der einzige, der den <code>EventKeeper</code> zur Wiedergabe befragt. Zyklen gibt es keine;
-      <code>utils.ts</code> und <code>constants.ts</code> liegen blattseitig und importieren nichts aus dem Kern.
-    </figcaption>
-  </figure>
-</section>
-
-<!-- ══ Executive Summary ═══════════════════════════════ -->
-<section>
-  <h2>Befundlage</h2>
-  <p>
-    Das Verifikationsgate ist auf ganzer Breite grün: 677 Tests in 29 Suiten, Coverage 99,82 / 98,02 / 99,23 / 100,
-    <code>attw --pack</code> in allen vier Auflösungsmodi, Lint und Format sauber, <code>tsc --noEmit</code> ohne
-    Fehler — gemessen nach geleertem ts-jest-Cache, also cache-unabhängig. Alle acht Findings, die der
-    Remediation-Lauf adressiert hat, sind am Code als behoben verifiziert. Kein kritischer und kein hoher Befund
-    bleibt übrig.
-  </p>
-  <p>
-    Was bleibt, verteilt sich auf drei Ecken. Die schwerwiegendste sitzt in der veröffentlichten Typoberfläche:
-    <code>UnsubscribeFunc</code> ist eine Union, weshalb der in drei Dokumenten empfohlene Zugriff
-    <code>off(ε, unsub.listener)</code> für jeden TypeScript-Konsumenten ein Kompilierfehler ist — die eigene
-    Testsuite umgeht das dreizehnmal mit <code>as any</code>. Zweitens die Lieferkette: <code>npm-run-all</code>
-    treibt das gesamte Gate an, hat seit 2018 kein Release und trägt die einzige nicht patchbare Kopie eines
-    High-Advisories. Drittens die Werkbank — typbewusstes Linting ist aus, kein Test läuft gegen das gebaute
-    Paket, und der Deploy-Workflow reicht <code>id-token: write</code> an genau den Job durch, der fremden Code
-    ausführt.
-  </p>
-  <p>
-    Der Rest sind Präzisionsschulden in einem Projekt, das sich selbst hohe Präzision auferlegt: Größenangaben
-    auf zwei Bezugsgrößen, zwei Migrationsdokumente, die elf Brüche versprechen und zehn aufzählen,
-    Coverage-Schwellen, die der gemessenen Deckung hinterherhinken. Nichts davon bedroht Konsumenten. Der Code
-    selbst steht bemerkenswert gut da — dokumentierte Eigenheiten sind durch Specs festgenagelt statt nur
-    beschrieben, und der einzige verbliebene Lebensdauer-Defekt war mit <code>WeakRef</code> nachgewiesen und im
-    Test fixiert, bevor dieses Audit ihn gemeldet hat.
-  </p>
-</section>
-
-<!-- ══ Severity ════════════════════════════════════════ -->
-<section>
-  <h2>Severity</h2>
-  <div class="sevgrid">
-    <div class="sevcard"><div class="n" style="color:var(--critical)">0</div><div class="l">critical</div></div>
-    <div class="sevcard"><div class="n" style="color:var(--high)">0</div><div class="l">high</div></div>
-    <div class="sevcard"><div class="n" style="color:var(--medium)">6</div><div class="l">medium</div></div>
-    <div class="sevcard"><div class="n" style="color:var(--low)">14</div><div class="l">low</div></div>
-    <div class="sevcard"><div class="n" style="color:var(--info)">5</div><div class="l">info</div></div>
-  </div>
-  <div class="bar" role="img" aria-label="6 medium, 14 low, 5 info von 25 Findings">
-    <span style="background:var(--medium); width:24%"></span>
-    <span style="background:var(--low); width:56%"></span>
-    <span style="background:var(--info); width:20%"></span>
-  </div>
-</section>
-
-<!-- ══ Kategorien ══════════════════════════════════════ -->
-<section>
-  <h2>Kategorien</h2>
-  <div class="catlist" id="cats"></div>
-</section>
-
-<!-- ══ Backlog ═════════════════════════════════════════ -->
-<section>
-  <h2>Backlog</h2>
-  <p class="lede">25 Findings. Zeile anklicken für Problem und Empfehlung.</p>
-  <div class="filters">
-    <div class="grp">
-      <span class="lbl">Severity</span>
-      <button class="f" data-sev="all" aria-pressed="true">alle</button>
-      <button class="f" data-sev="medium" aria-pressed="false">medium</button>
-      <button class="f" data-sev="low" aria-pressed="false">low</button>
-      <button class="f" data-sev="info" aria-pressed="false">info</button>
-    </div>
-    <div class="grp">
-      <span class="lbl">Status</span>
-      <button class="f" data-st="all" aria-pressed="true">alle</button>
-      <button class="f" data-st="new" aria-pressed="false">new</button>
-      <button class="f" data-st="unchanged" aria-pressed="false">unchanged</button>
-      <button class="f" data-st="carried-over" aria-pressed="false">carried-over</button>
-    </div>
-    <div class="grp">
-      <span class="lbl">Kategorie</span>
-      <select class="f" id="catsel"><option value="all">alle</option></select>
-    </div>
-  </div>
-  <div class="tablewrap">
-    <table>
-      <thead><tr>
-        <th style="width:1%"></th><th>ID</th><th>Titel</th><th>Kategorie</th>
-        <th>Location</th><th>Sev.</th><th>Status</th><th>Aufw.</th>
-      </tr></thead>
-      <tbody id="rows"></tbody>
-    </table>
-    <div class="empty" id="empty" hidden>Keine Findings für diese Filterkombination.</div>
-  </div>
-</section>
-
-<!-- ══ Offene Fragen ═══════════════════════════════════ -->
-<section>
-  <h2>Offene Fragen</h2>
-  <ol class="q">
-    <li><b>Ist Trusted Publishing für <code>@spearwolf/eventize</code> auf npmjs.com tatsächlich eingerichtet?</b>
-      Der Block <code>id-token: write</code> und der fehlende <code>NODE_AUTH_TOKEN</code> im Publish-Schritt
-      deuten darauf hin, von außen prüfbar ist es nicht. Falls nein, schlägt der nächste Publish fehl — und
-      CI-003 wäre keine Härtung, sondern der Einstieg in eine Fehlersuche.</li>
-    <li><b>Soll MEM-002 überhaupt behoben werden?</b> <code>AGENTS.md</code> hält fest, dass der Preis dieser
-      Änderung nie beziffert wurde. Die Alternative ist, den Pfad dauerhaft als dokumentierte Eigenschaft zu
-      führen — dann gehört er auf die Liste akzeptierter Punkte statt ins Backlog. Diese Entscheidung gehört
-      dem Projekt, nicht dem Audit.</li>
-    <li><b>Vor oder nach der ersten 6.x-Veröffentlichung?</b> Der Abschluss des Remediation-Plans hält fest:
-      Sobald ein 6.x in der Registry steht, ist der nächste Bruch ein Major. Sowohl API-001 als auch TYPE-003
-      sind Typbrüche. Werden sie noch unter dem laufenden Argument »kein 6.x wurde je ausgeliefert« eingeplant,
-      oder kosten sie eine 7.0.0?</li>
-  </ol>
-</section>
-
-<!-- ══ Optimierungspotenzial ═══════════════════════════ -->
-<section>
-  <h2>Optimierungspotenzial</h2>
-  <p class="lede">Kein Defekt — Dinge, die gut sind und weiter tragen könnten.</p>
-  <ul class="o">
-    <li><b>Die Verhaltenstabelle in <code>api-surfaces.spec.ts</code> ausweiten.</b> Sie prüft alle drei
-      API-Oberflächen gegen dieselben Erwartungen und sichert damit die Kernzusage »eine Implementierung«
-      maschinell ab, statt sie zu behaupten. Die retain-Familie fehlt dort noch — ausgerechnet die Gruppe,
-      deren drei Funktionen den Wildcard unterschiedlich behandeln.</li>
-    <li><b>Das GC-Harness weiter nutzen.</b> <code>src/__test-utils__/gc.ts</code> und die
-      <code>WeakRef</code>-Pins in <code>lifecycle.spec.ts</code> testen Lebensdauern — etwas, das Bibliotheken
-      dieser Größe fast nie tun. Nächster lohnender Kandidat wäre der <code>EventKeeper</code> bei dynamisch
-      erzeugten Namen: <code>eventNames</code> wächst dort unbegrenzt, und
-      <code>getRetainedEventNames()</code> existiert genau deswegen.</li>
-    <li><b>Die Sourcemap-Entscheidung dokumentieren.</b> <code>sourcemap: true</code> bei
-      <code>minify: false</code> liefert Maps mit vollständigem <code>sourcesContent</code> — 180 KB der
-      500 KB entpackter Paketgröße. Für eine Bibliothek dieser Art ein guter Tausch, aber eine bewusste
-      Entscheidung, die im README nirgends auftaucht.</li>
-    <li><b>Beim Wechsel auf <code>npm-run-all2</code> (DEP-003) gleich <code>--print-label</code> mitnehmen.</b>
-      Bei sieben <code>cbt</code>-Schritten hilft die Zuordnung der Ausgabe zum Schritt mehr, als der eine
-      zusätzliche Parameter kostet.</li>
-  </ul>
-</section>
-
-<!-- ══ Methodik ════════════════════════════════════════ -->
-<section>
-  <h2>Methodik</h2>
-  <div class="chart" id="chart"></div>
-
-  <dl class="method">
-    <dt>Vollständig gelesen</dt>
-    <dd>Alle 15 Nicht-Spec-Quelldateien unter <code>src/</code> (rund 2.300 Zeilen) sowie
-      <code>src/__test-utils__/</code>. Die gesamte Konfiguration: <code>package.json</code>,
-      <code>tsconfig.json</code>, <code>jest.config.ts</code>, <code>tsup.config.js</code>,
-      <code>eslint.config.mjs</code>, <code>.prettierrc.yaml</code>, <code>.prettierignore</code>,
-      <code>.editorconfig</code>, <code>.vscode/settings.json</code>, beide Workflows,
-      <code>scripts/publishPackage.cjs</code> und <code>scripts/createBanner.mjs</code>. Dazu
-      <code>AGENTS.md</code> und <code>skills/using-eventize/SKILL.md</code> vollständig.</dd>
-
-    <dt>Gezielt gelesen</dt>
-    <dd>Die 29 Spec-Suiten (rund 8.500 Zeilen) über Titel- und Muster-Greps, vertieft in
-      <code>emit-throwing-listener.spec.ts</code>, <code>lifecycle.spec.ts</code> und <code>off.spec.ts</code>.
-      <code>README.md</code> strukturell plus die geprüften Abschnitte, <code>docs/lifecycle.md</code>
-      (Migrationsteil vollständig), <code>references/migration.md</code> vollständig, <code>CHANGELOG.md</code>
-      an den Release-Köpfen mit ausgezählten Bruchlisten.</dd>
-
-    <dt>Ausgeführt</dt>
-    <dd><code>npx jest --clearCache &amp;&amp; npm run cbt</code> — Exit 0, 29 Suiten / 677 Tests, Coverage
-      99,82 / 98,02 / 99,23 / 100, <code>attw</code> 4/4. Dazu <code>npm outdated</code>,
-      <code>npm audit</code> samt <code>--omit=dev</code> und JSON-Auswertung der Advisory-Wurzeln,
-      <code>npm pack --dry-run</code>, <code>npm view</code> gegen die Registry (Versionen, dist-tags,
-      Publish-Daten), <code>tsc --noEmit</code> gegen zwei Probedateien — einmal gegen <code>src/</code>, einmal
-      gegen die veröffentlichte <code>lib/index.d.ts</code> — sowie Gzip-, Brotli- und Minify-Messungen des
-      Builds.</dd>
-
-    <dt>Nicht geprüft</dt>
-    <dd><code>lib/</code> als Verhaltensquelle — laut <code>AGENTS.md</code> generiert und nie zur Beantwortung
-      von Verhaltensfragen zu lesen; als <em>Auslieferungsartefakt</em> wurde es gemessen und typgeprüft.
-      Ebenfalls außen vor: <code>package-lock.json</code> zeilenweise, <code>coverage/</code>,
-      <code>.obsidian/</code>, <code>docs-assets/</code>. Von außen nicht prüfbar ist die registry-seitige
-      Trusted-Publishing-Konfiguration (siehe Offene Fragen).</dd>
-
-    <dt>Abgleich mit dem Vorlauf</dt>
-    <dd>Vorgänger: <code>./audit.html</code> vom 2026-07-26, Score 77,5, 20 Findings. Die Datei wurde erst
-      nach Abschluss des frischen Audits geöffnet, damit die Befunde unvoreingenommen am Code entstehen.
-      Match über Kategorie plus Location-Überlappung, sekundär über Titelähnlichkeit; bei Zweifel wurden zwei
-      Findings stehen gelassen statt eines zusammengeführt. <b>8 entfallen</b>, jedes einzeln am Code
-      re-verifiziert (Commits <code>4cda1ae</code>, <code>6d2a67d</code>, <code>23ae941</code>,
-      <code>e1211e5</code>, <code>78c8c10</code>); <b>keines</b> davon kontextbedingt gestrichen.
-      <b>12 übernommen</b>, jedes vor der Übernahme an seiner Location neu belegt. Die Liste akzeptierter
-      Punkte ist leer.</dd>
-
-    <dt>Abgrenzung zu MEM-001</dt>
-    <dd>Das alte MEM-001 (»aufgebrauchtes Handle hält den Emitter«, <code>eventize-api.ts:39-53</code>) ist
-      behoben: <code>makeUnsubscribe()</code> nullt seine Emitter-Referenz vor dem <code>off()</code>. Das neue
-      MEM-002 ist nicht dessen Wiederkehr, sondern der dokumentierte Rest — anderer Ort
-      (<code>EventStore.ts</code>), anderer Mechanismus (geteilter Referenzzähler über zwei Lebensdauern),
-      engere Bedingung.</dd>
-
-    <dt>Score</dt>
-    <dd>Start bei 100, Abzug 10 je <em>critical</em>, 5 je <em>high</em>, 2 je <em>medium</em>, 0,5 je
-      <em>low</em>, 0 je <em>info</em>, Untergrenze 0. Hier: 100 − (6 × 2) − (14 × 0,5) = <b>81,0</b>.
-      Delta +3,5 gegenüber 77,5 und damit unter der ±15-Schwelle, ab der ein Sprung einzuordnen wäre: Umfang
-      und Sampling entsprechen dem Vorlauf, der Zuwachs stammt aus behobenem Code abzüglich neuer Befunde.</dd>
-
-    <dt>Theme</dt>
-    <dd><code>light</code>, übernommen aus <code>summary.theme</code> des Vorlaufs, damit die Optik über
-      Folgeläufe stabil bleibt.</dd>
-  </dl>
-</section>
-
-<footer>
-  Erzeugt am 2026-07-26 · <code>./audit.html</code> · Der Report zeigt den aktuellen Zustand; behobene
-  Findings leben nur als Zähler weiter, die Historie liefert der git-Verlauf dieser Datei.
-</footer>
-
+<div class="diffbar small">
+  <span><b>6</b> behoben</span><span class="sep">|</span>
+  <span><b>1</b> verbessert</span><span class="sep">|</span>
+  <span><b>8</b> neu</span><span class="sep">|</span>
+  <span><b>15</b> übernommen</span><span class="sep">|</span>
+  <span><b>3</b> zurückgestellt (Anhang)</span>
 </div>
+
+<h2>Projektportrait</h2>
+
+<p><code>@spearwolf/eventize</code> macht ein beliebiges JS/TS-Objekt zu einem <em>synchronen</em>
+Event-Emitter. Kein Runtime-Dependency, ESM und CJS parallel, optional typisierte Event-Maps. Der
+Kern steckt in einem versteckten, nicht enumerierbaren Slot unter
+<code>Symbol.for('eventize')</code>: dort liegen die beiden Kollaborateure, und dieser Slot allein
+definiert, was ein Emitter ist. Deshalb funktioniert dieselbe API auf einem frischen <code>{}</code>,
+auf einem bestehenden Objekt und auf einer Klasseninstanz.</p>
+
+<p>Die Zielgruppe sind Systeme, in denen die Ausführungsreihenfolge zählt: Game-Loops,
+Render-Pipelines, alles mit <code>requestAnimationFrame</code>. Der Code umfasst knapp 2.500 Zeilen
+in 16 Quelldateien, flankiert von 682 Testfällen in 29 Spec-Dateien. Die laufende
+<code>6.0.0</code> ist unveröffentlicht und trägt bewusst das <code>-dev</code>-Suffix:
+<code>scripts/publishPackage.cjs</code> bricht davor ab, die Registry steht weiter auf
+<code>5.1.0</code>.</p>
+
+<div class="grid dom" style="margin-top:20px">
+  <div class="card dom-card">
+    <h3>Dispatch</h3>
+    <p class="small muted" style="margin:0">Zwei Pfade, die sich exakt gleich verhalten müssen:
+      <code>_emit</code> für eventisierte Ziele, <code>_duckEmit</code> für alles andere. Beide lehnen
+      <code>'*'</code> ab und lösen Member über dieselbe Prototype-Grenze auf.</p>
+    <div class="chips"><span class="chip">src/eventize-api.ts</span><span class="chip">src/EventListener.ts</span><span class="chip">src/utils.ts</span></div>
+  </div>
+  <div class="card dom-card">
+    <h3>Registry</h3>
+    <p class="small muted" style="margin:0">Listener-Verwaltung: Einfügen per Binärsuche nach
+      Priorität, Entfernen über fünf Argumentformen, referenzgezählte Deduplizierung.</p>
+    <div class="chips"><span class="chip">src/EventStore.ts</span></div>
+  </div>
+  <div class="card dom-card">
+    <h3>Retain</h3>
+    <p class="small muted" style="margin:0">Das Log zuletzt emittierter Werte samt Replay an neue
+      Abonnenten. Trennt Policy (»welche Namen werden gehalten«) vom Wert.</p>
+    <div class="chips"><span class="chip">src/EventKeeper.ts</span><span class="chip">src/getRetainedCount.ts</span></div>
+  </div>
+  <div class="card dom-card">
+    <h3>Subscription</h3>
+    <p class="small muted" style="margin:0">Die positionale Dekodierung der überladenen
+      <code>on()</code>-Formen, plus Validierung von Listener-Typ und Priorität.</p>
+    <div class="chips"><span class="chip">src/subscribeTo.ts</span></div>
+  </div>
+  <div class="card dom-card">
+    <h3>API-Oberflächen</h3>
+    <p class="small muted" style="margin:0">Drei Wege zur selben Implementierung: freie Funktionen,
+      <code>eventize.inject(obj)</code>, <code>class Eventize</code>. Keine Logik darf sich gabeln.</p>
+    <div class="chips"><span class="chip">src/eventize.ts</span><span class="chip">src/index.ts</span></div>
+  </div>
+  <div class="card dom-card">
+    <h3>Typ-Ebene</h3>
+    <p class="small muted" style="margin:0">Event-Maps, Branding über nicht exportierte Symbole,
+      Überladungssätze. Der Marker-Slot ist in den Typen bewusst undurchsichtig.</p>
+    <div class="chips"><span class="chip">src/types.ts</span><span class="chip">src/internals.ts</span></div>
+  </div>
+  <div class="card dom-card">
+    <h3>Integrations-Harness</h3>
+    <p class="small muted" style="margin:0">Containerisierter Lauf, der <code>@spearwolf/signalize</code>
+      als echten Consumer gegen das gepackte Tarball testet: Baseline gegen gepatcht.</p>
+    <div class="chips"><span class="chip">integration/</span></div>
+  </div>
+</div>
+
+<figure>
+<pre>
+  on() / once() / emit()        eventize.inject(obj)          class Eventize
+  freie Funktionen              injizierte Methoden           Basisklasse
+          |                             |                            |
+          +-------------+---------------+----------------------------+
+                        |
+                        v
+                 eventize-api.ts          &lt;-- die einzige Implementierung
+                        |
+                        v
+                 asEventized(obj)         &lt;-- legt den versteckten Slot an
+                        |
+        obj[ Symbol.for('eventize') ] = { store, keeper }
+                        |
+            +-----------+-----------+
+            |                       |
+            v                       v
+       EventStore              EventKeeper
+       Registry                Retain-Log
+            |                       |
+            |  forEach(name, fn)    |  replayTo(name, listener)
+            +-----------+-----------+
+                        |
+                        v
+                  EventListener            &lt;-- nie exportiert, auch nicht als Typ
+                  apply() -&gt; drei Formen:
+                  Funktion | Methodenname | Listener-Objekt
+</pre>
+<figcaption>Datenfluss beim Abonnieren und Emittieren. Die drei API-Oberflächen oben sind reine
+Delegationen; jede Verzweigung darunter existiert genau einmal. Der Slot in der Mitte ist die
+Definition eines Emitters, nicht bloß seine Markierung: <code>isEventized()</code> prüft nichts
+anderes. <code>EventListener</code> unten ist die einzige Klasse, die weder als Wert noch als Typ
+die Paketgrenze überschreitet.</figcaption>
+</figure>
+
+<h2>Executive Summary</h2>
+
+<p>Das erklärte Ziel von v6, die Speicherlecks zu beseitigen, ist erreicht und belastbar belegt. Die
+Bibliothek führt kein globales Register, keine <code>WeakMap</code>, keinen prozessweiten Zustand
+außer zwei Zählern; nach <code>off(ε)</code> hält ein Emitter nachweislich nichts mehr. Der
+Unsubscribe-Handle nullt seine Closure, <code>EventListener.detach()</code> gibt jedes Feld frei, und
+leere Buckets verschwinden aus der Map: 5.000 Abos und 5.000 Kündigungen hinterlassen exakt null
+Einträge. Was von den Altfindings zu dieser Klasse übrig ist, hat seine Speicherkonsequenz verloren
+und wurde entsprechend herabgestuft.</p>
+
+<p>Der Schwerpunkt hat sich damit verschoben, und genau darauf zielen die neuen Befunde. Ein
+Korrektheitsfehler bleibt: <code>off(ε, ['a','b'], listenerObject)</code> entfernt keinen einzigen
+Listener, löscht aber Retain-Werte und Retain-Policies der genannten Namen. Store und Keeper laufen
+dort auseinander, und zwar in derselben Fehlerklasse, die dieses Release an drei anderen Stellen
+ausdrücklich als BREAKING geschlossen hat. Die Form ist weder dokumentiert noch von einer Spec
+berührt.</p>
+
+<p>Beim Anspruch »keine unnötige Ressourcenverschwendung« liegt die eigentliche Lücke nicht im
+Speicher, sondern im Allokationsdruck. <code>EventStore.forEach()</code> kopiert bei jedem einzelnen
+<code>emit()</code> den gesamten Listener-Bucket, obwohl die überwiegende Mehrheit der Dispatches gar
+nichts mutiert: gemessen 4,3 µs pro Emit bei 512 Listenern, gut 10 Millionen kopierte Slots über
+20.000 Emits. Dasselbe Muster im Kleinen beim Wildcard-Replay, das über Retain-Policies statt über
+tatsächlich vorhandene Werte iteriert und bei 20.000 Policies mit einem einzigen Wert 1,4 ms für ein
+<code>on(ε, '*')</code> braucht.</p>
+
+<p>Auf der Prozessseite fällt eines auf: Die Integrations-Harness, eigens gebaut, um Regressionen
+gegen einen echten Consumer zu fangen, ist in keiner Pipeline verdrahtet. Für ein Release mit
+dreizehn angekündigten Breaking Changes ist das der eine Test, der zählt, und er läuft nur, wenn
+jemand daran denkt. Der Score fällt trotz sechs behobener Punkte um fünf, weil dieser Lauf den Code
+erstmals unter Last vermessen hat statt ihn nur zu lesen.</p>
+
+<h2>Severity-Übersicht</h2>
+<div class="card">
+  <div class="sev-rows" id="sev-rows"></div>
+  <p class="xsmall muted" style="margin:16px 0 0">Score-Herleitung: Start 100, davon
+    <code>critical</code> &minus;10, <code>high</code> &minus;5, <code>medium</code> &minus;2,
+    <code>low</code> &minus;0,5, <code>info</code> 0. Hier: 100 &minus; 5 &minus; 12 &minus; 7 = <b>76</b>.
+    Zurückgestellte Punkte im Anhang tragen kein Gewicht.</p>
+</div>
+
+<h2>Score-Verlauf</h2>
+<div class="chart">
+<svg viewBox="0 0 640 210" role="img" aria-label="Liniendiagramm der Health-Scores">
+  <line x1="46" y1="20" x2="614" y2="20" stroke="#e7e5e4" stroke-width="1"/>
+  <line x1="46" y1="105" x2="614" y2="105" stroke="#e7e5e4" stroke-width="1"/>
+  <line x1="46" y1="190" x2="614" y2="190" stroke="#d6d3d1" stroke-width="1"/>
+  <text x="38" y="24" text-anchor="end" font-size="10" fill="#8a8580">100</text>
+  <text x="38" y="109" text-anchor="end" font-size="10" fill="#8a8580">50</text>
+  <text x="38" y="194" text-anchor="end" font-size="10" fill="#8a8580">0</text>
+  <polyline fill="none" stroke="#4f46e5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"
+    points="76,44.65 183,122.85 290,53.15 397,58.25 504,52.3 611,60.8"/>
+  <circle cx="76"  cy="44.65"  r="3.5" fill="#fafaf9" stroke="#4f46e5" stroke-width="2"/>
+  <circle cx="183" cy="122.85" r="3.5" fill="#fafaf9" stroke="#4f46e5" stroke-width="2"/>
+  <circle cx="290" cy="53.15"  r="3.5" fill="#fafaf9" stroke="#4f46e5" stroke-width="2"/>
+  <circle cx="397" cy="58.25"  r="3.5" fill="#fafaf9" stroke="#4f46e5" stroke-width="2"/>
+  <circle cx="504" cy="52.3"   r="3.5" fill="#fafaf9" stroke="#4f46e5" stroke-width="2"/>
+  <circle cx="611" cy="60.8"   r="5"   fill="#4f46e5"/>
+  <text x="76"  y="36"  text-anchor="middle" font-size="10" fill="#57534e">85,5</text>
+  <text x="183" y="114" text-anchor="middle" font-size="10" fill="#57534e">39,5</text>
+  <text x="290" y="44"  text-anchor="middle" font-size="10" fill="#57534e">80,5</text>
+  <text x="397" y="76"  text-anchor="middle" font-size="10" fill="#57534e">77,5</text>
+  <text x="504" y="43"  text-anchor="middle" font-size="10" fill="#57534e">81</text>
+  <text x="611" y="50"  text-anchor="middle" font-size="11" font-weight="600" fill="#4f46e5">76</text>
+  <text x="76"  y="205" text-anchor="middle" font-size="9" fill="#8a8580">14.05.</text>
+  <text x="183" y="205" text-anchor="middle" font-size="9" fill="#8a8580">25.07.</text>
+  <text x="290" y="205" text-anchor="middle" font-size="9" fill="#8a8580">26.07. (1)</text>
+  <text x="397" y="205" text-anchor="middle" font-size="9" fill="#8a8580">26.07. (2)</text>
+  <text x="504" y="205" text-anchor="middle" font-size="9" fill="#8a8580">26.07. (3)</text>
+  <text x="611" y="205" text-anchor="middle" font-size="9" fill="#4f46e5">27.07.</text>
+</svg>
+</div>
+<p class="xsmall muted" style="margin-top:9px">Verlauf der Health-Scores seit 2026-05-14. Der Einbruch
+am 25.07. markiert das große 35-Findings-Audit gegen <code>v5.1.0</code>, dessen Abarbeitung die
+folgenden Läufe zeigen.</p>
+
+<h2>Kategorie-Übersicht</h2>
+<div class="cat-grid" id="cat-grid"></div>
+
+<h2>Backlog</h2>
+<div class="filters">
+  <span class="lab">Severity</span>
+  <button class="f" data-sev="all" aria-pressed="true">alle</button>
+  <button class="f" data-sev="high" aria-pressed="false">high</button>
+  <button class="f" data-sev="medium" aria-pressed="false">medium</button>
+  <button class="f" data-sev="low" aria-pressed="false">low</button>
+  <button class="f" data-sev="info" aria-pressed="false">info</button>
+  <select class="f" id="cat-filter"><option value="all">alle Kategorien</option></select>
+  <select class="f" id="status-filter">
+    <option value="all">alle Status</option>
+    <option value="new">new</option>
+    <option value="improved">improved</option>
+    <option value="unchanged">unchanged</option>
+    <option value="carried-over">carried-over</option>
+  </select>
+</div>
+<table>
+  <thead><tr>
+    <th style="width:26px"></th><th style="width:86px">ID</th><th style="width:86px">Severity</th>
+    <th>Titel</th><th style="width:230px">Ort</th><th style="width:52px">Aufwand</th>
+  </tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+<div class="empty" id="empty" style="display:none">Keine Findings für diese Filterkombination.</div>
+
+<h2>Offene Fragen</h2>
+<ol class="tight">
+  <li><b>Wie viele Breaking Changes trägt v6 wirklich?</b> Drei Dokumente nennen dieselbe Zahl und
+    belegen sie unterschiedlich: <code>CHANGELOG.md</code> markiert 9 Einträge als
+    <code>**BREAKING:**</code>, <code>docs/lifecycle.md</code> gliedert 3 große plus 9 kleinere,
+    <code>migration.md</code> listet 14 Punkte, und alle drei stehen unter der Überschrift
+    »dreizehn«. Welche Liste ist maßgeblich?</li>
+  <li><b>Soll die Retain-Semantik bei re-entrantem <code>emit()</code> dokumentiert oder geändert
+    werden?</b> Heute gewinnt der äußere, ältere Wert. Ein Wechsel auf »letzter Emit gewinnt« hieße,
+    <code>keeper.retain()</code> vor den Dispatch zu ziehen, und kollidiert mit der dokumentierten
+    Zusage, dass ein werfender Listener den zuvor gehaltenen Wert unangetastet lässt. Beides
+    gleichzeitig geht nicht.</li>
+  <li><b>Deckt die Integrations-Harness auch den CJS-Build ab?</b> <code>signalize</code> zieht das
+    Paket per ESM. <code>attw --pack</code> bestätigt zwar die Typ-Auflösung für CJS, aber kein
+    Consumer-Lauf berührt <code>lib/index.js</code> zur Laufzeit.</li>
+</ol>
+
+<h2>Optimierungspotenzial</h2>
+<p class="muted small">Kein Defekt, sondern Spielraum. Getrennt vom Backlog, weil hier nichts kaputt ist.</p>
+<ul class="tight">
+  <li><b>Ein Benchmark-Harness neben der Spec-Suite.</b> Das Release verspricht »absolut
+    vorhersehbares Laufzeitverhalten«, aber nichts im Repo misst Laufzeit. Die Spec-Suite pinnt
+    Semantik, nicht Kosten. Ein kleiner Satz Mikrobenchmarks (Dispatch mit 1/8/64/512 Listenern, mit
+    und ohne Wildcard, Subscribe-Unsubscribe-Churn) macht aus der Zusage eine prüfbare Größe und
+    würde PERF-001 und PERF-002 künftig selbst finden.</li>
+  <li><b>Eine Lesefunktion für gehaltene Werte.</b> <code>getRetainedCount()</code> und
+    <code>getRetainedEventNames()</code> beantworten das »wie viele« und das »welche«, aber nicht das
+    »was«. Ein <code>getRetainedArgs(ε, name)</code> schlösse die Diagnose-Trias, ohne den Keeper
+    offenzulegen.</li>
+  <li><b>Die Argument-Dekodierung in <code>_subscribeTo()</code> als Tabelle.</b> Heute halten
+    Kommentare die Positionslogik zusammen. Eine deklarative Formentabelle, gegen die geparst wird,
+    würde INFO-002 auflösen und den Überladungssatz in <code>types.ts</code> maschinell abgleichbar
+    machen.</li>
+  <li><b>Die Prototype-Grenze auch für Methodennamen anbieten.</b> Die Asymmetrie bei
+    <code>on(ε, 'evt', 'toString', obj)</code> ist bewusst und gepinnt. Ein optionales Flag, das die
+    strenge Auflösung auch dort erzwingt, gäbe defensiv gebautem Consumer-Code eine Wahl, ohne die
+    Vorgabe zu ändern.</li>
+</ul>
+
+<h2>Methodik</h2>
+
+<h3>Prüfumfang dieses Laufs</h3>
+<p class="small">Vollständig gelesen: alle 16 Nicht-Spec-Quellen unter <code>src/</code> (rund 2.500
+Zeilen), dazu <code>package.json</code>, <code>tsconfig.json</code>, <code>jest.config.ts</code>,
+<code>tsup.config.js</code>, <code>eslint.config.mjs</code>, beide Workflows,
+<code>scripts/publishPackage.cjs</code>, <code>integration/run.mjs</code> und
+<code>integration/README.md</code>. Aus der Dokumentation: <code>README.md</code>, die
+<code>v6.0.0</code>-Sektion von <code>CHANGELOG.md</code>, alle vier <code>docs/*.md</code> und
+<code>skills/using-eventize/</code>. Spec-Dateien gezielt: <code>emit-throwing-listener.spec.ts</code>
+vollständig, <code>lifecycle.spec.ts</code> in Teilen, <code>off.spec.ts</code>,
+<code>EventStore.spec.ts</code> und <code>emit-reentrancy.spec.ts</code> per Suche nach konkreten
+Fällen.</p>
+
+<p class="small"><b>Laufzeitproben statt Behauptungen.</b> Drei Skripte liefen gegen einen frischen
+<code>npm run build</code> und belegen jedes Verhaltens- und Performance-Finding einzeln:
+Dispatch-Kosten und Allokation bei 1/8/64/512 Listenern, Merge-Pfad mit Wildcard, Bucket-Buchführung
+über 5.000 Abo-Zyklen, Wildcard-Replay bei 10 bis 20.000 Retain-Policies, dazu die Sonderformen von
+<code>off()</code>, <code>once()</code> mit werfendem Listener und re-entrantes <code>emit()</code>.
+Sechs Hypothesen wurden geprüft; drei davon (werfender Listener, abgebrochener Dispatch,
+Auto-Eventize) erwiesen sich als bereits gepinnt und dokumentiert und sind deshalb <em>kein</em>
+Finding.</p>
+
+<p class="small"><b>Verifikation:</b> <code>npx jest --clearCache</code> gefolgt von
+<code>npm run cbt</code> läuft grün (682 Tests, 29 Suiten, 99,82 % Statements, 98,33 % Branches,
+100 % Lines). <code>npx attw --pack</code> meldet in allen vier Auflösungsmodi grün,
+<code>grep -c '^declare class' lib/index.d.ts</code> steht auf 1. <code>npm audit --omit=dev</code>
+findet keine Schwachstellen.</p>
+
+<p class="small"><b>Nicht bewertet:</b> <code>lib/</code> als Build-Artefakt (nur für Laufzeitproben
+und Größenmessung benutzt, nie als Quelle für Befunde), <code>node_modules/</code>,
+<code>coverage/</code>, <code>.obsidian/</code>. Das vorherige <code>audit.html</code> blieb bis nach
+Abschluss des frischen Laufs ungeöffnet.</p>
+
+<h3>Abgleich mit dem Vorlauf</h3>
+<p class="small">Vorgänger: 26. Juli 2026, Score 81, 25 Findings. Gematcht wurde primär über
+Kategorie und überlappende Location, sekundär über Titelähnlichkeit. <b>Sechs Findings sind
+entfallen</b>, jedes davon einzeln gegen den Code geprüft:</p>
+<ul class="tight small">
+  <li><code>DEP-004</code> und <code>INFO-004</code> durch Repo-Änderung: <code>.github/dependabot.yml</code>
+    existiert jetzt, <code>remediation-plan.md</code> wurde in <code>b93c14f</code> entfernt.</li>
+  <li><code>TEST-002</code> durch die neue Integrations-Harness, die das gepackte Tarball in einem
+    echten Consumer installiert. Was davon offen bleibt, führt dieser Lauf als <code>CI-004</code>
+    neu: sie läuft nirgends automatisch.</li>
+  <li><code>API-001</code>, <code>TEST-004</code> und <code>DX-005</code> kontextbedingt: Die Docs
+    versprechen <code>unsub.listener</code> nicht mehr, sondern dokumentieren dessen Wegfall als
+    Migration (<code>docs/lifecycle.md:163,232</code>); <code>jest.config.ts:17-22</code> begründet
+    die Schwellenwahl ausdrücklich als »knapp unter dem gemessenen Stand, damit sie bindet«; und die
+    Fehlermeldungen mit internem Funktionsnamen sind laut <code>CHANGELOG</code> seit v4 unverändert
+    und in <code>README.md:314</code> als Vertrag dokumentiert.</li>
+</ul>
+<p class="small"><code>MEM-002</code> wurde von <code>medium</code> auf <code>low</code> herabgestuft:
+Die Deduplizierung auf ein wartendes <code>once()</code> gibt es weiterhin, ihre Speicherfolge ist
+aber beseitigt und per <code>WeakRef</code> in <code>src/lifecycle.spec.ts</code> festgehalten.</p>
+<p class="small"><b>Zum Score-Rückgang um 5 Punkte:</b> Er stammt nicht aus verschlechtertem Code,
+sondern aus acht neuen Findings, die überwiegend aus Messungen kommen, die der Vorlauf nicht
+durchgeführt hat (Dispatch-Kosten, Allokationsverhalten, Wildcard-Replay-Skalierung), sowie aus
+Argumentformen, die er nicht durchprobiert hat. Das liegt unterhalb der Schwelle von 15 Punkten, ab
+der eine formale Einordnung Pflicht wäre, und steht hier der Vollständigkeit halber.</p>
+
+<h3>Theme</h3>
+<p class="small">Hell, übernommen aus <code>summary.theme</code> des Vorlaufs, damit die Optik über
+Folgeläufe stabil bleibt. Fix ausgeliefert, nicht an <code>prefers-color-scheme</code> gekoppelt.</p>
+
+<h2>Anhang: Akzeptierte / zurückgestellte Punkte</h2>
+<p class="small muted">Diese Punkte ruhen auf ausdrücklichen Wunsch. Sie sind nicht gelöst, tragen
+kein Gewicht im Health-Score und erscheinen nicht im Backlog. Jederzeit reaktivierbar.</p>
+<div class="ack" id="ack"></div>
 
 <script id="audit-data" type="application/json">
 {
   "summary": {
     "project": "@spearwolf/eventize",
-    "version": "6.2.0",
-    "stack": {
-      "runtime": "Node.js >= 18.16 / Browser",
-      "language": "TypeScript 5.9.3 (strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes)",
-      "build": "tsup 8.5.1 (esbuild 0.27.7), dual ESM + CJS",
-      "test": "Jest 30 + ts-jest 29 — 29 Suiten / 677 Tests",
-      "lint": "ESLint 10 + typescript-eslint 8 (flat config, ohne Typinformationen)",
-      "deps": "0 runtime, 21 dev",
-      "license": "Apache-2.0"
-    },
-    "date": "2026-07-26",
+    "version": "6.0.0-dev",
+    "stack": "TypeScript 5.9 (strict), tsup/esbuild, Jest 30 + ts-jest, ESM + CJS, Node >= 18.16, keine Runtime-Dependencies",
+    "date": "2026-07-27",
     "previousDate": "2026-07-26",
-    "previousScore": 77.5,
-    "score": 81.0,
-    "scoreDelta": 3.5,
+    "previousScore": 81,
+    "score": 76,
+    "scoreDelta": -5,
     "theme": "light",
-    "resolvedCount": 8,
-    "improvedCount": 0,
-    "newCount": 13,
-    "unchangedCount": 5,
-    "carriedOverCount": 7,
-    "bySeverity": {"critical": 0, "high": 0, "medium": 6, "low": 14, "info": 5},
+    "resolvedCount": 6,
+    "improvedCount": 1,
+    "newCount": 8,
+    "unchangedCount": 1,
+    "carriedOverCount": 14,
+    "bySeverity": {"critical": 0, "high": 1, "medium": 6, "low": 14, "info": 3},
     "byCategory": {
-      "Dependencies": 4,
-      "Developer Experience": 4,
+      "Bugs & Korrektheitsrisiken": 1,
+      "Performance": 2,
+      "Testabdeckung & Teststrategie": 2,
+      "Konsistenz": 2,
       "Sicherheit": 3,
-      "Testabdeckung & Teststrategie": 3,
-      "Projektaufbau & Build": 3,
-      "Öffentliche API": 2,
-      "Implementierungsstand": 2,
+      "Developer Experience": 3,
       "Memory Leaks & Ressourcen": 1,
-      "Typsicherheit (TS)": 1,
-      "Konsistenz": 1,
+      "Öffentliche API": 3,
+      "Typsicherheit (TS)": 2,
+      "Projektaufbau & Build": 3,
+      "Implementierungsstand": 1,
       "Architektur & Struktur": 1
     },
     "scoreHistory": [
@@ -491,69 +512,77 @@
       {"date": "2026-07-25", "score": 39.5},
       {"date": "2026-07-26", "score": 80.5},
       {"date": "2026-07-26", "score": 77.5},
-      {"date": "2026-07-26", "score": 81.0}
+      {"date": "2026-07-26", "score": 81},
+      {"date": "2026-07-27", "score": 76}
     ],
-    "methodology": {
-      "sourceFilesReadFully": 15,
-      "sourceLinesApprox": 2300,
-      "specSuites": 29,
-      "specLinesApprox": 8500,
-      "gate": "npx jest --clearCache && npm run cbt — Exit 0, Coverage 99.82/98.02/99.23/100, attw 4/4",
-      "notInspected": [
-        "lib/ als Verhaltensquelle (AGENTS.md-Konvention)",
-        "package-lock.json zeilenweise",
-        "coverage/",
-        ".obsidian/",
-        "docs-assets/",
-        "registry-seitige Trusted-Publishing-Konfiguration"
-      ]
-    }
+    "methodology": "Alle 16 Nicht-Spec-Quellen unter src/ vollstaendig gelesen (~2500 Zeilen), dazu package.json, tsconfig.json, jest.config.ts, tsup.config.js, eslint.config.mjs, beide GitHub-Workflows, scripts/publishPackage.cjs, integration/run.mjs und integration/README.md. Dokumentation: README.md, CHANGELOG.md (v6-Sektion), alle vier docs/*.md, skills/using-eventize/. Specs gezielt: emit-throwing-listener.spec.ts vollstaendig, lifecycle.spec.ts teilweise, off.spec.ts / EventStore.spec.ts / emit-reentrancy.spec.ts per Suche. Drei Laufzeit-Probeskripte gegen einen frischen Build belegen jedes Verhaltens- und Performance-Finding einzeln. Verifikation: npx jest --clearCache + npm run cbt gruen (682 Tests / 29 Suiten / 99,82 % Statements), attw --pack 4/4 gruen, npm audit --omit=dev ohne Befund. Nicht bewertet: lib/, node_modules/, coverage/, .obsidian/."
   },
-  "acknowledged": [],
   "findings": [
     {
-      "id": "API-001",
-      "category": "Öffentliche API",
-      "severity": "medium",
+      "id": "COR-001",
+      "category": "Bugs & Korrektheitsrisiken",
+      "severity": "high",
       "status": "new",
-      "title": "UnsubscribeFunc blockiert den dokumentierten Zugriff auf .listener / .listeners",
-      "location": "src/types.ts:126-128",
-      "effort": "M",
-      "description": "UnsubscribeFunc ist eine Union aus (() => void) & {listener: EventListener} und (() => void) & {listeners: EventListener[]}. TypeScript kann nicht entscheiden, welcher Arm vorliegt, also ist jeder Zugriff auf .listener oder .listeners ein TS2339 — geprüft gegen src/index.ts und gegen die veröffentlichte lib/index.d.ts, in beiden Fällen derselbe Fehler. Genau dieser Zugriff steht als empfohlene Cleanup-Form in docs/lifecycle.md:126,132,165, in references/migration.md:26,35 und in references/api-details.md:100. Die eigene Testsuite umgeht ihn dreizehnmal mit `as any` (lifecycle.spec.ts:345,380,410,411,441,455,533,541,556,576 sowie off.spec.ts:1087,1102). Zur Laufzeit ist die Zuordnung eindeutig — Einzelnamen-Formen liefern .listener, die Array-Form .listeners —, nur der Typ gibt diese Information nicht weiter.",
-      "recommendation": "Den Rückgabetyp pro Overload-Arm führen: Einzelnamen-Overloads liefern (() => void) & {listener: EventListener}, die Array-Form (() => void) & {listeners: EventListener[]}. Billiger, aber schwächer: beide Felder optional in einem Intersection-Typ, was am Aufrufort ein `!` erzwingt. Beides ist ein Typbruch und braucht einen CHANGELOG-Eintrag; als Nebeneffekt fallen die dreizehn `as any` aus der Suite."
+      "title": "off(ε, [names], listenerObject) leert den Keeper, ohne einen einzigen Listener zu entfernen",
+      "location": "src/eventize-api.ts:565-580, src/EventStore.ts:210",
+      "effort": "S",
+      "description": "Der Array-Zweig von EventStore.remove() verlangt listenerObject == null, sonst greift er nicht. Mit einem Listener-Objekt als drittem Argument fällt die Verarbeitung bis auf removeByListener(array, obj) durch, wo ein Array niemals mit einer Listener-Identität übereinstimmt: es wird nichts entfernt. Der Keeper-Zweig in off() prüft diese Bedingung jedoch nicht mit, sondern nur Array.isArray(listener), und ruft keeper.remove() für alle Namen des Arrays auf. Gemessen an einem Emitter mit einer Subscription und zwei Retain-Policies: nach off(ε, ['a','b'], lo) steht der Store unverändert bei 1 Subscription, während der Keeper von 1 Wert und 2 Policies auf 0 und 0 fällt. Damit ist dies die einzige verbliebene Stelle, an der Store und Keeper nachweislich auseinanderlaufen: eine Aufrufform, die nichts abmeldet, löscht Retain-Zustand. Genau diese Fehlerklasse hat v6 an drei anderen Stellen als BREAKING geschlossen. Weder docs/lifecycle.md:30, das alle off()-Formen tabelliert, noch off.spec.ts oder lifecycle.spec.ts erfassen die Kombination aus Array und Listener-Objekt.",
+      "recommendation": "Den Keeper-Zweig an dieselbe Bedingung koppeln, unter der der Store überhaupt tätig wird: die Array- und die Namensverzweigung nur betreten, wenn listenerObject == null ist. Das ist die kleinere der beiden Änderungen und stellt die Symmetrie her, ohne eine neue Aufrufform einzuführen. Die Alternative wäre, EventStore.remove() die Kombination behandeln zu lassen, also jeden Namen einzeln mit forceRemove weiterzureichen; das würde aber eine undokumentierte Form zu einer dokumentierten machen und verlangt eine Entscheidung über die gewünschte Semantik. In beiden Fällen: eine Zeile in der Formen-Tabelle von docs/lifecycle.md, ein Fall in off.spec.ts und ein CHANGELOG-Eintrag unter v6.0.0."
     },
     {
-      "id": "MEM-002",
-      "category": "Memory Leaks & Ressourcen",
+      "id": "PERF-001",
+      "category": "Performance",
       "severity": "medium",
       "status": "new",
-      "title": "on() dedupliziert auf ein wartendes once() und teilt einen Zähler über zwei Lebensdauern",
-      "location": "src/EventStore.ts:139-160, src/eventize-api.ts:438-462",
+      "title": "Jedes emit() kopiert den vollständigen Listener-Bucket, auch ohne Mutation",
+      "location": "src/EventStore.ts:337-394",
       "effort": "M",
-      "description": "once() fügt über noDedup: true immer eine eigene EventListener-Instanz ein — ein späteres on() mit gleichem (eventName, priority, listener, listenerObject) läuft jedoch durch insertOrFindSimilarListener() und sattelt auf genau diese Instanz auf, weil findSimilarListener() kein Ausschlusskriterium für Listener mit gesetztem callAfterApply kennt. Feuert das Event nie, hält der überlebende Listener die callAfterApply-Closure des once()-Handles, und die hält den Emitter samt Store, Keeper und allen zurückgehaltenen Nutzdaten. Das verbrauchte on()-Handle senkt damit einen Zähler, dessen Freigabelogik einem fremden, womöglich nie aufgerufenen Handle gehört. Mit WeakRef nachgewiesen und in lifecycle.spec.ts:569-590 (onDedupedOntoAPendingOnce) festgenagelt. Seit dem MEM-001-Fix in v6.2.0 ist das der letzte Weg, auf dem ein verbrauchtes Handle den Emitter noch hält.",
-      "recommendation": "findSimilarListener() verweigert die Deduplizierung auf einen Listener mit gesetztem callAfterApply. Kostet im Kollisionsfall eine zusätzliche Registrierung statt eines Zähler-Inkrements und ändert Verhalten — AGENTS.md hält ausdrücklich fest, dass dieser Preis nie beziffert wurde. Braucht einen CHANGELOG-Eintrag, und der Pin in lifecycle.spec.ts dreht sich um. Wird die Änderung nicht gewollt, gehört der Punkt auf die Liste akzeptierter Findings statt ins Backlog."
+      "description": "forEach() schützt den Walk gegen Ab- und Anmeldungen aus dem Listener heraus, indem es den Bucket per slice(0) kopiert. Der Schutz ist notwendig, die Kosten fallen aber bei jedem Dispatch an, obwohl die überwiegende Mehrheit der Emits nichts mutiert. Gemessen über je 20.000 Emits: 1 Listener 112 ns, 8 Listener 97 ns, 64 Listener 574 ns, 512 Listener 4312 ns pro Emit, insgesamt gut 10 Millionen kopierte Slots im größten Fall. Liegt zusätzlich ein Wildcard-Listener vor, werden zwei Arrays kopiert und der Merge kostet noch einmal rund ein Drittel mehr (512 Listener: 5718 ns). Positiv abgegrenzt: der Fall ohne Listener ist bereits optimiert und kostet 32,5 ns ohne jede Allokation. Für eine Bibliothek, die synchronen Dispatch in Game-Loops als Kernversprechen führt, ist dieser Allokationsdruck der wesentliche verbliebene Posten unter der Überschrift Ressourcenverschwendung.",
+      "recommendation": "Copy-on-write statt Copy-always. Ein Mutationszähler auf dem Store, den forEach() vor dem Walk liest: solange er sich nicht ändert, direkt über den Bucket iterieren; ändert er sich, auf eine in diesem Moment gezogene Kopie umschalten. Alternativ ein iterationDepth-Zähler, den die Mutationspfade (add, removeItemFromArray, removeListenerFromArray, removeAll) auswerten, um bei aktiver Iteration den Bucket zu klonen statt in-place zu ändern. Beide Varianten machen den Normalfall allokationsfrei. src/emit-reentrancy.spec.ts deckt die Fälle ab, die dabei nicht brechen dürfen (Peer mid-emit abgemeldet, off(ε) mid-emit, Selbstabmeldung, Anmeldung während des Dispatch) und ist der Regressionsschutz für den Umbau."
+    },
+    {
+      "id": "TEST-001",
+      "category": "Testabdeckung & Teststrategie",
+      "severity": "medium",
+      "status": "new",
+      "title": "Der isRemoved-Guard gegen Doppel-Release ist von keiner Spec gedeckt",
+      "location": "src/EventStore.ts:255",
+      "effort": "S",
+      "description": "removeByEventListener() beginnt mit if (listener.isRemoved) return; und verhindert damit, dass ein Handle einen bereits anderweitig entfernten Listener ein zweites Mal dekrementiert. Der Coverage-Lauf weist Zeile 255 als einzige unabgedeckte Anweisung in EventStore.ts aus: kein Test betritt den Pfad. Er ist über die öffentliche API leicht erreichbar, wie zwei Proben zeigen. Erstens: on(ε, ['a','b'], fn) liefert einen Handle über zwei Listener; ein off(ε, 'a') entfernt einen davon hinter dem Rücken des Handles, der anschließende Handle-Aufruf trifft einen detachten und einen lebenden Listener. Zweitens: zwei on()-Aufrufe mit demselben Listener-Objekt teilen sich einen Listener mit refCount 2; nach off(ε, 'a') und beiden Handle-Aufrufen bleibt refCount bei 2, ohne dass etwas doppelt freigegeben wird. Beides verhält sich korrekt, aber nichts hält es fest: ein Refactor kann den Guard entfernen, ohne dass eine Spec fällt. Damit ist ausgerechnet die Schutzvorrichtung gegen genau die Fehlerklasse ungetestet, um die sich dieses Release dreht.",
+      "recommendation": "Zwei Fälle in src/lifecycle.spec.ts, wo die übrige Handle-Semantik bereits als ausführbare Zusicherung liegt: ein Handle, der nach einem off(ε, eventName) aufgerufen wird, und ein Handle-Paar auf einer referenzgezählten Registrierung nach demselben Vorgang. Assertiert werden sollte nicht nur getSubscriptionCount(ε), sondern auch refCount des überlebenden Listeners, weil genau dessen Unverändertheit der Guard leistet."
+    },
+    {
+      "id": "DOC-002",
+      "category": "Konsistenz",
+      "severity": "medium",
+      "status": "new",
+      "title": "Re-entrantes emit() hält den älteren Wert, ohne dass es irgendwo steht",
+      "location": "src/eventize-api.ts:83-99, docs/retain.md:14",
+      "effort": "S",
+      "description": "_emitOne() schreibt keeper.retain(eventName, args) nach dem Dispatch. Emittiert ein Listener denselben Namen erneut, schließt der innere Aufruf zuerst ab und schreibt zuerst; der äußere überschreibt anschließend mit seinen älteren Argumenten und einer höheren Order-ID. Probe: bei retain(ε,'ping') und einem Listener, der bis zum Wert 2 hochzählt, sieht ein danach hinzukommender Abonnent den Wert 0, nicht 2. Die Reihenfolge, die docs/retain.md:14 als original emission order zusagt, ist damit die Abschluss- und nicht die Startreihenfolge, und bei Selbstrekursion gewinnt der äußerste Aufruf. Das Verhalten folgt zwingend aus der dokumentierten Zusage, dass ein werfender Listener den zuvor gehaltenen Wert unangetastet lässt, denn dafür muss der Schreibvorgang hinten stehen. Beschrieben ist es nirgends und von keiner Spec berührt: emit-reentrancy.spec.ts deckt An- und Abmeldungen während des Dispatch ab, nicht das Retain-Verhalten.",
+      "recommendation": "Zunächst festschreiben statt ändern: ein Fall in src/emit-reentrancy.spec.ts oder src/retain.spec.ts, der den gewinnenden Wert bei Selbstrekursion pinnt, dazu ein Absatz in docs/retain.md, der die Formulierung emission order zu Abschlussreihenfolge präzisiert. Eine Verhaltensänderung, also retain vor den Dispatch zu ziehen, wäre breaking und würde die Zusage zum werfenden Listener aufheben; sie gehört, wenn überhaupt, als bewusste Entscheidung mit CHANGELOG-Eintrag auf die Liste, nicht als stiller Fix."
+    },
+    {
+      "id": "CI-004",
+      "category": "Testabdeckung & Teststrategie",
+      "severity": "medium",
+      "status": "new",
+      "title": "Die Integrations-Harness läuft in keiner Pipeline",
+      "location": ".github/workflows/main.yml, .github/workflows/dev.yml, package.json:46",
+      "effort": "M",
+      "description": "Mit integration/ existiert seit den letzten sieben Commits eine vollständige Harness: sie baut das Paket, packt ein Tarball, installiert es in @spearwolf/signalize und lässt dort Typecheck und Tests laufen, in zwei Phasen (Baseline und gepatcht) und containerisiert reproduzierbar. Verdrahtet ist sie nirgends. Weder main.yml noch dev.yml erwähnen test:integrations; beide Workflows führen ausschließlich npm run cbt aus. Für ein Release, das dreizehn Breaking Changes gegen die einzige veröffentlichte Version stellt, ist der Lauf gegen einen echten Consumer der aussagekräftigste verfügbare Test, und er hängt davon ab, dass eine Person daran denkt. Hinzu kommt eine Format-Lücke: signalize bindet das Paket per ESM ein, sodass lib/index.js zur Laufzeit von keinem Consumer-Lauf berührt wird. attw --pack prüft die Typ-Auflösung für CJS, nicht das Laufzeitverhalten.",
+      "recommendation": "Ein eigener Workflow, nicht die cbt-Matrix erweitern: der Lauf braucht Docker und dauert erheblich länger als die Unit-Suite. Sinnvoller Zuschnitt sind ein Trigger auf push nach main, ein workflow_dispatch für den manuellen Fall und ein nächtlicher schedule. Bricht er, ist die Aussage wertvoll genug, um den Release-Pfad zu blockieren, also gehört er vor den deploy-Job. Für die CJS-Lücke genügt ein knapper Rauchtest im selben Container, der lib/index.js per require() lädt und einen emit-Zyklus fährt."
     },
     {
       "id": "CI-003",
       "category": "Sicherheit",
       "severity": "medium",
-      "status": "new",
+      "status": "carried-over",
       "title": "id-token: write gilt workflow-weit, also auch für den Testjob",
       "location": ".github/workflows/main.yml:7-9",
       "effort": "S",
-      "description": "Der permissions-Block steht auf Workflow-Ebene statt im deploy-Job. Damit bekommt auch der test-Job das Recht, ein OIDC-Token zu prägen — derselbe Job, der npm ci ausführt und über npm run cbt beliebigen Repository- und Dependency-Code startet. Ist auf npmjs.com Trusted Publishing für dieses Paket konfiguriert, worauf der Kommentar «Required for OIDC» deutet, ist dieses Token der Publish-Berechtigungsnachweis: Ein kompromittiertes Dev-Dependency im Testjob braucht dann keinen Secret-Diebstahl mehr, um zu veröffentlichen. Der Testjob selbst benötigt nichts über contents: read hinaus.",
-      "recommendation": "Den permissions-Block aus der Workflow-Ebene in den deploy-Job verschieben und dem test-Job explizit permissions: {contents: read} geben. Vier Zeilen, keine Verhaltensfolge auf dem grünen Pfad. Dieselbe Gelegenheit deckt CI-001 in dev.yml mit ab."
-    },
-    {
-      "id": "DEP-003",
-      "category": "Dependencies",
-      "severity": "medium",
-      "status": "new",
-      "title": "npm-run-all hat seit 2018 kein Release und trägt die einzige nicht patchbare Advisory-Kopie",
-      "location": "package.json:63",
-      "effort": "S",
-      "description": "npm view npm-run-all time weist 4.1.5 auf den 2018-11-24 aus, ohne Nachfolger — knapp acht Jahre ohne Veröffentlichung. Das Paket zieht minimatch@3.1.5 und darüber brace-expansion@1.1.16; die 1.x-Linie endet dort, ein Patch für GHSA-mh99-v99m-4gvg (Range <=5.0.7) existiert ausschließlich in 5.0.8. npm audit schlägt als Fix npm-run-all@1.1.3 vor — ein Downgrade um drei Hauptversionen, also kein Fix. Gewicht bekommt das dadurch, dass run-s das komplette cbt-Gate antreibt: lokal, in dev.yml und in main.yml.",
-      "recommendation": "Auf npm-run-all2 wechseln (aktuell 9.0.2, gepflegter Fork, identische run-s/run-p-CLI, zuletzt 2026-06 aktualisiert). Dessen Abhängigkeitsbaum bringt kein minimatch@3 mehr mit, womit eine der beiden Advisory-Wurzeln aus DEP-002 ersatzlos entfällt. Verifikation: npx jest --clearCache && npm run cbt — cbt ist der einzige Aufrufer und deckt den Wechsel damit selbst ab."
+      "description": "Der permissions-Block steht auf Workflow-Ebene und vergibt id-token: write an beide Jobs. Gebraucht wird das OIDC-Token ausschließlich vom deploy-Job für die Registry-Authentifizierung. Der test-Job führt npm ci und npm run cbt aus, also fremden Code aus dem Dependency-Baum, und trägt dabei die Berechtigung, ein Identitätstoken für den Publish-Vorgang anzufordern. Verifiziert: unverändert gegenüber dem Vorlauf.",
+      "recommendation": "Den Block aus der Workflow-Ebene entfernen und je Job vergeben: der test-Job bekommt contents: read, der deploy-Job zusätzlich id-token: write. Zwei zusätzliche Zeilen, keine Verhaltensänderung im Erfolgsfall."
     },
     {
       "id": "DX-002",
@@ -561,120 +590,132 @@
       "severity": "medium",
       "status": "carried-over",
       "title": "typescript-eslint läuft ohne Typinformationen",
-      "location": "eslint.config.mjs:11",
+      "location": "eslint.config.mjs:11,39-40",
       "effort": "M",
-      "description": "Die Konfiguration bindet tseslint.configs.recommended ein, nicht recommendedTypeChecked, und setzt weder parserOptions.project noch projectService — für diesen Lauf am Code erneut belegt. Damit bleibt die gesamte typbewusste Regelfamilie stumm: no-floating-promises, no-misused-promises, await-thenable, no-unnecessary-condition. Für eine Bibliothek, deren Kern aus positionsweise dekodierten unknown-Argumenten besteht und die mit emitAsync() und onceAsync() zwei Promise-Oberflächen führt, ist das die aussagekräftigste Regelklasse, die hier gerade nicht läuft. Im Remediation-Lauf ausdrücklich nicht angefordert, nicht etwa verworfen.",
-      "recommendation": "tseslint.configs.recommendedTypeChecked für src/**/*.ts ergänzen und languageOptions.parserOptions.projectService: true setzen. Mit Anlaufkosten rechnen: Die neuen Regeln melden beim ersten Lauf üblicherweise Treffer, die einzeln zu bewerten sind — bei dieser Codebasis am ehesten in den bewusst losen Dispatch-Pfaden, wo eine gezielte Ausnahme mit Begründung die richtige Antwort sein kann."
+      "description": "Die Konfiguration bindet tseslint.configs.recommended ein, nicht recommendedTypeChecked. Damit bleiben alle Regeln außen vor, die den Typechecker brauchen: no-floating-promises, no-misused-promises, await-thenable, no-unnecessary-condition. Gerade die ersten beiden sind für eine Bibliothek einschlägig, deren API mit emitAsync() und onceAsync() zwei Promise-Rückgaben führt, die ein Aufrufer stillschweigend fallen lassen kann. Auffällig ist der Block für **/*.js, der tseslint.configs.disableTypeChecked erweitert: er ergibt nur dann Sinn, wenn typgeprüfte Regeln aktiv wären, und ist in der aktuellen Fassung wirkungslos. Verifiziert: unverändert gegenüber dem Vorlauf.",
+      "recommendation": "Auf recommendedTypeChecked umstellen und languageOptions.parserOptions.projectService: true setzen. Der bestehende disableTypeChecked-Block für **/*.js wird dadurch von einem toten Rest zu genau der Ausnahme, als die er geschrieben wurde. Mit Laufzeitkosten im Lint-Schritt ist zu rechnen; bei 48 Dateien fällt das nicht ins Gewicht."
     },
     {
-      "id": "TEST-002",
-      "category": "Testabdeckung & Teststrategie",
-      "severity": "medium",
-      "status": "carried-over",
-      "title": "Kein Test läuft gegen das gebaute Dual-Format-Paket",
-      "location": "jest.config.ts:49-51",
-      "effort": "M",
-      "description": "testMatch ist auf **/src/** beschränkt, und kein Spec importiert aus lib/ — per Grep über alle 29 Suiten für diesen Lauf erneut bestätigt. Geprüft wird also ausschließlich der TypeScript-Quelltext durch die ts-jest-Transformation. attw --pack prüft die Auflösung der emittierten Deklarationen, nicht deren Laufzeitverhalten; ein Bruch, der erst im esbuild-Bundle oder in der CJS-Interop entsteht, hat keinen Gate-Schritt, der ihn fängt. Verschärfend hält AGENTS.md fest, dass typecheck und der Testlauf unter verschiedenen Modulauflösungen kompilieren (bundler gegen node10, wegen ts-jest#4198) und nur deshalb übereinstimmen, weil jeder Import in src/ relativ und erweiterungsfrei ist.",
-      "recommendation": "Eine schmale Smoke-Suite gegen lib/ nach dem Build: je ein import aus lib/index.mjs und ein require aus lib/index.js, die eventize/on/emit einmal durchspielen und isEventized() über beide Ladepfade prüfen — letzteres deckt zugleich ab, dass der Symbol.for-Marker realmweit trägt. Als eigener cbt-Schritt nach build, außerhalb von collectCoverageFrom, damit die Coverage-Schwelle unberührt bleibt."
+      "id": "MEM-002",
+      "category": "Memory Leaks & Ressourcen",
+      "severity": "low",
+      "previousSeverity": "medium",
+      "status": "improved",
+      "title": "on() dedupliziert auf ein wartendes once() und teilt einen Zähler über zwei Lebensdauern",
+      "location": "src/EventStore.ts:143-164, src/eventize-api.ts:449-471",
+      "effort": "L",
+      "description": "findSimilarListener() vergleicht Typ, Priorität, Eventname, Listener und Listener-Objekt, aber nicht, ob der gefundene Listener bereits ein callAfterApply trägt. Ein on() kann daher auf ein noch nicht ausgelöstes once() deduplizieren, wodurch eine einzige Registrierung mit einem gemeinsamen Referenzzähler zwei Abonnements unterschiedlicher Lebenserwartung bedient: das erste Feuern konsumiert das once(), dekrementiert den Zähler und lässt die on()-Registrierung bestehen. Herabgestuft, weil die Speicherfolge beseitigt ist: der konsumierte Handle nullt seine Closure, und src/lifecycle.spec.ts hält per WeakRef fest, dass der Emitter danach eingesammelt wird, wo er zuvor erreichbar blieb. Was bleibt, ist die Verhaltensasymmetrie eines geteilten Zählers. AGENTS.md führt den Zustand ausdrücklich als bekannt und ungelöst.",
+      "recommendation": "Unverändert lassen, solange keine Entscheidung darüber fällt. Die naheliegende Behebung, findSimilarListener() die Deduplizierung auf einen Listener mit gesetztem callAfterApply verweigern zu lassen, ist eine Verhaltensänderung mit unklarem Radius für Consumer, die auf der bestehenden Zählweise aufbauen. Sie gehört auf die Liste des nächsten Majors mit eigenem CHANGELOG-Eintrag, nicht in dieses Release, das bereits dreizehn Breaking Changes trägt."
+    },
+    {
+      "id": "PERF-002",
+      "category": "Performance",
+      "severity": "low",
+      "status": "new",
+      "title": "Wildcard-Replay iteriert Retain-Policies statt tatsächlich gehaltener Werte",
+      "location": "src/EventKeeper.ts:84-93",
+      "effort": "S",
+      "description": "Der Catch-em-all-Zweig von replayTo() läuft über this.eventNames, also über die Menge aller Namen mit Retain-Policy, und ruft sich für jeden davon selbst auf, um dann über this.events.get(name) festzustellen, dass meist gar kein Wert vorliegt. Die Kosten eines Wildcard-Abonnements skalieren damit mit der Zahl der Policies statt mit der Zahl vorhandener Werte. Gemessen bei genau einem gehaltenen Wert: 10 Policies 66 µs, 1.000 Policies 99 µs, 20.000 Policies 1.409 µs für ein einzelnes on(ε, '*'). Bei dynamisch erzeugten Retain-Namen wächst die Policy-Menge unbegrenzt, während die Wertmenge klein bleiben kann.",
+      "recommendation": "Über this.events iterieren statt über this.eventNames. Die Ergebnismenge ist identisch: jeder Eintrag in events besitzt per Konstruktion eine Policy, denn retain() schreibt nur bei vorhandener Policy, und '*' kann dort nie stehen, weil retain('*') wirft. Der Aufwand sinkt von O(Policies) auf O(Werte). Die Wildcard-Prüfung im Rumpf kann als Absicherung stehen bleiben; sie kostet nichts."
+    },
+    {
+      "id": "API-003",
+      "category": "Öffentliche API",
+      "severity": "low",
+      "status": "new",
+      "title": "on(ε, [], fn) abonniert nichts und meldet nichts",
+      "location": "src/subscribeTo.ts:136-155",
+      "effort": "S",
+      "description": "Mit einer leeren Namensliste durchläuft _subscribeTo() den Array-Zweig, erzeugt eine leere entries-Liste und liefert ein leeres Listener-Array zurück. Der Aufrufer bekommt einen gültigen Unsubscribe-Handle für null Registrierungen, getSubscriptionCount(ε) bleibt bei 0, und es gibt weder Warnung noch Fehler. Das fällt aus der Linie, die v6 sonst konsequent zieht: ein nicht dispatchbarer Listener wirft seit diesem Release, eine NaN-Priorität wirft, und beide Fälle geben zuvor eine warn()-Zeile aus, die benennt, welche der Eingaben schuld war. Eine leere Namensliste ist derselbe Fehlertyp, nämlich ein Aufruf, der nicht bewirken kann, was er zu bewirken vorgibt, und ist als einziger stumm. Typischer Auslöser ist eine zur Laufzeit gebaute Namensliste, die leer bleibt.",
+      "recommendation": "Eine warn()-Zeile im Array-Zweig, wenn entries leer ist, im Wortlaut der bestehenden Meldungen (called with an empty event name list!). Werfen wäre die konsequentere, aber härtere Variante und damit breaking; die Warnung reicht, um den stillen Fall sichtbar zu machen. Alternativ als bewusstes No-op in docs/ festhalten, dann aber ausdrücklich."
+    },
+    {
+      "id": "API-004",
+      "category": "Öffentliche API",
+      "severity": "low",
+      "status": "new",
+      "title": "Priority ist ein exportiertes Objekt, das jeder Consumer prozessweit umschreiben kann",
+      "location": "src/Priority.ts:3-18, src/types.ts:342-358",
+      "effort": "S",
+      "description": "Priority wird als gewöhnliches Objektliteral exportiert, ohne Object.freeze, und EventizePriority deklariert seine elf Felder ohne readonly. Ein Consumer kann Priority.Normal = 999 setzen, und danach sortiert jeder Emitter im selben Modul-Instanz-Realm anders, einschließlich der Emitter fremder Bibliotheken, die dasselbe Paket geladen haben. Verifiziert: die Zuweisung greift, Object.isFrozen(Priority) meldet false. Für ein Release, das absolut vorhersehbares Laufzeitverhalten als Zielsetzung führt, ist das die billigste erreichbare Zusage, die derzeit nicht gegeben wird. Anders als die Bindung der Zähler an die Modulinstanz, die bewusst und dokumentiert ist, folgt diese Offenheit keinem Entwurf, sondern nur der Voreinstellung von JavaScript.",
+      "recommendation": "Object.freeze() um das Literal und readonly auf allen Feldern von EventizePriority. Beides zusammen macht die Konstanten zur Laufzeit unveränderlich und zur Übersetzungszeit sichtbar unveränderlich. Keine Laufzeitkosten, kein Bruch für dokumentierte Verwendung: lesender Zugriff bleibt identisch, und schreibender war nie Teil der API. Ein Satz im CHANGELOG genügt, weil ein Consumer, der bislang schrieb, sich auf nichts Zugesichertes stützte."
+    },
+    {
+      "id": "TYPE-004",
+      "category": "Typsicherheit (TS)",
+      "severity": "low",
+      "status": "unchanged",
+      "title": "Unerreichbare Zweige halten die Branch-Coverage knapp über der Schwelle",
+      "location": "src/EventListener.ts:189,220, src/utils.ts:61-62",
+      "effort": "S",
+      "description": "Drei Stellen bleiben laut Coverage-Lauf unabgedeckt, zwei davon nachweislich unerreichbar. In EventListener.apply() prüft Zeile 220 this.isCatchEmAll || this.eventName === eventName, doch EventStore.forEach() liefert ausschließlich Listener aus dem Bucket des emittierten Namens plus die Wildcard-Liste, und EventKeeper.replayTo() ruft mit dem gehaltenen Namen auf: die Bedingung ist immer wahr, der falsche Zweig tot. Der Standardwert args: EventArgs = [] in Zeile 189 wird von keinem der beiden Aufrufer je benötigt, was der Kommentar an Ort und Stelle selbst festhält. In utils.ts betrifft es die Auswahl zwischen console.warn und console.log sowie den No-op-Rückfall ohne Konsole. Die Branch-Coverage liegt bei 98,33 % gegen eine Schwelle von 98, also mit einem Drittelpunkt Luft; jeder weitere tote Zweig lässt den cbt-Lauf aus einem Grund scheitern, der mit der auslösenden Änderung nichts zu tun hat. Das Projekt hat vergleichbare Fälle bereits ausdrücklich behandelt: der Eventname-Zweig von isEqual() wurde als unerreichbar gelöscht und im CHANGELOG als solcher begründet.",
+      "recommendation": "Derselben Linie folgen: die Bedingung in Zeile 220 analysieren und, sofern der tote Zweig bestätigt wird, auf den erreichbaren Teil reduzieren, mit einem Satz im CHANGELOG unter Internal. Für den args-Standardwert und die console-Auswahl genügt ein istanbul-ignore-Kommentar samt Begründung, weil beide als bewusstes Sicherheitsnetz für Aufrufer außerhalb des Pakets gedacht sind."
     },
     {
       "id": "TYPE-003",
       "category": "Typsicherheit (TS)",
       "severity": "low",
-      "status": "new",
-      "title": "emitAsync() ist als Promise<any> deklariert, obwohl die Laufzeit enger ist",
-      "location": "src/eventize-api.ts:617,625,630,636; src/types.ts:296-298",
-      "effort": "S",
-      "description": "Alle drei Overloads und die Implementierung geben Promise<any> zurück. Tatsächlich liefert die Funktion Promise<any[]>, wenn mindestens ein Listener einen Nicht-Nullwert zurückgab, sonst Promise<undefined> (eventize-api.ts:649). Die eigene Doku ist genauer als der Code: SKILL.md:47 nennt korrekt Promise<any[] | undefined>. any schaltet außerdem jede Weiterprüfung ab — (await emitAsync(ε, 'x')).map(…) kompiliert anstandslos, obwohl der Wert undefined sein kann, und genau das ist der dokumentierte Quirk. Das ist die eine Stelle, an der eine ansonsten sorgfältig verengte Oberfläche aufgibt.",
-      "recommendation": "Rückgabetyp in beiden Dateien auf Promise<any[] | undefined> ziehen. Bricht Aufrufer, die bisher unbesehen auf dem Ergebnis weiterarbeiteten — also genau die Aufrufer, die der Quirk trifft. CHANGELOG-Eintrag als Typbruch; SKILL.md:47 stimmt dann bereits."
+      "status": "carried-over",
+      "title": "emitAsync() ist als Promise<any[]> deklariert, obwohl die Laufzeit enger ist",
+      "location": "src/eventize-api.ts:626,634,639, src/types.ts:309-316",
+      "effort": "M",
+      "description": "Alle drei Überladungen und die Methodenvarianten in EventizeApi geben Promise<any[] | undefined> zurück. Der Elementtyp ist any, obwohl zur Laufzeit feststeht, dass jeder Eintrag der aufgelöste Rückgabewert eines Listeners ist, und bei typisierten Event-Maps ließe sich daraus mehr ableiten. Ein Aufrufer kann auf dem Ergebnis beliebig rechnen, ohne dass der Compiler eingreift. Verifiziert: unverändert gegenüber dem Vorlauf.",
+      "recommendation": "Auf Promise<unknown[] | undefined> wechseln, sofern die Aufrufstellen im Ökosystem das tragen; das ist breaking und gehört zu den dreizehn dazu oder auf den nächsten Major. Für typisierte Emitter wäre zusätzlich ein aus der Event-Map abgeleiteter Elementtyp denkbar, was allerdings verlangt, Listener-Rückgabewerte überhaupt erst in der Map zu modellieren, die derzeit nur Argumenttupel führt."
     },
     {
       "id": "BUILD-003",
       "category": "Projektaufbau & Build",
       "severity": "low",
-      "status": "new",
+      "status": "carried-over",
       "title": "tsconfig.json setzt kein noEmit",
       "location": "tsconfig.json:3-36",
       "effort": "S",
-      "description": "Das Flag steht ausschließlich im typecheck-Skript (package.json:46). Ein npx tsc -p tsconfig.json ohne Flag — der naheliegende Griff beim Nachstellen eines Typfehlers — schreibt neben jede .ts-Datei unter src/ eine .js. Dieses Verzeichnis wird von jests testMatch gescannt, das mit [tj]s ausdrücklich auch .js einschließt, und von collectCoverageFrom; .gitignore fängt die Dateien nicht. Im Review des Remediation-Laufs zweimal versehentlich ausgelöst und wieder aufgeräumt.",
-      "recommendation": "\"noEmit\": true in die compilerOptions aufnehmen. Das Flag im Skript wird dadurch redundant, stört aber nicht und dokumentiert die Absicht am Aufrufort. tsup liest die Datei über eine eigene Option und ist nicht betroffen — der Build bleibt unverändert."
+      "description": "Die Konfiguration enthält keine noEmit-Einstellung; das Typecheck-Skript reicht das Flag stattdessen auf der Kommandozeile nach (tsc --noEmit). Ein tsc-Aufruf ohne dieses Argument, etwa aus einem Editor, einem neuen Skript oder versehentlich, schreibt JavaScript neben die Quellen in src/. Die Ausgabe wäre nicht von .gitignore erfasst, das lib, build, dist und types kennt, aber keine Emissionen innerhalb von src/. Verifiziert: unverändert gegenüber dem Vorlauf.",
+      "recommendation": "noEmit: true in die compilerOptions aufnehmen. tsup erzeugt seine Ausgabe über esbuild und die eigene dts-Pipeline und ist davon nicht betroffen, ts-jest kompiliert im Speicher. Das Flag im Skript kann bleiben, schadet nicht und dokumentiert die Absicht an der zweiten Stelle."
     },
     {
       "id": "DX-004",
       "category": "Developer Experience",
       "severity": "low",
-      "status": "new",
+      "status": "carried-over",
       "title": "format:check deckt nur src/** ab",
-      "location": "package.json:49-50",
+      "location": "package.json:51-52",
       "effort": "S",
-      "description": "prettier --check 'src/**/*.{ts,js,json,md}' lässt alles außerhalb von src/ ungeprüft: README.md, CHANGELOG.md, AGENTS.md, docs/*.md, skills/**/*.md, dazu eslint.config.mjs, jest.config.ts, tsup.config.js und scripts/. Das sind rund 2.800 Zeilen Markdown plus die gesamte Toolchain-Konfiguration — und genau dort lag die Mehrheit der Änderungen der letzten drei Releases. eslint erfasst die JS/TS-Dateien wenigstens regelseitig; für Markdown existiert überhaupt kein Gate.",
-      "recommendation": "Muster auf '{src,docs,skills,scripts}/**/*.{ts,js,mjs,cjs,json,md}' plus die Wurzel-Markdown-Dateien erweitern und einmalig format:write laufen lassen, damit der erste Gate-Lauf nicht an Altbestand scheitert. Alternativ, falls Prettiers Prosa-Formatierung unerwünscht ist: .prettierignore gezielt für docs/ und README setzen und die Ausnahme dort begründen — dann ist die Lücke wenigstens eine Entscheidung."
-    },
-    {
-      "id": "TEST-004",
-      "category": "Testabdeckung & Teststrategie",
-      "severity": "low",
-      "status": "new",
-      "title": "coverageThreshold liegt unter der gemessenen Deckung",
-      "location": "jest.config.ts:23-30",
-      "effort": "S",
-      "description": "Frisch gemessen nach npx jest --clearCache: 99,82 / 98,02 / 99,23 / 100 für Statements / Branches / Functions / Lines. Die Schwellen stehen auf 99 / 97,5 / 99 / 99. Bei lines liegt ein voller Punkt Spiel — eine Regression, die eine vollständig gedeckte Zeile entfernt, passiert das Gate unbemerkt. Der Kommentar in derselben Datei («Set just below the state measured … Raise these when coverage rises») und AGENTS.md verlangen beide ausdrücklich das Nachziehen.",
-      "recommendation": "Auf 99,8 / 98 / 99,2 / 99,9 anheben — knapp unter dem Ist, damit die Schwelle bindet statt zu dekorieren. Niemals senken, um einen Build grün zu bekommen; das ist in AGENTS.md als Regel festgeschrieben und der Grund, warum die Zahlen überhaupt im Repository stehen."
+      "description": "Beide Prettier-Skripte sind auf src/**/*.{ts,js,json,md} beschränkt. Damit bleiben die Wurzeldateien außen vor, die den größten Teil der Prosa tragen: README.md mit rund 32 kB, CHANGELOG.md mit rund 83 kB, AGENTS.md, sämtliche docs/*.md, skills/, integration/ und die Konfigurationsdateien selbst. Der cbt-Lauf meldet Formatierungstreue, prüft sie aber für den Großteil des Repositories nicht. Verifiziert: unverändert gegenüber dem Vorlauf.",
+      "recommendation": "Die Glob-Muster auf das Repository ausweiten und stattdessen mit .prettierignore ausschließen, was nicht erfasst werden soll. Das kehrt die Voreinstellung um, von opt-in auf opt-out, und ist die Reihenfolge, in der ein Formatierer verlässlich bleibt. Ein einmaliger format:write-Lauf über die neu erfassten Dateien gehört als eigener Commit davor, damit die Umstellung nicht mit inhaltlichen Änderungen vermischt wird."
     },
     {
       "id": "API-002",
       "category": "Öffentliche API",
       "severity": "low",
-      "status": "new",
+      "status": "carried-over",
       "title": "eventize.inject() überschreibt vorhandene Member ohne Warnung",
       "location": "src/eventize.ts:82-111",
       "effort": "S",
-      "description": "Object.assign schreibt neun aufzählbare eigene Properties auf das Zielobjekt: on, once, onceAsync, off, emit, emitAsync, retain, retainClear, unretain. Ein Ziel, das eine davon bereits als eigene Property führt, verliert sie ersatzlos; liegt sie auf dem Prototyp, wird sie still verschattet. emit ist der kritische Name — der Duck-Typing-Pfad behandelt obj.emit als Dispatch-Kanal, ein Objekt mit eigener emit-Semantik verhält sich nach dem inject() also grundlegend anders als vorher. In README, docs/ und SKILL.md finden sich 19 Erwähnungen von inject, keine davon nennt die Kollision.",
-      "recommendation": "In README und SKILL.md einen Satz ergänzen, welche neun Namen belegt werden — das ist die eigentliche Lücke. Optional in inject() prüfen, ob einer der Namen bereits als eigene Property existiert, und über warn() melden; kein Fehler, denn das Überschreiben kann gewollt sein."
-    },
-    {
-      "id": "DX-005",
-      "category": "Developer Experience",
-      "severity": "low",
-      "status": "new",
-      "title": "Fehlermeldungen von on() / once() nennen eine interne Funktion",
-      "location": "src/subscribeTo.ts:54,119",
-      "effort": "S",
-      "description": "Beide Würfe lauten «subscribeTo() called with insufficient arguments» beziehungsweise «subscribeTo() called with a NaN priority». subscribeTo ist nicht Teil von src/index.ts und für einen Konsumenten weder aufrufbar noch auffindbar — der Fehler kommt aus on(), once(), obj.on() oder this.on(). Für die erste Meldung hält der Kommentar bei :118 Rückwärtskompatibilität dagegen, was sie erklärt; die zweite ist neu in v6.2.0 und erbt die Verwirrung ohne diesen Grund. Anders als warn() tragen beide Würfe zudem kein [eventize]-Präfix, obwohl LOG_NAMESPACE genau dafür existiert.",
-      "recommendation": "Zumindest die NaN-Meldung auf den tatsächlich aufgerufenen Namen umstellen und beide mit LOG_NAMESPACE präfixen. Die Alt-Meldung ist in on.spec.ts verankert und in docs/lifecycle.md:169 wörtlich zitiert — eine Änderung zieht dort nach und gehört in den CHANGELOG."
+      "description": "inject() legt neun Methoden per Object.assign auf das Zielobjekt. Trägt dieses bereits ein on, off, emit oder eine der übrigen Bezeichnungen, wird sie ersatzlos ersetzt, ohne Hinweis. Betroffen sind gerade die Fälle, für die inject() gedacht ist: bestehende Objekte, die häufig schon eine eigene Emitter-artige Oberfläche mitbringen. Das Ergebnis ist ein Objekt, dessen Methoden lautlos die Bedeutung gewechselt haben. Verifiziert: unverändert gegenüber dem Vorlauf.",
+      "recommendation": "Vor dem Object.assign prüfen, welche der neun Namen bereits belegt sind, und für jeden Treffer eine warn()-Zeile ausgeben, im Wortlaut der übrigen Warnungen des Pakets. Werfen wäre breaking und für den Fall zu hart, dass jemand bewusst überschreibt. Ergänzend ein Satz in README.md und docs/, der die Überschreibung als beabsichtigtes Verhalten benennt."
     },
     {
       "id": "DOC-001",
       "category": "Implementierungsstand",
       "severity": "low",
-      "status": "new",
-      "title": "Beide Migrationsdokumente versprechen elf Breaking Changes und zählen zehn auf",
-      "location": "skills/using-eventize/references/migration.md:3; docs/lifecycle.md:63",
+      "status": "carried-over",
+      "title": "Drei Dokumente nennen dreizehn Breaking Changes und belegen drei verschiedene Zahlen",
+      "location": "docs/lifecycle.md:63, skills/using-eventize/references/migration.md:3, CHANGELOG.md",
       "effort": "S",
-      "description": "Die Zahl selbst stimmt: Der CHANGELOG führt für v6.0.0 neun BREAKING-Punkte, für v6.1.0 keinen und für v6.2.0 zwei — zusammen elf. Beide Dokumente fassen jedoch die zwei getrennten CHANGELOG-Einträge zum Bulk-off() zusammen (Wildcard-Formen einerseits, Array mit nullish-Element andererseits) und kommen dadurch auf zehn zählbare Einträge: migration.md zehn Bullets, docs/lifecycle.md drei ausgearbeitete Abschnitte plus «Seven more». Inhaltlich fehlt nichts, beide Formen sind in lifecycle.md:93-100 beschrieben. Wer nachzählt, sucht trotzdem einen elften Punkt — in einem Projekt, das seine Bruchlisten sonst auszählt und die Zählung im Remediation-Plan schriftlich verteidigt, ist das eine sichtbare Kante.",
-      "recommendation": "Entweder die beiden off()-Formen als getrennte Bullets führen, oder die Kopfzeile auf «zehn» ändern und den Zusammenzug in einem Halbsatz benennen. Dasselbe gilt für migration.md:69, das «the four runtime changes» gegen drei ausgearbeitete Abschnitte in lifecycle.md stellt — unter derselben Zusammenzug-Lesart korrekt, aber nur für den, der sie kennt."
-    },
-    {
-      "id": "DEP-004",
-      "category": "Dependencies",
-      "severity": "low",
-      "status": "new",
-      "title": "Keine automatisierte Dependency-Pflege",
-      "location": ".github/",
-      "effort": "S",
-      "description": "Unter .github/ liegen ausschließlich workflows/dev.yml und workflows/main.yml — keine dependabot.yml, keine Renovate-Konfiguration. Bei 21 Dev-Dependencies, zwei offenen Advisory-Wurzeln und einem seit acht Jahren unveröffentlichten Paket wird Drift ausschließlich durch ein manuelles npm outdated sichtbar. Für eine Bibliothek ohne Laufzeit-Abhängigkeiten ist die Dev-Toolchain die gesamte Angriffsfläche der Lieferkette.",
-      "recommendation": ".github/dependabot.yml mit package-ecosystem: npm, wöchentlichem Intervall und Dev-Dependencies zu einer gruppierten PR zusammengefasst. Das cbt-Gate läuft in beiden Workflows und ist stark genug, solche PRs automatisch zu bewerten; die Gruppierung hält die Zahl der PRs beherrschbar."
+      "description": "Die Zahl steht wörtlich in docs/lifecycle.md:63 und in der Überschrift von migration.md, und die Einleitung des CHANGELOG-Abschnitts übernimmt sie. Die zugehörigen Listen tragen sie nicht: CHANGELOG.md markiert im v6-Abschnitt 9 Einträge mit **BREAKING:**, docs/lifecycle.md gliedert 3 ausführliche Unterabschnitte plus 9 Punkte unter Smaller breaking changes, was 12 ergibt, und migration.md führt 14 Einträge. Der Vorlauf hatte denselben Befund mit den damaligen Zahlen elf gegen zehn; die Diskrepanz ist über die Neufassung hinweg erhalten geblieben und hat sich verbreitert. Für ein Migrationsdokument ist die Zahl kein Schmuck: ein Leser hakt sie ab.",
+      "recommendation": "Eine der drei Listen zur maßgeblichen erklären, die beiden anderen daran ausrichten und die Zahl an allen drei Stellen daraus ableiten, statt sie zu wiederholen. Naheliegend ist CHANGELOG.md als Quelle, weil dort jeder Punkt ohnehin mit Migrationshinweis und betroffenen Dateien steht. Anschließend prüfen, ob die zusätzlichen Punkte in migration.md Breaking Changes sind oder Verhaltensänderungen unterhalb dieser Schwelle, denn zwei davon sind im CHANGELOG genau so eingeordnet."
     },
     {
       "id": "REL-001",
       "category": "Projektaufbau & Build",
       "severity": "low",
-      "status": "new",
+      "status": "carried-over",
       "title": "Veröffentlichte Versionen bekommen keinen Git-Tag",
-      "location": ".github/workflows/main.yml:33-55",
+      "location": ".github/workflows/main.yml:33-55, scripts/publishPackage.cjs",
       "effort": "S",
-      "description": "package.json steht auf 6.2.0, der CHANGELOG führt v6.1.0 und v6.2.0 als Releases, der jüngste Tag ist v6.0.0. Der Deploy-Job publiziert bei jedem Push auf main — gesteuert allein durch scripts/publishPackage.cjs, das -dev-Versionen und bereits veröffentlichte Nummern überspringt — und legt keinen Tag an. Aktuell ist der Schaden hypothetisch: Die Registry endet bei 5.1.0, kein 6.x wurde je publiziert. Der nächste Push auf main veröffentlicht jedoch 6.2.0 ohne rückverfolgbaren Commit. Die Tag-Liste ist zudem uneinheitlich: 0.0.8 und 0.5.0 ohne v-Präfix neben elf Tags mit.",
-      "recommendation": "Im Deploy-Job nach erfolgreichem Publish taggen und pushen; publishPackage.cjs kennt das Ergebnis bereits und kann den Exit-Code entsprechend führen, sodass der Tag nur bei tatsächlicher Veröffentlichung entsteht. Alternativ Tags am Release-Commit von Hand, dann aber konsequent und mit einheitlichem v-Präfix."
+      "description": "Der deploy-Job baut und veröffentlicht, erzeugt aber weder Tag noch GitHub-Release. Weder der Workflow noch publishPackage.cjs enthalten eine entsprechende Anweisung. Damit lässt sich im Nachhinein kein Commit einer Registry-Version zuordnen, außer über das Datum. Für ein Projekt, dessen CHANGELOG jede Änderung auf Dateiebene benennt, ist das die fehlende Klammer zwischen Beschreibung und Stand. Verifiziert: unverändert gegenüber dem Vorlauf.",
+      "recommendation": "Im deploy-Job nach erfolgreichem publish:pkg einen annotierten Tag v${version} setzen und pushen. Da publishPackage.cjs bei -dev-Versionen und bei bereits veröffentlichten Versionen ohne Fehler abbricht, muss der Tag-Schritt dieselbe Entscheidung kennen: am einfachsten, indem das Skript sein Ergebnis über GITHUB_OUTPUT meldet und der Folgeschritt daran hängt. Sonst entstehen Tags für Läufe, die nichts veröffentlicht haben."
     },
     {
       "id": "CI-001",
@@ -684,52 +725,30 @@
       "title": "dev.yml ohne permissions-Block",
       "location": ".github/workflows/dev.yml:1-27",
       "effort": "S",
-      "description": "Der CI-Workflow deklariert keine permissions und erbt damit die Repository-Voreinstellung — für diesen Lauf erneut am Code geprüft. Steht die auf «read and write», läuft jeder Push auf jeden Branch mit einem GITHUB_TOKEN, das Contents, Issues und Packages schreiben darf, und zwar in einem Job, der npm ci ausführt und damit die Install-Skripte sämtlicher Dev-Dependencies. main.yml deklariert immerhin einen Block, wenn auch zu weit gefasst — siehe CI-003.",
-      "recommendation": "permissions: {contents: read} auf Workflow-Ebene in dev.yml. Der Job liest ausschließlich und braucht nichts darüber hinaus. Zusammen mit CI-003 in einem Durchgang zu erledigen."
+      "description": "Der Workflow für alle Nicht-main-Branches deklariert keine permissions und erbt damit die Repository-Voreinstellung, die je nach Organisationseinstellung bis zu contents: write reicht. Er führt npm ci und npm run cbt aus, also Code aus dem Dependency-Baum, und braucht dafür ausschließlich Lesezugriff. Verifiziert: unverändert gegenüber dem Vorlauf.",
+      "recommendation": "permissions: contents: read auf Workflow-Ebene ergänzen. Zwei Zeilen, keine Auswirkung auf den Ablauf, und sie machen die Berechtigung unabhängig davon, wie die Organisationsvoreinstellung morgen aussieht."
     },
     {
       "id": "CI-002",
       "category": "Projektaufbau & Build",
       "severity": "low",
-      "status": "unchanged",
-      "title": "Keine concurrency-Group; zwei Pushes auf main rennen um den Publish",
-      "location": ".github/workflows/main.yml:3-5,33-36",
-      "effort": "S",
-      "description": "Der Workflow triggert auf jedem Push nach main ohne concurrency-Group, zwei schnell aufeinanderfolgende Pushes starten also zwei Deploy-Jobs. scripts/publishPackage.cjs:46 prüft zwar gegen die Registry, ob die Version bereits existiert, aber zwischen dieser Abfrage und dem npm publish in Zeile 56 liegt ein Netzwerk-Roundtrip — ein klassisches TOCTOU-Fenster. Die Registry weist den zweiten Publish dann mit E403 ab, was den Workflow rot färbt, ohne dass etwas kaputt wäre; ein rotes main aus einem harmlosen Grund ist genau die Sorte Signal, die man später ignoriert.",
-      "recommendation": "concurrency: {group: deploy-${{ github.ref }}, cancel-in-progress: false} auf Workflow-Ebene. cancel-in-progress bewusst auf false, weil ein bereits laufender Publish nicht abgebrochen werden darf."
-    },
-    {
-      "id": "DEP-001",
-      "category": "Dependencies",
-      "severity": "low",
       "status": "carried-over",
-      "title": "sinon und @types/sinon je ein Major zurück",
-      "location": "package.json:58,66",
+      "title": "Keine concurrency-Group; zwei Pushes auf main rennen um den Publish",
+      "location": ".github/workflows/main.yml:3-5,33-55",
       "effort": "S",
-      "description": "npm outdated für diesen Lauf: sinon 21.1.2 gegen 22.1.0, @types/sinon 21.0.1 gegen 22.0.0, dazu globals 17.7.0 gegen 17.8.0. Alle drei sind reine Dev-Dependencies, die Suite ist grün, ein konkreter Defekt ist nicht bekannt — der Befund ist Aktualität, nicht Funktion. Der Doppelsprung ist zusammen zu machen, weil @types/sinon der Major-Linie des Laufzeitpakets folgt.",
-      "recommendation": "sinon und @types/sinon gemeinsam auf 22 heben, globals mitziehen. Verifikation npx jest --clearCache && npm run cbt. Vorher die Sinon-22-Changelogs auf Änderungen an den fake- und spy-Signaturen prüfen, die in src/__test-utils__/ und quer durch die Specs verwendet werden."
-    },
-    {
-      "id": "DEP-002",
-      "category": "Dependencies",
-      "severity": "low",
-      "status": "unchanged",
-      "title": "22 Advisories in den Dev-Dependencies, zwei Wurzeln",
-      "location": "package.json:53-73",
-      "effort": "M",
-      "description": "npm audit meldet 22 betroffene Pakete (21 high, 1 low), npm audit --omit=dev meldet null — Konsumenten sind nicht betroffen, das Paket hat keine Laufzeit-Abhängigkeiten. Die Wurzeln: brace-expansion GHSA-mh99-v99m-4gvg (high, DoS durch unbegrenzte Expansion) erreicht über minimatch@9 in jests glob die Version 2.1.2 und über minimatch@3 in npm-run-all die 1.1.16 — beide sind das Ende ihrer Major-Linie, gepatcht ist ausschließlich 5.0.8. Zweitens esbuild GHSA-g7r4-m6w7-qqqr (low, Dateilesen über den Dev-Server unter Windows) über tsup@8.5.1 auf esbuild@0.27.7, behoben in 0.28.1. Praktisch ausnutzbar ist keines: Die Glob-Muster stammen aus der Repo-Konfiguration, und tsup startet keinen Dev-Server. Ein dauerhaft rotes npm audit stumpft aber ab, und das ist der eigentliche Schaden.",
-      "recommendation": "esbuild über ein tsup-Update oder einen overrides-Eintrag auf >=0.28.1 ziehen — nicht brechend, Fix verfügbar. Die brace-expansion-Kette in npm-run-all löst DEP-003 auf; die in jest bleibt, bis jest sein glob anhebt. Keinen overrides-Eintrag auf brace-expansion@5 erzwingen: minimatch@3 erwartet ^1.1.7, und die API hat sich über die Majors verändert — das tauscht einen bekannten Zustand gegen einen ungeprüften."
+      "description": "Kein Workflow deklariert eine concurrency-Group. Zwei kurz aufeinanderfolgende Pushes auf main starten zwei vollständige Läufe, die beide bis zum deploy-Job durchlaufen. Dass daraus derzeit kein Schaden entsteht, liegt an publishPackage.cjs, das die Registry abfragt und bei bereits veröffentlichter Version abbricht; das ist eine Prüfung mit Zeitfenster zwischen Abfrage und Veröffentlichung, kein Schloss. Zusätzlich verbrauchen die parallelen Testmatrizen acht Runner für ein Ergebnis, das nur für den jüngsten Commit zählt. Verifiziert: unverändert gegenüber dem Vorlauf.",
+      "recommendation": "In dev.yml eine Gruppe je Branch mit cancel-in-progress: true, damit überholte Läufe abgebrochen werden. In main.yml dieselbe Gruppierung, aber mit cancel-in-progress: false, weil ein laufender Publish nicht mitten im Vorgang abgebrochen werden darf; die Läufe reihen sich dann auf, statt zu konkurrieren."
     },
     {
       "id": "DX-003",
       "category": "Developer Experience",
       "severity": "low",
-      "status": "unchanged",
+      "status": "carried-over",
       "title": "README mischt zwei Größen-Basen in einer Angabe",
-      "location": "README.md:15-16,23; skills/using-eventize/SKILL.md:8",
+      "location": "README.md:15,23, skills/using-eventize/SKILL.md:8",
       "effort": "S",
-      "description": "README.md:15-16 nennt «The ESM build is about 27.5 kB unminified», sieben Zeilen später steht «~5 kB gzipped». Am aktuellen Build nachgemessen: lib/index.mjs 29.227 B (28,5 kB), lib/index.js 30.782 B (30,1 kB) — die unminifizierte Angabe ist um 1 bis 2,6 kB veraltet. Die Gzip-Angabe stimmt, bezieht sich aber auf eine andere Basis: minifiziert und gzip sind es 4.292 B, roh gzip dagegen 7.638 B für ESM und 8.105 B für CJS. Zwei Zahlen, zwei Bezugsgrößen, kein Hinweis darauf; SKILL.md:8 wiederholt die 5-kB-Angabe ohne Qualifikation.",
-      "recommendation": "Beide Zahlen in einen Satz ziehen und die Basis benennen, etwa «ESM-Build 28,5 kB unminifiziert, minifiziert und gzip rund 4,3 kB». Da tsup mit minify: false baut, ist die minifizierte Zahl die des Konsumenten-Bundles — das gehört dazugesagt, sonst liest sich die kleinere Zahl als das, was ausgeliefert wird."
+      "description": "Zwei Zeilen auseinander stehen die ESM-Build ist etwa 27,5 kB unminifiziert und ein minimaler Fußabdruck (~5 kB gzipped), ohne dass die zweite Angabe die Minifizierung nennt, auf der sie beruht. Nachgemessen am aktuellen Build: unminifiziert 29.196 Bytes (28,5 kB, also etwas über der genannten Zahl), unminifiziert und gzip-komprimiert 7.630 Bytes (7,5 kB), minifiziert und gzip-komprimiert 4.292 Bytes (4,2 kB). Die 5-kB-Angabe ist damit für den minifizierten Fall vertretbar, für den ausgelieferten Zustand aber um gut die Hälfte zu niedrig, und das Paket liefert unminifiziert aus (tsup.config.js setzt minify: false). Dieselbe Zahl steht ohne jede Qualifizierung in skills/using-eventize/SKILL.md:8.",
+      "recommendation": "Beide Angaben auf dieselbe Basis stellen und diese benennen, etwa 28,5 kB unminifiziert, rund 4,3 kB minifiziert und gzip-komprimiert. Die Zahl in SKILL.md gleich mitziehen. Wer die Werte künftig nicht von Hand pflegen will, hängt eine Größenmessung an den Build-Schritt und lässt sie beim Überschreiten einer Schwelle scheitern."
     },
     {
       "id": "INFO-001",
@@ -737,10 +756,10 @@
       "severity": "info",
       "status": "carried-over",
       "title": "Priority-Legacy-Aliase bleiben Teil der öffentlichen Oberfläche",
-      "location": "src/Priority.ts:14-17; src/types.ts:332-339",
+      "location": "src/Priority.ts:14-17, src/types.ts:350-357",
       "effort": "S",
-      "description": "AAA, BB, C und Default stehen weiter im Priority-Objekt und im EventizePriority-Interface, jeweils mit @deprecated und dem Zusatz «Slated for removal in a future major». v6.0.0 wäre dieser Major gewesen; v6.2.0 hat stattdessen zwei weitere Brüche unter derselben Minor untergebracht. Die Aliase kosten nichts außer vier Zeilen und einer verdoppelten Oberfläche, in der C und Medium denselben Wert tragen — laut Kommentar ist C sogar der Grund, weshalb Medium überhaupt existiert.",
-      "recommendation": "Entweder im nächsten Major entfernen und das jetzt unter ## Unreleased ankündigen, oder das @deprecated auf eine konkrete Version festnageln, statt «a future major» stehenzulassen. Der derzeitige Zustand kündigt eine Entfernung an, die seit zwei Majors nicht stattfindet."
+      "description": "AAA, BB, C und Default stehen weiterhin im Priority-Objekt und in EventizePriority, jeweils mit @deprecated und dem Hinweis auf Entfernung in einem künftigen Major. Dieser Major ist der laufende. Da die dts-Erzeugung die Doc-Kommentare seit dem Wechsel in tsup.config.js erhält, sehen Consumer die Verfallsmarkierung immerhin im Editor. Verifiziert: unverändert gegenüber dem Vorlauf.",
+      "recommendation": "Entweder in v6.0.0 entfernen, wo dreizehn Breaking Changes ohnehin einen Migrationsdurchgang erzwingen, und die Ersetzung in migration.md aufnehmen. Oder die Ankündigung entschärfen und einen konkreten Zielmajor nennen, statt sie über eine weitere Hauptversion offen zu lassen."
     },
     {
       "id": "INFO-002",
@@ -749,42 +768,46 @@
       "status": "carried-over",
       "title": "Die Argument-Heuristik von _subscribeTo ist nur durch Kommentare strukturiert",
       "location": "src/subscribeTo.ts:65-94",
-      "effort": "M",
-      "description": "Die Dekodierung der überladenen on()-Formen ist eine dreistufige if/else-Kette über args.length und typeof args[0] beziehungsweise typeof args[1], deren Zuordnung zu den vierzehn SubscribeArgs-Varianten ausschließlich in Kommentaren steht. AGENTS.md hält fest, dass diese Datei und types.ts im Gleichschritt zu ändern sind — genau das Kopplungsmerkmal, das eine Struktur im Code tragen sollte statt in Prosa daneben. Die Corner Cases sind in on.spec.ts über 958 Zeilen dicht abgedeckt; das Risiko ist Lesbarkeit, nicht Korrektheit.",
-      "recommendation": "Kein Umbau nötig, solange die Oberfläche steht. Falls sie noch einmal wächst: die Zweige in benannte Prädikate ziehen (isCatchAllWithPriority(args), isNamedWithPriority(args)), die dieselben Namen tragen wie die SubscribeArgs-Kommentare — dann sind Typ und Dekodierung über den Namen gekoppelt statt über die Aufmerksamkeit des nächsten Lesers."
+      "effort": "L",
+      "description": "Die positionale Dekodierung entscheidet über eine Kette aus Längenvergleichen und typeof-Prüfungen, welcher der überladenen Aufrufformen ein Aufruf entspricht. Welche Form welchem Zweig entspricht, steht ausschließlich in Kommentaren. Der Überladungssatz in types.ts muss dazu passen, ohne dass irgendetwas den Abgleich erzwingt; AGENTS.md hält deshalb ausdrücklich fest, dass beide im Gleichschritt zu ändern sind. Verifiziert: unverändert gegenüber dem Vorlauf.",
+      "recommendation": "Mittelfristig eine deklarative Formentabelle einführen, gegen die geparst wird, statt einer Verzweigungskette. Sie ließe sich in derselben Datei gegen SubscribeArgs prüfen und machte die Zuordnung maschinell nachvollziehbar. Kurzfristig genügt es, die Kommentar-Nummerierung und die Reihenfolge des Überladungssatzes in types.ts als ausdrücklich gekoppelt zu kennzeichnen."
     },
     {
       "id": "INFO-003",
       "category": "Sicherheit",
       "severity": "info",
-      "status": "unchanged",
-      "title": "Der Marker-Slot ist configurable und lässt sich löschen",
-      "location": "src/utils.ts:76-79",
-      "effort": "S",
-      "description": "defineHiddenPropertyRO() setzt configurable: true ohne begründenden Kommentar; writable und enumerable bleiben auf ihrem false-Default. Der Slot ist damit nicht schreibbar, aber löschbar: delete obj[Symbol.for('eventize')] macht ein Objekt still nicht-eventisiert. isEventized() meldet danach false, off() wird zum No-Op, und ein erneutes eventize() legt einen frischen Store an — die alten Listener bleiben registriert, aber unerreichbar. Der Schlüssel ist ein Symbol.for() und damit realmweit auffindbar, was laut AGENTS.md Absicht ist, weil Identität realmweit sein muss. Kein Spec deckt die Löschung ab.",
-      "recommendation": "Wenn nichts darauf angewiesen ist, configurable: false setzen und damit auch das Nachdefinieren ausschließen. Wenn doch — Test-Utilities, Hot-Reload —, den Grund als Kommentar an die Stelle schreiben. Derzeit lässt sich am Code nicht entscheiden, ob das Flag Absicht oder Voreinstellung ist, und das ist der eigentliche Befund."
-    },
-    {
-      "id": "INFO-004",
-      "category": "Implementierungsstand",
-      "severity": "info",
       "status": "carried-over",
-      "title": "remediation-plan.md liegt abgearbeitet im Repo-Root",
-      "location": "remediation-plan.md",
+      "title": "Der Marker-Slot ist configurable und lässt sich löschen",
+      "location": "src/utils.ts:73-83, src/asEventized.ts:31",
       "effort": "S",
-      "description": "Die Datei ist versioniert, 39 KB groß, und alle fünf Pakete tragen [x] — der Lauf ist abgeschlossen und in d93aeac konsolidiert. Sie beschreibt damit ausschließlich erledigte Arbeit, steht aber neben README.md und AGENTS.md an der prominentesten Stelle des Repositories. Im Tarball landet sie nicht, das files-Feld listet sie nicht; die Verwechslungsgefahr betrifft also allein Mitarbeitende am Repository, die dort eine offene Aufgabenliste vermuten könnten.",
-      "recommendation": "Nach docs/ oder in ein notes/-Verzeichnis verschieben, oder löschen — die Historie liefert git, und der CHANGELOG trägt das Ergebnis. Bleibt sie liegen, gehört eine Kopfzeile «abgeschlossen am 2026-07-26» an den Anfang."
+      "description": "defineHiddenPropertyRO() legt die Eigenschaft mit configurable: true an. Damit lässt sich der Slot per delete entfernen, wonach das Objekt nicht mehr eventisiert ist, während Listener und gehaltene Werte in den nun unerreichbaren Kollaborateuren verbleiben; ein späteres on() legt stillschweigend einen zweiten, leeren Satz an. Der Name der Funktion sagt read-only zu, was für den Wert zutrifft, für die Existenz der Eigenschaft aber nicht. Ein Angriffsszenario ist das nicht, das Symbol ist über Symbol.for() ohnehin für jeden erreichbar. Verifiziert: unverändert gegenüber dem Vorlauf.",
+      "recommendation": "configurable: false setzen, sofern kein Aufrufer darauf baut, den Slot wieder zu entfernen. Beim einzigen Aufrufer, asEventized(), ist das nicht der Fall. Falls die Konfigurierbarkeit beabsichtigt ist, etwa für Tests, gehört ein Satz an die Funktion, der das erklärt, und der Name sollte nicht mehr RO zusagen."
+    }
+  ],
+  "acknowledged": [
+    {
+      "id": "DEP-003",
+      "title": "npm-run-all hat seit 2018 kein Release und trägt die einzige nicht patchbare Advisory-Kopie",
+      "category": "Dependencies",
+      "location": "package.json:65",
+      "reason": "Vom Nutzer zurückgestellt: Das Build-System setzt bewusst auf teils veraltete Versionen; ein Reboot des Build-Systems ist vorgesehen, aber noch nicht terminiert. Ohne Auswirkung auf Consumer, da das Paket keine Runtime-Dependencies hat (npm audit --omit=dev meldet null Befunde).",
+      "acknowledgedDate": "2026-07-27"
     },
     {
-      "id": "INFO-005",
-      "category": "Testabdeckung & Teststrategie",
-      "severity": "info",
-      "status": "unchanged",
-      "title": "Drei Defensivstellen ohne Abdeckung, zwei davon unerreichbar",
-      "location": "src/getSubscriptionCount.ts:8-14; src/utils.ts:56-66",
-      "effort": "S",
-      "description": "Der frische Lauf mit geleertem Cache weist als einzige Lücken EventListener.ts:186,217, EventStore.ts:251, getSubscriptionCount.ts:10 und utils.ts:61-62 aus. Zwei davon sind nicht bloß ungedeckt, sondern unerreichbar: In getSubscriptionCount() hat isEventized(o) bereits festgestellt, dass o[NAMESPACE] truthy ist, also kann weder ?.store nullish werden noch ?? 0 feuern — die Datei steht deshalb bei 75 % Branch-Deckung, dem schwächsten Wert im Projekt. getRetainedCount.ts erreicht dasselbe Ergebnis ohne toten Zweig, weil sein keeperOf() für nicht-eventisierte Ziele undefined liefert und das ?? 0 dort echt ist. Dritter Punkt am selben Ort: hasConsole (utils.ts:56) wird außerhalb des eigenen Moduls von niemandem mehr gelesen, bleibt aber exportiert, und der No-Op-Arm von warn ist der Grund für 80 % Function-Deckung in der Datei.",
-      "recommendation": "In getSubscriptionCount() ?. und ?? 0 innerhalb der Guard fallen lassen oder die keeperOf()-Form von getRetainedCount.ts übernehmen. hasConsole nicht mehr exportieren — es ist nicht Teil von src/index.ts, also keine öffentliche Oberfläche. Die verbleibenden Stellen in EventListener.ts und EventStore.ts sind echte Defensivzweige gegen direkt konstruierte Instanzen und sollen ausdrücklich stehen bleiben."
+      "id": "DEP-002",
+      "title": "22 Advisories in den Dev-Dependencies, zwei Wurzeln",
+      "category": "Dependencies",
+      "location": "package.json:55-75",
+      "reason": "Vom Nutzer zurückgestellt: Teil des angekündigten Build-System-Reboots. Aktueller Stand unverändert 22 Befunde (1 low, 21 high), sämtlich in devDependencies über npm-run-all/minimatch und esbuild; npm audit --omit=dev meldet null. Betroffen sind allein die CI-Runner, nicht die ausgelieferte Bibliothek.",
+      "acknowledgedDate": "2026-07-27"
+    },
+    {
+      "id": "DEP-001",
+      "title": "sinon und @types/sinon je ein Major zurück",
+      "category": "Dependencies",
+      "location": "package.json:59,68",
+      "reason": "Vom Nutzer zurückgestellt: Teil des angekündigten Build-System-Reboots. sinon 21.1.2 gegen 22.1.0, @types/sinon 21.0.1 gegen 22.0.0, beides reine Test-Werkzeuge. Die Bindung von TypeScript auf 5.9 ist davon unabhängig und in AGENTS.md mit den Peer-Bereichen von ts-jest (<7) und typescript-eslint (<6.1.0) begründet.",
+      "acknowledgedDate": "2026-07-27"
     }
   ]
 }
@@ -792,126 +815,106 @@
 
 <script>
 (() => {
-  'use strict';
-  const DATA = JSON.parse(document.getElementById('audit-data').textContent);
-  const F = DATA.findings;
-  const SEV_ORDER = {critical: 0, high: 1, medium: 2, low: 3, info: 4};
-  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const data = JSON.parse(document.getElementById('audit-data').textContent);
+  const {findings, summary, acknowledged} = data;
+  const SEV = ['critical','high','medium','low','info'];
+  const SEV_LABEL = {critical:'Critical', high:'High', medium:'Medium', low:'Low', info:'Info'};
+  const esc = (s) => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
-  /* ── Kategorie-Übersicht ── */
-  const cats = DATA.summary.byCategory;
-  const maxCat = Math.max.apply(null, Object.keys(cats).map((k) => cats[k]));
-  document.getElementById('cats').innerHTML = Object.keys(cats)
-    .sort((a, b) => cats[b] - cats[a] || a.localeCompare(b, 'de'))
-    .map((name) => `<div class="catrow"><span>${esc(name)}</span>
-        <span class="meter"><span class="catbar" style="width:${Math.round((cats[name] / maxCat) * 120)}px"></span>
-        <span class="cnt">${cats[name]}</span></span></div>`).join('');
+  const maxSev = Math.max(...SEV.map(s => summary.bySeverity[s] || 0), 1);
+  document.getElementById('sev-rows').innerHTML = SEV.map(s => {
+    const n = summary.bySeverity[s] || 0;
+    return '<div class="sev-row">'
+      + '<span class="sev-name c-' + s + '">' + SEV_LABEL[s] + '</span>'
+      + '<span class="track"><span class="fill bg-' + s + '" style="width:'
+      + (n ? Math.max(3, n / maxSev * 100) : 0) + '%"></span></span>'
+      + '<span class="sev-count">' + n + '</span></div>';
+  }).join('');
 
-  const sel = document.getElementById('catsel');
-  Object.keys(cats).sort((a, b) => a.localeCompare(b, 'de')).forEach((c) => {
+  const cats = Object.entries(summary.byCategory)
+    .sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0],'de'));
+  document.getElementById('cat-grid').innerHTML = cats
+    .map(([c,n]) => '<div class="cat"><span>' + esc(c) + '</span><b>' + n + '</b></div>').join('');
+  const catSel = document.getElementById('cat-filter');
+  cats.forEach(([c]) => {
     const o = document.createElement('option');
-    o.value = c; o.textContent = c;
-    sel.appendChild(o);
+    o.value = c; o.textContent = c; catSel.appendChild(o);
   });
 
-  /* ── Backlog ── */
-  const state = {sev: 'all', st: 'all', cat: 'all'};
+  const order = {critical:0, high:1, medium:2, low:3, info:4};
+  const sorted = [...findings].sort((a,b) => order[a.severity]-order[b.severity] || a.id.localeCompare(b.id));
   const tbody = document.getElementById('rows');
-  const empty = document.getElementById('empty');
 
-  const sorted = F.slice().sort((a, b) =>
-    SEV_ORDER[a.severity] - SEV_ORDER[b.severity] || a.id.localeCompare(b.id));
-
-  function render() {
-    const vis = sorted.filter((f) =>
-      (state.sev === 'all' || f.severity === state.sev) &&
-      (state.st === 'all' || f.status === state.st) &&
-      (state.cat === 'all' || f.category === state.cat));
-
-    tbody.innerHTML = vis.map((f) => {
-      const prev = f.previousSeverity
-        ? ` title="${esc(f.previousSeverity)} → ${esc(f.severity)}"` : '';
-      return `<tr class="item">
-        <td><span class="chev">▶</span></td>
-        <td class="id">${esc(f.id)}</td>
-        <td class="ti">${esc(f.title)}</td>
-        <td>${esc(f.category)}</td>
-        <td class="loc">${esc(f.location)}</td>
-        <td><span class="sev ${esc(f.severity)}">${esc(f.severity)}</span></td>
-        <td><span class="st ${esc(f.status)}"${prev}>${esc(f.status)}</span></td>
-        <td class="eff">${esc(f.effort)}</td>
-      </tr>
-      <tr class="detail" hidden><td colspan="8"><div class="inner">
-        <h5>Problem</h5><p>${esc(f.description)}</p>
-        <h5>Empfehlung</h5><p>${esc(f.recommendation)}</p>
-      </div></td></tr>`;
-    }).join('');
-
-    empty.hidden = vis.length > 0;
-  }
+  tbody.innerHTML = sorted.map((f,i) => {
+    const st = f.status
+      ? '<span class="st ' + f.status + '"'
+        + (f.previousSeverity ? ' title="' + f.previousSeverity + ' → ' + f.severity + '"' : '')
+        + '>' + f.status + '</span>'
+      : '';
+    return '<tr class="row" data-i="' + i + '" data-sev="' + f.severity + '" data-cat="'
+      + esc(f.category) + '" data-status="' + (f.status||'') + '">'
+      + '<td class="arrow" data-arrow="' + i + '">▸</td>'
+      + '<td class="id">' + f.id + '</td>'
+      + '<td class="sev c-' + f.severity + '">' + f.severity + '</td>'
+      + '<td>' + esc(f.title) + st + '</td>'
+      + '<td class="loc">' + esc(f.location) + '</td>'
+      + '<td class="eff">' + (f.effort||'') + '</td></tr>'
+      + '<tr class="detail" data-detail="' + i + '"><td colspan="6">'
+      + '<div class="det-block"><div class="k">Problem und Konsequenz</div><div class="v">'
+      + esc(f.description) + '</div></div>'
+      + '<div class="det-block"><div class="k">Empfehlung</div><div class="v">'
+      + esc(f.recommendation) + '</div></div>'
+      + '<div class="det-block"><div class="k">Kategorie</div><div class="v small muted">'
+      + esc(f.category)
+      + (f.previousSeverity ? ' &middot; vorher <b>' + f.previousSeverity + '</b>, jetzt <b>' + f.severity + '</b>' : '')
+      + '</div></div></td></tr>';
+  }).join('');
 
   tbody.addEventListener('click', (e) => {
-    const row = e.target.closest('tr.item');
+    const row = e.target.closest('tr.row');
     if (!row) return;
-    const det = row.nextElementSibling;
-    const isOpen = !det.hidden;
-    det.hidden = isOpen;
-    row.classList.toggle('open', !isOpen);
+    const i = row.dataset.i;
+    const det = tbody.querySelector('tr.detail[data-detail="' + i + '"]');
+    const open = det.classList.toggle('open');
+    tbody.querySelector('td[data-arrow="' + i + '"]').textContent = open ? '▾' : '▸';
   });
 
-  document.querySelectorAll('button.f').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const key = btn.hasAttribute('data-sev') ? 'sev' : 'st';
-      const attr = key === 'sev' ? 'data-sev' : 'data-st';
-      document.querySelectorAll('button.f[' + attr + ']')
-        .forEach((b) => b.setAttribute('aria-pressed', 'false'));
-      btn.setAttribute('aria-pressed', 'true');
-      state[key] = btn.getAttribute(attr);
-      render();
+  let sevF = 'all';
+  const apply = () => {
+    const catF = catSel.value;
+    const stF = document.getElementById('status-filter').value;
+    let shown = 0;
+    tbody.querySelectorAll('tr.row').forEach(row => {
+      const ok = (sevF === 'all' || row.dataset.sev === sevF)
+              && (catF === 'all' || row.dataset.cat === catF)
+              && (stF === 'all' || row.dataset.status === stF);
+      row.style.display = ok ? '' : 'none';
+      const det = tbody.querySelector('tr.detail[data-detail="' + row.dataset.i + '"]');
+      if (!ok) {
+        det.classList.remove('open');
+        tbody.querySelector('td[data-arrow="' + row.dataset.i + '"]').textContent = '▸';
+      }
+      det.style.display = ok ? '' : 'none';
+      if (ok) shown++;
     });
-  });
-  sel.addEventListener('change', () => { state.cat = sel.value; render(); });
+    document.getElementById('empty').style.display = shown ? 'none' : 'block';
+  };
+  document.querySelectorAll('button.f').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('button.f').forEach(o => o.setAttribute('aria-pressed', String(o === b)));
+    sevF = b.dataset.sev; apply();
+  }));
+  catSel.addEventListener('change', apply);
+  document.getElementById('status-filter').addEventListener('change', apply);
 
-  render();
-
-  /* ── Score-Verlauf ── */
-  const hist = DATA.summary.scoreHistory || [];
-  if (hist.length >= 3) {
-    const W = 640, H = 210, PL = 44, PR = 22, PT = 30, PB = 36;
-    const iw = W - PL - PR, ih = H - PT - PB;
-    const x = (i) => PL + (i * iw) / (hist.length - 1);
-    const y = (s) => PT + ih - (s / 100) * ih;
-    const pts = hist.map((h, i) => x(i).toFixed(1) + ',' + y(h.score).toFixed(1)).join(' ');
-    const last = hist.length - 1;
-
-    const grid = [0, 50, 100].map((v) =>
-      `<line x1="${PL}" y1="${y(v)}" x2="${W - PR}" y2="${y(v)}" stroke="#e7e5e4" stroke-width="1"/>
-       <text x="${PL - 8}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="#a8a29e">${v}</text>`
-    ).join('');
-
-    const dots = hist.map((h, i) => {
-      const cur = i === last;
-      return `<circle cx="${x(i)}" cy="${y(h.score)}" r="${cur ? 5 : 3.5}"
-                fill="${cur ? '#4f46e5' : '#fafaf9'}" stroke="#4f46e5" stroke-width="2"/>
-        <text x="${x(i)}" y="${y(h.score) - (cur ? 14 : 11)}" text-anchor="middle"
-              font-size="${cur ? 11 : 10}" font-weight="${cur ? 600 : 400}"
-              fill="${cur ? '#4f46e5' : '#78716c'}">${String(h.score).replace('.', ',')}</text>
-        <text x="${x(i)}" y="${H - 10}" text-anchor="middle" font-size="9.5"
-              fill="#a8a29e">${esc(h.date.slice(5))}</text>`;
-    }).join('');
-
-    document.getElementById('chart').innerHTML =
-      `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verlauf der Health-Scores">
-        ${grid}
-        <polyline points="${pts}" fill="none" stroke="#4f46e5" stroke-width="2"
-                  stroke-linejoin="round" stroke-linecap="round"/>
-        ${dots}
-      </svg>
-      <figcaption>Verlauf der Health-Scores seit ${esc(hist[0].date)}. Der Einbruch auf 39,5 am 2026-07-25
-      stammt aus einem Lauf mit deutlich größerer Prüftiefe, nicht aus Codeverfall — die drei Läufe danach
-      arbeiten dessen Backlog ab.</figcaption>`;
-  }
+  document.getElementById('ack').innerHTML = acknowledged.map(a =>
+    '<div class="ack-item"><div class="t">' + esc(a.title) + '</div>'
+    + '<div class="xsmall muted" style="margin:3px 0 7px"><span class="mono">' + a.id + '</span> &middot; '
+    + esc(a.category) + ' &middot; <span class="mono">' + esc(a.location) + '</span> &middot; zurückgestellt am '
+    + a.acknowledgedDate + '</div>'
+    + '<div class="small">' + esc(a.reason) + '</div></div>').join('');
 })();
 </script>
+
+</div>
 </body>
 </html>
