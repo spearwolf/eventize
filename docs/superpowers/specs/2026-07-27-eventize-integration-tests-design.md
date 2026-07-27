@@ -82,40 +82,69 @@ pnpm comes from corepack, honoring signalize's `packageManager: pnpm@11.17.0`.
 **The clone happens in the image**, with the ref as a build `ARG`. Changing the ref
 invalidates the layer on its own; nobody has to remember `--no-cache`.
 
-**`pnpm install` runs in the image against the unmodified `package.json`**, i.e. against
-eventize `5.0.0` from the registry. The v6 tarball is deliberately *not* baked in — it
-changes on every eventize rebuild and would invalidate the expensive layer every time.
-A named volume for the pnpm store makes the second, runtime install cheap.
+**`pnpm install` runs in the image against the unmodified manifest**, i.e. against
+eventize `5.0.0` from the registry, with `--frozen-lockfile`. The v6 tarball is
+deliberately *not* baked in: it changes on every eventize rebuild and would invalidate
+the expensive layer every time. Both `node_modules` and the pnpm store stay in the image,
+so the runtime install only has to add one package from a local tarball. No store volume
+— mounting one would shadow the warm store the image already carries.
+
+Each run resets signalize to its pristine state with `git checkout -- . && git clean -fd`
+rather than restoring a copied tree: pnpm links `node_modules` out of the store, and
+`cp -a` would break those links for hundreds of megabytes. `git clean` without `-x`
+leaves ignored paths, so `node_modules` survives the reset while every source edit,
+patch and YAML merge from a previous run is gone.
 
 ### Wiring eventize in
 
 Host side: `npm run build`, then `npm pack --pack-destination tmp/integration`. The
 tarball is mounted read-only at `/opt/eventize/pkg.tgz`.
 
-Container side, `entrypoint.sh` edits signalize's `package.json` programmatically:
+Container side, `entrypoint.sh` merges into signalize's **`pnpm-workspace.yaml`**:
 
-```json
-"pnpm": {
-  "overrides":           {"@spearwolf/eventize": "file:/opt/eventize/pkg.tgz"},
-  "peerDependencyRules": {"allowedVersions": {"@spearwolf/eventize": "*"}}
-}
+```yaml
+overrides:
+  '@spearwolf/eventize': file:/opt/eventize/pkg.tgz
+peerDependencyRules:
+  allowedVersions:
+    '@spearwolf/eventize': '*'
 ```
 
-Both halves are load-bearing. signalize declares `@spearwolf/eventize: ^5.0.0` as *peer
-and* dev dependency; `6.0.0-dev` satisfies neither, so without `peerDependencyRules`
-pnpm refuses the install outright, and without `overrides` the dev dependency pulls v5
-from the registry regardless.
+**Not `package.json`.** pnpm 11 no longer reads the `pnpm` field there; signalize's own
+`pnpm-workspace.yaml` carries a comment saying so, and it is verified empirically —
+`pnpm.overrides` in `package.json` produces
+`[WARN] The "pnpm" field in package.json is no longer read by pnpm` and leaves the
+dependency graph untouched, while the same override in `pnpm-workspace.yaml` takes
+effect. The file already exists (it holds `allowBuilds` for `@swc/core`, which the SWC
+native binding needs), so the entrypoint **merges** rather than overwrites.
+
+`overrides` is what redirects the dependency; without it the dev dependency pulls v5
+from the registry no matter what the peer range says. `peerDependencyRules` only
+silences the peer mismatch — `strict-peer-dependencies` defaults to false, so an
+unsatisfied peer is a warning, not a failure. It is set anyway so that a real peer
+error stays visible in the log instead of drowning in expected noise.
+
+The runtime install must **not** use `--frozen-lockfile`: the override changes the
+resolution, so the lockfile legitimately differs. The image-layer install does use it,
+because there nothing is overridden.
 
 This wiring is **not** a patch file. It is required on every run, has nothing to do with
-breaking changes, must never be counted as migration effort, and must survive a ref bump
-— JSON manipulation does, a context diff does not.
+breaking changes, must never be counted as migration effort, and must survive a ref bump.
+A YAML merge does; a context diff does not.
 
 ### Steps
 
-Three steps per phase, each with its own exit code and its own log. All three run even
-if an earlier one fails, except that a failed install aborts the rest (nothing to test).
+Four steps per phase, each with its own exit code and its own log. All run even if an
+earlier one fails, except that a failed install or a failed version assertion aborts the
+rest.
 
 1. **`pnpm install`** — a failure here is a resolution problem, not an API problem.
+1b. **Version assertion** — read `node_modules/@spearwolf/eventize/package.json` and
+   abort with exit `11` unless its `version` equals the host's `package.json` version.
+   This is the most dangerous failure mode in the whole harness: if the override
+   silently misses, signalize resolves eventize `5.0.0` from the registry and the suite
+   goes **green** while proving nothing. A green run must never be possible against the
+   wrong eventize.
 2. **`pnpm exec tsc --noEmit`** — the actual guard. signalize's vitest setup transpiles
    through SWC, which strips types without checking them, so a green vitest run proves
    nothing about the type surface. This step compiles signalize under
@@ -125,7 +154,7 @@ if an earlier one fails, except that a failed install aborts the rest (nothing t
 3. **`pnpm vitest run --reporter=json`** — runtime behaviour, machine-readable.
 
 Exit code of the entrypoint is the highest failure code encountered:
-`0` all green, `10` install, `20` typecheck, `30` tests.
+`0` all green, `10` install, `11` wrong eventize resolved, `20` typecheck, `30` tests.
 
 ### Phases
 
@@ -147,9 +176,9 @@ Mounts:
 | `tmp/integration/<pkg>.tgz` | `/opt/eventize/pkg.tgz` | ro |
 | `integration/patches/signalize/` | `/opt/patches` | ro |
 | `tmp/integration/<phase>/` | `/out` | rw |
-| named volume `eventize-it-pnpm-store` | pnpm store | rw |
 
-Environment: `PHASE`, `SIGNALIZE_REF`, `EVENTIZE_TARBALL`, `OUT_DIR`.
+Environment: `PHASE`, `EVENTIZE_VERSION` (the version the assertion demands),
+`SIGNALIZE_REF`, `EVENTIZE_TARBALL`, `PATCHES_DIR`, `OUT_DIR`.
 
 `run.mjs` flags: `--phase=baseline|patched|both` (default `both`), `--ref=<git-ref>`
 (overrides the config file), `--no-build` (reuse an existing tarball),
@@ -165,10 +194,12 @@ into the raw logs only when it needs the detail.
 {
   "phase": "baseline",
   "signalize": {"repo": "…", "ref": "v0.31.1", "commit": "359d939…"},
-  "eventize":  {"version": "6.0.0-dev", "tarballSha256": "…"},
+  "eventize":  {"version": "6.0.0-dev", "resolvedVersion": "6.0.0-dev",
+                "tarballSha256": "…"},
   "patches":   {"applied": [], "failed": []},
   "steps": [
     {"name": "install",   "exitCode": 0, "durationMs": 0, "log": "install.log"},
+    {"name": "assert-version", "exitCode": 0, "durationMs": 0, "log": "install.log"},
     {"name": "typecheck", "exitCode": 2, "durationMs": 0, "log": "typecheck.log",
      "errorCount": 0},
     {"name": "test",      "exitCode": 1, "durationMs": 0, "log": "vitest.log",
@@ -249,5 +280,7 @@ The implementation is done when:
   from timings and the commit hash.
 - A deliberately broken patch (garbage context) surfaces in `patches.failed` and does
   not silently produce a green phase 2.
+- Removing the `overrides` entry from the wiring makes the run fail with exit `11`,
+  not pass. A green run against eventize 5.0.0 must be impossible.
 - `npm run cbt` is unaffected: no new dependency in the runtime path, no new step.
 - `npm pack --dry-run` does not list `docs/superpowers/` or `.claude/`.
