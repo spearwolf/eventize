@@ -34,6 +34,32 @@ The difference between them is the migration cost for a real consumer.
 | `20` | `tsc --noEmit` failed |
 | `30` | vitest failed |
 
+## Artifacts
+
+Per phase, under `tmp/integration/<phase>/`: `install.log`, `typecheck.log`,
+`vitest.log`, `vitest.json`, `patches.log` (patched phase only) and
+`result.json`. Read `result.json`; drop into the raw logs only for detail.
+
+```jsonc
+{
+  "phase": "baseline",
+  "signalize": {"ref": "359d939a…", "commit": "359d939a…"},
+  "eventize":  {"version": "6.0.0-dev", "resolvedVersion": "6.0.0-dev"},
+  "patches":   {"applied": [], "failed": []},
+  "steps": [
+    {"name": "install",        "exitCode": 0, "durationMs": 1933, "log": "install.log"},
+    {"name": "assert-version", "exitCode": 0, "durationMs": 0,    "log": "install.log"},
+    {"name": "typecheck",      "exitCode": 0, "durationMs": 4210, "log": "typecheck.log"},
+    {"name": "test",           "exitCode": 0, "durationMs": 6180, "log": "vitest.log"}
+  ],
+  "exitCode": 0
+}
+```
+
+`exitCode` is the highest failure code any step reached. `patches.failed`
+being non-empty is a first-class signal, not a warning: the pinned ref moved
+out from under the patch set.
+
 ## Why the ref is a SHA
 
 signalize pushes no release tags; `v0.0.1` is the only one that exists. So
@@ -74,8 +100,8 @@ reported. `tsconfig.lib.json` would dodge the noise too, but it excludes
 
 ## Proving the harness still bites
 
-A green run is only worth something if a break would have been caught. Two
-throwaway fixtures do that; neither belongs in a commit.
+A green run is only worth something if a break would have been caught. Three
+throwaway fixtures do that; none of them belongs in a commit.
 
 **Is the version assertion live?** Change the injected override in
 `entrypoint.sh` from `file:${EVENTIZE_TARBALL}` to `^5.0.0`, rebuild, run.
@@ -104,6 +130,23 @@ the module does not resolve at all, which is a finding about eventize's
 
 The fixture creates a new file on purpose: no context lines, so it cannot go
 stale when the pinned ref moves.
+
+**Is a stale patch caught?** Drop in a patch that cannot possibly apply and run
+the patched phase:
+
+```
+# changelog: none — deliberate test fixture
+# signalize-ref: none
+--- a/src/does-not-exist.ts
++++ b/src/does-not-exist.ts
+@@ -1,1 +1,1 @@
+-nonsense
++more nonsense
+```
+
+Expected: exit `13`, the filename in `patches.failed`, and no test run at all.
+The same fixture proves the baseline phase ignores patches entirely — run it
+with `--phase=baseline` and both `patches` arrays stay empty.
 
 ## Patches
 
