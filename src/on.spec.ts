@@ -1,5 +1,15 @@
 import {fake} from 'sinon';
 
+// Listener objects that record how they were called. Declaring the slots the
+// methods write to is what the bare `@ts-expect-error` above each assignment
+// used to stand in for — the suppression hid a missing type, not a real
+// conflict.
+type RecordingListener = {
+  args?: Array<any>;
+  context?: unknown;
+  [method: string]: unknown;
+};
+
 import {EVENT_CATCH_EM_ALL} from './constants';
 import {latestListener, latestListenerPair} from './__test-utils__/listeners';
 
@@ -24,8 +34,7 @@ describe('on()', () => {
         obj,
         'foo',
         7,
-        function () {
-          // @ts-expect-error
+        function (this: object) {
           context = this;
         },
         listenerObject,
@@ -54,9 +63,8 @@ describe('on()', () => {
       });
     });
     describe('on( eventName, priority, listenerFuncName, listenerObject )', () => {
-      const listenerObject = {
+      const listenerObject: RecordingListener = {
         foo(...args: Array<any>) {
-          // @ts-expect-error
           this.args = args;
         },
       };
@@ -69,7 +77,6 @@ describe('on()', () => {
         expect(getSubscriptionCount(obj)).toBe(1);
       });
       it('emit() calls the listener', () => {
-        // @ts-expect-error
         expect(listenerObject.args).toEqual(['bar', 666]);
       });
       it('priority is correct', () => {
@@ -141,8 +148,7 @@ describe('on()', () => {
       let context: object;
       obj.on(
         'foo',
-        function () {
-          // @ts-expect-error
+        function (this: object) {
           context = this;
         },
         listenerObject,
@@ -161,7 +167,7 @@ describe('on()', () => {
         expect(context).toBe(listenerObject);
       });
       it('priority is correct', () => {
-        expect(listener.priority).toBe(Priority.Default);
+        expect(listener.priority).toBe(Priority.Normal);
       });
       it('eventName is correct', () => {
         expect(listener.eventName).toBe('foo');
@@ -181,7 +187,7 @@ describe('on()', () => {
         expect(listenerFunc.calledWith('plah', 669)).toBeTruthy();
       });
       it('priority is correct', () => {
-        expect(listener.priority).toBe(Priority.Default);
+        expect(listener.priority).toBe(Priority.Normal);
       });
       it('eventName is correct', () => {
         expect(listener.eventName).toBe('foo');
@@ -202,8 +208,7 @@ describe('on()', () => {
       obj.on(
         Foo,
         7,
-        function () {
-          // @ts-expect-error
+        function (this: object) {
           context = this;
         },
         listenerObject,
@@ -229,9 +234,8 @@ describe('on()', () => {
       });
     });
     describe('on( eventName, priority, listenerFuncName, listenerObject )', () => {
-      const listenerObject = {
+      const listenerObject: RecordingListener = {
         foo(...args: Array<any>) {
-          // @ts-expect-error
           this.args = args;
         },
       };
@@ -241,7 +245,6 @@ describe('on()', () => {
       obj.emit(Foo, 'bar', 666);
 
       it('emit() calls the listener', () => {
-        // @ts-expect-error
         expect(listenerObject.args).toEqual(['bar', 666]);
       });
       it('priority is correct', () => {
@@ -313,8 +316,7 @@ describe('on()', () => {
       let context: object;
       obj.on(
         Foo,
-        function () {
-          // @ts-expect-error
+        function (this: object) {
           context = this;
         },
         listenerObject,
@@ -330,7 +332,7 @@ describe('on()', () => {
         expect(context).toBe(listenerObject);
       });
       it('priority is correct', () => {
-        expect(listener.priority).toBe(Priority.Default);
+        expect(listener.priority).toBe(Priority.Normal);
       });
       it('eventName is correct', () => {
         expect(listener.eventName).toBe(Foo);
@@ -350,7 +352,7 @@ describe('on()', () => {
         expect(listenerFunc.calledWith('plah', 669)).toBeTruthy();
       });
       it('priority is correct', () => {
-        expect(listener.priority).toBe(Priority.Default);
+        expect(listener.priority).toBe(Priority.Normal);
       });
       it('eventName is correct', () => {
         expect(listener.eventName).toBe(Foo);
@@ -370,8 +372,7 @@ describe('on()', () => {
       obj.on(
         ['foo', 'fu'],
         7,
-        function () {
-          // @ts-expect-error
+        function (this: object) {
           context.push(this);
         },
         listenerObject,
@@ -402,11 +403,9 @@ describe('on()', () => {
     });
     describe('on( eventName*, priority, listenerFuncName, listenerObject )', () => {
       const mockFunc = fake();
-      const listenerObject = {
+      const listenerObject: RecordingListener = {
         foo(...args: Array<any>) {
-          // @ts-expect-error
           this.context = this;
-          // @ts-expect-error
           this.args = args;
           mockFunc(...args);
         },
@@ -418,9 +417,7 @@ describe('on()', () => {
 
       it('emit() calls the listener', () => {
         expect(mockFunc.callCount).toBe(2);
-        // @ts-expect-error
         expect(listenerObject.args).toEqual(['bar', 666]);
-        // @ts-expect-error
         expect(listenerObject.context).toBe(listenerObject);
       });
       it('priorities are correct', () => {
@@ -497,11 +494,10 @@ describe('on()', () => {
       const listenerObject = {};
       const listenerFunc = fake();
       const obj = eventize.inject();
-      const contexts: object = [];
+      const contexts: unknown[] = [];
       obj.on(
         ['foo', 'bar'],
-        function fooBar(...args: any[]) {
-          // @ts-expect-error
+        function fooBar(this: unknown, ...args: any[]) {
           contexts.push(this);
           listenerFunc(...args);
         },
@@ -516,8 +512,8 @@ describe('on()', () => {
         expect(listenerFunc.calledWith('plah', 669)).toBeTruthy();
       });
       it('priorities are correct', () => {
-        expect(listeners[0].priority).toBe(Priority.Default);
-        expect(listeners[1].priority).toBe(Priority.Default);
+        expect(listeners[0].priority).toBe(Priority.Normal);
+        expect(listeners[1].priority).toBe(Priority.Normal);
       });
       it('eventNames are correct', () => {
         expect(listeners[0].eventName).toBe('foo');
@@ -528,9 +524,7 @@ describe('on()', () => {
         expect(listeners[1].isCatchEmAll).toBe(false);
       });
       it('emit() calls the listener with correct context', () => {
-        // @ts-expect-error
         expect(contexts[0]).toBe(listenerObject);
-        // @ts-expect-error
         expect(contexts[1]).toBe(listenerObject);
       });
     });
@@ -547,8 +541,8 @@ describe('on()', () => {
         expect(listenerFunc.calledWith('plah', 669)).toBeTruthy();
       });
       it('priorities are correct', () => {
-        expect(listeners[0].priority).toBe(Priority.Default);
-        expect(listeners[1].priority).toBe(Priority.Default);
+        expect(listeners[0].priority).toBe(Priority.Normal);
+        expect(listeners[1].priority).toBe(Priority.Normal);
       });
       it('eventNames are correct', () => {
         expect(listeners[0].eventName).toBe('foo');
@@ -599,8 +593,7 @@ describe('on()', () => {
     let context: object;
     obj.on(
       7,
-      function () {
-        // @ts-expect-error
+      function (this: object) {
         context = this;
       },
       listenerObject,
@@ -645,13 +638,12 @@ describe('on()', () => {
       expect(listener.isCatchEmAll).toBe(true);
     });
   });
-  describe('on( listenerFunc, listenerObject ) => object.on( "*", Priority.Default, listenerFunc, listenerObject )', () => {
+  describe('on( listenerFunc, listenerObject ) => object.on( "*", Priority.Normal, listenerFunc, listenerObject )', () => {
     const listenerObject = {};
     const listenerFunc = fake();
     const obj = eventize.inject();
     let context: object;
-    obj.on(function () {
-      // @ts-expect-error
+    obj.on(function (this: object) {
       context = this;
     }, listenerObject);
     const listener = latestListener(obj);
@@ -665,7 +657,7 @@ describe('on()', () => {
       expect(context).toBe(listenerObject);
     });
     it('priority is correct', () => {
-      expect(listener.priority).toBe(Priority.Default);
+      expect(listener.priority).toBe(Priority.Normal);
     });
     it('eventName is correct', () => {
       expect(listener.eventName).toBe(EVENT_CATCH_EM_ALL);
@@ -674,7 +666,7 @@ describe('on()', () => {
       expect(listener.isCatchEmAll).toBe(true);
     });
   });
-  describe('on( listenerFunc ) => object.on( "*", Priority.Default, listenerFunc )', () => {
+  describe('on( listenerFunc ) => object.on( "*", Priority.Normal, listenerFunc )', () => {
     const listenerFunc = fake();
     const obj = eventize.inject();
     obj.on(listenerFunc);
@@ -685,7 +677,7 @@ describe('on()', () => {
       expect(listenerFunc.calledWith('plah', 669)).toBeTruthy();
     });
     it('priority is correct', () => {
-      expect(listener.priority).toBe(Priority.Default);
+      expect(listener.priority).toBe(Priority.Normal);
     });
     it('eventName is correct', () => {
       expect(listener.eventName).toBe(EVENT_CATCH_EM_ALL);
@@ -714,7 +706,7 @@ describe('on()', () => {
       expect(listener.isCatchEmAll).toBe(true);
     });
   });
-  describe('on( object ) => object.on( "*", Priority.Default, object )', () => {
+  describe('on( object ) => object.on( "*", Priority.Normal, object )', () => {
     const listenerFunc = fake();
     const obj = eventize.inject();
     obj.on({foo: listenerFunc});
@@ -725,7 +717,7 @@ describe('on()', () => {
       expect(listenerFunc.calledWith('plah', 667)).toBeTruthy();
     });
     it('priority is correct', () => {
-      expect(listener.priority).toBe(Priority.Default);
+      expect(listener.priority).toBe(Priority.Normal);
     });
     it('eventName is correct', () => {
       expect(listener.eventName).toBe(EVENT_CATCH_EM_ALL);

@@ -61,7 +61,7 @@ describe('documented quirks', () => {
       const [firstListener] = listeners;
       expect(firstListener).toBeDefined();
       if (firstListener === undefined) return;
-      expect(firstListener.priority).toBe(Priority.Default);
+      expect(firstListener.priority).toBe(Priority.Normal);
       expect(Number.isNaN(firstListener.priority)).toBe(false);
     });
 
