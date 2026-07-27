@@ -42,7 +42,7 @@ const findInsertIndex = (
   return lo;
 };
 
-const removeItemFromArray = (arr: Array<any>, item: any) => {
+const removeItemFromArray = (arr: Array<unknown>, item: unknown) => {
   const idx = arr.indexOf(item);
   if (idx > -1) {
     arr.splice(idx, 1);
@@ -115,13 +115,17 @@ const removeAll = (fromArray: Array<EventListener> | undefined) => {
   }
 };
 
+// `unknown` for the two listener slots, not `any`: the store never calls into
+// them, it only compares them by identity. Saying `any` here claimed a
+// knowledge the registry does not have and switched off checking inside a
+// function whose whole job is comparison.
 const isSimilar = (
   a: {
     listenerType: number | undefined;
     priority: number;
     eventName: string | symbol;
-    listenerObject: any;
-    listener: any;
+    listenerObject: unknown;
+    listener: unknown;
   },
   b: EventListener,
 ) => {

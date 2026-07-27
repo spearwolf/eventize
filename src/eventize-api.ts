@@ -660,7 +660,7 @@ export function retain<T extends object>(
   eventNames: AnyEventNames,
 ): void;
 // implementation
-export function retain(obj: object, eventNames: any): void {
+export function retain(obj: object, eventNames: AnyEventNames): void {
   if (hasWildcard(eventNames)) {
     throw new Error(
       "retain() must be called with a concrete event name — '*' is reserved for subscribing to all events and cannot be retained",
@@ -680,7 +680,7 @@ export function retainClear<T extends object>(
   eventNames: AnyEventNames,
 ): void;
 // implementation
-export function retainClear(eventizedObj: object, eventNames: any): void {
+export function retainClear(eventizedObj: object, eventNames: AnyEventNames): void {
   if (!isEventized(eventizedObj)) {
     throw new Error('object is not eventized');
   }
@@ -701,7 +701,7 @@ export function unretain<T extends object>(
   eventNames: AnyEventNames,
 ): void;
 // implementation
-export function unretain(eventizedObj: object, eventNames: any): void {
+export function unretain(eventizedObj: object, eventNames: AnyEventNames): void {
   if (!isEventized(eventizedObj)) {
     throw new Error('object is not eventized');
   }

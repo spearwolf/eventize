@@ -9,7 +9,10 @@ import {dispatchableMember, isCatchEmAll, isEventName} from './utils';
 
 type EmitFnType = Function | undefined;
 type CallAfterApplyFnType = (() => void) | undefined;
-type ReturnValue = (retVal: any) => void;
+// A listener may return anything, and this callback only forwards it into
+// emitAsync()'s collector — nothing here inspects the value, so `unknown` is
+// the accurate type. `any` would let a caller do arithmetic on it unchecked.
+type ReturnValue = (retVal: unknown) => void;
 
 /**
  * A dispatch target seen from the inside: event-named members that may or may

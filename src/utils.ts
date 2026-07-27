@@ -66,7 +66,9 @@ export const warn = hasConsole
   : () => {};
 
 type PropertyKey = string | symbol;
-type PropertyValue = any;
+// Handed straight to Object.defineProperty and never inspected, so `unknown`
+// costs nothing and stops the alias from being an `any` in disguise.
+type PropertyValue = unknown;
 
 export const defineHiddenPropertyRO = <T extends object>(
   obj: T,
