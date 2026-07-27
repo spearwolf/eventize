@@ -84,6 +84,39 @@ write_result() {
 git checkout -q -- .
 git clean -qfd
 
+# --- patches ----------------------------------------------------------------
+# Applied only in the patched phase, in filename order, before install: a
+# patch may change dependencies. Patches are semantic migrations only — the
+# pnpm wiring below is not a patch and never counts as migration effort.
+PATCHES_APPLIED='[]'
+PATCHES_FAILED='[]'
+
+if [ "$PHASE" = "patched" ] && [ -d "$PATCHES_DIR" ]; then
+  for patch in "$PATCHES_DIR"/*.patch; do
+    [ -e "$patch" ] || continue
+    name=$(basename "$patch")
+    if git apply --verbose "$patch" >>"$OUT_DIR/patches.log" 2>&1; then
+      PATCHES_APPLIED=$(jq -c --arg n "$name" '. + [$n]' <<<"$PATCHES_APPLIED")
+      echo "applied $name"
+    else
+      PATCHES_FAILED=$(jq -c --arg n "$name" '. + [$n]' <<<"$PATCHES_FAILED")
+      echo "FAILED to apply $name" >&2
+    fi
+  done
+fi
+
+PATCHES_JSON=$(jq -nc --argjson a "$PATCHES_APPLIED" --argjson f "$PATCHES_FAILED" \
+  '{applied: $a, failed: $f}')
+
+# A stale patch set is a first-class finding, not a warning to scroll past:
+# the pinned signalize ref moved out from under the patches. Never proceed to
+# a green run on a partially applied set.
+if [ "$(jq -r '.failed | length' <<<"$PATCHES_JSON")" -gt 0 ]; then
+  note_failure 13
+  write_result
+  exit "$WORST"
+fi
+
 # --- wire the local eventize tarball in -------------------------------------
 # pnpm 11 no longer reads the "pnpm" field in package.json; settings live in
 # pnpm-workspace.yaml. Appending is valid YAML as long as the keys are absent,

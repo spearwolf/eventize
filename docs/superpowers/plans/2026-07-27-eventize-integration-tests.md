@@ -643,10 +643,44 @@ echo "exit=$?"
 ```
 Expected: exit `13`, and `jq -r '.patches.failed[]' tmp/integration/patched/result.json` prints `999-garbage.patch`.
 
-- [ ] **Step 4: Remove the fixture**
+- [ ] **Step 3b: Canary — prove the typecheck is sharp**
+
+A green baseline only means something if `tsc` would have caught a break. This
+fixture proves it does, and proves eventize's declarations are actually being
+resolved rather than silently skipped.
 
 ```bash
-rm integration/patches/signalize/999-garbage.patch
+rm -f integration/patches/signalize/999-garbage.patch
+cat > integration/patches/signalize/998-canary.patch <<'EOF'
+# changelog: none — deliberate test fixture, removed after verification
+# signalize-ref: none
+diff --git a/src/zz-canary.ts b/src/zz-canary.ts
+new file mode 100644
+--- /dev/null
++++ b/src/zz-canary.ts
+@@ -0,0 +1,4 @@
++import {on} from '@spearwolf/eventize';
++
++// Deliberately wrong: `on` is a function, not a number.
++export const canary: number = on;
+EOF
+```
+
+Re-run the patched command from Step 3.
+Expected: exit `20`, `patches.applied` contains `998-canary.patch`, and
+`typecheck.log` reports `TS2322` naming eventize's own overload signature
+(`EventizedObject`, `ListenerFor`, `UnsubscribeFunc`). A `TS2307` instead would
+mean the module does not resolve at all — a finding about eventize's `exports`
+map, not a passing canary.
+
+A patch that creates a new file is used on purpose: it needs no context lines,
+so it cannot go stale when the pinned ref moves.
+
+- [ ] **Step 4: Remove the fixtures**
+
+```bash
+rm -f integration/patches/signalize/999-garbage.patch \
+      integration/patches/signalize/998-canary.patch
 ```
 
 - [ ] **Step 5: Verify a patched run with no patches equals the baseline**
