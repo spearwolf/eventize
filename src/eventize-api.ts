@@ -608,7 +608,7 @@ export function emitAsync<
   obj: EventizedObject<TEvents>,
   eventName: K,
   ...args: ArgsFor<TEvents, K>
-): Promise<any>;
+): Promise<any[] | undefined>;
 export function emitAsync<
   TEvents extends EventMap,
   K extends EventKeysOf<TEvents>,
@@ -616,18 +616,18 @@ export function emitAsync<
   obj: EventizedObject<TEvents>,
   eventNames: K[],
   ...args: ArgsFor<TEvents, K>
-): Promise<any>;
+): Promise<any[] | undefined>;
 export function emitAsync<T extends object>(
   obj: NonTypedEmitter<T>,
   eventNames: AnyEventNames,
   ...args: EventArgs
-): Promise<any>;
+): Promise<any[] | undefined>;
 // implementation
 export function emitAsync(
   target: object,
   eventNames: AnyEventNames,
   ...args: EventArgs
-): Promise<any> {
+): Promise<any[] | undefined> {
   let values: any[] = [];
   const returnValue = (val: unknown) => {
     values.push(val);
@@ -640,7 +640,11 @@ export function emitAsync(
   values = values.map((val: any) =>
     Array.isArray(val) ? Promise.all(val) : Promise.resolve(val),
   );
-  return values.length > 0 ? Promise.all(values) : Promise.resolve();
+  // `Promise.resolve(undefined)`, not the argument-less `Promise.resolve()`:
+  // the latter is `Promise<void>`, and the declared `Promise<any[] | undefined>`
+  // rejects it. Same value at runtime, and the distinction is the point of
+  // narrowing the type — a caller has to handle the empty case.
+  return values.length > 0 ? Promise.all(values) : Promise.resolve(undefined);
 }
 
 // ---------------------------------------------------------------------------

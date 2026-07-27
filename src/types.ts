@@ -302,8 +302,11 @@ export interface EventizeApi<
   emitAsync<K extends EventKeysOf<TEvents> | symbol>(
     eventName: K,
     ...args: ArgsFor<TEvents, K>
-  ): Promise<any>;
-  emitAsync(eventNames: AnyEventNames, ...args: EventArgs): Promise<any>;
+  ): Promise<any[] | undefined>;
+  emitAsync(
+    eventNames: AnyEventNames,
+    ...args: EventArgs
+  ): Promise<any[] | undefined>;
 
   retain(eventNames: EventKeysOf<TEvents> | Array<EventKeysOf<TEvents>>): void;
   retain(eventNames: AnyEventNames): void;

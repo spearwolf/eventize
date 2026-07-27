@@ -238,6 +238,22 @@ describe('documented quirks', () => {
       on(ε, 'foo', (): unknown => undefined);
       await expect(emitAsync(ε, 'foo')).resolves.toBeUndefined();
     });
+
+    // TYPE-003: the declared return type used to be `Promise<any>`, which let
+    // the line below compile and then throw at runtime — on exactly the quirk
+    // the two cases above pin. `Promise<any[] | undefined>` makes the compiler
+    // say so. This case fails if anyone widens the signature back to `any`:
+    // the directive goes unused and TS2578 breaks the build.
+    it('does not let the result be used without checking for undefined', async () => {
+      const ε = eventize();
+      const results = await emitAsync(ε, 'foo');
+
+      expect(results).toBeUndefined();
+      expect(() => {
+        // @ts-expect-error results may be undefined
+        results.map((value: unknown) => value);
+      }).toThrow(TypeError);
+    });
   });
 
   describe('eventize.is()', () => {
