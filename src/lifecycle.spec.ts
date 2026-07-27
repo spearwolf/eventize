@@ -15,6 +15,13 @@ import {
   unretain,
 } from './index';
 import {collect} from './__test-utils__/gc';
+import {
+  latestListener,
+  latestListenerPair,
+  storeOf,
+} from './__test-utils__/listeners';
+
+import type {EventListener} from './EventListener';
 
 /**
  * What cleanup means in this library, as executable assertions.
@@ -342,15 +349,16 @@ describe('lifecycle', () => {
       const obj = eventize();
       const listenerObject = {};
 
-      const unsubscribe = once(obj, 'toString', listenerObject) as any;
+      const unsubscribe = once(obj, 'toString', listenerObject);
+      const listener = latestListener(obj);
       emit(obj, 'toString');
 
       expect(getSubscriptionCount(obj)).toBe(1);
-      expect(unsubscribe.listener.listener).toBe(listenerObject);
+      expect(listener.listener).toBe(listenerObject);
 
       unsubscribe();
       expect(getSubscriptionCount(obj)).toBe(0);
-      expect(unsubscribe.listener.listener).toBeNull();
+      expect(listener.listener).toBeNull();
     });
 
     it('is released by the emit() fallback when the object has one', () => {
@@ -377,12 +385,13 @@ describe('lifecycle', () => {
     it('a consumed handle holds no listener references', () => {
       const obj = eventize();
       const listenerObject = {foo: fake()};
-      const unsubscribe = on(obj, 'foo', listenerObject) as any;
+      const unsubscribe = on(obj, 'foo', listenerObject);
+      const listener = latestListener(obj);
 
       unsubscribe();
 
-      expect(unsubscribe.listener.listener).toBeNull();
-      expect(unsubscribe.listener.listenerObject).toBeNull();
+      expect(listener.listener).toBeNull();
+      expect(listener.listenerObject).toBeNull();
     });
 
     it('an array of consumed handles releases everything', () => {
@@ -392,14 +401,18 @@ describe('lifecycle', () => {
         [`e-${i}`]: fake(),
       }));
 
-      objects.forEach((lo, i) => subs.push(on(obj, `e-${i}`, lo)));
+      const listeners: EventListener[] = [];
+      objects.forEach((lo, i) => {
+        subs.push(on(obj, `e-${i}`, lo));
+        listeners.push(latestListener(obj));
+      });
       expect(getSubscriptionCount(obj)).toBe(50);
 
       subs.forEach((u) => u());
 
       expect(getSubscriptionCount(obj)).toBe(0);
-      subs.forEach((u) => {
-        expect((u as any).listener.listener).toBeNull();
+      listeners.forEach((l) => {
+        expect(l.listener).toBeNull();
       });
     });
 
@@ -407,22 +420,23 @@ describe('lifecycle', () => {
       const obj = eventize();
       const service = {foo: fake()};
 
-      const h1 = on(obj, 'foo', service) as any;
-      const h2 = on(obj, 'foo', service) as any; // shares one EventListener, refCount = 2
+      const h1 = on(obj, 'foo', service);
+      const shared = latestListener(obj);
+      const h2 = on(obj, 'foo', service); // dedups onto `shared`, refCount = 2
       expect(getSubscriptionCount(obj)).toBe(1);
+      expect(latestListener(obj)).toBe(shared); // no second listener was built
 
       h1();
 
       // decremented, but not detached — the shared listener is still live
       expect(getSubscriptionCount(obj)).toBe(1);
-      expect(h1.listener.listener).not.toBeNull();
+      expect(shared.listener).not.toBeNull();
 
       h2();
 
       // only the last outstanding handle actually releases the reference
       expect(getSubscriptionCount(obj)).toBe(0);
-      expect(h1.listener.listener).toBeNull();
-      expect(h2.listener.listener).toBeNull();
+      expect(shared.listener).toBeNull();
     });
 
     it('onceAsync with an aborted signal leaves nothing behind', async () => {
@@ -436,31 +450,32 @@ describe('lifecycle', () => {
       expect(getSubscriptionCount(obj)).toBe(0);
     });
 
-    it('once() returns a handle carrying .listener, released once consumed', () => {
+    it('once() detaches its listener the moment it fires', () => {
       const obj = eventize();
-      const handle = once(obj, 'foo', fake()) as any;
+      once(obj, 'foo', fake());
+      const listener = latestListener(obj);
 
-      expect(handle.listener).not.toBeNull();
+      expect(listener.listener).not.toBeNull();
 
       emit(obj, 'foo');
 
-      // once() already auto-unsubscribed after firing — the handle is a
-      // no-op now, but it still carries the (detached) listener reference.
-      expect(handle.listener.listener).toBeNull();
+      // once() already auto-unsubscribed after firing, so the registration is
+      // detached even though nobody called the handle.
+      expect(listener.listener).toBeNull();
       expect(getSubscriptionCount(obj)).toBe(0);
     });
 
-    it('once(ε, [names]) returns a handle carrying .listeners, all released', () => {
+    it('once(ε, [names]) detaches every listener it registered', () => {
       const obj = eventize();
-      const handle = once(obj, ['foo', 'bar'], fake()) as any;
+      const handle = once(obj, ['foo', 'bar'], fake());
+      const listeners = latestListenerPair(obj);
 
-      expect(Array.isArray(handle.listeners)).toBe(true);
-      expect(handle.listeners).toHaveLength(2);
+      expect(getSubscriptionCount(obj)).toBe(2);
 
       handle();
 
       expect(getSubscriptionCount(obj)).toBe(0);
-      handle.listeners.forEach((l: any) => {
+      listeners.forEach((l) => {
         expect(l.listener).toBeNull();
       });
     });
@@ -527,21 +542,28 @@ describe('lifecycle', () => {
       expect(verdict).toMatch(/^collected/);
     });
 
-    it('the consumed handle still exposes its detached listener', () => {
+    it('the consumed handle is a bare function', () => {
       const obj = eventize();
       const listenerObject = {foo: fake()};
-      const unsubscribe = on(obj, 'foo', listenerObject) as any;
+      const unsubscribe = on(obj, 'foo', listenerObject);
+      const listener = latestListener(obj);
 
       unsubscribe();
 
-      // Releasing the emitter must not cost the documented .listener property.
-      expect(unsubscribe.listener).toBeDefined();
-      expect(unsubscribe.listener.listener).toBeNull();
+      // API-001: the handle used to hand the detached EventListener back as
+      // `.listener`. It carries nothing now — the detachment it used to make
+      // visible is asserted on the registration itself.
+      expect(Object.keys(unsubscribe)).toEqual([]);
+      expect(listener.listener).toBeNull();
 
-      const multi = on(obj, ['a', 'b'], listenerObject) as any;
+      const multi = on(obj, ['a', 'b'], listenerObject);
+      const pair = latestListenerPair(obj);
       multi();
 
-      expect(multi.listeners).toHaveLength(2);
+      expect(Object.keys(multi)).toEqual([]);
+      pair.forEach((l) => {
+        expect(l.listener).toBeNull();
+      });
     });
 
     // The limit of the guarantee, pinned as it is rather than as it should be.
@@ -550,19 +572,25 @@ describe('lifecycle', () => {
     // the emitter — so "a consumed handle holds nothing" is true only for the
     // call that actually took the listener out of the store.
     it('a shared registration still releases the emitter — unless the surviving listener leads back to it', async () => {
+      // Handing the listener back alongside the handle does not widen what the
+      // test frame keeps alive: `makeUnsubscribe()` captures the very same
+      // instance in its closure, so the handle held it either way — before
+      // API-001 through the `.listener` property, now through the capture.
       const plainSharedRegistration = () => {
         const obj = eventize();
         const listenerObject = {foo: () => {}};
-        const first = on(obj, 'foo', listenerObject) as any;
+        const first = on(obj, 'foo', listenerObject);
+        const listener = latestListener(obj);
         on(obj, 'foo', listenerObject); // refCount = 2
         first();
-        return {handle: first, ref: new WeakRef(obj)};
+        return {handle: first, listener, ref: new WeakRef(obj)};
       };
 
       const shared = plainSharedRegistration();
       const sharedVerdict = await collect(shared.ref);
 
-      expect(shared.handle.listener.isRemoved).toBe(false); // still registered
+      expect(shared.handle).toBeDefined();
+      expect(shared.listener.isRemoved).toBe(false); // still registered
       expect(sharedVerdict).toMatch(/^collected/);
 
       // Now the same shape, except the surviving listener is a once() whose
@@ -573,16 +601,18 @@ describe('lifecycle', () => {
         const obj = eventize();
         const listenerObject = {foo: () => {}};
         once(obj, 'foo', listenerObject); // handle dropped, never fires
-        const handle = on(obj, 'foo', listenerObject) as any; // refCount = 2
+        const listener = latestListener(obj);
+        const handle = on(obj, 'foo', listenerObject); // dedups, refCount = 2
         handle();
-        return {handle, ref: new WeakRef(obj)};
+        return {handle, listener, ref: new WeakRef(obj)};
       };
 
       const deduped = onDedupedOntoAPendingOnce();
       const dedupedVerdict = await collect(deduped.ref);
 
-      expect(deduped.handle.listener.isRemoved).toBe(false);
-      expect(typeof deduped.handle.listener.callAfterApply).toBe('function');
+      expect(deduped.handle).toBeDefined();
+      expect(deduped.listener.isRemoved).toBe(false);
+      expect(typeof deduped.listener.callAfterApply).toBe('function');
       // The harness verdict is part of the pattern on purpose: a bare
       // /^still reachable/ also matches when the collector is dead, which
       // would make this — the one case asserting something is *not* collected
@@ -593,8 +623,8 @@ describe('lifecycle', () => {
 
   describe('the store empties its buckets', () => {
     it('leaves no empty named-listener buckets behind', () => {
-      const obj = eventize() as any;
-      const store = obj[Symbol.for('eventize')].store;
+      const obj = eventize();
+      const store = storeOf(obj);
 
       for (let i = 0; i < 200; i++) {
         const unsubscribe = on(obj, `e-${i}`, fake());

@@ -1,5 +1,4 @@
 import type {EventKeeper} from './EventKeeper';
-import type {EventListener} from './EventListener';
 import type {EventStore} from './EventStore';
 import type {NAMESPACE} from './constants';
 
@@ -123,9 +122,18 @@ export type EventListenerMethods<TEvents extends EventMap = DefaultEventMap> = {
   emit?: (eventName: EventKeysOf<TEvents>, ...args: any[]) => void;
 };
 
-export type UnsubscribeFunc =
-  | ((() => void) & {listener: EventListener})
-  | ((() => void) & {listeners: Array<EventListener>});
+/**
+ * What `on()` and `once()` hand back: a function that releases the
+ * subscription, and nothing else.
+ *
+ * It used to carry the underlying `EventListener` as `.listener` (single-name
+ * forms) or `.listeners` (array form). Those are gone — they exposed an
+ * internal type no consumer could construct, subclass or `instanceof`, and the
+ * union that declared them made both fields unreadable anyway, because
+ * TypeScript could never tell the two arms apart. The one thing they were good
+ * for, `off(ε, unsub.listener)`, is what calling the handle already does.
+ */
+export type UnsubscribeFunc = () => void;
 
 /**
  * Options for `onceAsync()`. Passing a `signal` gives the caller a way to

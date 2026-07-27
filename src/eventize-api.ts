@@ -40,33 +40,29 @@ const afterApply = (callback?: () => void) => (listener: EventListener) => {
 // The nulled `host` capture *is* the consumed flag, and that is what stops a
 // handle kept after its call from pinning the emitter — with it the store, the
 // keeper and every retained payload (MEM-001). A separate boolean would leave
-// `host` in the closure forever. `listeners` stays captured on purpose: the
-// handle object carries the very same references under `.listener` /
-// `.listeners` for its whole life, so nulling the closure copy would release
-// nothing and only buy a branch that can never be taken.
+// `host` in the closure forever. `listeners` stays captured because the first
+// call needs it to reach `off()`; it is the only reference the handle keeps
+// once consumed, now that the `.listener` / `.listeners` properties are gone.
 //
 // What this releases is what *this closure* held, which is not the same as
 // "a consumed handle holds nothing". When the call merely decremented a shared
-// reference count, `.listener` stays populated — and such a listener can still
-// reach the emitter: its `callAfterApply` may be another, unconsumed handle's
-// closure (an `on()` that deduped onto a `once()` whose event never fired), or
-// the listener object may be the emitter itself. Only the call that takes the
-// count to zero detaches. Pinned in `src/lifecycle.spec.ts`.
+// reference count, the captured listener stays registered and populated — and
+// such a listener can still reach the emitter: its `callAfterApply` may be
+// another, unconsumed handle's closure (an `on()` that deduped onto a `once()`
+// whose event never fired), or the listener object may be the emitter itself.
+// Only the call that takes the count to zero detaches. Pinned in
+// `src/lifecycle.spec.ts`.
 const makeUnsubscribe = (
   host: EventizedObject,
   listeners: EventListener | Array<EventListener>,
 ): UnsubscribeFunc => {
   let heldHost: EventizedObject | null = host;
-  const unsubscribe = () => {
+  return () => {
     const target = heldHost;
     if (target === null) return;
     heldHost = null;
     off(target, listeners);
   };
-  return Object.assign(
-    unsubscribe,
-    Array.isArray(listeners) ? {listeners} : {listener: listeners},
-  );
 };
 
 const _emitOne = (
@@ -447,10 +443,8 @@ export function once(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
     args,
     true,
   );
-  // Idempotence and the `.listener` / `.listeners` properties both come out of
-  // makeUnsubscribe() now. once() used to wrap the handle in a guard of its
-  // own — and then re-attach the properties that wrapper had swallowed —
-  // because on()'s handle had no guard to share.
+  // Idempotence comes out of makeUnsubscribe() now. once() used to wrap the
+  // handle in a guard of its own, because on()'s handle had no guard to share.
   const unsubscribe = makeUnsubscribe(eventizedObj, listeners);
   if (Array.isArray(listeners)) {
     listeners.forEach(afterApply(unsubscribe));

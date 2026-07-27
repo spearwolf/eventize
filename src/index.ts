@@ -11,6 +11,4 @@ export * from './getRetainedCount';
 
 export {EVENT_CATCH_EM_ALL} from './constants';
 
-export type {EventListener} from './EventListener';
-
 export type * from './types';

@@ -45,7 +45,7 @@ on(ε, 'foo', (received) => {
 | the `unsubscribe`/`unsubscribe()` handle from `on()`/`once()` | its own listener(s) only                          | **untouched** — it isn't an event-name form                                                |
 
 > [!DANGER]
-> **`off(ε, undefined)` is not a no-op.** `undefined == null`, so it takes the exact same branch as the bare `off(ε)` and removes **every** listener on the emitter. Cleanup code that forwards a possibly-missing handle property straight through — `off(ε, maybeHandle.listener)` — wipes the whole emitter the moment that property is `undefined`, instead of doing nothing. Guard the call, or pass the handle itself and let it no-op safely on repeat calls.
+> **`off(ε, undefined)` is not a no-op.** `undefined == null`, so it takes the exact same branch as the bare `off(ε)` and removes **every** listener on the emitter. Cleanup code that forwards a possibly-missing value straight through — `off(ε, handlers[name])` for a name that was never registered — wipes the whole emitter instead of doing nothing. Guard the call, or keep the `on()` handle and call that, which no-ops safely however often it runs.
 >
 > **Wrapping it in an array does not contain it.** `EventStore.remove()` forwards each element back into itself, so `off(ε, [null])`, `off(ε, [undefined])` and `off(ε, ['foo', undefined])` each hit the same wipe branch — one nullish element takes the whole emitter, and since v6.0.0 the retained state with it. An event-name list assembled at runtime is the realistic way in: `off(ε, ids.map((id) => nameFor(id)))` empties the emitter as soon as one lookup returns `undefined`. Filter the array first.
 
@@ -123,18 +123,13 @@ u2();
 getSubscriptionCount(ε); // => 0 — only now released
 ```
 
-`off(ε, unsub.listener)` is affected the same way `unsub()` itself is: both
-now go through the same single-shot `makeUnsubscribe()` guard, so calling
-`off()` with a handle's `.listener` after the handle itself already fired
-decrements nothing — the registration it pointed at may already be gone, or
-may be a live sibling registration, but either way a second release attempt
-is a no-op rather than a second decrement. Code that stored a handle only to
-call `off(ε, unsub.listener)` unconditionally on cleanup, regardless of
-whether `unsub()` already ran, now gets the safe behavior `docs/off.md` had
-always promised. Nothing to change unless a cleanup path *relied* on the old
-double-decrement to force a shared registration to zero — reach for
-`off(ε, listenerObject)` instead, which removes every matching subscription
-in one call regardless of how many handles it was split across.
+Since v6.3.0 the handle is the only route to that registration: `.listener` and
+`.listeners` are gone (see [Which handles to keep](#which-handles-to-keep)), so
+a cleanup path cannot reach past `unsub()` to the underlying listener any more.
+Nothing to change unless a cleanup path *relied* on calling `off()` twice to
+force a shared registration to zero — reach for `off(ε, listenerObject)`
+instead, which removes every matching subscription in one call regardless of
+how many handles it was split across.
 
 ### `once()` no longer deduplicates
 
@@ -162,10 +157,10 @@ unchanged.
 Seven more, each narrow enough not to need a worked snippet:
 
 - **`on(ε, eventName, methodName, listenerObject)` with a missing or `null` listener object now dispatches to nothing instead of throwing.** `on(ε, 'foo', 'handler', null)` used to throw `TypeError: Cannot read properties of null` the moment the event fired; it now silently does nothing until a real listener object is supplied later, matching how the same branch already tolerated a listener object with no matching method. Code that caught the `TypeError` as a signal no longer sees it — check with `getSubscriptionCount(ε)` instead if that mattered.
-- **`off(ε, <numeric listener id>)` no longer removes anything.** Passing `unsub.listener.id` — the internal `EventListener`'s numeric id — used to detach the listener outright, skipping the reference count every documented removal path honours. It was never documented and had no test. Use `unsub()` or `off(ε, unsub.listener)` instead; both go through the same reference-counted path.
-- **`UnsubscribeFunc.listener` / `.listeners` are now typed as this package's `EventListener`, not the DOM global of the same name.** `src/types.ts` referenced the name without importing it, so it silently bound to `lib.dom`'s `EventListener` (`(evt: Event) => void`) in the published declarations. Code that annotated `const l: EventListener = unsub.listener` against the DOM type now gets a type error — that annotation was already wrong, it just had no way to know. No runtime change.
+- **`off(ε, <numeric listener id>)` no longer removes anything.** Passing the internal `EventListener`'s numeric id used to detach the listener outright, skipping the reference count every documented removal path honours. It was never documented and had no test. Use `unsub()` instead; since v6.3.0 there is no supported way to obtain that id anyway.
+- **`UnsubscribeFunc.listener` and `.listeners` are gone (v6.3.0), and so is the `EventListener` type export.** The handle is `() => void` and nothing else. See the entry under [Which handles to keep](#which-handles-to-keep) for why, and use `unsub()` wherever code reached for `off(ε, unsub.listener)`.
 - **`export type ListenerType` is gone.** It was `export type ListenerType = unknown` — an alias nothing in the package referenced. Replace an import of it with `unknown` directly.
-- **An `EventListener` built directly with a `null` or `undefined` listener now dispatches to nothing instead of throwing.** Only reachable by constructing `EventListener` yourself; `on()` / `once()` reject such a listener before one is ever built, and the runtime bundles don't export the class at all (`src/index.ts` re-exports it as a type only). No action needed unless code somehow holds a reference to the class itself.
+- **An `EventListener` built directly with a `null` or `undefined` listener now dispatches to nothing instead of throwing.** Only reachable by constructing `EventListener` yourself; `on()` / `once()` reject such a listener before one is ever built, and since v6.3.0 the class is not exported at all — neither as a value nor as a type. No action needed unless code somehow holds a reference to the class itself.
 - **`on()` / `once()` throw on a listener they cannot dispatch to.** The slot used to be tested for truthiness alone, so `on(ε, 'foo', 5)` registered a subscription no `emit()` could ever reach: it counted towards `getSubscriptionCount(ε)`, survived every dispatch, and came off only with an explicit `off()`. The same call with `0` threw, because `0` is falsy — the same mistake behaved in opposite ways depending on the number. Only a function, a string, a symbol or a non-null object passes now; the message is the familiar `subscribeTo() called with insufficient arguments`. Every documented spelling of `on()` is unaffected, so the call sites to grep for are the ones that forward a value into the listener position — a config field, a wrapper's `arguments`, an argument that slipped a place.
 - **`on()` / `once()` throw on a `NaN` priority.** `NaN` is a `number`, so it passed the positional decoding and then poisoned the ordering: `b.priority - a.priority` is `NaN` for every pair, every comparison is false, and the listener was inserted at a position decided by the size of the bucket rather than by any priority relation — no error, no warning, just the wrong call order. All four positions a priority can occupy are covered, `[name, priority]` tuples included; a `NaN` in one tuple registers none of the names in that call, and a `NaN` at call level rejects even when every tuple carries its own priority. `Priority.Max` and `Priority.Min` are `±Infinity` and stay valid — the test is `Number.isNaN`, not a finiteness test. Validate before the call rather than after: `on(ε, 'foo', Number.isNaN(p) ? Priority.Normal : p, fn)` expresses what the old behaviour merely pretended to do. A tuple carries its own priority and needs its own guard — `on(ε, [['a', Number.isNaN(p) ? Priority.Normal : p]], fn)`; the call-level value is not a fallback for a tuple that spells one out.
 
@@ -227,16 +222,27 @@ Cleanup is the caller's job. `unretain(ε, '*')` is the blunt instrument; `unret
 
 ## Which handles to keep
 
-Both `on()` and `once()` return an `UnsubscribeFunc` — a callable function object also carrying `.listener` (single-event forms) or `.listeners` (multi-event-name array form), typed and populated identically for both functions. Calling a handle releases references on two levels, and only the second one is conditional:
+Both `on()` and `once()` return an `UnsubscribeFunc`, which since v6.3.0 is exactly `() => void`.
+
+> [!IMPORTANT]
+> **The handle no longer carries `.listener` / `.listeners`.** It used to expose the underlying `EventListener` — as `.listener` for the single-name forms, `.listeners` for the array form. Both are gone, along with the `EventListener` type export. Three reasons, in the order they matter:
+>
+> - The declared type was a union of the two shapes, and TypeScript could never tell the arms apart, so *both* fields were a `TS2339` at every call site. The one pattern the docs described, `off(ε, unsub.listener)`, did not compile against the published declarations.
+> - It handed out an internal class no consumer could construct, subclass or `instanceof` — the runtime bundles never exported it.
+> - The single thing it was good for is what calling the handle already does, through the same reference-counted path, without needing the emitter in scope.
+>
+> **Migration:** replace `off(ε, unsub.listener)` with `unsub()`. Both were single-shot and both honoured the reference count, so the behaviour is unchanged. Code that reached further in — `unsub.listener.id`, `unsub.listener.isRemoved` — was reading internals and has no replacement by design.
+
+Calling a handle releases references on two levels, and only the second one is conditional:
 
 - **The closure's own reference to the emitter, unconditionally.** The handle closes over the emitter it was created against; that capture is nulled on the first call, so a handle kept in an array after teardown no longer pins the emitter through *its own closure* — and with it the store, the keeper and every retained payload, under *any* event name. Before this fix a single kept handle for `'foo'` was enough to keep a buffer retained under `'bar'` alive for the lifetime of the array.
 - **The listener, when it actually left the store.** If the call really removed the listener (rather than only decrementing a shared reference count, see the note below), everything that listener held is nulled via `EventListener.detach()` — the listener function or object, the listener object's context, and the `callAfterApply` hook.
 
 > [!WARNING]
-> **A consumed handle is not automatically reference-free.** The two levels above are separate on purpose: when the call only decremented a shared count, `.listener` stays populated *and registered*, and a registered listener can lead straight back to the emitter. Two shapes do it, both verified with `WeakRef`:
+> **A consumed handle is not automatically reference-free.** The two levels above are separate on purpose: when the call only decremented a shared count, the listener the handle captured stays populated *and registered*, and a registered listener can lead straight back to the emitter. Removing `.listener` did not close this — the closure still holds the same instance, because the first call needs it to reach `off()`. Two shapes do it, both verified with `WeakRef`:
 >
 > - `once(ε, 'foo', service)` whose event never fires, followed by `on(ε, 'foo', service)` — the `on()` deduplicates onto the `once()` listener, so consuming the `on()` handle takes the count from 2 to 1 and detaches nothing. The surviving listener's `callAfterApply` is the `once()` handle's closure, and *that* handle was never called, so it still holds the emitter. Same for the method-name form.
-> - **The emitter subscribed as its own listener object**, registered twice: `on(ε, 'foo', ε)`, the method-name form `on(ε, 'foo', 'method', ε)`, and the wildcard clothing of both, `on(ε, ε)`. All three deduplicate, so the first consumed handle leaves the listener registered — and the emitter sits in one of the listener's own slots: `.listener.listener` for the object form, `.listener.listenerObject` for the method-name form. Watching only one of those two fields misses half the cases.
+> - **The emitter subscribed as its own listener object**, registered twice: `on(ε, 'foo', ε)`, the method-name form `on(ε, 'foo', 'method', ε)`, and the wildcard clothing of both, `on(ε, ε)`. All three deduplicate, so the first consumed handle leaves the listener registered — and the emitter sits in one of the listener's own slots, a different one per spelling. Watching only one of them misses half the cases.
 >
 > The plain case is fine: two `on()` calls with an ordinary listener object release the emitter as soon as the first handle is consumed, count still at 1. So does `on(ε, 'foo', fn, ε)` registered twice, which looks like the second bullet but isn't — function listeners never deduplicate, so each handle detaches its own listener outright. What matters is not the count but what the *surviving* listener points at. If you keep handles past teardown and either shape applies, drop the handles too, or use `off(ε, listenerObject)` — which removes every matching registration in one call, regardless of how many handles they were split across.
 
@@ -261,7 +267,7 @@ A handle that is never called keeps its listener (and, transitively, whatever th
 > const h2 = on(ε, 'foo', service); // same subscription, refCount = 2
 >
 > h1();
-> // getSubscriptionCount(ε) is still 1 — h1.listener.listener is NOT null yet
+> // getSubscriptionCount(ε) is still 1 — the shared listener is NOT detached yet
 > h1();
 > // still 1 — a consumed handle is inert, it cannot decrement a second time
 > h2();
@@ -270,7 +276,7 @@ A handle that is never called keeps its listener (and, transitively, whatever th
 >
 > **Each handle is single-shot (since v6.0.0).** Calling one a second time does nothing at all — it does not decrement the shared count again, and so it cannot take a *sibling* handle's registration down with it. Up to v5.1.0 only `once()` carried that guard: `h1(); h1();` on the pair above dropped the count straight to 0, unsubscribing `h2`'s registration from under it, and the double call is precisely what defensive cleanup code writes.
 >
-> The retention window is what survives. Holding on to `h1` after calling it, expecting it to have released `service`, is exactly the pattern the "consumed handle" claim above is meant to rule out — and the guard does not shorten it, because `h1` is inert while the shared listener is still very much alive. If a listener object may be subscribed more than once, only the *last* handle's call marks the true release point. What keeps `service` alive through a consumed `h1` is `h1.listener` — the public, still-populated `EventListener` — not `h1`'s own capture of the emitter, which is gone the moment `h1()` returns, count or no count. That distinction is not academic: in the two shapes listed under [Which handles to keep](#which-handles-to-keep) the still-populated `.listener` reaches the emitter anyway, so "the closure released it" and "nothing holds it" are different claims.
+> The retention window is what survives. Holding on to `h1` after calling it, expecting it to have released `service`, is exactly the pattern the "consumed handle" claim above is meant to rule out — and the guard does not shorten it, because `h1` is inert while the shared listener is still very much alive. If a listener object may be subscribed more than once, only the *last* handle's call marks the true release point. What keeps `service` alive through a consumed `h1` is the still-populated `EventListener` the handle captured, not `h1`'s own capture of the *emitter*, which is gone the moment `h1()` returns, count or no count. Removing the `.listener` property in v6.3.0 hid that instance from callers; it did not stop the closure from holding it. In the two shapes listed under [Which handles to keep](#which-handles-to-keep) the surviving listener reaches the emitter anyway, so "the closure released it" and "nothing holds it" remain different claims.
 
 > [!NOTE]
 > **`once()` is exempt from de-duplication (since v6.0.0).** Calling `once()` twice for the same event name on the same listener object creates two independent one-shot subscriptions: two firings on the first `emit()`, two retained-value replays if the event is retained, and two handles that each release exactly their own listener. Up to v5.1.0 the second call bumped the first listener's reference count instead, while the auto-unsubscribe hook accounted for a single firing — one emit took the count from 2 to 1 and the surviving handle's idempotence guard stopped it ever reaching 0. That listener fired on every subsequent `emit()` and could only be removed with an external `off(ε, listenerObject)` (`MEM-002`). If you upgrade from v5.x and relied on two `once()` calls collapsing into one, use a single `once()`.

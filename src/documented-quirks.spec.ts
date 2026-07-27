@@ -1,6 +1,7 @@
 import {emitAsync, emit, off, on, retain} from './eventize-api';
 import {eventize} from './eventize';
 import {Priority} from './Priority';
+import {listenersOf} from './__test-utils__/listeners';
 import type {OnEventNames} from './types';
 
 // Guards for behaviors that README / docs / the using-eventize skill promise
@@ -53,13 +54,11 @@ describe('documented quirks', () => {
       const ε = eventize();
 
       // @ts-expect-error a one-element tuple is not an EventNameWithPriority
-      const unsubscribe = on(ε, [['foo']], () => {});
+      on(ε, [['foo']], () => {});
 
-      expect('listeners' in unsubscribe).toBe(true);
-      if (!('listeners' in unsubscribe)) return;
-
-      expect(unsubscribe.listeners).toHaveLength(1);
-      const [firstListener] = unsubscribe.listeners;
+      const listeners = listenersOf(ε, 'foo');
+      expect(listeners).toHaveLength(1);
+      const [firstListener] = listeners;
       expect(firstListener).toBeDefined();
       if (firstListener === undefined) return;
       expect(firstListener.priority).toBe(Priority.Default);

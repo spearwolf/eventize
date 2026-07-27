@@ -11,6 +11,7 @@ import {
   once,
   retain,
 } from './index';
+import {latestListener} from './__test-utils__/listeners';
 
 describe('off()', () => {
   describe('by function', () => {
@@ -997,12 +998,11 @@ describe('off()', () => {
       const ε = eventize();
       const listenerObject = {foo: fake()};
 
-      const unsubscribe = on(ε, 'foo', listenerObject);
-      // @ts-expect-error .listener is not on the multi-event arm of the union
-      off(ε, unsubscribe.listener.id);
+      on(ε, 'foo', listenerObject);
+      off(ε, latestListener(ε).id);
 
       // it used to detach the listener outright, skipping the reference count
-      // that off(ε, unsubscribe.listener) and unsubscribe() both honour
+      // that unsubscribe() and off(ε, <the listener instance>) both honour
       expect(getSubscriptionCount(ε)).toBe(1);
 
       emit(ε, 'foo');
@@ -1081,41 +1081,47 @@ describe('off()', () => {
   });
 
   describe('reference release after unsubscribe', () => {
+    // The handle no longer carries the EventListener (API-001), so these read
+    // the registry directly — which is what they always meant. Capture before
+    // the removal: afterwards the listener is out of the store.
     it('drops the listener references from a consumed handle', () => {
       const obj = eventize();
       const listenerObject = {foo: fake()};
-      const unsubscribe = on(obj, 'foo', 'foo', listenerObject) as any;
+      const unsubscribe = on(obj, 'foo', 'foo', listenerObject);
+      const listener = latestListener(obj);
 
-      expect(unsubscribe.listener.listenerObject).toBe(listenerObject);
+      expect(listener.listenerObject).toBe(listenerObject);
 
       unsubscribe();
 
-      expect(unsubscribe.listener.isRemoved).toBe(true);
-      expect(unsubscribe.listener.listener).toBeNull();
-      expect(unsubscribe.listener.listenerObject).toBeNull();
-      expect(unsubscribe.listener.callAfterApply).toBeUndefined();
+      expect(listener.isRemoved).toBe(true);
+      expect(listener.listener).toBeNull();
+      expect(listener.listenerObject).toBeNull();
+      expect(listener.callAfterApply).toBeUndefined();
     });
 
     it('drops references on off(ε, eventName) too', () => {
       const obj = eventize();
       const listenerFunc = fake();
-      const unsubscribe = on(obj, 'foo', listenerFunc) as any;
+      on(obj, 'foo', listenerFunc);
+      const listener = latestListener(obj);
 
       off(obj, 'foo');
 
-      expect(unsubscribe.listener.isRemoved).toBe(true);
-      expect(unsubscribe.listener.listener).toBeNull();
+      expect(listener.isRemoved).toBe(true);
+      expect(listener.listener).toBeNull();
     });
 
     it('drops references on off(ε) too', () => {
       const obj = eventize();
       const listenerFunc = fake();
-      const unsubscribe = on(obj, 'foo', listenerFunc) as any;
+      on(obj, 'foo', listenerFunc);
+      const listener = latestListener(obj);
 
       off(obj);
 
-      expect(unsubscribe.listener.isRemoved).toBe(true);
-      expect(unsubscribe.listener.listener).toBeNull();
+      expect(listener.isRemoved).toBe(true);
+      expect(listener.listener).toBeNull();
     });
   });
 

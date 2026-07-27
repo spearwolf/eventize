@@ -22,27 +22,29 @@ compile errors instead.
   dedup is unaffected.
 - **Unsubscribe handles are single-shot.** Calling one a second time used to
   decrement a shared reference count again, releasing a *sibling* handle's
-  registration out from under it. A second call is now inert — including
-  `off(ε, unsub.listener)` called after `unsub()` already ran, which now
-  no-ops instead of risking a second decrement.
+  registration out from under it. A second call is now inert.
 - **A method-name subscription with a missing listener object no-ops
   instead of throwing.** `on(ε, 'foo', 'handler', null)` used to throw the
   moment the event fired; it now silently does nothing until a real
   listener object is supplied.
 - **`off(ε, <numeric listener id>)` no longer removes anything.** This was
-  undocumented and untested — passing `unsub.listener.id` used to detach
-  the listener outright, skipping the reference count every documented
-  path honours. Use `unsub()` or `off(ε, unsub.listener)`.
-- **`UnsubscribeFunc.listener` / `.listeners` are now typed as this
-  package's `EventListener`**, not the DOM global of the same name they
-  silently bound to before. Type-only; code that annotated against the DOM
-  type now gets a type error.
+  undocumented and untested — passing the internal listener's numeric id
+  used to detach it outright, skipping the reference count every documented
+  path honours. Use `unsub()`.
+- **`UnsubscribeFunc.listener` / `.listeners` are gone (v6.3.0), and so is
+  the `EventListener` type export.** The handle is `() => void`. The union
+  that declared the two fields made either access a `TS2339` at every call
+  site, so `off(ε, unsub.listener)` never compiled against the published
+  declarations in the first place. Replace it with `unsub()` — same
+  reference-counted path, same single-shot guard, no emitter needed in
+  scope. Reads past it (`unsub.listener.id`, `.isRemoved`) were internals
+  and have no replacement.
 - **`export type ListenerType` is gone** — an alias for `unknown` nothing
   referenced. Replace an import with `unknown` directly.
 - **An `EventListener` built directly with a `null`/`undefined` listener
   now dispatches to nothing instead of throwing.** Only reachable by
-  constructing the class yourself, which the runtime bundles don't even
-  export.
+  constructing the class yourself, which the package does not export at
+  all — neither as a value nor, since v6.3.0, as a type.
 - **`on()` / `once()` throw on a listener they cannot dispatch to.** The
   slot used to be checked for truthiness only, so `on(ε, 'foo', 5)`
   registered a listener no `emit()` could ever reach — it counted towards

@@ -9,6 +9,7 @@ import {
   once,
   retain,
 } from './index';
+import {latestListener} from './__test-utils__/listeners';
 
 describe('once()', () => {
   describe('once() before on()', () => {
@@ -165,34 +166,43 @@ describe('once()', () => {
   });
 
   describe('UnsubscribeFunc contract', () => {
-    it('exposes .listener for a single event name', () => {
+    // API-001: the handle used to expose the internal EventListener as
+    // `.listener` (single-name forms) or `.listeners` (array form). Both are
+    // gone. The union that declared them made either access a TS2339 anyway,
+    // and they handed out a class no consumer could construct or name.
+    it('carries no properties for a single event name', () => {
       const obj = eventize();
       const unsubscribe = once(obj, 'foo', fake());
 
-      expect(Object.keys(unsubscribe)).toEqual(['listener']);
-      expect((unsubscribe as any).listener).toBeDefined();
+      expect(typeof unsubscribe).toBe('function');
+      expect(Object.keys(unsubscribe)).toEqual([]);
+      expect(Object.getOwnPropertyNames(unsubscribe)).not.toContain('listener');
     });
 
-    it('exposes .listeners for an array of event names', () => {
+    it('carries no properties for an array of event names either', () => {
       const obj = eventize();
       const unsubscribe = once(obj, ['foo', 'bar'], fake());
 
-      expect(Object.keys(unsubscribe)).toEqual(['listeners']);
-      expect((unsubscribe as any).listeners).toHaveLength(2);
+      expect(getSubscriptionCount(obj)).toBe(2);
+      expect(Object.keys(unsubscribe)).toEqual([]);
+      expect(Object.getOwnPropertyNames(unsubscribe)).not.toContain(
+        'listeners',
+      );
     });
 
-    it('allows off(ε, unsubscribe.listener) as a cleanup path', () => {
+    it('still lets off() take a registered listener instance', () => {
       const obj = eventize();
       const survivor = fake();
       on(obj, 'bar', survivor);
-      const unsubscribe = once(obj, 'foo', fake());
+      once(obj, 'foo', fake());
+      const listener = latestListener(obj);
 
       expect(getSubscriptionCount(obj)).toBe(2);
-      off(obj, (unsubscribe as any).listener);
+      // off(ε, <EventListener>) still works — only the route to the instance
+      // through the handle is gone. Consumers reach for unsubscribe() instead,
+      // which goes through the same reference-counted path.
+      off(obj, listener);
 
-      // exactly the once() subscription is gone, not the whole emitter —
-      // pre-fix, `.listener` was undefined and off(ε, undefined) swept
-      // everything, which a single-subscription emitter could not reveal
       expect(getSubscriptionCount(obj)).toBe(1);
 
       emit(obj, 'bar');
