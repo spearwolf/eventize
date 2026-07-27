@@ -566,58 +566,74 @@ describe('lifecycle', () => {
       });
     });
 
-    // The limit of the guarantee, pinned as it is rather than as it should be.
-    // A handle that only decremented a shared reference count leaves its
-    // .listener registered and populated, and such a listener can lead back to
-    // the emitter — so "a consumed handle holds nothing" is true only for the
-    // call that actually took the listener out of the store.
-    it('a shared registration still releases the emitter — unless the surviving listener leads back to it', async () => {
-      // Handing the listener back alongside the handle does not widen what the
-      // test frame keeps alive: `makeUnsubscribe()` captures the very same
-      // instance in its closure, so the handle held it either way — before
-      // API-001 through the `.listener` property, now through the capture.
+    // A consumed handle releases the emitter even when the call only
+    // decremented a shared reference count and the surviving listener leads
+    // straight back to the emitter. That second half is new: until v6.3.0 the
+    // handle went on holding the listener, first through the `.listener`
+    // property and then through the closure capture that outlived it.
+    //
+    // Neither helper may hand the listener back. The whole question is what
+    // the *handle* still reaches, and a listener held by the test frame keeps
+    // the emitter alive on its own — which would make both assertions below
+    // pass for the wrong reason.
+    it('a consumed handle releases the emitter even when the surviving listener leads back to it', async () => {
       const plainSharedRegistration = () => {
         const obj = eventize();
         const listenerObject = {foo: () => {}};
         const first = on(obj, 'foo', listenerObject);
-        const listener = latestListener(obj);
-        on(obj, 'foo', listenerObject); // refCount = 2
-        first();
-        return {handle: first, listener, ref: new WeakRef(obj)};
+        on(obj, 'foo', listenerObject); // dedups, refCount = 2
+        first(); // decrements to 1, detaches nothing
+        return {handle: first, ref: new WeakRef(obj)};
       };
 
       const shared = plainSharedRegistration();
       const sharedVerdict = await collect(shared.ref);
 
-      expect(shared.handle).toBeDefined();
-      expect(shared.listener.isRemoved).toBe(false); // still registered
+      expect(typeof shared.handle).toBe('function');
       expect(sharedVerdict).toMatch(/^collected/);
 
-      // Now the same shape, except the surviving listener is a once() whose
-      // event never fired: on() dedups onto it, and its callAfterApply is the
-      // once() handle's closure — which still holds the emitter, because that
-      // handle was never called.
+      // The hard case: the surviving listener is a once() whose event never
+      // fired, so its callAfterApply is the once() handle's closure — and that
+      // handle was never called, so it still holds the emitter. Consuming the
+      // on() handle takes the count from 2 to 1 and detaches nothing, which
+      // used to leave this whole chain hanging off the consumed handle:
+      //   handle -> closure -> listener -> callAfterApply -> once closure -> ε
+      // Nulling the capture cuts it at the first link.
       const onDedupedOntoAPendingOnce = () => {
         const obj = eventize();
         const listenerObject = {foo: () => {}};
         once(obj, 'foo', listenerObject); // handle dropped, never fires
-        const listener = latestListener(obj);
         const handle = on(obj, 'foo', listenerObject); // dedups, refCount = 2
         handle();
-        return {handle, listener, ref: new WeakRef(obj)};
+        return {handle, ref: new WeakRef(obj)};
       };
 
       const deduped = onDedupedOntoAPendingOnce();
       const dedupedVerdict = await collect(deduped.ref);
 
-      expect(deduped.handle).toBeDefined();
-      expect(deduped.listener.isRemoved).toBe(false);
-      expect(typeof deduped.listener.callAfterApply).toBe('function');
-      // The harness verdict is part of the pattern on purpose: a bare
-      // /^still reachable/ also matches when the collector is dead, which
-      // would make this — the one case asserting something is *not* collected
-      // — the single test a broken harness turns green.
-      expect(dedupedVerdict).toMatch(/^still reachable.*harness ok/);
+      expect(typeof deduped.handle).toBe('function');
+      expect(dedupedVerdict).toMatch(/^collected/);
+    });
+
+    // The control group for the case above. Without it, `collected` proves
+    // nothing: an emitter nobody holds is collected whether or not the handle
+    // releases anything. Here the handle is never called, so it must still
+    // pin the emitter — if this one ever reports `collected`, the assertions
+    // above are measuring an emitter that was already unreachable.
+    it('an unconsumed handle still pins the emitter (control)', async () => {
+      const keepUnconsumed = () => {
+        const obj = eventize();
+        const handle = on(obj, 'foo', {foo: () => {}});
+        return {handle, ref: new WeakRef(obj)};
+      };
+
+      const kept = keepUnconsumed();
+      const verdict = await collect(kept.ref);
+
+      expect(typeof kept.handle).toBe('function');
+      // A bare /^still reachable/ would also match a dead collector, which
+      // would turn the one test asserting *not collected* green by accident.
+      expect(verdict).toMatch(/^still reachable.*harness ok/);
     });
   });
 

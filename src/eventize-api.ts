@@ -37,31 +37,45 @@ const afterApply = (callback?: () => void) => (listener: EventListener) => {
 // calls a stored handle defensively ("call it again, it's a no-op") is exactly
 // the shape that hit it, and `docs/off.md` promised that no-op.
 //
-// The nulled `host` capture *is* the consumed flag, and that is what stops a
-// handle kept after its call from pinning the emitter — with it the store, the
-// keeper and every retained payload (MEM-001). A separate boolean would leave
-// `host` in the closure forever. `listeners` stays captured because the first
-// call needs it to reach `off()`; it is the only reference the handle keeps
-// once consumed, now that the `.listener` / `.listeners` properties are gone.
+// The nulled capture *is* the consumed flag, and that is what stops a handle
+// kept after its call from pinning anything — the emitter, and with it the
+// store, the keeper and every retained payload (MEM-001). A separate boolean
+// would leave both references in the closure forever.
 //
-// What this releases is what *this closure* held, which is not the same as
-// "a consumed handle holds nothing". When the call merely decremented a shared
-// reference count, the captured listener stays registered and populated — and
-// such a listener can still reach the emitter: its `callAfterApply` may be
-// another, unconsumed handle's closure (an `on()` that deduped onto a `once()`
-// whose event never fired), or the listener object may be the emitter itself.
-// Only the call that takes the count to zero detaches. Pinned in
-// `src/lifecycle.spec.ts`.
+// Both go in one slot so a single null test releases them together and
+// TypeScript narrows both at once. Splitting them into two `let`s costs a
+// branch that can never be taken: they are only ever nulled as a pair.
+//
+// Nulling `listeners` is younger than nulling `host` and only started paying
+// off in v6.3.0. While the handle still carried `.listener` / `.listeners`,
+// the same instances hung off the handle object in public, so clearing the
+// closure copy released nothing. With those properties gone the closure is the
+// only holder — and it is worth clearing, because a call that merely
+// decremented a shared reference count leaves the listener registered and
+// populated, and such a listener can lead straight back to the emitter: its
+// `callAfterApply` may be another, unconsumed handle's closure (an `on()` that
+// deduped onto a `once()` whose event never fired), or the listener object may
+// be the emitter itself. That chain used to hang off the consumed handle.
+//
+// What this does *not* fix is MEM-002 itself: `on()` still deduplicates onto a
+// pending `once()`, so one reference count still spans two lifetimes. It is
+// only the memory consequence that is gone — and only for handles that were
+// actually called. An unconsumed handle pins the emitter by design; the
+// control group in `src/lifecycle.spec.ts` pins that it still does.
 const makeUnsubscribe = (
   host: EventizedObject,
   listeners: EventListener | Array<EventListener>,
 ): UnsubscribeFunc => {
-  let heldHost: EventizedObject | null = host;
+  let held: {
+    host: EventizedObject;
+    listeners: EventListener | Array<EventListener>;
+  } | null = {host, listeners};
+
   return () => {
-    const target = heldHost;
+    const target = held;
     if (target === null) return;
-    heldHost = null;
-    off(target, listeners);
+    held = null;
+    off(target.host, target.listeners);
   };
 };
 
