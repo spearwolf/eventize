@@ -298,7 +298,7 @@ export class EventStore {
     // The event name is known, and the filter checks it anyway — no reason to
     // walk every other bucket. Catch-em-all listeners are not in this one:
     // they live in the array the branch above handles, which is where they
-    // have always been and where this path only started looking in v6.1.0.
+    // have always been and where this path only started looking in v6.0.0.
     const bucket = this.namedListeners.get(eventName);
     if (!bucket) return;
     removeSimilarListenersFromArray(bucket, eventName, listenerObject);

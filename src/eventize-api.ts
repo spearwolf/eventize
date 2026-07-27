@@ -47,10 +47,10 @@ const afterApply = (callback?: () => void) => (listener: EventListener) => {
 // TypeScript narrows both at once. Splitting them into two `let`s costs a
 // branch that can never be taken: they are only ever nulled as a pair.
 //
-// Nulling `listeners` is younger than nulling `host` and only started paying
-// off in v6.3.0. While the handle still carried `.listener` / `.listeners`,
-// the same instances hung off the handle object in public, so clearing the
-// closure copy released nothing. With those properties gone the closure is the
+// Nulling `listeners` only pays off because the handle no longer carries
+// `.listener` / `.listeners`. While it did, the same instances hung off the
+// handle object in public, so clearing the closure copy released nothing.
+// With those properties gone the closure is the
 // only holder — and it is worth clearing, because a call that merely
 // decremented a shared reference count leaves the listener registered and
 // populated, and such a listener can lead straight back to the emitter: its

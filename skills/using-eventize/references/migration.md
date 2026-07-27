@@ -1,12 +1,14 @@
 # eventize — migration notes
 
-## v5 → v6: eleven breaking changes
+## v5 → v6: thirteen breaking changes
 
-Against the last released version, `v5.1.0`. Most are runtime changes on
+Against the last released version, `v5.1.0` — and `v6.0.0` is the only
+`6.x` there is, so this is the whole jump. Most are runtime changes on
 signatures that don't change shape, so grep for the call patterns rather
-than relying on the type checker to find affected sites. Two are type-only
-(a wrong type binding fixed, a dead type export removed) and surface as
-compile errors instead.
+than relying on the type checker to find affected sites. Four are
+type-only (the unsubscribe handle reduced to `() => void`, `emitAsync()`
+narrowed, the marker slot made opaque, a dead type export removed) and
+surface as compile errors instead.
 
 - **Bulk `off()` now clears retained state.** `off(ε)`, `off(ε, '*')`, and
   any array containing `'*'`, `null` or `undefined` (`off(ε, ['*', …])`,
@@ -30,21 +32,35 @@ compile errors instead.
 - **`off(ε, <numeric listener id>)` no longer removes anything.** This was
   undocumented and untested — passing the internal listener's numeric id
   used to detach it outright, skipping the reference count every documented
-  path honours. Use `unsub()`.
-- **`UnsubscribeFunc.listener` / `.listeners` are gone (v6.3.0), and so is
-  the `EventListener` type export.** The handle is `() => void`. The union
+  path honours. Use `unsub()`; with the handle reduced to `() => void`
+  there is no supported way to obtain such an id anyway.
+- **`UnsubscribeFunc.listener` / `.listeners` are gone, and so is the
+  `EventListener` type export.** The handle is `() => void`. The union
   that declared the two fields made either access a `TS2339` at every call
   site, so `off(ε, unsub.listener)` never compiled against the published
-  declarations in the first place. Replace it with `unsub()` — same
+  declarations in the first place — and the `EventListener` it named was
+  the **DOM** global, not this package's class, because `src/types.ts`
+  used the name without importing it. Replace it with `unsub()` — same
   reference-counted path, same single-shot guard, no emitter needed in
   scope. Reads past it (`unsub.listener.id`, `.isRemoved`) were internals
   and have no replacement.
+- **`emitAsync()` returns `Promise<any[] | undefined>`**, on all three API
+  surfaces, instead of `Promise<any>`. The runtime has always resolved to
+  `undefined` when no listener returned a non-null value; the old `any`
+  did not merely lose precision, it switched checking off, so
+  `(await emitAsync(ε, 'x')).map(…)` compiled and then threw on exactly
+  that case. Add a guard: `(await emitAsync(ε, 'x'))?.map(…)`, or `?? []`.
+- **The marker slot on `EventizedObject` is opaque**, so `EventStore`,
+  `EventKeeper` and `EventListener` no longer appear in `lib/index.d.ts`.
+  Nothing that calls the API breaks — the slot's key is a non-exported
+  `unique symbol`, so reading it from outside was a `TS7053` either way.
+  Only code that annotated the slot structurally is affected.
 - **`export type ListenerType` is gone** — an alias for `unknown` nothing
   referenced. Replace an import with `unknown` directly.
 - **An `EventListener` built directly with a `null`/`undefined` listener
   now dispatches to nothing instead of throwing.** Only reachable by
   constructing the class yourself, which the package does not export at
-  all — neither as a value nor, since v6.3.0, as a type.
+  all — neither as a value nor as a type.
 - **`on()` / `once()` throw on a listener they cannot dispatch to.** The
   slot used to be checked for truthiness only, so `on(ε, 'foo', 5)`
   registered a listener no `emit()` could ever reach — it counted towards
@@ -74,11 +90,11 @@ live in
 [`docs/lifecycle.md#migrating-from-v5`](../../../docs/lifecycle.md#migrating-from-v5)
 rather than being duplicated here.
 
-Two more runtime changes ride along in `v6.1.0`, both filed as **fixes**
-rather than breaking changes — one stopped dispatching to code the subscriber
-never wrote, the other made a call do the one thing its arguments ask for —
-but a `v5.1.0` consumer meets both in the same upgrade and neither is visible
-to the type checker:
+Two more runtime changes ride along, both filed as **fixes** rather than
+breaking changes — one stopped dispatching to code the subscriber never
+wrote, the other made a call do the one thing its arguments ask for — but a
+`v5.1.0` consumer meets both in the same upgrade and neither is visible to
+the type checker:
 
 - **An event name that only matches an inherited `Object.prototype` member
   dispatches to nothing.** `toString`, `toLocaleString`, `valueOf`,
@@ -121,7 +137,7 @@ to the type checker:
 `emit()` and `emitAsync()` no longer throw `"object is not eventized"` on a non-eventized target. They duck-type instead:
 
 1. `obj[eventName]` is a function the object itself provides → call it with
-   `this === obj`. Since v6.1.0 a member inherited from `Object.prototype`
+   `this === obj`. Since v6.0.0 a member inherited from `Object.prototype`
    doesn't count (see the v5 → v6 note above).
 2. Else `obj.emit` is a function → call `obj.emit(eventName, …args)`.
 3. Else silent no-op.

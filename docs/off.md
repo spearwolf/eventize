@@ -173,7 +173,7 @@ emit(ε, 'foo'); // => "foo"  (once — the named subscription is still there)
 emit(ε, 'bar'); // (nothing happens)
 ```
 
-Until v6.1.0 this call removed nothing at all and said nothing about it: `off()` routed a name-plus-object pair into the named buckets, where a wildcard listener never lives. Reach for `off(ε, service)` when you mean both halves, and `off(ε, '*')` when you mean the whole emitter — the three read almost alike and do quite different things.
+Up to v5.1.0 this call removed nothing at all and said nothing about it: `off()` routed a name-plus-object pair into the named buckets, where a wildcard listener never lives. Reach for `off(ε, service)` when you mean both halves, and `off(ε, '*')` when you mean the whole emitter — the three read almost alike and do quite different things.
 
 ## Interaction with `retain()`
 

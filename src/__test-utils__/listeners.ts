@@ -7,7 +7,7 @@ import type {EventMap, EventName, EventizedObject} from '../types';
 /**
  * Reach into an emitter's `EventStore` from a spec.
  *
- * Until v6.3.0 the specs got at the `EventListener` a subscription produced
+ * Up to v5.1.0 the specs got at the `EventListener` a subscription produced
  * through `unsubscribe.listener` / `.listeners`. Those properties are gone from
  * the public surface — they handed out an internal class no consumer could
  * construct, subclass or `instanceof`, and the union declaring them made both

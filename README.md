@@ -311,7 +311,7 @@ emit(ε, 'my-event', 'Silent?'); // (nothing happens)
 
 The full set of call shapes — including the method-name form `on(ε, 'foo', 'methodName', obj)` — is listed in [`skills/using-eventize/references/api-details.md`](./skills/using-eventize/references/api-details.md).
 
-The listener slot takes only what can be dispatched to: a function, a method name (string or symbol), or a listener object. Anything else throws — `on(ε, 'foo', 5)` fails instead of registering a subscription no `emit()` could ever reach. Since v6.2.0; up to v6.1.0 the slot was tested for truthiness alone, so that call registered a dead entry while `on(ε, 'foo', 0)` threw.
+The listener slot takes only what can be dispatched to: a function, a method name (string or symbol), or a listener object. Anything else throws — `on(ε, 'foo', 5)` fails instead of registering a subscription no `emit()` could ever reach. Since v6.0.0; up to v5.1.0 the slot was tested for truthiness alone, so that call registered a dead entry while `on(ε, 'foo', 0)` threw.
 
 ##### Multiple Event Names
 
@@ -395,7 +395,7 @@ console.log(calls); // => ["Critical", "Normal", "Low"]
 
 `Priority` provides `Max`, `Critical`, `High`, `Medium`, `Normal`, `Low`, and `Min`. The legacy aliases `AAA` (= `Critical`), `BB` (= `High`), `C` (= `Medium`), and `Default` (= `Normal`) are `@deprecated` on `EventizePriority` and slated for removal in a future major — they keep working, but editors now strike them through.
 
-A priority must be an actual number: since v6.2.0 `NaN` throws (`subscribeTo() called with a NaN priority`), in every position a priority can occupy — up to v6.1.0 it passed and left the listener wherever the size of the bucket put it. `Priority.Max` and `Priority.Min` are `±Infinity` and are perfectly valid — the guard is `Number.isNaN`, not a finiteness test. Validate at the call site, not after: `on(ε, 'foo', Number.isNaN(p) ? Priority.Normal : p, listener)` — and a `[name, priority]` tuple needs the same guard on its own second element, the call-level one does not cover it.
+A priority must be an actual number: since v6.0.0 `NaN` throws (`subscribeTo() called with a NaN priority`), in every position a priority can occupy — up to v5.1.0 it passed and left the listener wherever the size of the bucket put it. `Priority.Max` and `Priority.Min` are `±Infinity` and are perfectly valid — the guard is `Number.isNaN`, not a finiteness test. Validate at the call site, not after: `on(ε, 'foo', Number.isNaN(p) ? Priority.Normal : p, listener)` — and a `[name, priority]` tuple needs the same guard on its own second element, the call-level one does not cover it.
 
 To give each event of a multi-event subscription its own priority, pass `[eventName, priority]` tuples. Tuples and bare names may be mixed freely; a tuple's priority overrides the call-level one for that event:
 

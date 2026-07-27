@@ -568,9 +568,9 @@ describe('lifecycle', () => {
 
     // A consumed handle releases the emitter even when the call only
     // decremented a shared reference count and the surviving listener leads
-    // straight back to the emitter. That second half is new: until v6.3.0 the
-    // handle went on holding the listener, first through the `.listener`
-    // property and then through the closure capture that outlived it.
+    // straight back to the emitter. That second half is new: up to v5.1.0 the
+    // handle went on holding the listener, both through the `.listener`
+    // property and through the closure capture behind it.
     //
     // Neither helper may hand the listener back. The whole question is what
     // the *handle* still reaches, and a listener held by the test frame keeps
