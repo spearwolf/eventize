@@ -393,6 +393,12 @@ if [ "$RESOLVED" != "$EVENTIZE_VERSION" ]; then
 fi
 record_step assert-version 0 0 install.log
 echo "eventize ${RESOLVED} resolved — assertion passed"
+
+# Provisional terminator so this task is a complete, testable deliverable on
+# its own. Task 4 replaces these two lines with the typecheck/test block,
+# which ends the same way.
+write_result
+exit "$WORST"
 ```
 
 - [ ] **Step 3: Add the result writer**
