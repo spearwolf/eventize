@@ -680,7 +680,10 @@ export function retainClear<T extends object>(
   eventNames: AnyEventNames,
 ): void;
 // implementation
-export function retainClear(eventizedObj: object, eventNames: AnyEventNames): void {
+export function retainClear(
+  eventizedObj: object,
+  eventNames: AnyEventNames,
+): void {
   if (!isEventized(eventizedObj)) {
     throw new Error('object is not eventized');
   }
@@ -701,7 +704,10 @@ export function unretain<T extends object>(
   eventNames: AnyEventNames,
 ): void;
 // implementation
-export function unretain(eventizedObj: object, eventNames: AnyEventNames): void {
+export function unretain(
+  eventizedObj: object,
+  eventNames: AnyEventNames,
+): void {
   if (!isEventized(eventizedObj)) {
     throw new Error('object is not eventized');
   }

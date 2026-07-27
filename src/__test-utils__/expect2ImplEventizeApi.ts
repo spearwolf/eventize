@@ -70,7 +70,10 @@ export interface ConformityApi {
   ) => Promise<ReturnType>;
   off: (listener?: unknown, listenerObject?: unknown) => void;
   emit: (eventNames: AnyEventNames, ...args: EventArgs) => void;
-  emitAsync: (eventNames: AnyEventNames, ...args: EventArgs) => Promise<any>;
+  emitAsync: (
+    eventNames: AnyEventNames,
+    ...args: EventArgs
+  ) => Promise<any[] | undefined>;
   retain: (eventNames: AnyEventNames) => void;
   retainClear: (eventNames: AnyEventNames) => void;
   unretain: (eventNames: AnyEventNames) => void;
@@ -105,7 +108,7 @@ const emitAsyncLoose = emitAsync as (
   obj: object,
   eventNames: AnyEventNames,
   ...args: EventArgs
-) => Promise<any>;
+) => Promise<any[] | undefined>;
 const onceAsyncLoose = onceAsync as <ReturnType = void>(
   obj: object,
   eventNames: AnyEventNames,

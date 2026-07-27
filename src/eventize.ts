@@ -46,7 +46,7 @@ const emitAsyncLoose = emitAsync as (
   obj: object,
   eventNames: AnyEventNames,
   ...args: EventArgs
-) => Promise<any>;
+) => Promise<any[] | undefined>;
 const onceAsyncLoose = onceAsync as <ReturnType = void>(
   obj: object,
   eventNames: AnyEventNames,
@@ -99,7 +99,7 @@ export const eventize: EventizerFuncAPI = (() => {
       emitAsync: (
         eventNames: AnyEventNames,
         ...args: EventArgs
-      ): Promise<any> => emitAsyncLoose(obj, eventNames, ...args),
+      ): Promise<any[] | undefined> => emitAsyncLoose(obj, eventNames, ...args),
 
       retain: (eventNames: AnyEventNames): void => retainLoose(obj, eventNames),
 
@@ -156,7 +156,10 @@ export class Eventize<TEvents extends EventMap = DefaultEventMap> {
     emitLoose(this, eventNames, ...args);
   }
 
-  emitAsync(eventNames: AnyEventNames, ...args: EventArgs): Promise<any> {
+  emitAsync(
+    eventNames: AnyEventNames,
+    ...args: EventArgs
+  ): Promise<any[] | undefined> {
     return emitAsyncLoose(this, eventNames, ...args);
   }
 
