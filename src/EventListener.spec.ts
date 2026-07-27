@@ -11,8 +11,8 @@ import {
   EVENT_CATCH_EM_ALL,
   LISTENER_IS_NAMED_FUNC,
   LISTENER_IS_OBJ,
-  NAMESPACE,
 } from './constants';
+import {storeOf} from './__test-utils__/listeners';
 
 const bar = Symbol('bar');
 
@@ -110,7 +110,7 @@ describe('EventListener', () => {
       // detectListenerType() gives no tag, truthy or not. Registering the
       // listener by hand is what still puts a primitive in front of a real
       // dispatch, which is the case this asserts.
-      obj[NAMESPACE].store.add(new EventListener('toFixed', 0, 42), true);
+      storeOf(obj).add(new EventListener('toFixed', 0, 42), true);
       // Anchors the assertion below: without this, the same expectation would
       // stay green if the listener had never landed in the bucket the dispatch
       // reads. The sibling case underneath proves the path does collect.
@@ -120,7 +120,7 @@ describe('EventListener', () => {
 
     it('collects from a real listener registered the same way', async () => {
       const obj = eventize();
-      obj[NAMESPACE].store.add(
+      storeOf(obj).add(
         new EventListener('toFixed', 0, {toFixed: () => 'COLLECTED'}),
         true,
       );

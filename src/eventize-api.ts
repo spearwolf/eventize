@@ -1,6 +1,7 @@
 import type {EventListener} from './EventListener';
 import {asEventized} from './asEventized';
-import {EVENT_CATCH_EM_ALL, NAMESPACE} from './constants';
+import {EVENT_CATCH_EM_ALL} from './constants';
+import {internalsOf} from './internals';
 import {isEventized} from './isEventized';
 import {subscribeTo, subscribeToDeferred} from './subscribeTo';
 import type {
@@ -90,7 +91,7 @@ const _emitOne = (
       "emit() must be called with a concrete event name — '*' is reserved for subscribing to all events and cannot be emitted",
     );
   }
-  const {store, keeper} = eventizedObj[NAMESPACE];
+  const {store, keeper} = internalsOf(eventizedObj);
   store.forEach(eventName, (listener) =>
     listener.apply(eventName, args, returnValue),
   );
@@ -319,7 +320,7 @@ export function on<T extends object>(
 // implementation
 export function on(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
   const eventizedObj = asEventized(obj);
-  const {store, keeper} = eventizedObj[NAMESPACE];
+  const {store, keeper} = internalsOf(eventizedObj);
   return makeUnsubscribe(eventizedObj, subscribeTo(store, keeper, args));
 }
 
@@ -447,7 +448,7 @@ export function once<T extends object>(
 // implementation
 export function once(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
   const eventizedObj = asEventized(obj);
-  const {store, keeper} = eventizedObj[NAMESPACE];
+  const {store, keeper} = internalsOf(eventizedObj);
   // noDedup: each once() gets its own listener instance. Folding two one-shot
   // subscriptions into one refCounted listener left the second callAfterApply
   // overwriting the first, and the surviving handle could never release it.
@@ -544,7 +545,7 @@ export function off(
   if (!isEventized(eventizedObj)) {
     return;
   }
-  const {store, keeper} = eventizedObj[NAMESPACE];
+  const {store, keeper} = internalsOf(eventizedObj);
   const listenerType = typeof listener;
   const forceRemove =
     listenerObject != null &&
@@ -681,7 +682,7 @@ export function retain(obj: object, eventNames: AnyEventNames): void {
     );
   }
   const eventizedObj = asEventized(obj);
-  const {keeper} = eventizedObj[NAMESPACE];
+  const {keeper} = internalsOf(eventizedObj);
   keeper.add(eventNames);
 }
 
@@ -701,7 +702,7 @@ export function retainClear(
   if (!isEventized(eventizedObj)) {
     throw new Error('object is not eventized');
   }
-  const {keeper} = eventizedObj[NAMESPACE];
+  const {keeper} = internalsOf(eventizedObj);
   if (hasWildcard(eventNames)) {
     keeper.clearAll();
     return;
@@ -725,7 +726,7 @@ export function unretain(
   if (!isEventized(eventizedObj)) {
     throw new Error('object is not eventized');
   }
-  const {keeper} = eventizedObj[NAMESPACE];
+  const {keeper} = internalsOf(eventizedObj);
   if (hasWildcard(eventNames)) {
     keeper.removeAll();
     return;

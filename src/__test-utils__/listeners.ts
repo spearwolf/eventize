@@ -1,4 +1,4 @@
-import {NAMESPACE} from '../constants';
+import {internalsOf} from '../internals';
 
 import type {EventListener} from '../EventListener';
 import type {EventStore} from '../EventStore';
@@ -27,13 +27,13 @@ import type {EventMap, EventName, EventizedObject} from '../types';
 /** The emitter's listener registry, without an `as any` at the call site. */
 export const storeOf = <T extends EventMap>(
   obj: EventizedObject<T>,
-): EventStore => obj[NAMESPACE].store;
+): EventStore => internalsOf(obj).store;
 
 /** Every registered listener, named buckets first, then the wildcard bucket. */
 export const allListeners = <T extends EventMap>(
   obj: EventizedObject<T>,
 ): EventListener[] => {
-  const {store} = obj[NAMESPACE];
+  const {store} = internalsOf(obj);
   return [
     ...Array.from(store.namedListeners.values()).flat(),
     ...store.catchEmAllListeners,
@@ -50,7 +50,7 @@ export const listenersOf = <T extends EventMap>(
   obj: EventizedObject<T>,
   eventName: EventName,
 ): EventListener[] => {
-  const {store} = obj[NAMESPACE];
+  const {store} = internalsOf(obj);
   return eventName === '*'
     ? [...store.catchEmAllListeners]
     : [...store.getListenersForEventName(eventName)];

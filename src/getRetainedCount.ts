@@ -1,12 +1,10 @@
 import type {EventKeeper} from './EventKeeper';
-import {NAMESPACE} from './constants';
+import {internalsOf} from './internals';
 import {isEventized} from './isEventized';
-import type {EventizedObject, EventName} from './types';
+import type {EventName} from './types';
 
 const keeperOf = (o: object): EventKeeper | undefined =>
-  isEventized(o)
-    ? ((o as EventizedObject)[NAMESPACE]?.keeper as EventKeeper | undefined)
-    : undefined;
+  isEventized(o) ? internalsOf(o).keeper : undefined;
 
 /**
  * How many events currently hold a retained value.

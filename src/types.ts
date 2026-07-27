@@ -1,5 +1,3 @@
-import type {EventKeeper} from './EventKeeper';
-import type {EventStore} from './EventStore';
 import type {NAMESPACE} from './constants';
 
 export type EventName = string | symbol;
@@ -72,12 +70,21 @@ export type ArgsFor<T, K> = K extends keyof T
   : EventArgs;
 
 declare const __TEventsBrand: unique symbol;
+declare const __EventizeInternalsBrand: unique symbol;
 
+/**
+ * The marker slot, deliberately opaque. What actually sits here is the
+ * `EventizeInternals` of `src/internals.ts` — the `EventStore` and the
+ * `EventKeeper`. Declaring that shape inline made both classes, and through
+ * the store the `EventListener` too, reachable from this exported type, so
+ * tsup inlined all three into `lib/index.d.ts`. Nothing outside could use
+ * them: the key is a non-exported `unique symbol`, so the slot answered
+ * `TS7053` from a consumer's side either way. The boundary already held in
+ * practice; now it holds in the types. Internal readers go through
+ * `internalsOf()`.
+ */
 export interface EventizedObject<TEvents extends EventMap = DefaultEventMap> {
-  [NAMESPACE]: {
-    keeper: EventKeeper;
-    store: EventStore;
-  };
+  [NAMESPACE]: {readonly [__EventizeInternalsBrand]: true};
   // Phantom field — never present at runtime. Exists only at the type level
   // so the generic parameter `TEvents` is preserved through TS structural
   // matching and so inference binds `TEvents` to the user-supplied event map
