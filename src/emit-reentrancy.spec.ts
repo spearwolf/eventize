@@ -1,6 +1,6 @@
 import {fake} from 'sinon';
 
-import {emit, eventize, getSubscriptionCount, off, on} from './index';
+import {emit, eventize, getSubscriptionCount, off, on, retain} from './index';
 
 describe('emit() re-entrancy (sub/unsub during dispatch)', () => {
   describe('unsubscribe during emit', () => {
@@ -242,6 +242,62 @@ describe('emit() re-entrancy (sub/unsub during dispatch)', () => {
       emit(ε, 'foo');
 
       expect(calls).toEqual(['a', 'b', 'c']);
+    });
+  });
+
+  describe('retain order under nested emit()', () => {
+    // _emitOne() (eventize-api.ts) calls keeper.retain() only *after*
+    // store.forEach() returns — that ordering is what lets a throwing
+    // listener leave the previously retained value untouched (docs/retain.md:
+    // "the retain write happens after all listeners have run"). The same
+    // ordering has a broader consequence than same-event recursion: *any*
+    // emit() call that is still nested inside another when it finishes
+    // writes its retain state before the enclosing call does, regardless of
+    // whether the two calls share an event name. The ordinary way to nest
+    // one emit() inside another is forwarding — a listener that relays one
+    // event as another, synchronously, before returning.
+    it('retains forwarded events in completion order, not emission order, when a listener forwards to a different event', () => {
+      const ε = eventize();
+      retain(ε, 'a');
+      retain(ε, 'b');
+
+      // 'a' forwards to 'b' — the emit(ε, 'b', …) call is nested inside the
+      // 'a' dispatch and returns (and retains) before it does.
+      on(ε, 'a', () => emit(ε, 'b', 'B'));
+
+      emit(ε, 'a', 'A');
+
+      const seen: string[] = [];
+      // A wildcard function listener never receives the event name — a
+      // listener-object with .emit() does, and doubles as the catch-all
+      // fallback for names it has no dedicated method for.
+      on(ε, {emit: (name: string) => seen.push(name)});
+
+      // 'b' was retained first (the inner, forwarded call finished first),
+      // 'a' second (the outer call finished last) — the reverse of the
+      // order the two events were actually emitted in.
+      expect(seen).toEqual(['b', 'a']);
+    });
+
+    // Self-recursion — a listener re-emitting the *same* event name — is
+    // the special case where the rule above is most surprising, because
+    // both nested calls compete for a single retained slot instead of two.
+    it('retains the outermost call’s args, not the innermost, after a listener re-emits the same event', () => {
+      const ε = eventize();
+      retain(ε, 'ping');
+
+      on(ε, 'ping', (value: number) => {
+        if (value < 2) {
+          emit(ε, 'ping', value + 1);
+        }
+      });
+
+      emit(ε, 'ping', 0);
+
+      const seen: number[] = [];
+      on(ε, 'ping', (value: number) => seen.push(value));
+
+      expect(seen).toEqual([0]);
     });
   });
 });

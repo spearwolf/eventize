@@ -11,7 +11,7 @@ Key behaviors:
 - Calling `retain()` on a non-eventized object automatically eventizes it.
 - Only the **last** emission is retained; later ones overwrite it.
 - Retained events are delivered to new subscribers synchronously, during `on()`.
-- With several retained events, a new subscriber receives them in original emission order.
+- With several retained events, a new subscriber receives them in completion order — the order in which each event's `emit()` call returned, not the order in which the calls started. The two coincide only when no `emit()` call is nested inside another. Nesting is not a corner case: any listener that itself calls `emit()` before returning — most commonly a forwarding listener, `on(upstream, downstream)`, relaying one event onto another — reverses completion order relative to start order for the events involved. See below.
 - String and symbol event names both work.
 
 ```javascript
@@ -95,6 +95,69 @@ console.log(result); // => { ready: true }
 - Calling `retain()` repeatedly for the same event is idempotent.
 - New wildcard (`*`) subscribers also receive retained events.
 - A throwing listener leaves the previously retained value untouched — the retain write happens after all listeners have run.
+
+### Retain order under nested `emit()`
+
+The previous point — the retain write sits *after* dispatch — has a
+consequence that reaches well past self-recursion: **any** `emit()` call
+that runs to completion while nested inside another — a listener calling
+`emit()` before it returns, on any target and any event name — writes its
+retained state before the call that contains it does. Completion order is
+inside-out, the reverse of start order, for every pair of events caught up
+in a nesting. The ordinary way this happens is forwarding: a listener that
+relays one event as another, whether onto the same object or onto a
+downstream emitter (`on(upstream, downstream)` — see the pitfalls list in
+`skills/using-eventize/SKILL.md`). No shared event name and no
+self-reference are required, just one `emit()` call that hasn't returned
+yet when another one starts:
+
+```js
+const ε = eventize();
+retain(ε, 'a');
+retain(ε, 'b');
+
+on(ε, 'a', () => emit(ε, 'b', 'B')); // 'a' forwards to 'b'
+
+emit(ε, 'a', 'A');
+
+const seen = [];
+// a wildcard function listener never receives the event name (see the
+// pitfalls list) — a listener-object with .emit() does, and is also the
+// catch-all fallback for names it has no method for
+on(ε, {emit: (name, value) => seen.push([name, value])});
+
+console.log(seen);
+// => [['b', 'B'], ['a', 'A']]
+// 'b' retained first (the inner, forwarded call), 'a' second (the outer
+// call) — even though 'a' was emitted first and 'b' only as a consequence
+// of it
+```
+
+Self-recursion — a listener re-emitting the *same* event name before
+returning — is the special case where this rule is most surprising, because
+here the nested calls share one retained slot instead of two, so only the
+last write is visible at all: `emit(ε, 'ping', 0)` with a listener that, on
+receiving a value below 2, calls `emit(ε, 'ping', value + 1)` again before
+returning. The innermost call (`value === 2`) finishes and writes first,
+then each enclosing call overwrites that write as the recursion unwinds, and
+the outermost call (`value === 0`) writes last. A subscriber added
+afterwards sees `0`, not `2` — the same "after" rule as above, just with
+both nested calls competing for the same slot instead of two different
+ones:
+
+```js
+const ε = eventize();
+retain(ε, 'ping');
+
+on(ε, 'ping', (value) => {
+  if (value < 2) emit(ε, 'ping', value + 1);
+});
+
+emit(ε, 'ping', 0);
+
+on(ε, 'ping', (value) => console.log(value));
+// => 0   (the outermost call's args, not the innermost 2)
+```
 
 `'*'` is subscribe-only. `retain(ε, '*')` throws, matching `emit()`. On
 `unretain()` and `retainClear()` the wildcard means *all retained events*:
