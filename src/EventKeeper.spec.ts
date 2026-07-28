@@ -293,13 +293,15 @@ describe('EventKeeper', () => {
     expect(keeper.events.size).toBe(0);
   });
 
-  it('replayTo skips a wildcard name inside eventNames instead of recursing', () => {
+  it('replayTo skips a wildcard name inside events instead of recursing', () => {
     const keeper = new EventKeeper();
 
     // retain() rejects '*' since v5.2, so this can only be reached by seeding
-    // eventNames by hand. Without the isCatchEmAll guard in the catch-em-all
-    // branch, replayTo('*') walks into itself here and blows the stack.
-    keeper.eventNames.add('*');
+    // `events` by hand — since PERF-002, the catch-em-all branch walks
+    // `events` (not `eventNames`), so that's the structure the isCatchEmAll
+    // guard now has to protect. Without it, a '*' entry here would recurse
+    // into itself and blow the stack.
+    keeper.events.set('*', {order: -1, args: []});
     keeper.add('foo');
     keeper.retain('foo', ['payload']);
 
@@ -317,5 +319,25 @@ describe('EventKeeper', () => {
     const replayedNames = emitter.apply.mock.calls.map((c) => c[0]);
     expect(replayedNames).toContain('foo');
     expect(replayedNames).not.toContain('*');
+  });
+
+  // PERF-002: replayTo('*') must replay exactly what's in `events`, no more
+  // and no less, regardless of how many retain policies exist alongside it.
+  // This pins result equivalence, not iteration cost — a bulk of policies
+  // with a single retained value must still produce a single replay.
+  it('replayTo(*) replays only the retained values, unaffected by the number of policies', () => {
+    const keeper = new EventKeeper();
+
+    const names = Array.from({length: 200}, (_, i) => `policy-${i}`);
+    keeper.add(names);
+
+    // only one of the many known policies actually holds a retained value
+    keeper.retain('policy-137', ['onlyValue']);
+
+    const emitter = {apply: jest.fn()};
+    EventKeeper.publish(keeper.replayTo('*', emitter));
+
+    expect(emitter.apply).toHaveBeenCalledTimes(1);
+    expect(emitter.apply.mock.calls[0]).toEqual(['policy-137', ['onlyValue']]);
   });
 });

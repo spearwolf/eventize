@@ -82,7 +82,15 @@ export class EventKeeper {
         });
       }
     } else {
-      this.eventNames.forEach((name) => {
+      // Iterate the retained values, not the retain policies: every entry in
+      // `events` has a policy by construction — retain() only ever writes
+      // one that's already known — so this visits the same names as
+      // `eventNames` would, minus the ones with no value to replay. Cost is
+      // O(retained values), not O(policies).
+      //
+      // Map#forEach's callback is (value, key) — `name` is the second
+      // argument here, unlike the `eventNames` Set this replaced.
+      this.events.forEach((_event, name) => {
         // '*' can never be a retained name — retain() rejects it — but the
         // guard costs nothing and stops any future path that lets it in from
         // recursing through this branch forever.
