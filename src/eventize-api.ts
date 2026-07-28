@@ -567,13 +567,20 @@ export function off(
     return;
   }
 
-  if (Array.isArray(listener)) {
+  if (listenerObject == null && Array.isArray(listener)) {
     // Only the event-name elements are meaningful to the keeper. Arrays reach
     // this branch from two directions: an explicit off(ε, [name, …]) call, and
     // the unsubscribe function returned by a multi-event on(), which passes an
     // array of EventListener instances. Filtering by isEventName keeps symbol
     // event names — which the old `typeof === 'string'` test silently dropped —
     // while still ignoring listener instances.
+    //
+    // The listenerObject == null guard mirrors EventStore.remove(): its array
+    // branch requires the same condition, so off(ε, [names], listenerObject)
+    // falls through to removeByListener(), where an array never matches a
+    // listener identity and nothing is unsubscribed. Without this guard the
+    // keeper cleared retained state for a call shape that detached no
+    // listener at all (COR-001).
     keeper.remove(listener.filter(isEventName));
   } else if (isEventName(listener)) {
     keeper.remove(listener);

@@ -466,6 +466,38 @@ describe('off()', () => {
     });
   });
 
+  // COR-001: the array branch of off() requires listenerObject == null before
+  // it does anything to the store (EventStore.remove() falls through to
+  // removeByListener(), and an array never matches a listener identity — so
+  // nothing is unsubscribed). The keeper branch used to miss that condition
+  // and cleared retained state regardless, making this call shape unretain
+  // events it never actually unsubscribed from.
+  describe('by array of eventNames and listenerObject', () => {
+    it('off(ε, [names], listenerObject) is a full no-op: neither store nor keeper change', () => {
+      const ε = eventize();
+      const listenerObject = {foo: fake(), a: fake(), b: fake()};
+
+      on(ε, 'foo', listenerObject);
+      retain(ε, 'a');
+      retain(ε, 'b');
+      emit(ε, 'a', 1);
+      emit(ε, 'b', 2);
+
+      expect(getSubscriptionCount(ε)).toBe(1);
+      expect(getRetainedCount(ε)).toBe(2);
+      expect(getRetainedEventNames(ε)).toEqual(['a', 'b']);
+
+      off(ε, ['a', 'b'], listenerObject);
+
+      expect(getSubscriptionCount(ε)).toBe(1);
+      expect(getRetainedCount(ε)).toBe(2);
+      expect(getRetainedEventNames(ε)).toEqual(['a', 'b']);
+
+      emit(ε, 'foo');
+      expect(listenerObject.foo.callCount).toBe(1);
+    });
+  });
+
   describe('using unsubscribe function', () => {
     it('unsubscribe function from on() removes the listener', () => {
       const ε = eventize();
