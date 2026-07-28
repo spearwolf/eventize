@@ -142,20 +142,24 @@ export class EventListener {
   /**
    * In the test for equality, the priority is not considered.
    *
-   * Two shapes only: the listener instance itself — which is what
-   * `EventStore.removeSimilarListenersFromArray()` hands in — or the
-   * `(listener, listenerObject)` pair a subscription was registered with.
+   * One shape: the `(listener, listenerObject)` pair a subscription was
+   * registered with. The sole caller is `EventStore.removeByListener()`, the
+   * last fall-through in `EventStore.remove()`.
    *
-   * There used to be two more. A match on the numeric `id` let
+   * There used to be three more, all deleted for the same reason — no reachable
+   * caller could ever take them. A match on the numeric `id` let
    * `off(ε, unsub.listener.id)` remove a subscription while skipping the
-   * reference count every documented removal path honours, and an event-name
-   * branch was unreachable: `EventStore.remove()` routes a name with no
-   * listener object to `removeByEventName()`, and `off()` sets `forceRemove`
-   * for a name *with* one, so the only caller of `isEqual()` on that path
-   * never sees a string or symbol here.
+   * reference count every documented removal path honours. An event-name branch
+   * could not be reached: `remove()` routes a name with no listener object to
+   * `removeByEventName()`, and `off()` sets `forceRemove` for a name *with*
+   * one, so neither shape arrives here. And a match on the listener instance
+   * itself lost its last caller in v6.0.0, when association-matching removal
+   * stopped collecting its victims and handing each one back in for an identity
+   * search — it tests and splices in a single pass now — while `remove()` routes
+   * an `EventListener` to `removeByEventListener()` two branches before this
+   * method is reachable at all.
    */
   isEqual(listener: unknown, listenerObject: unknown = null): boolean {
-    if (listener === this) return true;
     return this.listener === listener && this.listenerObject === listenerObject;
   }
 

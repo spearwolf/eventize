@@ -212,7 +212,7 @@ describe('off()', () => {
   });
 
   // off(ε, listenerObject) promises "every subscription of that object", and
-  // removeListenerFromArray used to splice only the first findIndex match per
+  // the store's removal used to splice only the first findIndex match per
   // bucket. Anything that can put two similar listeners into one bucket — two
   // once() calls (v6.0.0), or two on() calls at differing priorities (always) —
   // left the rest subscribed and still firing.
@@ -794,7 +794,7 @@ describe('off()', () => {
     });
 
     // Boundary 3: reference counting behaves exactly as in the named case —
-    // removeSimilarListenersFromArray() detaches outright, refCount is not
+    // the association-matching removal path detaches outright, refCount is not
     // consulted, so one off() call releases both on() registrations.
     it("off(ε, '*', ctx) releases a refCount-2 registration in one call, as the named form does", () => {
       const wildcardEmitter = eventize();

@@ -366,17 +366,540 @@ describe('EventStore', () => {
     });
   });
 
+  // PERF-001. Up to v5.1.0 forEach() protected its walk by copying the bucket
+  // before every dispatch — one allocation per emit, whether or not anything
+  // mutated. Since v6.0.0 the copy moved to the mutating side: a walk declares
+  // the one or two arrays it is stepping through, and a path that changes one
+  // of *those* clones it, swaps the clone into the store and leaves the walk
+  // holding the old array. Everything else in the store — every bucket no walk
+  // is holding — changes in place, whether or not a dispatch is running.
+  // Bucket identity is the only externally visible trace of that; every other
+  // spec in this repo asserts dispatch behaviour, which the rewrite leaves
+  // untouched by construction. Without these cases the whole thing is
+  // invisible and the next refactor puts the copy back.
+  describe('clone-on-mutate: a bucket is copied only when a dispatch mutates it', () => {
+    it('reuses the named bucket across a dispatch that mutates nothing', () => {
+      const store = new EventStore();
+      store.add(new EventListener('foo', 0, () => {}));
+      const before = store.namedListeners.get('foo');
+
+      store.forEach('foo', () => {});
+      store.forEach('foo', () => {});
+
+      expect(store.namedListeners.get('foo')).toBe(before);
+    });
+
+    it('reuses the wildcard bucket across a dispatch that mutates nothing', () => {
+      const store = new EventStore();
+      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}));
+      const before = store.catchEmAllListeners;
+
+      store.forEach('foo', () => {});
+
+      expect(store.catchEmAllListeners).toBe(before);
+    });
+
+    it('reuses both buckets across a mutation-free merge dispatch', () => {
+      const store = new EventStore();
+      store.add(new EventListener('foo', 0, () => {}));
+      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}));
+      const beforeNamed = store.namedListeners.get('foo');
+      const beforeWildcard = store.catchEmAllListeners;
+
+      const seen: EventListener[] = [];
+      store.forEach('foo', (l) => seen.push(l));
+
+      expect(seen).toHaveLength(2);
+      expect(store.namedListeners.get('foo')).toBe(beforeNamed);
+      expect(store.catchEmAllListeners).toBe(beforeWildcard);
+    });
+
+    it('replaces the named bucket when a listener subscribes mid-dispatch', () => {
+      const store = new EventStore();
+      store.add(new EventListener('foo', 10, () => {}));
+      const before = store.namedListeners.get('foo');
+
+      store.forEach('foo', () => {
+        store.add(new EventListener('foo', 5, () => {}));
+      });
+
+      const after = store.namedListeners.get('foo');
+      expect(after).not.toBe(before);
+      // The walk kept the array it started on — which is exactly why the
+      // listener added mid-dispatch does not run in the current emit.
+      expect(before).toHaveLength(1);
+      expect(after).toHaveLength(2);
+    });
+
+    it('replaces the named bucket when a listener unsubscribes mid-dispatch', () => {
+      const store = new EventStore();
+      store.add(new EventListener('foo', 10, () => {}));
+      const doomed = store.add(new EventListener('foo', 5, () => {}));
+      const before = store.namedListeners.get('foo');
+
+      let dispatched = 0;
+      store.forEach('foo', () => {
+        dispatched += 1;
+        store.remove(doomed, null);
+      });
+
+      const after = store.namedListeners.get('foo');
+      expect(after).not.toBe(before);
+      expect(before).toHaveLength(2);
+      expect(after).toHaveLength(1);
+      // Both entries of the old array are still walked; `doomed` is skipped by
+      // EventListener.apply()'s isRemoved check, not by the array shrinking.
+      expect(dispatched).toBe(2);
+    });
+
+    it('replaces the wildcard bucket when a wildcard listener unsubscribes mid-dispatch', () => {
+      const store = new EventStore();
+      store.add(new EventListener(EVENT_CATCH_EM_ALL, 10, () => {}));
+      const doomed = store.add(
+        new EventListener(EVENT_CATCH_EM_ALL, 5, () => {}),
+      );
+      const before = store.catchEmAllListeners;
+
+      store.forEach('foo', () => {
+        store.remove(doomed, null);
+      });
+
+      expect(store.catchEmAllListeners).not.toBe(before);
+      expect(before).toHaveLength(2);
+      expect(store.catchEmAllListeners).toHaveLength(1);
+    });
+
+    it('replaces both buckets when everything is removed mid-dispatch', () => {
+      const store = new EventStore();
+      store.add(new EventListener('foo', 10, () => {}));
+      store.add(new EventListener('foo', 5, () => {}));
+      store.add(new EventListener(EVENT_CATCH_EM_ALL, 7, () => {}));
+      const beforeNamed = store.namedListeners.get('foo');
+      const beforeWildcard = store.catchEmAllListeners;
+
+      store.forEach('foo', () => {
+        store.remove(null, null); // off(ε)
+      });
+
+      expect(store.getSubscriptionCount()).toBe(0);
+      // The named entry is gone from the map entirely; the wildcard array is a
+      // fixed member, so it is swapped for a fresh one instead of truncated.
+      expect(store.namedListeners.has('foo')).toBe(false);
+      expect(store.catchEmAllListeners).not.toBe(beforeWildcard);
+      // Neither of the arrays the walk is holding was truncated under it.
+      expect(beforeNamed).toHaveLength(2);
+      expect(beforeWildcard).toHaveLength(1);
+    });
+
+    // The cases above only say *that* the bucket was replaced. The ones below
+    // say how often, and for which buckets — which is the whole difference
+    // between clone-on-mutate and a version of the copy it replaced that is
+    // merely rearranged, or quadratic. n mutations in one dispatch must cost
+    // one clone, not n; and k *other* buckets touched by that dispatch must
+    // cost nothing at all. Without these, a store that clones per mutation, or
+    // one that clones every bucket it touches while any walk is running,
+    // passes every other spec in this repo.
+    it('clones a bucket once per walk, not once per mutation', () => {
+      const store = new EventStore();
+      store.add(new EventListener('foo', 10, () => {}));
+      const before = store.namedListeners.get('foo');
+
+      let afterFirst: EventListener[] | undefined;
+      store.forEach('foo', () => {
+        store.add(new EventListener('foo', 5, () => {}));
+        afterFirst = store.namedListeners.get('foo');
+        store.add(new EventListener('foo', 4, () => {}));
+        store.add(new EventListener('foo', 3, () => {}));
+      });
+
+      expect(afterFirst).not.toBe(before);
+      // The second and third mutation land in the clone the first one made —
+      // no running walk is holding it, so there is nothing to protect.
+      expect(store.namedListeners.get('foo')).toBe(afterFirst);
+      expect(before).toHaveLength(1);
+      expect(afterFirst).toHaveLength(4);
+    });
+
+    it('clones again once a nested walk has taken the clone over', () => {
+      const store = new EventStore();
+      store.add(new EventListener('foo', 10, () => {}));
+      const original = store.namedListeners.get('foo');
+
+      let outerClone: EventListener[] | undefined;
+      let innerClone: EventListener[] | undefined;
+      store.forEach('foo', () => {
+        store.add(new EventListener('foo', 5, () => {}));
+        outerClone = store.namedListeners.get('foo');
+        store.forEach('foo', () => {
+          // This nested walk started *after* the clone was installed, so it is
+          // holding it and the clone is no longer free to change.
+          store.add(new EventListener('foo', 4, () => {}));
+          innerClone = store.namedListeners.get('foo');
+        });
+      });
+
+      expect(outerClone).not.toBe(original);
+      expect(innerClone).not.toBe(outerClone);
+      expect(outerClone).toHaveLength(2);
+    });
+
+    // A clone is free to change only until some walk picks it up. Both nested
+    // walks below run at the same nesting depth and inside the same dispatch
+    // tree, so anything that decides "this array is safe" from the depth it
+    // was created at, or from "the store made it during this dispatch", hands
+    // the second walk an array it is itself stepping through.
+    it('clones again for a second nested walk over the first one’s clone', () => {
+      const store = new EventStore();
+      store.add(new EventListener('outer', 0, () => {}));
+      store.add(new EventListener('inner', 0, () => {}));
+
+      let firstClone: EventListener[] | undefined;
+      let secondClone: EventListener[] | undefined;
+      store.forEach('outer', () => {
+        store.forEach('inner', () => {
+          store.add(new EventListener('inner', -1, () => {}));
+          firstClone = store.namedListeners.get('inner');
+        });
+        // The first nested walk is over; this one is new, and it grabs the
+        // clone that walk left behind.
+        store.forEach('inner', () => {
+          store.add(new EventListener('inner', -2, () => {}));
+          secondClone = store.namedListeners.get('inner');
+        });
+      });
+
+      expect(firstClone).not.toBe(secondClone);
+      // Untouched by the second walk's mutations — which is the point.
+      expect(firstClone).toHaveLength(2);
+      // The second walk runs over those two entries, so it mutates twice: the
+      // first add clones, the second lands in that clone.
+      expect(secondClone).toHaveLength(4);
+    });
+
+    it('clones each of the two buckets it walks at most once', () => {
+      const store = new EventStore();
+      store.add(new EventListener('foo', 10, () => {}));
+      const namedDoomed = store.add(new EventListener('foo', 5, () => {}));
+      const wildcardDoomed = store.add(
+        new EventListener(EVENT_CATCH_EM_ALL, 7, () => {}),
+      );
+
+      let step = 0;
+      let namedAfterFirst: EventListener[] | undefined;
+      // Dispatch order: named@10, wildcard@7, named@5 — one mutation each, and
+      // the third one returns to the bucket the first one cloned.
+      store.forEach('foo', () => {
+        step += 1;
+        if (step === 1) {
+          store.remove(namedDoomed, null);
+          namedAfterFirst = store.namedListeners.get('foo');
+        } else if (step === 2) {
+          store.remove(wildcardDoomed, null);
+        } else {
+          store.add(new EventListener('foo', 1, () => {}));
+        }
+      });
+
+      expect(step).toBe(3);
+      // The wildcard bucket cloned in between must not have displaced what the
+      // store knows about the named one — otherwise the third mutation clones
+      // a second time and the per-walk bound only holds for one bucket at a
+      // time.
+      expect(store.namedListeners.get('foo')).toBe(namedAfterFirst);
+    });
+
+    // The other half of the bound, and the one PERF-001 was nearly lost on: a
+    // walk holds its own two arrays and nothing else, so every other bucket a
+    // dispatch touches changes in place. A store that copies whichever bucket
+    // it is about to change "because a dispatch is running" pays one copy per
+    // *mutated* bucket instead of one per *walked* bucket — and off(ε, obj)
+    // from a teardown listener, the documented cleanup form, walks the lot.
+    it('does not clone a bucket no walk is holding', () => {
+      const store = new EventStore();
+      const context = {};
+      store.add(new EventListener('go', 0, () => {}));
+      for (const name of ['a', 'b', 'c']) {
+        store.add(new EventListener(name, 0, NOOP, context));
+      }
+      const before = {
+        go: store.namedListeners.get('go'),
+        a: store.namedListeners.get('a'),
+        b: store.namedListeners.get('b'),
+        c: store.namedListeners.get('c'),
+      };
+
+      store.forEach('go', () => {
+        store.remove(context, null);
+      });
+
+      // 'a', 'b' and 'c' emptied in place — the arrays captured above are the
+      // ones that were spliced. A clone would have left each of them holding
+      // its listener and moved the emptying into a copy nobody can see.
+      expect(before.a).toHaveLength(0);
+      expect(before.b).toHaveLength(0);
+      expect(before.c).toHaveLength(0);
+      expect(store.namedListeners.has('a')).toBe(false);
+      // 'go' is the bucket the walk is stepping through, so that one *is*
+      // cloned — the removal must not shrink it under the running walk.
+      expect(before.go).toHaveLength(1);
+    });
+
+    it('does not clone anything when a dispatch only subscribes to other events', () => {
+      const store = new EventStore();
+      store.add(new EventListener('go', 0, () => {}));
+      const names = ['n0', 'n1', 'n2', 'n3', 'n4'];
+      for (const name of names) store.add(new EventListener(name, 0, () => {}));
+      const before = names.map((n) => store.namedListeners.get(n));
+
+      store.forEach('go', () => {
+        for (const name of names) {
+          store.add(new EventListener(name, -1, () => {}));
+        }
+      });
+
+      names.forEach((name, i) => {
+        expect(store.namedListeners.get(name)).toBe(before[i]);
+        expect(before[i]).toHaveLength(2);
+      });
+    });
+
+    // Nesting is not a stack of one: the enclosing walks are still stepping
+    // through their own arrays, and a mutation from the innermost callback has
+    // to answer for all of them. An implementation that only remembers the
+    // innermost walk's two buckets splices `outer` under the walk that is
+    // reading it.
+    it('clones an enclosing walk’s bucket when a nested walk mutates it', () => {
+      const store = new EventStore();
+      store.add(new EventListener('outer', 10, () => {}));
+      const doomed = store.add(new EventListener('outer', 5, () => {}));
+      store.add(new EventListener('inner', 0, () => {}));
+      const before = store.namedListeners.get('outer');
+
+      let dispatched = 0;
+      let step = 0;
+      store.forEach('outer', () => {
+        dispatched += 1;
+        if (++step > 1) return;
+        store.forEach('inner', () => {
+          store.remove(doomed, null);
+        });
+      });
+
+      expect(store.namedListeners.get('outer')).not.toBe(before);
+      expect(before).toHaveLength(2);
+      // Both entries of the array the outer walk started on are still visited;
+      // `doomed` is skipped by EventListener.apply()'s isRemoved check.
+      expect(dispatched).toBe(2);
+    });
+
+    // An empty bucket is not walked, so no walk holds it and a mid-dispatch
+    // subscription goes straight in. The dispatch still does not see the new
+    // listener — forEach() never looks at that array again — and the emitter
+    // is spared a copy of an array with nothing in it.
+    it('does not clone an empty wildcard bucket the walk skipped', () => {
+      const store = new EventStore();
+      store.add(new EventListener('foo', 0, () => {}));
+      const before = store.catchEmAllListeners;
+      const seen: EventListener[] = [];
+
+      store.forEach('foo', (l) => {
+        seen.push(l);
+        store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}));
+      });
+
+      expect(seen).toHaveLength(1);
+      expect(store.catchEmAllListeners).toBe(before);
+      expect(before).toHaveLength(1);
+    });
+
+    // Held-ness rides on the bucket, so a bucket has to carry it from the
+    // moment it exists. An array that reaches the registry without the field
+    // reads as held — `undefined === 0` is false — and buys itself one copy it
+    // does not owe, which then installs a well-formed clone and hides the
+    // mistake for good. Both places a bucket is born from nothing are checked
+    // here; the third, the clone in bucketForMutation(), is covered by the
+    // copy-count cases above, which go red three at a time without it.
+    it('mutates a freshly created bucket in place — no dispatch, no copy', () => {
+      const store = new EventStore();
+
+      const named = store.getListenersForEventName('foo');
+      store.add(new EventListener('foo', 0, () => {}));
+      expect(store.namedListeners.get('foo')).toBe(named);
+
+      const wildcards = store.catchEmAllListeners;
+      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}));
+      expect(store.catchEmAllListeners).toBe(wildcards);
+    });
+
+    it('mutates the wildcard bucket a mid-dispatch off(ε) installed in place', () => {
+      const store = new EventStore();
+      store.add(new EventListener('foo', 0, () => {}));
+      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}));
+
+      let step = 0;
+      let fresh: Array<EventListener> | undefined;
+      store.forEach('foo', () => {
+        if (++step > 1) return;
+        store.remove(null, null); // off(ε) — hands the store a fresh bucket
+        fresh = store.catchEmAllListeners;
+        store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}));
+      });
+
+      expect(fresh).not.toBe(undefined);
+      expect(store.catchEmAllListeners).toBe(fresh);
+      expect(fresh).toHaveLength(1);
+    });
+
+    // Held-ness is a count on the bucket, not a mark. Both walks below are
+    // stepping through the same array, so the inner one's exit takes back its
+    // own claim and no more — anything that clears the state outright hands
+    // the mutation an array the outer walk is still reading.
+    it('still clones after a nested walk over the same bucket has returned', () => {
+      const store = new EventStore();
+      store.add(new EventListener('foo', 10, () => {}));
+      const before = store.namedListeners.get('foo');
+
+      let step = 0;
+      store.forEach('foo', () => {
+        if (++step > 1) return;
+        store.forEach('foo', () => {});
+        store.add(new EventListener('foo', 5, () => {}));
+      });
+
+      expect(store.namedListeners.get('foo')).not.toBe(before);
+      expect(before).toHaveLength(1);
+      expect(store.namedListeners.get('foo')).toHaveLength(2);
+    });
+
+    it('still clones after a nested dispatch has returned', () => {
+      const store = new EventStore();
+      store.add(new EventListener('outer', 0, () => {}));
+      store.add(new EventListener('inner', 0, () => {}));
+      const before = store.namedListeners.get('outer');
+
+      store.forEach('outer', () => {
+        // The nested walk finishes first. Its exit must hand the enclosing
+        // walk's buckets back, not declare the store free of walks — the outer
+        // one is still running over 'outer'.
+        store.forEach('inner', () => {});
+        store.add(new EventListener('outer', -1, () => {}));
+      });
+
+      expect(store.namedListeners.get('outer')).not.toBe(before);
+      expect(before).toHaveLength(1);
+    });
+
+    // One removal call can take several entries out of one bucket — the same
+    // object subscribed at two priorities, two once() registrations, the same
+    // function twice. The first of them owes the clone; the rest have to land
+    // in it, and the loop that does the splicing has to notice that it already
+    // switched arrays. Getting that wrong copies per removed entry, or worse,
+    // splices the second one out of the array the walk is reading.
+    it('clones once when off(ε, listenerObject) takes several entries out of the walked bucket', () => {
+      const store = new EventStore();
+      const context = {};
+      store.add(new EventListener('foo', 10, () => {}));
+      store.add(new EventListener('foo', 5, NOOP, context));
+      store.add(new EventListener('foo', 4, NOOP, context));
+      const before = store.namedListeners.get('foo');
+
+      let afterFirst: EventListener[] | undefined;
+      let dispatched = 0;
+      store.forEach('foo', () => {
+        dispatched += 1;
+        if (dispatched > 1) return;
+        store.remove(context, null);
+        afterFirst = store.namedListeners.get('foo');
+      });
+
+      expect(afterFirst).not.toBe(before);
+      expect(store.namedListeners.get('foo')).toBe(afterFirst);
+      expect(afterFirst).toHaveLength(1);
+      expect(before).toHaveLength(3);
+      expect(dispatched).toBe(3);
+    });
+
+    it('clones once when off(ε, name, listenerObject) takes several entries out of the walked bucket', () => {
+      const store = new EventStore();
+      const context = {};
+      store.add(new EventListener('foo', 10, () => {}));
+      store.add(new EventListener('foo', 5, NOOP, context));
+      store.add(new EventListener('foo', 4, NOOP, context));
+      const before = store.namedListeners.get('foo');
+
+      let afterFirst: EventListener[] | undefined;
+      let dispatched = 0;
+      store.forEach('foo', () => {
+        dispatched += 1;
+        if (dispatched > 1) return;
+        store.remove('foo', context, true);
+        afterFirst = store.namedListeners.get('foo');
+      });
+
+      expect(afterFirst).not.toBe(before);
+      expect(store.namedListeners.get('foo')).toBe(afterFirst);
+      expect(afterFirst).toHaveLength(1);
+      expect(before).toHaveLength(3);
+      expect(dispatched).toBe(3);
+    });
+
+    // forEach('*') is a store-level call — emit(ε, '*') throws long before it —
+    // and it walks the wildcard bucket only. A '*' key in namedListeners, which
+    // the public getListenersForEventName('*') creates on the spot, is not
+    // walked, is therefore never held, and so is never cloned. That is what
+    // keeps bucketForMutation()'s choice between the wildcard slot and the map
+    // out of reach of the one name where the two disagree.
+    it("forEach('*') walks the wildcard bucket and leaves a '*' key in namedListeners alone", () => {
+      const store = new EventStore();
+      const wildcard = store.add(
+        new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}),
+      );
+      const impostor = store.getListenersForEventName(EVENT_CATCH_EM_ALL);
+      impostor.push(new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}));
+
+      const seen: EventListener[] = [];
+      store.forEach(EVENT_CATCH_EM_ALL, (l) => {
+        seen.push(l);
+        store.add(new EventListener('foo', 0, () => {}));
+      });
+
+      expect(seen).toEqual([wildcard]);
+      expect(store.catchEmAllListeners).toHaveLength(1);
+      expect(store.namedListeners.get(EVENT_CATCH_EM_ALL)).toBe(impostor);
+      expect(impostor).toHaveLength(1);
+    });
+
+    it('mutates in place again after a listener threw mid-dispatch', () => {
+      const store = new EventStore();
+      store.add(new EventListener('foo', 0, () => {}));
+      const before = store.namedListeners.get('foo');
+
+      expect(() =>
+        store.forEach('foo', () => {
+          throw new Error('boom');
+        }),
+      ).toThrow('boom');
+
+      // The buckets are released from a finally block: a throwing listener
+      // must not leave a dead walk holding one, or every later mutation of it
+      // clones for the rest of the store's life.
+      store.add(new EventListener('foo', -1, () => {}));
+      expect(store.namedListeners.get('foo')).toBe(before);
+      expect(before).toHaveLength(2);
+    });
+  });
+
   // Both buckets are dense in every reachable code path — add()/remove() never
   // leave a hole behind. These two tests break that invariant on purpose (by
   // growing `.length` past the real entries, which is enough to create holes
   // without needing a cast) to pin two specific defensive throws. This is not
-  // general hole-tolerance for the class: findSimilarListener/isSimilar die
-  // on a hole with their own uncaught TypeError (`b.listenerType`) for the
-  // LISTENER_IS_OBJ/LISTENER_IS_NAMED_FUNC path, removeByEventNameAndListenerObject
-  // and removeByListener the same way through isEqual, and removeListenerFromArray
-  // (used by removeByListener) walks holes silently via its `!== undefined`
-  // guard rather than throwing at all. Only add()'s no-similar-listener path
-  // and forEach()'s merge loop are pinned here.
+  // general hole-tolerance for the class, and the paths differ: add()'s dedup
+  // search dies on a hole with an uncaught TypeError from inside isSimilar
+  // (`b.listenerType`, because Array.prototype.find visits holes) for the
+  // LISTENER_IS_OBJ/LISTENER_IS_NAMED_FUNC types, while both removal loops
+  // walk holes silently instead, each guarding its candidate with
+  // `!== undefined`. Only add()'s no-similar-listener path and forEach()'s
+  // merge loop are pinned here.
   describe('pins the two defensive branches that throw on a holey bucket', () => {
     it('findInsertIndex throws instead of silently choosing an insert position', () => {
       const store = new EventStore();
