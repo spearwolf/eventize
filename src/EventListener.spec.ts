@@ -357,12 +357,18 @@ describe('EventListener', () => {
     // same way EventStore.spec.ts pins its holey-bucket throws.
     it('tolerates an obligation whose members list does not include this listener', () => {
       const listener = new EventListener('foo', 0, {});
+      const sibling = new EventListener('foo', 0, {});
       const obligation = createOnceObligation();
       listener.onceObligations = [obligation];
+      // A member the mismatch is *not* about: detach() splices out itself and
+      // nothing else, and finding no entry for itself must not take anyone
+      // else's with it.
+      obligation.members.push(sibling);
 
       expect(() => listener.detach()).not.toThrow();
       expect(listener.onceObligations).toBe(undefined);
-      expect(obligation.members).toEqual([]);
+      expect(obligation.members).toHaveLength(1);
+      expect(obligation.members[0]).toBe(sibling);
     });
   });
 });

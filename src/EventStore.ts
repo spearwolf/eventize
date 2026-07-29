@@ -306,12 +306,14 @@ export class EventStore {
   /**
    * Splices out *every* entry under `eventName` that `listenerObject` takes
    * part in — not just the first — detaching each, and returns the bucket the
-   * store holds afterwards. One bucket can hold several matches: two `once()`
-   * registrations (exempt from dedup since v6.0.0), two `on()` calls at
-   * differing priorities (priority is part of the similarity key, so they
-   * never collapse), or the same function subscribed twice (functions never
-   * dedup). `off(ε, eventName, listenerObject)` promises to remove all of
-   * them, and splicing only the first left the rest subscribed and firing.
+   * store holds afterwards. Two shapes still put several matches in one
+   * bucket: two `on()` calls at differing priorities (priority is part of the
+   * similarity key, so they never collapse), and the same function subscribed
+   * twice (functions never dedup). Two `once()` calls on one identity were a
+   * third until v6.0.0; they aggregate into a single registration now, so this
+   * pass finds one entry there however many obligations it carries.
+   * `off(ε, eventName, listenerObject)` promises to remove all of them, and
+   * splicing only the first left the rest subscribed and firing.
    *
    * One backward pass, reading from the array it was handed. Backwards keeps
    * the indices of the entries not yet visited valid across each splice, and

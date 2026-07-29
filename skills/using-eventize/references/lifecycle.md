@@ -57,17 +57,23 @@ Three rows to watch:
 ## Handles
 
 `on()` and `once()` return `() => void`. No properties, and a second call is
-inert — which matters because `on()` de-duplicates, so two handles can share one
-registration and a double call must not take the sibling's down with it.
+inert — which matters because `on()` and `once()` both aggregate onto one
+registration, so two handles can share it and a double call must not take the
+sibling's down with it.
 
 A call releases two things:
 
 - **the emitter, unconditionally** — the closure's capture is nulled on the first
-  call, so a consumed handle held in an array pins nothing: not the emitter, not
+  call, so a spent handle held in an array pins nothing: not the emitter, not
   the registry, not the retained-event log, not any retained payload;
 - **the listener, only when it actually left the store** — if the call merely
-  decremented a shared reference count, the listener stays registered and
-  populated.
+  decremented a shared reference count, or discharged one of several pending
+  obligations, the listener stays registered and populated.
+
+A `once()` handle has a second way to be spent, and it is the usual one: the
+dispatch that discharges its obligation releases the capture too, whether or not
+anyone calls the handle. A fired `once()` therefore holds nothing from the
+moment it fires.
 
 ```js
 const subs = [];
@@ -77,8 +83,10 @@ subs.push(once(ε, 'bar', service));
 subs.forEach((unsubscribe) => unsubscribe());
 ```
 
-**A handle you never call still pins the emitter — by design.** The array above
-is as leaky as any array of live references if `forEach` never runs.
+**A handle whose subscription is still pending pins the emitter — by design.**
+The array above is as leaky as any array of live references if `forEach` never
+runs. A `once()` whose event already fired is the exception: it was spent by the
+dispatch and holds nothing.
 `off(ε, listenerObject)` is the alternative: it removes every matching
 registration in one call, however many handles they were split across.
 
@@ -99,7 +107,9 @@ getSubscriptionCount(ε); // => 0
 
 The retention window belongs to the registration, not to the handle: until the
 count hits zero, `service` stays reachable through the still-registered listener.
-`once()` is exempt from de-duplication and always registers its own.
+Since v6.0.0 a `once()` on the same identity aggregates onto that very listener
+rather than registering its own — it adds a pending obligation instead of a
+count, and the listener lives while either is outstanding.
 
 ## When a `once()` is actually spent
 

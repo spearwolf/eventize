@@ -177,9 +177,12 @@ describe('on()/once() aggregate by listener identity', () => {
 
       once(ε, ['a', 'b'], h);
 
-      // one invocation for the once() call, total — not one per name it
-      // covers. Both listeners survive on their on() registrations either way.
-      expect(h.a.callCount + h.b.callCount).toBe(3);
+      // One invocation for the once() call, total — not one per name it
+      // covers. The pair, not the sum: 'a' replays first and settles the
+      // shared obligation there, so a sum of 3 would read the same for the
+      // 1-and-2 split, which is the failure this case is watching for. Both
+      // listeners survive on their on() registrations either way.
+      expect([h.a.callCount, h.b.callCount]).toEqual([2, 1]);
       expect(getSubscriptionCount(ε)).toBe(2);
     });
 
@@ -266,7 +269,12 @@ describe('on()/once() aggregate by listener identity', () => {
       expect(listenerObject.foo.callCount).toBe(2);
     });
 
-    it('a spent once() handle does not discharge a later obligation', () => {
+    // Named for what it pins: the *later* obligation survives. The spent
+    // handle being inert is the `settled` guard's job, and that one is
+    // asserted directly in EventStore.spec.ts — "releasing an already-settled
+    // obligation is a no-op". Here it would pass with the guard gone anyway,
+    // because dischargeObligation() empties `members` on its way out.
+    it('a later obligation survives a handle spent on an earlier one', () => {
       const ε = eventize();
       const listenerObject = {foo: fake()};
 

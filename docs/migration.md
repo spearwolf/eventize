@@ -91,11 +91,19 @@ and `once()` calls produced it, in whatever order. The first dispatch
 discharges every pending `once()` on that identity; the registration survives
 for as long as an `on()` still holds it.
 
-Grep for a listener object subscribed with both calls on the same event:
+Only calls whose listener is an **object** — or a `(methodName, object)` pair —
+can aggregate. A function listener never does, in either version. No text
+pattern tells those apart reliably, so list every `once()` call site and narrow
+by hand:
 
 ```bash
-grep -rn "once(.*,.*)" src | grep -v "once(.*function"
+grep -rnE '\bonce\s*\(' --include='*.ts' --include='*.js' \
+  --exclude-dir=node_modules .
 ```
+
+For each hit, check whether the same object is also subscribed to that event
+name with `on()` at the same priority. Those are the pairs whose call count
+changes; everything else is untouched.
 
 Two calls on one identity used to mean two invocations in one registration
 order and one in the other. They now always mean one. Where two invocations

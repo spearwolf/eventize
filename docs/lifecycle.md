@@ -173,7 +173,10 @@ conditional:
 - **The emitter, unconditionally.** The handle closes over the emitter it was
   created against, and that capture is nulled on the first call. A handle kept in
   an array after teardown no longer pins the emitter — nor, through it, the
-  store, the keeper, or any retained payload under any event name.
+  store, the keeper, or any retained payload under any event name. A `once()`
+  handle gets there without being called at all: the dispatch that discharges
+  its obligation nulls the capture, so a `once()` that has fired holds nothing
+  from that moment on, teardown loop or no teardown loop.
 - **The listener, when nothing is left holding it.** An `on()` handle decrements
   the persistent reference count; a `once()` handle discharges its own
   obligation. Either can leave the listener standing — a shared `on()`
@@ -201,9 +204,11 @@ subs.forEach((unsubscribe) => unsubscribe());
 ```
 
 > [!WARNING]
-> **A handle you never call still pins the emitter — by design.** The array
-> above is exactly as leaky as any other array of live references if `forEach`
-> is never run. Call your handles on teardown, or use `off(ε, listenerObject)`,
+> **A handle whose subscription is still pending pins the emitter — by design.**
+> The array above is exactly as leaky as any other array of live references if
+> `forEach` is never run. The one exception is a `once()` whose event already
+> fired: the dispatch spent it, and it holds nothing.
+> Call your handles on teardown, or use `off(ε, listenerObject)`,
 > which removes every matching registration in one go regardless of how many
 > handles they were split across.
 

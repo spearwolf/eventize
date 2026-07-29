@@ -90,17 +90,27 @@ threshold of 98, so the next dead branch fails `cbt` for a reason unrelated to
 whatever change triggered it. Either reduce the reachable condition (with a
 CHANGELOG line under Internal) or add `istanbul ignore` with a reason.
 
-### The double-release guard has no spec
+### The double-release guard has no spec of its own
 
-`EventStore.removeByEventListener()` opens with `if (listener.isRemoved)
-return;`, which stops a handle from decrementing a listener that was already
-removed by another route. Nothing exercises it. Both ways in are reachable
-through the public API: `on(ε, ['a','b'], fn)` gives one handle over two
-listeners, and `off(ε, 'a')` then removes one behind the handle's back; and
-two `on()` calls with the same listener object share a listener at
-`refCount = 2`, where an `off(ε, 'a')` plus both handle calls must leave the
-count alone. Assert `refCount` on the surviving listener, not just
-`getSubscriptionCount(ε)` — the count staying put is what the guard buys.
+`EventStore.release()` opens with `if (listener.isRemoved) return;`, which stops
+an `on()` handle from decrementing a listener that some other route already
+removed. Two cases in `EventStore.spec.ts` reach the line incidentally —
+"replaces the named bucket when a listener unsubscribes mid-dispatch" and its
+wildcard twin both fail if it is turned into a throw — but nothing asserts what
+it buys, so deleting it leaves the suite green.
+
+The reachable recipe: two `on()` calls with the same listener object share one
+listener at `refCount = 2`; `off(ε, 'foo')` force-removes it through
+`EventListener.detach()`, and calling both handles afterwards must leave the
+count where it is. Assert `refCount` on the detached listener (grab it with
+`latestListener()` before the `off()`), not `getSubscriptionCount(ε)` — the
+subscription count is already zero either way, and the count staying put is the
+whole point. Without the guard the two calls take it to zero and the second
+runs `dropListener()` over a listener that is out of every bucket.
+
+The parallel guard on the `once()` side, `releaseObligation()`'s
+`if (obligation.settled) return;`, is covered: `EventStore.spec.ts` →
+"releasing an already-settled obligation is a no-op".
 
 ### `tsconfig.json` sets no `noEmit`
 

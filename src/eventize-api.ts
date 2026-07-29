@@ -599,12 +599,15 @@ export function off(
   }
 
   if (listenerObject == null && Array.isArray(listener)) {
-    // Only the event-name elements are meaningful to the keeper. Arrays reach
-    // this branch from two directions: an explicit off(ε, [name, …]) call, and
-    // the unsubscribe function returned by a multi-event on(), which passes an
-    // array of EventListener instances. Filtering by isEventName keeps symbol
-    // event names — which the old `typeof === 'string'` test silently dropped —
-    // while still ignoring listener instances.
+    // Only the event-name elements are meaningful to the keeper. One caller
+    // reaches this branch: an explicit off(ε, [name, …]). The multi-event on()
+    // handle used to be a second, passing an array of EventListener instances
+    // through here; since v6.0.0 it gives each registration back through
+    // EventStore.release() and never enters off() at all. The isEventName
+    // filter stays because the surviving caller hands in whatever the consumer
+    // assembled: it keeps symbol event names — which the old
+    // `typeof === 'string'` test silently dropped — and ignores anything that
+    // is not a name at all.
     //
     // The listenerObject == null guard mirrors EventStore.remove(): its array
     // branch requires the same condition, so off(ε, [names], listenerObject)

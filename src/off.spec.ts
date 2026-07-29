@@ -1279,18 +1279,25 @@ describe('off()', () => {
       expect(late.callCount).toBe(0);
     });
 
-    it('leaves a multi-event unsubscribe handle on the name path', () => {
+    // The negative control for the three cases above: an array carrying no
+    // bulk marker at all must take the name path, however many names are in
+    // it. Written when the multi-event unsubscribe handle still passed
+    // EventListener instances through off(); that route is gone since v6.0.0
+    // — makeOnUnsubscribe() releases each listener through the store — so the
+    // case now pins the direction that is still reachable.
+    it('an array of plain names takes the name path, leaving unlisted names retained', () => {
       const obj = eventize();
-      retain(obj, 'keep');
+      retain(obj, ['keep', 'a']);
       emit(obj, 'keep', 'value');
-      const unsubscribe = on(obj, ['a', 'b'], fake());
+      emit(obj, 'a', 'gone');
+      on(obj, 'a', fake());
+      on(obj, 'b', fake());
 
-      unsubscribe();
+      off(obj, ['a', 'b']);
 
       expect(getSubscriptionCount(obj)).toBe(0);
-      // the handle passes EventListener instances, not names — the bulk path
-      // must not trigger, so 'keep' survives
       expect(getRetainedCount(obj)).toBe(1);
+      expect(getRetainedEventNames(obj)).toEqual(['keep']);
     });
   });
 });
