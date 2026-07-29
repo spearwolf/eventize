@@ -517,28 +517,32 @@ export class EventStore {
    * call, and settling them one per dispatch would make a second `once()` on
    * the same identity fire on the next emit instead of this one.
    *
-   * `settledCount` is `EventListener.apply()`'s pre-dispatch snapshot of
-   * `onceObligations.length`, not the live length read now. Obligations are
-   * only ever appended, so the leading `settledCount` entries are exactly the
-   * ones that existed when the dispatch began — anything the callback itself
-   * just added by re-subscribing with `once()` sits after them and is left
-   * alone, to be settled by a dispatch of its own. Reading the live length
-   * here instead would discharge that one too, before it ever gets to fire.
+   * `watermark` is `EventListener.apply()`'s pre-dispatch snapshot of the
+   * obligation sequence counter, not a count or an array slice boundary. Every
+   * obligation this listener carries whose `sequence` is below that value
+   * existed before the dispatch began, wherever it sits in the array — a
+   * position cannot say that, because releasing a handle or a force-removal
+   * can splice an obligation out of the *middle* of `onceObligations` and
+   * shift every later entry left, including one the callback added *during*
+   * this very dispatch by re-subscribing. Filtering by `sequence` instead of
+   * position is what keeps that reshuffle from mattering.
    *
    * Runs from inside `EventListener.apply()`, so from inside a live `forEach()`
    * walk. `dischargeObligation()` → `dropListener()` routes through
    * `bucketForMutation()`, which is what keeps the walk's array intact.
    *
-   * A slice of the leading entries, not the live array: discharging an
-   * obligation removes it from every member's own list, this listener's
-   * included, out from under the loop that is currently iterating it.
+   * A copy, not the live array: discharging an obligation removes it from
+   * every member's own list, this listener's included, out from under the
+   * loop that is currently iterating it.
    */
-  settleOneShots(listener: EventListener, settledCount: number): void {
+  settleOneShots(listener: EventListener, watermark: number): void {
     const obligations = listener.onceObligations;
-    if (obligations === undefined || settledCount === 0) return;
+    if (obligations === undefined) return;
 
-    for (const obligation of obligations.slice(0, settledCount)) {
-      if (!obligation.settled) this.dischargeObligation(obligation);
+    for (const obligation of obligations.slice()) {
+      if (obligation.sequence < watermark && !obligation.settled) {
+        this.dischargeObligation(obligation);
+      }
     }
   }
 

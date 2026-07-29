@@ -1,5 +1,4 @@
-import {EventListener} from './EventListener';
-import type {OnceObligation} from './EventListener';
+import {createOnceObligation, EventListener} from './EventListener';
 import {EventStore} from './EventStore';
 
 import {EVENT_CATCH_EM_ALL} from './constants';
@@ -302,7 +301,7 @@ describe('EventStore', () => {
       const store = new EventStore();
       const listenerObject = {};
       const first = store.add(new EventListener('foo', 0, listenerObject));
-      const obligation: OnceObligation = {settled: false, members: []};
+      const obligation = createOnceObligation();
       // what once() passes: the identity is already registered, so the
       // obligation joins it instead of inserting a second listener
       const second = store.add(
@@ -325,14 +324,14 @@ describe('EventStore', () => {
     it('releasing an already-settled obligation is a no-op', () => {
       const store = new EventStore();
       const listenerObject = {};
-      const obligation: OnceObligation = {settled: false, members: []};
+      const obligation = createOnceObligation();
       const listener = store.add(
         new EventListener('foo', 0, listenerObject),
         obligation,
       );
       store.add(new EventListener('foo', 0, listenerObject));
 
-      store.settleOneShots(listener, 1);
+      store.settleOneShots(listener, obligation.sequence + 1);
       expect(obligation.settled).toBe(true);
       expect(listener.onceObligations).toBe(undefined);
 
@@ -357,26 +356,54 @@ describe('EventStore', () => {
       expect(store.getSubscriptionCount()).toBe(1);
     });
 
-    it('settleOneShots() leaves obligations beyond the given count untouched', () => {
+    it('settleOneShots() leaves an obligation created after the watermark untouched', () => {
       const store = new EventStore();
       const listenerObject = {};
-      const before: OnceObligation = {settled: false, members: []};
+      const before = createOnceObligation();
       const listener = store.add(
         new EventListener('foo', 0, listenerObject),
         before,
       );
-      // Simulates a once() that re-subscribed itself from inside its own
-      // dispatch: a second obligation, appended after apply() already took
-      // its pre-dispatch snapshot of the count.
-      const reArmed: OnceObligation = {settled: false, members: []};
+      // The watermark a dispatch would have captured right here — before
+      // anything re-subscribes. `reArmed` is created after it on purpose,
+      // simulating a once() that re-subscribed itself from inside its own
+      // dispatch: it shares the listener's onceObligations array, but not
+      // this watermark.
+      const watermark = before.sequence + 1;
+      const reArmed = createOnceObligation();
       store.add(new EventListener('foo', 0, listenerObject), reArmed);
 
-      store.settleOneShots(listener, 1);
+      store.settleOneShots(listener, watermark);
 
       expect(before.settled).toBe(true);
       expect(reArmed.settled).toBe(false);
       expect(listener.onceObligations).toEqual([reArmed]);
       expect(store.getSubscriptionCount()).toBe(1);
+    });
+
+    // Position cannot substitute for the watermark check above: if a listener
+    // holds an *older* obligation that ends up sitting after a *newer* one in
+    // `onceObligations` — exactly what a mid-array release or force-removal
+    // produces — a position-based cutoff would settle the wrong one. Ordering
+    // it deliberately out of sequence is what makes this case different from
+    // the one above rather than a duplicate of it.
+    it('settleOneShots() finds a qualifying obligation regardless of its position in the array', () => {
+      const store = new EventStore();
+      const listenerObject = {};
+      const older = createOnceObligation();
+      const newer = createOnceObligation();
+      const listener = store.add(new EventListener('foo', 0, listenerObject));
+      // Built out of registration order on purpose: `newer` occupies index 0,
+      // `older` index 1 — the reverse of creation order.
+      listener.onceObligations = [newer, older];
+      newer.members.push(listener);
+      older.members.push(listener);
+
+      store.settleOneShots(listener, older.sequence + 1);
+
+      expect(older.settled).toBe(true);
+      expect(newer.settled).toBe(false);
+      expect(listener.onceObligations).toEqual([newer]);
     });
 
     // The four cases below construct states EventStore.add() never actually
@@ -389,12 +416,15 @@ describe('EventStore', () => {
     describe('mismatched obligation bookkeeping is tolerated, not trusted', () => {
       it('settleOneShots() skips an obligation that is already settled', () => {
         const store = new EventStore();
-        const obligation: OnceObligation = {settled: true, members: []};
+        const obligation = createOnceObligation();
+        obligation.settled = true;
         const listener = new EventListener('foo', 0, {});
         listener.onceObligations = [obligation];
         store.add(listener);
 
-        expect(() => store.settleOneShots(listener, 1)).not.toThrow();
+        expect(() =>
+          store.settleOneShots(listener, obligation.sequence + 1),
+        ).not.toThrow();
         // Left exactly as found: skipping a settled obligation must not
         // silently clear it from a listener that was never actually
         // discharged for it.
@@ -404,8 +434,8 @@ describe('EventStore', () => {
       it('releaseObligation() tolerates a member with no obligations of its own', () => {
         const store = new EventStore();
         const persistentOnly = store.add(new EventListener('foo', 0, {}));
-        const obligation: OnceObligation = {
-          settled: false,
+        const obligation = {
+          ...createOnceObligation(),
           members: [persistentOnly],
         };
 
@@ -419,12 +449,9 @@ describe('EventStore', () => {
       it('releaseObligation() tolerates a member whose obligations list a different one', () => {
         const store = new EventStore();
         const listener = store.add(new EventListener('foo', 0, {}));
-        const otherObligation: OnceObligation = {settled: false, members: []};
+        const otherObligation = createOnceObligation();
         listener.onceObligations = [otherObligation];
-        const obligation: OnceObligation = {
-          settled: false,
-          members: [listener],
-        };
+        const obligation = {...createOnceObligation(), members: [listener]};
 
         expect(() => store.releaseObligation(obligation)).not.toThrow();
 

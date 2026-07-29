@@ -29,10 +29,10 @@ const registerEventListener = (
   if (obligation !== null && el.callAfterApply === undefined) {
     // One hook per listener, however many once() obligations it carries. It
     // outlives none of them: settleOneShots() clears it when the last one
-    // discharges. The count comes from apply() at the moment it calls this —
-    // see settleOneShots() for why that has to be a snapshot, not a live read.
-    el.callAfterApply = (settledCount) =>
-      store.settleOneShots(el, settledCount);
+    // discharges. The watermark comes from apply() at the moment it calls
+    // this — see settleOneShots() for why it has to be the sequence counter's
+    // value, not a count or a position.
+    el.callAfterApply = (watermark) => store.settleOneShots(el, watermark);
   }
 
   // An aggregating on() gets no replay — the handler already saw that value.

@@ -476,5 +476,57 @@ describe('on()/once() aggregate by listener identity', () => {
       emit(ε, 'foo');
       expect(listenerObject.foo.callCount).toBe(3);
     });
+
+    // The settlement boundary is a stamped sequence number, not a position in
+    // onceObligations — it has to be, because releasing a handle can splice an
+    // obligation out of the *middle* of that array. Here the handler releases
+    // its own (already-fired-adjacent) once() handle and arms a fresh once()
+    // in the same breath: the release empties the array before the re-arm
+    // refills it, so the new obligation lands in the same slot the old one
+    // just vacated. A position-based cutoff would settle it as if it had been
+    // there all along; a sequence-based one still tells them apart.
+    //
+    // on() is scaffolding, not the thing under test: it is what lets the
+    // re-arm below find the listener still registered and aggregate onto it,
+    // instead of building a second one — the shape the bug needs to
+    // reproduce. Released immediately after the dispatch it was there for, so
+    // everything from that point on is held up by the once() obligation alone
+    // — which is what makes the bug observable through the public API at all:
+    // with the on() still in place, a wrongly-discharged obligation and a
+    // correctly-surviving one look identical from the outside, because the
+    // listener stays registered either way.
+    it('releasing one once() handle and arming another from inside the same dispatch settles only the old one', () => {
+      const ε = eventize();
+      // A mutable holder, not a forward-declared handle: the callback below
+      // has to close over the handle its own registration produces, which
+      // does not exist until listenerObject does.
+      const handles: {unsubFirst?: () => void} = {};
+      const listenerObject = {
+        foo: fake(() => {
+          handles.unsubFirst?.(); // no-op after the first call — the
+          // obligation it holds is the one this very dispatch is about to settle
+          once(ε, 'foo', listenerObject);
+        }),
+      };
+
+      handles.unsubFirst = once(ε, 'foo', listenerObject);
+      const unsubOn = on(ε, 'foo', listenerObject);
+
+      emit(ε, 'foo');
+      expect(listenerObject.foo.callCount).toBe(1);
+
+      unsubOn();
+      // if the once() armed during this dispatch had been swallowed along
+      // with the one the dispatch actually settled, nothing would be left
+      // holding the listener and it would already be gone
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      emit(ε, 'foo');
+      expect(listenerObject.foo.callCount).toBe(2);
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      emit(ε, 'foo');
+      expect(listenerObject.foo.callCount).toBe(3);
+    });
   });
 });

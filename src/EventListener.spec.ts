@@ -1,5 +1,4 @@
-import {EventListener} from './EventListener';
-import type {OnceObligation} from './EventListener';
+import {createOnceObligation, EventListener} from './EventListener';
 import {
   emit,
   emitAsync,
@@ -358,7 +357,7 @@ describe('EventListener', () => {
     // same way EventStore.spec.ts pins its holey-bucket throws.
     it('tolerates an obligation whose members list does not include this listener', () => {
       const listener = new EventListener('foo', 0, {});
-      const obligation: OnceObligation = {settled: false, members: []};
+      const obligation = createOnceObligation();
       listener.onceObligations = [obligation];
 
       expect(() => listener.detach()).not.toThrow();

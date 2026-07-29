@@ -1,5 +1,6 @@
 import {asEventized} from './asEventized';
 import {EVENT_CATCH_EM_ALL} from './constants';
+import {createOnceObligation} from './EventListener';
 import type {EventListener, OnceObligation} from './EventListener';
 import {internalsOf} from './internals';
 import {isEventized} from './isEventized';
@@ -463,7 +464,7 @@ export function once(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
   // dispatch that satisfies it, retained replay included, which can happen
   // before this handle even exists — releaseObligation() bails on `settled`
   // if it already did.
-  const obligation: OnceObligation = {settled: false, members: []};
+  const obligation = createOnceObligation();
   subscribeTo(store, keeper, args, obligation);
   return makeOnceUnsubscribe(eventizedObj, obligation);
 }
