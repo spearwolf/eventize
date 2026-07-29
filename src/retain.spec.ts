@@ -478,12 +478,11 @@ describe('retain()', () => {
       expect(listenerObject.b.calledWith('B')).toBe(true);
     });
 
-    // once() is exempt from dedup (v6.0.0), so it never folds into the
-    // existing on() subscription: it gets its own listener, receives the
-    // replay on its own account, and detaches again in the same breath. The
-    // on() subscription is what remains. The CORR-001 guard against an
-    // unconditional replay lives in the first case of this block — this one
-    // pins that the exemption reaches the retained path too.
+    // A once() next to an existing on() joins its registration, and still gets
+    // the replay: the obligation is new even though the listener is not.
+    // Without that, whether a once() fires on a retained event would depend on
+    // an unrelated on() with the same handler. The guard against an
+    // unconditional replay lives in the first case of this block.
     it('replays to a once() registered next to an existing on()', () => {
       const obj = eventize();
       const listenerObject = {foo: fake()};

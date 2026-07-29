@@ -1,9 +1,14 @@
-import type {EventListener} from './EventListener';
 import {asEventized} from './asEventized';
-import {EVENT_CATCH_EM_ALL} from './constants';
+import {
+  EVENT_CATCH_EM_ALL,
+  REGISTER_ONE_SHOT,
+  REGISTER_PERSISTENT,
+  type RegisterKind,
+} from './constants';
 import {internalsOf} from './internals';
 import {isEventized} from './isEventized';
-import {subscribeTo, subscribeToDeferred} from './subscribeTo';
+import {subscribeTo} from './subscribeTo';
+import type {Registration} from './subscribeTo';
 import type {
   AnyEventNames,
   ArgsFor,
@@ -25,59 +30,49 @@ import type {
 } from './types';
 import {dispatchableMember, isEventName} from './utils';
 
-const afterApply = (callback?: () => void) => (listener: EventListener) => {
-  listener.callAfterApply = () => {
-    callback?.();
-  };
-};
-
 // The handle is idempotent by construction: a second call is inert, not a
-// second `off()`. Without the guard a deduped on() subscription — one
-// EventListener with refCount = 2 — was decremented twice by the same handle,
-// which unsubscribed the *other* handle's registration. Cleanup code that
-// calls a stored handle defensively ("call it again, it's a no-op") is exactly
-// the shape that hit it, and `docs/off.md` promised that no-op.
+// second release. Without the guard a shared registration was decremented
+// twice by the same handle, which released a sibling handle's count. Cleanup
+// code that calls a stored handle defensively ("call it again, it's a no-op")
+// is exactly the shape that hit it, and `docs/off.md` promised that no-op.
 //
 // The nulled capture *is* the consumed flag, and that is what stops a handle
 // kept after its call from pinning anything — the emitter, and with it the
-// store, the keeper and every retained payload. A separate boolean
-// would leave both references in the closure forever.
+// store, the keeper and every retained payload. A separate boolean would leave
+// both references in the closure forever. Both go in one slot so a single null
+// test releases them together and TypeScript narrows both at once.
 //
-// Both go in one slot so a single null test releases them together and
-// TypeScript narrows both at once. Splitting them into two `let`s costs a
-// branch that can never be taken: they are only ever nulled as a pair.
-//
-// Nulling `listeners` only pays off because the handle no longer carries
-// `.listener` / `.listeners`. While it did, the same instances hung off the
-// handle object in public, so clearing the closure copy released nothing.
-// With those properties gone the closure is the
-// only holder — and it is worth clearing, because a call that merely
-// decremented a shared reference count leaves the listener registered and
-// populated, and such a listener can lead straight back to the emitter: its
-// `callAfterApply` may be another, unconsumed handle's closure (an `on()` that
-// deduped onto a `once()` whose event never fired), or the listener object may
-// be the emitter itself. That chain used to hang off the consumed handle.
-//
-// What this does *not* fix: `on()` still deduplicates onto a pending `once()`,
-// so one reference count still spans two lifetimes. It is only the memory
-// consequence that is gone — and only for handles that were actually called.
-// An unconsumed handle pins the emitter by design; the control group in
-// `src/lifecycle.spec.ts` pins that it still does. The dedup itself is held
-// for the next major — see `docs/backlog.md`.
+// Releasing goes through the store rather than the public `off()`: a handle
+// gives back the one registration it made, which is a different operation from
+// `off(ε, 'foo', obj)` force-removing everything under an identity. The kind
+// and the settle generation travel with the capture because only the handle
+// knows them.
 const makeUnsubscribe = (
   host: EventizedObject,
-  listeners: EventListener | Array<EventListener>,
+  registrations: Registration | Array<Registration>,
+  kind: RegisterKind,
 ): UnsubscribeFunc => {
   let held: {
     host: EventizedObject;
-    listeners: EventListener | Array<EventListener>;
-  } | null = {host, listeners};
+    registrations: Registration | Array<Registration>;
+  } | null = {host, registrations};
 
   return () => {
     const target = held;
     if (target === null) return;
     held = null;
-    off(target.host, target.listeners);
+    const {store} = internalsOf(target.host);
+    if (Array.isArray(target.registrations)) {
+      target.registrations.forEach((registration) =>
+        store.release(registration.listener, kind, registration.settleId),
+      );
+    } else {
+      store.release(
+        target.registrations.listener,
+        kind,
+        target.registrations.settleId,
+      );
+    }
   };
 };
 
@@ -322,7 +317,11 @@ export function on<T extends object>(
 export function on(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
   const eventizedObj = asEventized(obj);
   const {store, keeper} = internalsOf(eventizedObj);
-  return makeUnsubscribe(eventizedObj, subscribeTo(store, keeper, args));
+  return makeUnsubscribe(
+    eventizedObj,
+    subscribeTo(store, keeper, args, REGISTER_PERSISTENT),
+    REGISTER_PERSISTENT,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -450,25 +449,16 @@ export function once<T extends object>(
 export function once(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
   const eventizedObj = asEventized(obj);
   const {store, keeper} = internalsOf(eventizedObj);
-  // noDedup: each once() gets its own listener instance. Folding two one-shot
-  // subscriptions into one refCounted listener left the second callAfterApply
-  // overwriting the first, and the surviving handle could never release it.
-  const {listeners, publishRetained} = subscribeToDeferred(
-    store,
-    keeper,
-    args,
-    true,
+  // The auto-unsubscribe is not this handle's job any more: the store settles
+  // every pending obligation on the listener after a dispatch, which is what
+  // lets two once() calls on one identity share a single registration. A
+  // retained event therefore fires inside subscribeTo(), before this handle
+  // exists — release() bails on `isRemoved` if it already took the listener.
+  return makeUnsubscribe(
+    eventizedObj,
+    subscribeTo(store, keeper, args, REGISTER_ONE_SHOT),
+    REGISTER_ONE_SHOT,
   );
-  // Idempotence comes out of makeUnsubscribe() now. once() used to wrap the
-  // handle in a guard of its own, because on()'s handle had no guard to share.
-  const unsubscribe = makeUnsubscribe(eventizedObj, listeners);
-  if (Array.isArray(listeners)) {
-    listeners.forEach(afterApply(unsubscribe));
-  } else {
-    afterApply(unsubscribe)(listeners);
-  }
-  publishRetained();
-  return unsubscribe;
 }
 
 // ---------------------------------------------------------------------------

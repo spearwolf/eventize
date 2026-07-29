@@ -110,7 +110,7 @@ describe('EventListener', () => {
       // detectListenerType() gives no tag, truthy or not. Registering the
       // listener by hand is what still puts a primitive in front of a real
       // dispatch, which is the case this asserts.
-      storeOf(obj).add(new EventListener('toFixed', 0, 42), true);
+      storeOf(obj).add(new EventListener('toFixed', 0, 42));
       // Anchors the assertion below: without this, the same expectation would
       // stay green if the listener had never landed in the bucket the dispatch
       // reads. The sibling case underneath proves the path does collect.
@@ -122,7 +122,6 @@ describe('EventListener', () => {
       const obj = eventize();
       storeOf(obj).add(
         new EventListener('toFixed', 0, {toFixed: () => 'COLLECTED'}),
-        true,
       );
       await expect(emitAsync(obj, 'toFixed', 2)).resolves.toEqual([
         'COLLECTED',

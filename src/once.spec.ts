@@ -40,6 +40,13 @@ describe('once()', () => {
     });
   });
 
+  // A multi-name once() builds one EventListener per name — different names
+  // never aggregate — so each name now carries its own independent one-shot
+  // obligation. Up to v5.1.0 all of them shared a single unsubscribe closure,
+  // so firing any one name detached every other name in the same call too;
+  // that coupling lived in the two-phase subscribeToDeferred() this refactor
+  // removes, and settlement is per-listener now, matching how on() with an
+  // array of names already always behaved.
   it('called with multiple event names', () => {
     const e = eventize();
 
@@ -52,19 +59,10 @@ describe('once()', () => {
     expect(sub).toHaveBeenCalledWith(42);
     sub.mockClear();
 
+    // 'bar' is its own obligation and is still pending
     emit(e, 'bar');
-    expect(sub).not.toHaveBeenCalled(); // is no longer called because 'foo' has already been called back
-
-    // ---
-    once(e, ['foo', 'bar'], sub);
-
-    emit(e, 'bar', 666);
     expect(sub).toHaveBeenCalledTimes(1);
-    expect(sub).toHaveBeenCalledWith(666);
-    sub.mockClear();
-
-    emit(e, 'foo');
-    expect(sub).not.toHaveBeenCalled();
+    expect(getSubscriptionCount(e)).toBe(0);
   });
 
   describe('with retained event', () => {
@@ -82,7 +80,10 @@ describe('once()', () => {
       expect(getSubscriptionCount(e)).toBe(0);
     });
 
-    it('unsubscribes after retained replay (array of event names)', () => {
+    // 'bar' carries no retained value and no relationship to 'foo' any more —
+    // see the comment on 'called with multiple event names' above — so it
+    // stays subscribed on its own account after 'foo' replays and detaches.
+    it('unsubscribes the replayed name only (array of event names)', () => {
       const e = eventize();
 
       retain(e, 'foo');
@@ -93,6 +94,11 @@ describe('once()', () => {
 
       expect(sub).toHaveBeenCalledTimes(1);
       expect(sub).toHaveBeenCalledWith(42);
+      expect(getSubscriptionCount(e)).toBe(1);
+
+      emit(e, 'bar', 666);
+      expect(sub).toHaveBeenCalledTimes(2);
+      expect(sub).toHaveBeenCalledWith(666);
       expect(getSubscriptionCount(e)).toBe(0);
     });
   });
@@ -190,7 +196,13 @@ describe('once()', () => {
       );
     });
 
-    it('still lets off() take a registered listener instance', () => {
+    // Up to v5.1.0, off() accepted the raw EventListener instance behind a
+    // handle — the route the handle itself used to reach the store before
+    // `.listener`/`.listeners` came off it. The handle now releases through
+    // EventStore.release() directly, and remove() lost the branch that made an
+    // instance special: it falls through to the identity comparison every
+    // other unrecognized value hits, matches nothing, and off() no-ops.
+    it('silently no-ops when off() is given a raw listener instance', () => {
       const obj = eventize();
       const survivor = fake();
       on(obj, 'bar', survivor);
@@ -198,12 +210,9 @@ describe('once()', () => {
       const listener = latestListener(obj);
 
       expect(getSubscriptionCount(obj)).toBe(2);
-      // off(ε, <EventListener>) still works — only the route to the instance
-      // through the handle is gone. Consumers reach for unsubscribe() instead,
-      // which goes through the same reference-counted path.
       off(obj, listener);
 
-      expect(getSubscriptionCount(obj)).toBe(1);
+      expect(getSubscriptionCount(obj)).toBe(2);
 
       emit(obj, 'bar');
       expect(survivor.callCount).toBe(1);
@@ -223,22 +232,22 @@ describe('once()', () => {
     });
   });
 
-  describe('no dedup between once() registrations', () => {
-    it('two once() on the same listener object fire twice, then detach', () => {
+  describe('once() aggregates like on()', () => {
+    it('two once() on the same listener object fire once, then detach', () => {
       const obj = eventize();
       const listenerObject = {foo: fake()};
 
       once(obj, 'foo', listenerObject);
       once(obj, 'foo', listenerObject);
-      expect(getSubscriptionCount(obj)).toBe(2);
+      expect(getSubscriptionCount(obj)).toBe(1);
 
       emit(obj, 'foo', 'first');
 
-      expect(listenerObject.foo.callCount).toBe(2);
+      expect(listenerObject.foo.callCount).toBe(1);
       expect(getSubscriptionCount(obj)).toBe(0);
 
       emit(obj, 'foo', 'second');
-      expect(listenerObject.foo.callCount).toBe(2);
+      expect(listenerObject.foo.callCount).toBe(1);
     });
 
     it('the same holds for the method-name form', () => {
@@ -247,15 +256,15 @@ describe('once()', () => {
 
       once(obj, 'foo', 'handler', listenerObject);
       once(obj, 'foo', 'handler', listenerObject);
-      expect(getSubscriptionCount(obj)).toBe(2);
+      expect(getSubscriptionCount(obj)).toBe(1);
 
       emit(obj, 'foo');
 
-      expect(listenerObject.handler.callCount).toBe(2);
+      expect(listenerObject.handler.callCount).toBe(1);
       expect(getSubscriptionCount(obj)).toBe(0);
     });
 
-    it('each returned handle releases its own subscription', () => {
+    it('each returned handle releases its own obligation', () => {
       const obj = eventize();
       const listenerObject = {foo: fake()};
 
@@ -284,20 +293,20 @@ describe('once()', () => {
       expect(listenerObject.foo.callCount).toBe(1);
     });
 
-    it('a once() and an on() on the same object stay independent', () => {
+    it('a once() and an on() on the same object share one registration', () => {
       const obj = eventize();
       const listenerObject = {foo: fake()};
 
       on(obj, 'foo', listenerObject);
       once(obj, 'foo', listenerObject);
-      expect(getSubscriptionCount(obj)).toBe(2);
-
-      emit(obj, 'foo');
-      expect(listenerObject.foo.callCount).toBe(2);
       expect(getSubscriptionCount(obj)).toBe(1);
 
       emit(obj, 'foo');
-      expect(listenerObject.foo.callCount).toBe(3);
+      expect(listenerObject.foo.callCount).toBe(1);
+      expect(getSubscriptionCount(obj)).toBe(1);
+
+      emit(obj, 'foo');
+      expect(listenerObject.foo.callCount).toBe(2);
     });
 
     it('two once() on a retained event both receive the replay', () => {

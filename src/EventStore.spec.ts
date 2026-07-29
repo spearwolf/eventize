@@ -1,7 +1,11 @@
 import {EventListener} from './EventListener';
 import {EventStore} from './EventStore';
 
-import {EVENT_CATCH_EM_ALL} from './constants';
+import {
+  EVENT_CATCH_EM_ALL,
+  REGISTER_ONE_SHOT,
+  REGISTER_PERSISTENT,
+} from './constants';
 
 // A stand-in listener for the fixtures that only care about bookkeeping, not
 // about dispatch. It has to be a *real* listener value: a `null` listener has
@@ -84,12 +88,12 @@ describe('EventStore', () => {
   });
 
   describe('namedListeners memory cleanup', () => {
-    it('removing the last listener for an event name deletes the map entry (off via EventListener)', () => {
+    it('removing the last listener for an event name deletes the map entry (release())', () => {
       const store = new EventStore();
       const listener = store.add(new EventListener('foo', 0, () => {}));
       expect(store.namedListeners.has('foo')).toBe(true);
 
-      store.remove(listener, null);
+      store.release(listener, REGISTER_PERSISTENT, 0);
 
       expect(store.namedListeners.has('foo')).toBe(false);
       expect(store.namedListeners.size).toBe(0);
@@ -136,7 +140,7 @@ describe('EventStore', () => {
       for (let i = 0; i < 1000; i++) {
         const name = `event-${i}`;
         const listener = store.add(new EventListener(name, 0, () => {}));
-        store.remove(listener, null);
+        store.release(listener, REGISTER_PERSISTENT, 0);
       }
       expect(store.namedListeners.size).toBe(0);
       expect(store.getSubscriptionCount()).toBe(0);
@@ -264,7 +268,7 @@ describe('EventStore', () => {
       const target = store.add(new EventListener('target', 0, () => {}));
       expect(store.namedListeners.size).toBe(101);
 
-      store.remove(target, null);
+      store.release(target, REGISTER_PERSISTENT, 0);
 
       expect(store.namedListeners.has('target')).toBe(false);
       expect(store.namedListeners.size).toBe(100);
@@ -278,7 +282,7 @@ describe('EventStore', () => {
       );
       store.add(new EventListener('named', 0, () => {}));
 
-      store.remove(target, null);
+      store.release(target, REGISTER_PERSISTENT, 0);
 
       expect(store.catchEmAllListeners).toHaveLength(0);
       expect(store.getSubscriptionCount()).toBe(1);
@@ -297,25 +301,45 @@ describe('EventStore', () => {
       expect(store.getSubscriptionCount()).toBe(1);
     });
 
-    it('inserts instead of deduplicating when noDedup is set', () => {
+    it('aggregates a one-shot registration onto a similar listener', () => {
       const store = new EventStore();
       const listenerObject = {};
       const first = store.add(new EventListener('foo', 0, listenerObject));
-      // what once() passes: a similar listener is present, and it is ignored
+      // what once() passes: the identity is already registered, so the
+      // obligation joins it instead of inserting a second listener
       const second = store.add(
         new EventListener('foo', 0, listenerObject),
-        true,
+        REGISTER_ONE_SHOT,
       );
 
-      expect(second).not.toBe(first);
+      expect(second).toBe(first);
       expect(first.refCount).toBe(1);
-      expect(second.refCount).toBe(1);
-      expect(store.getSubscriptionCount()).toBe(2);
-
-      store.remove(second, null);
+      expect(first.onceCount).toBe(1);
       expect(store.getSubscriptionCount()).toBe(1);
-      store.remove(first, null);
+
+      store.release(first, REGISTER_ONE_SHOT, 0);
+      expect(store.getSubscriptionCount()).toBe(1);
+      store.release(first, REGISTER_PERSISTENT, 0);
       expect(store.getSubscriptionCount()).toBe(0);
+    });
+
+    it('a settled obligation cannot be released by its old generation', () => {
+      const store = new EventStore();
+      const listenerObject = {};
+      const listener = store.add(
+        new EventListener('foo', 0, listenerObject),
+        REGISTER_ONE_SHOT,
+      );
+      store.add(new EventListener('foo', 0, listenerObject));
+
+      store.settleOneShots(listener);
+      expect(listener.onceCount).toBe(0);
+      expect(listener.settleId).toBe(1);
+
+      store.release(listener, REGISTER_ONE_SHOT, 0);
+
+      expect(listener.refCount).toBe(1);
+      expect(store.getSubscriptionCount()).toBe(1);
     });
 
     it('honours refCount before removing anything', () => {
@@ -326,10 +350,10 @@ describe('EventStore', () => {
       expect(second).toBe(first);
       expect(first.refCount).toBe(2);
 
-      store.remove(first, null);
+      store.release(first, REGISTER_PERSISTENT, 0);
       expect(store.getSubscriptionCount()).toBe(1);
 
-      store.remove(first, null);
+      store.release(first, REGISTER_PERSISTENT, 0);
       expect(store.getSubscriptionCount()).toBe(0);
     });
 
@@ -343,11 +367,14 @@ describe('EventStore', () => {
       expect(store.getSubscriptionCount()).toBe(1);
     });
 
-    // Pins a pre-existing quirk rather than fixing one: the foreign listener is
-    // detach()ed and its refCount decremented while it stays in its own store's
-    // array. The pre-refactor full scan did exactly the same — documentation,
-    // not a behaviour change.
-    it('ignores a listener that belongs to another store', () => {
+    // remove() no longer special-cases an EventListener instance at all — that
+    // branch is gone along with removeByEventListener(), and a handle now
+    // gives its registration back through release() instead. What is left is
+    // the generic identity comparison every unrecognized object hits: a
+    // foreign listener never equals anything in another store's buckets, in
+    // its own store's namedListeners entry, or in the catch-em-all bucket, so
+    // remove() harmlessly matches nothing.
+    it('a foreign EventListener instance never matches by identity', () => {
       const a = new EventStore();
       const b = new EventStore();
       const target = a.add(new EventListener('foo', 0, () => {}));
@@ -355,14 +382,37 @@ describe('EventStore', () => {
 
       expect(() => b.remove(target, null)).not.toThrow();
       expect(b.getSubscriptionCount()).toBe(1);
+      expect(a.getSubscriptionCount()).toBe(1);
     });
 
-    it('ignores a foreign listener whose event name is unknown here', () => {
+    // release() takes the caller's word for which store a listener belongs
+    // to — it has no way to check. Pins the same pre-existing quirk the
+    // instanceof-EventListener branch of remove() used to reach: a foreign
+    // listener is detach()ed and its own count decremented, while it stays put
+    // in its own store's bucket. dropListener() still has to visit *this*
+    // store's bucket for the name (or the absence of one) without throwing.
+    it('releasing a foreign listener detaches it without touching this store’s bucket for that name', () => {
+      const a = new EventStore();
+      const b = new EventStore();
+      const target = a.add(new EventListener('foo', 0, () => {}));
+      b.add(new EventListener('foo', 0, () => {})); // same name, different instance, own bucket
+
+      expect(() => b.release(target, REGISTER_PERSISTENT, 0)).not.toThrow();
+
+      expect(target.isRemoved).toBe(true);
+      expect(a.getSubscriptionCount()).toBe(1);
+      expect(b.getSubscriptionCount()).toBe(1);
+    });
+
+    it('releasing a foreign listener whose event name has no bucket here does not throw', () => {
       const a = new EventStore();
       const b = new EventStore();
       const target = a.add(new EventListener('foo', 0, () => {}));
 
-      expect(() => b.remove(target, null)).not.toThrow();
+      expect(() => b.release(target, REGISTER_PERSISTENT, 0)).not.toThrow();
+
+      expect(target.isRemoved).toBe(true);
+      expect(a.getSubscriptionCount()).toBe(1);
     });
   });
 
@@ -440,7 +490,7 @@ describe('EventStore', () => {
       let dispatched = 0;
       store.forEach('foo', () => {
         dispatched += 1;
-        store.remove(doomed, null);
+        store.release(doomed, REGISTER_PERSISTENT, 0);
       });
 
       const after = store.namedListeners.get('foo');
@@ -461,7 +511,7 @@ describe('EventStore', () => {
       const before = store.catchEmAllListeners;
 
       store.forEach('foo', () => {
-        store.remove(doomed, null);
+        store.release(doomed, REGISTER_PERSISTENT, 0);
       });
 
       expect(store.catchEmAllListeners).not.toBe(before);
@@ -591,10 +641,10 @@ describe('EventStore', () => {
       store.forEach('foo', () => {
         step += 1;
         if (step === 1) {
-          store.remove(namedDoomed, null);
+          store.release(namedDoomed, REGISTER_PERSISTENT, 0);
           namedAfterFirst = store.namedListeners.get('foo');
         } else if (step === 2) {
-          store.remove(wildcardDoomed, null);
+          store.release(wildcardDoomed, REGISTER_PERSISTENT, 0);
         } else {
           store.add(new EventListener('foo', 1, () => {}));
         }
@@ -681,7 +731,7 @@ describe('EventStore', () => {
         dispatched += 1;
         if (++step > 1) return;
         store.forEach('inner', () => {
-          store.remove(doomed, null);
+          store.release(doomed, REGISTER_PERSISTENT, 0);
         });
       });
 

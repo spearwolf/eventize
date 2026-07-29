@@ -1,8 +1,11 @@
-import {EventListener} from './EventListener';
+import type {EventListener} from './EventListener';
 import {
   EVENT_CATCH_EM_ALL,
   LISTENER_IS_NAMED_FUNC,
   LISTENER_IS_OBJ,
+  REGISTER_ONE_SHOT,
+  REGISTER_PERSISTENT,
+  type RegisterKind,
 } from './constants';
 import type {EventName} from './types';
 import {isCatchEmAll, isEventName} from './utils';
@@ -201,6 +204,14 @@ const findSimilarListener = (
   return undefined;
 };
 
+const countRegistration = (listener: EventListener, kind: RegisterKind) => {
+  if (kind === REGISTER_ONE_SHOT) {
+    listener.onceCount += 1;
+  } else {
+    listener.refCount += 1;
+  }
+};
+
 export class EventStore {
   readonly namedListeners: Map<EventName, ListenerBucket>;
 
@@ -389,29 +400,32 @@ export class EventStore {
   }
 
   /**
-   * Returns the given listener, or — when an identical one is already
-   * registered and `noDedup` is false — the existing one with its reference
-   * count increased.
+   * Returns the listener the registration landed on: the given one when it was
+   * inserted, or an existing one with the same identity. Either way the
+   * counter for `kind` is incremented on it, which is what makes `on()` and
+   * `once()` aggregate in both registration orders.
    *
-   * `once()` passes `noDedup: true`: two one-shot subscriptions mean two
-   * firings, and collapsing them leaves a listener whose own idempotence
-   * guard blocks its handles from ever releasing it.
+   * The `noDedup` flag this replaced only ever guarded the incoming call, so a
+   * later `on()` still folded onto a pending `once()` while the reverse order
+   * did not. Identity decides which listener, the counters decide how long.
    */
-  add(listener: EventListener, noDedup = false): EventListener {
+  add(
+    listener: EventListener,
+    kind: RegisterKind = REGISTER_PERSISTENT,
+  ): EventListener {
     const bucket = listener.isCatchEmAll
       ? this.catchEmAllBucket
       : this.getListenersForEventName(listener.eventName);
 
-    if (!noDedup) {
-      const similarListener = findSimilarListener(listener, bucket);
-      if (similarListener) {
-        // A dedup bumps a reference count and touches no array, so it owes no
-        // clone. Searching the live bucket is safe for the same reason.
-        similarListener.refCount += 1;
-        return similarListener;
-      }
+    const similarListener = findSimilarListener(listener, bucket);
+    if (similarListener) {
+      // An aggregation bumps a counter and touches no array, so it owes no
+      // clone. Searching the live bucket is safe for the same reason.
+      countRegistration(similarListener, kind);
+      return similarListener;
     }
 
+    countRegistration(listener, kind);
     const target = this.bucketForMutation(listener.eventName, bucket);
     target.splice(findInsertIndex(target, listener), 0, listener);
     return listener;
@@ -440,12 +454,6 @@ export class EventStore {
     // off('foo') / off(Symbol('foo'))
     if (listenerObject == null && isEventName(listener)) {
       this.removeByEventName(listener);
-      return;
-    }
-
-    // off(EventListener) — used by the unsubscribe function returned from on()
-    if (listener instanceof EventListener) {
-      this.removeByEventListener(listener);
       return;
     }
 
@@ -480,14 +488,59 @@ export class EventStore {
     this.namedListeners.delete(eventName);
   }
 
-  private removeByEventListener(listener: EventListener): void {
+  /**
+   * Gives one registration back. The handle returned by `on()` / `once()` is
+   * the only caller, and it knows which kind it holds.
+   *
+   * A one-shot release compares the generation it was registered in: a dispatch
+   * that already discharged the obligation bumped `settleId`, and decrementing
+   * `onceCount` from a spent handle would take a count that now belongs to a
+   * later registration — the shape that once let one handle unsubscribe
+   * another's listener.
+   */
+  release(listener: EventListener, kind: RegisterKind, settleId: number): void {
     if (listener.isRemoved) return;
-    listener.refCount -= 1;
-    if (listener.refCount >= 1) return;
 
-    // A listener lives in exactly one bucket: the catch-em-all array, or the
-    // named array for its own eventName. A multi-event on() creates one
-    // EventListener per name, so there is never more than one home to visit.
+    if (kind === REGISTER_ONE_SHOT) {
+      if (listener.settleId !== settleId) return;
+      listener.onceCount -= 1;
+    } else {
+      listener.refCount -= 1;
+    }
+
+    if (listener.refCount + listener.onceCount > 0) return;
+    this.dropListener(listener);
+  }
+
+  /**
+   * Discharges every pending one-shot obligation of a listener that has just
+   * been dispatched. All of them at once: they were satisfied by the same call,
+   * and counting them down one per dispatch would make a second `once()` on the
+   * same identity fire on the next emit instead of this one.
+   *
+   * Runs from inside `EventListener.apply()`, so from inside a live `forEach()`
+   * walk. `dropListener()` routes through `bucketForMutation()`, which is what
+   * keeps the walk's array intact.
+   */
+  settleOneShots(listener: EventListener): void {
+    if (listener.onceCount === 0) return;
+
+    listener.onceCount = 0;
+    listener.settleId += 1;
+    listener.callAfterApply = undefined;
+
+    if (listener.refCount === 0) {
+      this.dropListener(listener);
+    }
+  }
+
+  /**
+   * Takes a listener out of the registry, unconditionally. A listener lives in
+   * exactly one bucket: the catch-em-all array, or the named array for its own
+   * eventName. A multi-event `on()` creates one EventListener per name, so
+   * there is never more than one home to visit.
+   */
+  private dropListener(listener: EventListener): void {
     if (listener.isCatchEmAll) {
       this.removeItem(listener.eventName, this.catchEmAllBucket, listener);
     } else {

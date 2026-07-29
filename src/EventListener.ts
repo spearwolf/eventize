@@ -117,9 +117,23 @@ export class EventListener {
   // Read by EventStore.isSimilar(), which needs a value it can compare with
   // `===`. Never read by apply() — see the note there.
   readonly listenerType: number | undefined;
+  // Runs after a dispatch that actually invoked the listener. It means "settle
+  // the pending one-shot obligations", not "release a handle" — one listener
+  // can carry several once() registrations, and a single closure per handle
+  // could only ever speak for the last one.
   callAfterApply: CallAfterApplyFnType;
   isRemoved: boolean;
+  // Two counters, not one, because two kinds of registration share a listener:
+  // refCount is what on() adds, onceCount is the pending obligations once()
+  // adds. The listener lives while their sum is above zero. Folding them into
+  // one number is what made the registration order decide the behaviour.
   refCount: number;
+  onceCount: number;
+  // Bumped every time a dispatch discharges the pending obligations. An
+  // unsubscribe handle captures it at registration and compares on release: a
+  // handle whose obligation is already discharged must not decrement a counter
+  // that now belongs to somebody else.
+  settleId: number;
 
   constructor(
     eventName: EventName,
@@ -136,7 +150,9 @@ export class EventListener {
     this.listenerType = detectListenerType(listener);
     this.callAfterApply = undefined;
     this.isRemoved = false;
-    this.refCount = 1;
+    this.refCount = 0;
+    this.onceCount = 0;
+    this.settleId = 0;
   }
 
   /**
@@ -155,9 +171,10 @@ export class EventListener {
    * one, so neither shape arrives here. And a match on the listener instance
    * itself lost its last caller in v6.0.0, when association-matching removal
    * stopped collecting its victims and handing each one back in for an identity
-   * search — it tests and splices in a single pass now — while `remove()` routes
-   * an `EventListener` to `removeByEventListener()` two branches before this
-   * method is reachable at all.
+   * search — it tests and splices in a single pass now. `remove()` no longer
+   * has an `EventListener` branch at all: the unsubscribe handle gives its
+   * registration back through `EventStore.release()` instead, so an
+   * `EventListener` instance never reaches `remove()` to begin with.
    */
   isEqual(listener: unknown, listenerObject: unknown = null): boolean {
     return this.listener === listener && this.listenerObject === listenerObject;
@@ -168,6 +185,10 @@ export class EventListener {
    * listeners are spliced out of their bucket, so nothing looks them up
    * again; `apply()` bails on `isRemoved` before touching any of the nulled
    * fields.
+   *
+   * The counters are left as they are: a detached listener is out of its
+   * bucket, so no dedup search finds it again, and every reader bails on
+   * `isRemoved` first.
    */
   detach(): void {
     this.isRemoved = true;
