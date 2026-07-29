@@ -80,8 +80,9 @@ describe.each(apiSurfaces)('$name', ({create}) => {
     await expect(api.emitAsync('foo')).resolves.toEqual([1, 2]);
   });
 
-  // TYPE-003 was first fixed on the standalone functions only; the inject()
-  // and class surfaces kept declaring `Promise<any>` and went on accepting
+  // Narrowing emitAsync()'s return type was first done on the standalone
+  // functions only; the inject() and class surfaces kept declaring
+  // `Promise<any>` and went on accepting
   // the unchecked access. Pinning it here rather than beside the standalone
   // case is the point — this file is what makes "three surfaces, one
   // implementation" a check instead of a claim, and the type is part of the

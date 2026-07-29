@@ -1,6 +1,6 @@
 # eventize — migration notes
 
-## v5 → v6: thirteen breaking changes
+## v5 → v6
 
 Against the last released version, `v5.1.0` — and `v6.0.0` is the only
 `6.x` there is, so this is the whole jump. Most are runtime changes on
@@ -9,6 +9,12 @@ than relying on the type checker to find affected sites. Four are
 type-only (the unsubscribe handle reduced to `() => void`, `emitAsync()`
 narrowed, the marker slot made opaque, a dead type export removed) and
 surface as compile errors instead.
+
+Not fixed in v6, and worth knowing when reasoning about reference counts:
+`on()` still deduplicates onto a `once()` that has not fired yet, so one
+count serves two subscriptions with different lifetimes — the first emit
+consumes the `once()`, decrements, and leaves the `on()` registration
+standing. Held for the next major.
 
 - **Bulk `off()` now clears retained state.** `off(ε)`, `off(ε, '*')`, and
   any array containing `'*'`, `null` or `undefined` (`off(ε, ['*', …])`,
@@ -84,11 +90,21 @@ surface as compile errors instead.
   apply the same guard inside a tuple, which the call-level value does not
   cover.
 
-Worked before/after snippets for the four runtime changes, plus how to
-verify a migration with `getRetainedCount(ε)` / `getSubscriptionCount(ε)`,
-live in
-[`docs/lifecycle.md#migrating-from-v5`](../../../docs/lifecycle.md#migrating-from-v5)
-rather than being duplicated here.
+Verify an upgrade with `getSubscriptionCount(ε)` and `getRetainedCount(ε)`
+around the call in question — they read both halves of an emitter's state
+without reaching into internals, and `getRetainedCount(ε)` is where the
+bulk-`off()` change shows up:
+
+```js
+retain(ε, 'config');
+emit(ε, 'config', settings);
+on(ε, 'config', fn);
+
+off(ε);
+
+getSubscriptionCount(ε); // => 0 — in v5 and v6 alike
+getRetainedCount(ε); // => 0 in v6, would have been 1 in v5
+```
 
 Two more runtime changes ride along, both filed as **fixes** rather than
 breaking changes — one stopped dispatching to code the subscriber never

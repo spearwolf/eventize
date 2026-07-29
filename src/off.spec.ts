@@ -466,7 +466,7 @@ describe('off()', () => {
     });
   });
 
-  // COR-001: the array branch of off() requires listenerObject == null before
+  // The array branch of off() requires listenerObject == null before
   // it does anything to the store (EventStore.remove() falls through to
   // removeByListener(), and an array never matches a listener identity — so
   // nothing is unsubscribed). The keeper branch used to miss that condition
@@ -1113,7 +1113,7 @@ describe('off()', () => {
   });
 
   describe('reference release after unsubscribe', () => {
-    // The handle no longer carries the EventListener (API-001), so these read
+    // The handle no longer carries the EventListener, so these read
     // the registry directly — which is what they always meant. Capture before
     // the removal: afterwards the listener is out of the store.
     it('drops the listener references from a consumed handle', () => {

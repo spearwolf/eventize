@@ -366,7 +366,7 @@ describe('EventStore', () => {
     });
   });
 
-  // PERF-001. Up to v5.1.0 forEach() protected its walk by copying the bucket
+  // Up to v5.1.0 forEach() protected its walk by copying the bucket
   // before every dispatch — one allocation per emit, whether or not anything
   // mutated. Since v6.0.0 the copy moved to the mutating side: a walk declares
   // the one or two arrays it is stepping through, and a path that changes one
@@ -608,8 +608,8 @@ describe('EventStore', () => {
       expect(store.namedListeners.get('foo')).toBe(namedAfterFirst);
     });
 
-    // The other half of the bound, and the one PERF-001 was nearly lost on: a
-    // walk holds its own two arrays and nothing else, so every other bucket a
+    // The other half of the bound, and the one this design was nearly lost on:
+    // a walk holds its own two arrays and nothing else, so every other bucket a
     // dispatch touches changes in place. A store that copies whichever bucket
     // it is about to change "because a dispatch is running" pays one copy per
     // *mutated* bucket instead of one per *walked* bucket — and off(ε, obj)

@@ -40,7 +40,7 @@ const afterApply = (callback?: () => void) => (listener: EventListener) => {
 //
 // The nulled capture *is* the consumed flag, and that is what stops a handle
 // kept after its call from pinning anything — the emitter, and with it the
-// store, the keeper and every retained payload (MEM-001). A separate boolean
+// store, the keeper and every retained payload. A separate boolean
 // would leave both references in the closure forever.
 //
 // Both go in one slot so a single null test releases them together and
@@ -58,11 +58,12 @@ const afterApply = (callback?: () => void) => (listener: EventListener) => {
 // deduped onto a `once()` whose event never fired), or the listener object may
 // be the emitter itself. That chain used to hang off the consumed handle.
 //
-// What this does *not* fix is MEM-002 itself: `on()` still deduplicates onto a
-// pending `once()`, so one reference count still spans two lifetimes. It is
-// only the memory consequence that is gone — and only for handles that were
-// actually called. An unconsumed handle pins the emitter by design; the
-// control group in `src/lifecycle.spec.ts` pins that it still does.
+// What this does *not* fix: `on()` still deduplicates onto a pending `once()`,
+// so one reference count still spans two lifetimes. It is only the memory
+// consequence that is gone — and only for handles that were actually called.
+// An unconsumed handle pins the emitter by design; the control group in
+// `src/lifecycle.spec.ts` pins that it still does. The dedup itself is held
+// for the next major — see `docs/backlog.md`.
 const makeUnsubscribe = (
   host: EventizedObject,
   listeners: EventListener | Array<EventListener>,
@@ -580,7 +581,7 @@ export function off(
     // falls through to removeByListener(), where an array never matches a
     // listener identity and nothing is unsubscribed. Without this guard the
     // keeper cleared retained state for a call shape that detached no
-    // listener at all (COR-001).
+    // listener at all.
     keeper.remove(listener.filter(isEventName));
   } else if (isEventName(listener)) {
     keeper.remove(listener);

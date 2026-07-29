@@ -22,7 +22,6 @@
   "files": [
     "lib",
     "docs",
-    "!docs/superpowers",
     "skills",
     "README.md",
     "CHANGELOG.md",

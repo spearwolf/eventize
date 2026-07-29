@@ -231,8 +231,8 @@ export class EventStore {
   }
 
   /**
-   * The array a mutation has to go through, and the one rule the whole of
-   * PERF-001 rests on.
+   * The array a mutation has to go through, and the one rule the whole
+   * clone-on-mutate design rests on.
    *
    * If no walk is holding this bucket the mutation happens in place and
    * nothing is allocated — that covers every dispatch that mutates nothing at

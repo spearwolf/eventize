@@ -5,20 +5,24 @@ description: Use when code imports `@spearwolf/eventize`, mentions `eventize`/`E
 
 # @spearwolf/eventize
 
-A ~5 kB gz, zero-dep, **synchronous** event emitter for any JS/TS object. ESM + CJS, opt-in generic event maps.
+A zero-dependency **synchronous** event emitter for any JS/TS object. ESM + CJS,
+opt-in generic event maps. Ships unminified (~36 kB ESM); around 4.5 kB once a
+bundler minifies it and the transport gzips it.
 
 Deeper material — load only when the task needs it:
 
 | File | Covers |
 | --- | --- |
 | `references/api-details.md` | every `on()` / `off()` shape, per-event priorities, retain semantics in full |
+| `references/lifecycle.md` | what an emitter holds, what each `off()` form releases, handle and `once()` lifetime |
 | `references/typed-events.md` | generic event maps, the `EventMap` trap, symbol escape hatch |
 | `references/migration.md` | v5 → v6 breaking changes, the v4 → v5 emit change, the v4.3 type-brand migration for classes |
-| [`../../docs/lifecycle.md`](../../docs/lifecycle.md) | what an emitter holds and what releases it |
 
 ## Mental model
 
-An **emitter** is any object carrying a hidden symbol slot with a listener registry (`store`) and a retained-event log (`keeper`). Three ways to attach it, sharing one implementation:
+An **emitter** is any object carrying a hidden symbol slot with a listener
+registry (`store`) and a retained-event log (`keeper`). Three ways to attach it,
+sharing one implementation:
 
 | Style | Create | Call |
 | --- | --- | --- |
@@ -26,7 +30,9 @@ An **emitter** is any object carrying a hidden symbol slot with a listener regis
 | Injected methods | `eventize.inject(obj)` | `obj.on(…)`, `obj.emit(…)` |
 | Class inheritance | `class X extends Eventize {}` | `this.on(…)`, `this.emit(…)` |
 
-Listeners run **synchronously**, highest priority first. `emitAsync` changes only how return values are aggregated, never when listeners run. Convention: name eventized objects `ε` (epsilon).
+Listeners run **synchronously**, highest priority first. `emitAsync` changes only
+how return values are aggregated, never when listeners run. Convention: name
+eventized objects `ε` (epsilon).
 
 ## API surface
 
@@ -57,35 +63,91 @@ import {eventize, on, once, onceAsync, emit, emitAsync,
 | `Priority` | `Max Critical High Medium Normal Low Min` (higher runs first) | object |
 | `EVENT_CATCH_EM_ALL` | the wildcard name, `'*'` | `string` |
 
-Event names are `string` or `symbol`. Anywhere a name is accepted, an array of names works too.
+Event names are `string` or `symbol`. Anywhere a name is accepted, an array of
+names works too. The unsubscribe handle is exactly `() => void` — it carries no
+properties, and a second call is inert.
 
 ## The four behavior families
 
-How each function treats a target that was never eventized — the single most common source of surprise:
+How each function treats a target that was never eventized — the single most
+common source of surprise:
 
 | Functions | On a non-eventized target |
 | --- | --- |
 | `on`, `once`, `onceAsync`, `retain` | **auto-eventize** it, then proceed |
-| `emit`, `emitAsync` (v5+) | **duck-type**: `obj[eventName](…args)`, else `obj.emit(eventName, …args)`, else no-op — an inherited `Object.prototype` member is not a match (pitfall 11) |
+| `emit`, `emitAsync` | **duck-type**: `obj[eventName](…args)`, else `obj.emit(eventName, …args)`, else no-op — an inherited `Object.prototype` member is not a match (pitfall 11) |
 | `off`, `getSubscriptionCount`, `getRetainedCount`, `getRetainedEventNames` | **permissive**: silent no-op / `0` / `[]`, even for `null` |
 | `retainClear`, `unretain` | **throw** `"object is not eventized"` |
 
-`on`-family functions install behavior, so auto-eventizing is a meaningful reading of the intent. Retain-state mutators have no duck-typed equivalent, so they still surface typos. Since v5, `emit()` no longer throws on plain objects — for typo safety use a typed emitter (`eventize<TEvents>()`, which rejects unknown names at compile time) or an explicit `isEventized()` guard.
+`on`-family functions install behavior, so auto-eventizing is a meaningful
+reading of the intent. Retain-state mutators have no duck-typed equivalent, so
+they still surface typos. `emit()` does not throw on plain objects — for typo
+safety use a typed emitter (`eventize<TEvents>()`, which rejects unknown names at
+compile time) or an explicit `isEventized()` guard.
 
 ## Pitfalls
 
-1. **`'*'` is subscribe-only.** `emit(ε, '*', …)` throws. In an array form, names before the `'*'` still dispatch before the throw. `retain(ε, '*')` throws as well — an array containing `'*'` throws whatever else it lists. On `unretain()` and `retainClear()` the wildcard is not an error but a bulk form: it targets every retained event.
-2. **Wildcard function listeners never receive the event name** — only the emit args. To learn the name, subscribe a listener-object with an `.emit(eventName, …args)` method; that method is also the catch-all fallback whenever no method matches the event name.
-3. **Forwarding needs a real `.emit` method.** `on(upstream, downstream)` forwards everything, but only because `eventize.inject()` and `class extends Eventize` install `.emit`. Plain `eventize(obj)` does **not** — forwarding to such a target silently no-ops.
-4. **No cycle detection.** `A → B → A`, or re-emitting the same event from inside its own listener, recurses until the stack overflows. The v4.2 guard was reverted because it forbade valid patterns. Break cycles yourself.
-5. **A throwing listener aborts the rest of that dispatch.** Later listeners for the same `emit()` don't run, the throwing listener stays subscribed, and `retain()` is not updated for that emit (the write happens after all listeners). Wrap risky bodies yourself; there is no global error handler by design. The same after-dispatch write order means **any** `emit()` nested inside another — not just self-recursion — retains out of start order: the inner call writes first, the outer call overwrites last. The common way in is forwarding (`on(upstream, downstream)`, pitfall 3): `retain(ε,'a')`, `retain(ε,'b')`, a listener on `'a'` that calls `emit(ε,'b', …)` retains `'b'` before `'a'`, even though `'a'` was emitted first. Self-recursion — re-emitting the *same* name — is the special case where it surprises most, because both nested calls compete for one retained slot: `retain(ε,'ping')` with a listener that counts `0 → 1 → 2` via recursive re-emission leaves `0` retained, not `2`. See `docs/retain.md`.
-6. **Listener-objects dedupe under `on()`, functions never do, `once()` never does.** `on(ε, 'foo', listenerObj)` twice yields one listener with refcount 2; each unsubscribe decrements. The same *function* subscribed twice fires twice. Match key: `(eventName, priority, listener, listenerContext)`. Since v6.0.0 `once()` is exempt: every call registers its own listener, so two `once()` calls fire twice, replay a retained value twice, and release independently.
-7. **`off()` mid-emit** skips listeners that haven't run yet in that dispatch.
-8. **`emitAsync()` resolves `undefined`, not `[]`**, when nothing was collected. `null`/`undefined` returns are dropped; arrays of promises are flattened via `Promise.all`.
-9. **`off(ε, name)` unretains that event** — it drops the stored value *and* the retain policy, so later emits aren't retained until `retain()` is called again. Scalar and array forms behave alike for strings and symbols since v5.1; before that, `off(ε, [aSymbol])` left retained state untouched. Since v6.0.0 the bulk forms `off(ε)` and `off(ε, '*')` do the same for *every* retained name — up to v5.1.0 they cleared only listeners and still replayed old payloads to later subscribers. The three-argument `off(ε, '*', listenerObject)` is the one name-plus-object form that leaves retained state alone: it detaches that object from the wildcard bucket only, named subscriptions of the same object survive, and `'*'` never carries retained state to begin with. Up to v5.1.0 it removed nothing at all.
-10. **Events emitted before `retain()` are not stored.** Retain starts recording from the call onwards.
-11. **Event names inherited from `Object.prototype` dispatch to nothing.** `toString`, `toLocaleString`, `valueOf`, `constructor`, `hasOwnProperty`, `isPrototypeOf`, `propertyIsEnumerable` (and V8's `__defineGetter__` family) are skipped on both dispatch paths when the target only inherits them — a listener-object subscription and a duck-typed `emit()` alike. Up to v5.1.0 they hit the inherited function: `emitAsync(ε, 'toString')` collected `'[object Object]'` and `once(ε, 'toString', {})` was consumed without calling anything. Write your own `toString` method — on the object or on its class — and it dispatches as normal; the comparison is against `Object.prototype`'s function by identity, so the one own property that is still skipped is an alias of that very function (`{toString: Object.prototype.toString}`). A skipped name falls through to the `.emit()` fallback. The method-name form `on(ε, 'evt', 'toString', obj)` is exempt — it names what it wants.
-12. **`on()` rejects what it cannot dispatch (since v6.0.0).** The listener slot is type-checked, not truthiness-checked: a function, a string, a symbol or a non-null object passes, anything else throws. Up to v5.1.0 `on(ε, 'foo', 5)` registered a listener that no `emit()` could ever reach while still counting towards `getSubscriptionCount(ε)` — the same call with `0` threw, because `0` is falsy. A `NaN` priority throws as well, in every position, tuples included, and a `NaN` inside `on(ε, ['a', ['b', NaN]], fn)` registers nothing at all; up to v5.1.0 it slid the listener to a position decided by the bucket size, since `b.priority - a.priority` makes every comparison false. `Priority.Max` / `Priority.Min` (`±Infinity`) and `0` stay valid — the test is `Number.isNaN`.
+1. **`'*'` is subscribe-only.** `emit(ε, '*', …)` throws. In an array form, names
+   before the `'*'` still dispatch before the throw. `retain(ε, '*')` throws as
+   well — an array containing `'*'` throws whatever else it lists. On
+   `unretain()` and `retainClear()` the wildcard is not an error but a bulk form:
+   it targets every retained event.
+2. **Wildcard function listeners never receive the event name** — only the emit
+   args. To learn the name, subscribe a listener-object with an
+   `.emit(eventName, …args)` method; that method is also the catch-all fallback
+   whenever no method matches the event name.
+3. **Forwarding needs a real `.emit` method.** `on(upstream, downstream)`
+   forwards everything, but only because `eventize.inject()` and
+   `class extends Eventize` install `.emit`. Plain `eventize(obj)` does **not** —
+   forwarding to such a target silently no-ops.
+4. **No cycle detection.** `A → B → A`, or re-emitting the same event from inside
+   its own listener, recurses until the stack overflows. Break cycles yourself.
+5. **A throwing listener aborts the rest of that dispatch.** Later listeners for
+   the same `emit()` don't run, the throwing listener stays subscribed — a
+   throwing `once()` therefore fires again — and `retain()` is not updated for
+   that emit, because the write happens after all listeners. Wrap risky bodies
+   yourself; there is no global error handler by design.
+6. **Nested `emit()` retains out of order.** The same after-dispatch write means
+   **any** `emit()` nested inside another — not only self-recursion — writes its
+   retained state first, innermost call to outermost. The common way in is
+   forwarding (pitfall 3): with `retain(ε,'a')` and `retain(ε,'b')`, a listener on
+   `'a'` that calls `emit(ε,'b', …)` retains `'b'` before `'a'`. Self-recursion is
+   the case that surprises most, because both calls compete for one slot:
+   `retain(ε,'ping')` with a listener counting `0 → 1 → 2` by re-emission leaves
+   `0` retained, not `2`.
+7. **Listener-objects dedupe under `on()`, functions never do, `once()` never
+   does.** `on(ε, 'foo', listenerObj)` twice yields one listener with refcount 2;
+   each unsubscribe decrements. The same *function* subscribed twice fires twice.
+   Match key: `(eventName, priority, listener, listenerContext)`. Every `once()`
+   registers its own listener, so two `once()` calls fire twice, replay a retained
+   value twice, and release independently.
+8. **`off()` mid-emit** skips listeners that haven't run yet in that dispatch.
+9. **`emitAsync()` resolves `undefined`, not `[]`**, when nothing was collected.
+   `null`/`undefined` returns are dropped; arrays of promises are flattened via
+   `Promise.all`.
+10. **`off(ε, name)` unretains that event** — it drops the stored value *and* the
+    retain policy, so later emits aren't retained until `retain()` is called
+    again. The bulk forms `off(ε)`, `off(ε, '*')` and any array holding a `'*'` or
+    a nullish element do the same for *every* retained name. `off(ε, undefined)`
+    is one of those bulk forms, not a no-op — forwarding a possibly-missing value
+    into `off()` wipes the emitter. The three-argument `off(ε, '*', listenerObject)`
+    is the one name-plus-object form that leaves retained state alone.
+11. **Event names inherited from `Object.prototype` dispatch to nothing.**
+    `toString`, `toLocaleString`, `valueOf`, `constructor`, `hasOwnProperty`,
+    `isPrototypeOf`, `propertyIsEnumerable` and V8's `__defineGetter__` family are
+    skipped on both dispatch paths when the target only inherits them. Write your
+    own method — on the object or on its class — and it dispatches as normal; the
+    comparison is against `Object.prototype`'s function by identity, so the one
+    own property still skipped is an alias of that very function
+    (`{toString: Object.prototype.toString}`). A skipped name falls through to the
+    `.emit()` fallback. The method-name form `on(ε, 'evt', 'toString', obj)` is
+    exempt — it names what it wants.
+12. **`on()` rejects what it cannot dispatch.** The listener slot is type-checked,
+    not truthiness-checked: a function, a string, a symbol or a non-null object
+    passes, anything else throws. A `NaN` priority throws as well, in every
+    position, tuples included, and a `NaN` inside `on(ε, ['a', ['b', NaN]], fn)`
+    registers nothing at all. `Priority.Max` / `Priority.Min` (`±Infinity`) and `0`
+    stay valid — the test is `Number.isNaN`.
 
 ## Idiomatic shape
 
@@ -105,4 +167,5 @@ unsubscribe();
 
 ## When not to reach for eventize
 
-Async-by-default queuing wants a real message bus. Backpressure or streaming wants `ReadableStream` or RxJS. A single callback wants to be a callback.
+Async-by-default queuing wants a real message bus. Backpressure or streaming
+wants `ReadableStream` or RxJS. A single callback wants to be a callback.

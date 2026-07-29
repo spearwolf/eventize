@@ -296,8 +296,8 @@ describe('EventKeeper', () => {
   it('replayTo skips a wildcard name inside events instead of recursing', () => {
     const keeper = new EventKeeper();
 
-    // retain() rejects '*' since v5.2, so this can only be reached by seeding
-    // `events` by hand — since PERF-002, the catch-em-all branch walks
+    // retain() rejects '*' since v6.0.0, so this can only be reached by seeding
+    // `events` by hand — since v6.0.0 the catch-em-all branch walks
     // `events` (not `eventNames`), so that's the structure the isCatchEmAll
     // guard now has to protect. Without it, a '*' entry here would recurse
     // into itself and blow the stack.
@@ -321,7 +321,7 @@ describe('EventKeeper', () => {
     expect(replayedNames).not.toContain('*');
   });
 
-  // PERF-002: replayTo('*') must replay exactly what's in `events`, no more
+  // replayTo('*') must replay exactly what's in `events`, no more
   // and no less, regardless of how many retain policies exist alongside it.
   // This pins result equivalence, not iteration cost — a bulk of policies
   // with a single retained value must still produce a single replay.

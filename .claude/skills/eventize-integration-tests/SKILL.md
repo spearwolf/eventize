@@ -26,9 +26,8 @@ Never call `docker` directly — the script owns that, this skill owns judgement
    proved nothing.
 
 3. **Read before guessing.** Read `CHANGELOG.md` under
-   `` ## `v6.0.0` (unreleased) `` and
-   `skills/using-eventize/references/migration.md` **before** interpreting a
-   single error message. The order is binding: reversed, you write patches that
+   `` ## `v6.0.0` (unreleased) `` and `docs/migration.md` **before** interpreting
+   a single error message. The order is binding: reversed, you write patches that
    paper over a genuine regression.
 
 4. **Classify.** Every baseline breakage gets exactly one category:

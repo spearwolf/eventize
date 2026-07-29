@@ -166,7 +166,7 @@ describe('once()', () => {
   });
 
   describe('UnsubscribeFunc contract', () => {
-    // API-001: the handle used to expose the internal EventListener as
+    // The handle used to expose the internal EventListener as
     // `.listener` (single-name forms) or `.listeners` (array form). Both are
     // gone. The union that declared them made either access a TS2339 anyway,
     // and they handed out a class no consumer could construct or name.
