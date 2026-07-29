@@ -227,7 +227,7 @@ emit(ε, 'test');
 
 ## Reference counting
 
-When the *same* listener-object subscription is registered more than once **through `on()`**, eventize collapses the duplicates into a single entry carrying a reference count. Each `on()` increments it, each unsubscribe decrements it, and the listener is only really removed at zero.
+When the *same* listener-object subscription is registered more than once — through `on()`, `once()`, or a mixture of the two — eventize collapses the duplicates into a single entry. `on()` and `once()` track their share of it separately: a persistent reference count for `on()`, and a list of pending one-shot obligations for `once()`. Each `on()` call increments the reference count, each of its unsubscribe handles decrements it; each `once()` call adds one obligation, discharged as a batch by whichever matching dispatch reaches the listener first. The listener is only really removed once both are empty — no `on()` holding it and no obligation pending.
 
 ```javascript
 const ε = eventize();
@@ -247,19 +247,19 @@ emit(ε, 'foo'); // (nothing happens)
 ```
 
 > [!IMPORTANT]
-> Reference counting applies **only to listener-object forms of `on()`** — `on(ε, eventName, listenerObject)` and `on(ε, eventName, 'methodName', listenerObject)`. Two subscriptions count as identical when event name, priority, listener object, and listener context all match.
+> Reference counting applies **only to listener-object forms** — `on(ε, eventName, listenerObject)` and `on(ε, eventName, 'methodName', listenerObject)`, and, since v6.0.0, the matching `once()` forms aggregating onto them (below). Two subscriptions count as identical when event name, priority, listener object, and listener context all match.
 
 > [!IMPORTANT]
-> **`once()` never deduplicates (since v6.0.0).** Every `once()` call registers its own listener, whatever is already subscribed:
+> **`once()` aggregates onto the same identity `on()` does (since v6.0.0).** Two `once()` calls, or a `once()` next to an existing `on()` in either order, land on one listener:
 >
 > ```javascript
 > once(ε, 'foo', listener);
-> once(ε, 'foo', listener); // a SECOND one-shot subscription
+> once(ε, 'foo', listener); // a second obligation on the SAME listener
 >
-> emit(ε, 'foo'); // => "foo" twice — then both are gone
+> emit(ε, 'foo'); // => "foo" once — both obligations discharge together
 > ```
 >
-> Two one-shot subscriptions mean two firings, each returned handle releases exactly its own, and a `once()` registered next to an existing `on()` for the same listener object is independent of it. Up to v5.1.0 `once()` shared `on()`'s dedup, which produced a listener that fired on every emit and could only be removed with `off(ε, listenerObject)`.
+> Each `once()` call still returns its own handle, and each handle releases only its own obligation — calling one early is a no-op if the matching dispatch already discharged it. An `on()` on the same identity keeps the listener alive independently of any `once()` obligations riding on it: `on(ε, 'foo', listener); once(ε, 'foo', listener); emit(ε, 'foo');` fires once, discharges the `once()`, and leaves the `on()` registration subscribed. Up to v5.1.0 this held only when the `once()` came first — the reverse order produced two independent listeners that both fired.
 
 Function listeners behave differently — each `on()` is an independent registration:
 

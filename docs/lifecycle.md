@@ -174,15 +174,20 @@ conditional:
   created against, and that capture is nulled on the first call. A handle kept in
   an array after teardown no longer pins the emitter — nor, through it, the
   store, the keeper, or any retained payload under any event name.
-- **The listener, when it actually left the store.** If the call really removed
-  the listener rather than only decrementing a shared reference count,
-  everything the listener held is nulled: the listener function or object, its
-  context, and the auto-unsubscribe hook.
+- **The listener, when nothing is left holding it.** An `on()` handle decrements
+  the persistent reference count; a `once()` handle discharges its own
+  obligation. Either can leave the listener standing — a shared `on()`
+  registration at `refCount > 0`, or another pending `once()` obligation — and
+  the listener is only actually removed once both are empty. When it is,
+  everything it held is nulled: the listener function or object, its context,
+  and the once() settlement hook.
 
 Nulling the capture doubles as the consumed flag, which is what makes each
 handle single-shot: a second call finds nothing to release and does nothing. That
-matters because `on()` de-duplicates — two handles can share one registration,
-and a handle called twice must not take its sibling's registration down with it.
+matters because `on()` de-duplicates and `once()` aggregates onto the same
+identity — several handles can share one registration, and a handle called
+twice, or a `once()` handle called after its obligation already discharged,
+must not take a sibling's registration down with it.
 
 This makes the common pattern safe:
 
@@ -228,9 +233,35 @@ count reaches zero, `service` stays reachable through the still-registered
 listener. What does *not* keep it alive is `h1` itself — a consumed handle holds
 nothing, so keeping one past teardown is untidy rather than load-bearing.
 
-`once()` is exempt from de-duplication: every `once()` call registers its own
-listener, so two of them mean two firings, two replays of a retained value, and
-two handles that each release exactly their own.
+`once()` aggregates onto the same identity as `on()` (since v6.0.0): two
+`once()` calls, or a `once()` next to an existing `on()`, land on one listener.
+Each `once()` call adds its own *obligation* rather than a second listener, and
+the store — not either handle — discharges every pending obligation on a
+listener together, in a batch, from inside the dispatch that first reaches it:
+
+```javascript
+const u1 = once(ε, 'foo', service); // one obligation
+const u2 = once(ε, 'foo', service); // a second obligation, same listener
+
+emit(ε, 'foo'); // => called once — both obligations discharge in this dispatch
+u1(); // no-op — already discharged
+u2(); // no-op — already discharged
+```
+
+A handle called before its obligation discharges releases only that one, and
+never touches a registration an `on()` is still holding:
+
+```javascript
+const h = on(ε, 'foo', service);   // refCount = 1
+const u = once(ε, 'foo', service); // one obligation, same listener
+
+u();               // releases the obligation by hand — it never fired
+emit(ε, 'foo');    // => called once, through the on() alone
+getSubscriptionCount(ε); // => 1 — the on() registration is untouched
+```
+
+A listener is only actually detached once nothing is left holding it — no
+`on()` registration and no pending `once()` obligation.
 
 ### A `once()` is only spent when something was actually called
 
@@ -243,11 +274,12 @@ subscribed. A listener object carrying an `.emit()` method is answered by that
 fallback and released as usual.
 
 The same rule holds when the call happened but threw. A throwing listener *did*
-get called, but the auto-unsubscribe runs after the call returns, and a throw
-never returns — so the subscription survives the exception and fires again on the
-next matching `emit()`. A one-shot without a kept handle can turn into a
-repeat-shot the moment it throws. Once some later invocation completes normally,
-the hook finally runs and releases it.
+get called, but the store only discharges the pending obligation after `apply()`
+returns, and a throw never returns — so the obligation, and the subscription it
+sits on, survives the exception and fires again on the next matching `emit()`. A
+one-shot without a kept handle can turn into a repeat-shot the moment it throws.
+Once some later invocation completes normally, the store finally settles the
+obligation and — if nothing else is holding the listener — releases it.
 
 If such a name might never be answered, keep the handle and call it on teardown;
 `getSubscriptionCount(ε)` shows the difference.

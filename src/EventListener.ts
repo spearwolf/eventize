@@ -126,10 +126,23 @@ const createUniqId = () => ++lastId;
 // that says when it was created stays exactly what it always was. Same
 // pattern as `EventListener.lastId` above and `EventKeeper.nextOrderId`: a
 // module-global counter, scoped to one loaded module instance rather than one
-// realm, which is fine here for the same reason it's fine there — ordering is
-// only ever compared between listeners (or obligations) that came from the
-// same module instance in the first place. See AGENTS.md, "Counters are per
-// module instance".
+// realm. That scoping is safe for `lastId`: a mis-ordered comparison there
+// only reorders equal-priority listeners, and every listener `lastId` is ever
+// compared against belongs to the same emitter, hence the same module
+// instance that constructed it. It is not safe here in the same way:
+// `asEventized()`'s marker is realm-wide by design, so if both the ESM and
+// CJS builds are loaded against the same objects, a store obtained from one
+// module instance can still receive a listener `new EventListener()`'d by the
+// other — `EventStore.add()` matches structurally, not by module identity —
+// and gain an obligation whose `sequence` was stamped by that other
+// instance's counter. That listener's `apply()` then reads its watermark from
+// *this* instance's counter, which shares nothing with the counter that
+// stamped the obligation; if the foreign counter is ahead, `sequence <
+// watermark` is never true and the obligation never discharges — a `once()`
+// that fires on every emit instead of settling once. Loading both builds
+// against the same eventized objects is unsupported for exactly this reason,
+// not merely a guarantee this counter happens to provide. See AGENTS.md,
+// "Counters are per module instance".
 let nextObligationSequence = 0;
 
 /**

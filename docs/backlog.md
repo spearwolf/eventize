@@ -15,26 +15,6 @@ consumer can observe it.
 
 ## Deferred to the next major
 
-### `on()` deduplicates onto a pending `once()`
-
-`EventStore.findSimilarListener()` compares listener type, priority, event
-name, listener and listener object — but not whether the listener it found
-already carries a `callAfterApply` hook. So an `on()` can collapse onto a
-`once()` that has not fired yet, and one reference count then serves two
-subscriptions with different lifetimes: the first emit consumes the `once()`,
-decrements the count, and leaves the `on()` registration standing.
-
-The memory consequence is gone as of v6.0.0 — a consumed unsubscribe handle
-nulls its captures, and `src/lifecycle.spec.ts` pins with `WeakRef` that the
-emitter is collected where it used to stay reachable. What remains is the
-behavioural asymmetry of the shared count.
-
-**Deferred on purpose.** The obvious fix — have `findSimilarListener()` refuse
-to deduplicate onto a listener that already carries a `callAfterApply` — is a
-behaviour change whose blast radius on consumers built around the current
-counting is unmeasured. It does not ship as a silent fix inside a release that
-already carries breaking changes. Next major, with its own CHANGELOG entry.
-
 ### `off(ε, eventName, listenerObject)` unretains the whole event name
 
 The form detaches one listener object's subscription to one event, and drops

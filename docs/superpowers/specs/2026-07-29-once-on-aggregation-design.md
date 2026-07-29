@@ -240,3 +240,32 @@ turn red. Per `AGENTS.md`, run `npx jest --clearCache` before verifying, and
 `off(ε, eventName, listenerObject)` unretaining the whole event name stays as it
 is, and so does the wildcard asymmetry between `retain()` and `emit()` on arrays.
 Both are separate backlog entries.
+
+## Amendment, 2026-07-29: the counting model above was replaced
+
+Everything above this line describes what was *designed*, not what shipped.
+Implementing the `refCount` / `onceCount` / `settleId` model surfaced a
+documented behaviour the design never accounted for: `once(ε, ['foo', 'bar'],
+handler)` has always removed the listener after the **first** of those names
+to fire, pinned by two cases in `src/once.spec.ts`. A per-listener counter has
+no way to express that race — `onceCount` lives on one listener, and a
+multi-name call registers one listener per name. Hanging a group hook off the
+single `callAfterApply` slot to reach the siblings would have reintroduced
+exactly the registration-order dependence this whole change exists to remove.
+
+A human ruled that the race semantics stay, so the counting model was
+**replaced**, not extended, before implementation: `onceCount`, `settleId` and
+the three `REGISTER_*` symbols the design above describes do not exist in the
+shipped code. In their place, one `once()` call creates one `OnceObligation`
+object (`{settled, members, sequence}`) that every listener the call registers
+shares — a multi-name call pushes the *same* obligation onto each of its
+listeners, so discharging it from any one of them discharges it for all. A
+listener carries `refCount` (unchanged, for `on()`) plus a lazily-created
+`onceObligations: OnceObligation[] | undefined` (for every `once()` riding on
+it), and is alive while `refCount > 0 || onceObligations !== undefined`.
+Settlement stamps each obligation with a `sequence` at creation and compares it
+against a watermark `EventListener.apply()` reads before dispatching, rather
+than trusting a count or an array position — both of which a mid-dispatch
+release or force-removal can invalidate. See `AGENTS.md`, "Two collaborators
+per emitter" and the "Known asymmetries" aggregation bullet, and
+`src/EventListener.ts` for the mechanism as built.

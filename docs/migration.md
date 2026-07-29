@@ -83,22 +83,36 @@ force a shared registration to zero. Reach for `off(ε, listenerObject)`, which
 removes every matching subscription in one call however many handles they were
 split across.
 
-### `once()` no longer deduplicates
+### `on()` and `once()` aggregate by listener identity
 
-```js
-// v5 — two once() calls collapsed into one listener that then never stopped
-once(ε, 'ready', handlerObject);
-once(ε, 'ready', handlerObject);
-emit(ε, 'ready'); // one call — and the listener is still subscribed
+A listener object — or a `(methodName, listenerObject)` pair — subscribed to
+the same event at the same priority is one registration, however many `on()`
+and `once()` calls produced it, in whatever order. The first dispatch
+discharges every pending `once()` on that identity; the registration survives
+for as long as an `on()` still holds it.
 
-// v6 — two independent one-shot subscriptions
-once(ε, 'ready', handlerObject);
-once(ε, 'ready', handlerObject);
-emit(ε, 'ready'); // two calls — both detached afterwards
+Grep for a listener object subscribed with both calls on the same event:
+
+```bash
+grep -rn "once(.*,.*)" src | grep -v "once(.*function"
 ```
 
-Drop the duplicate `once()`, or guard the handler against being invoked twice.
-`on()`'s reference-counted de-duplication is unaffected.
+Two calls on one identity used to mean two invocations in one registration
+order and one in the other. They now always mean one. Where two invocations
+were the point, give the second subscription its own handler:
+
+```js
+// before — two invocations only if the on() came first
+on(ε, 'ready', handlers);
+once(ε, 'ready', handlers);
+
+// after — two invocations in either order
+on(ε, 'ready', handlers);
+once(ε, 'ready', {ready: () => handlers.ready()});
+```
+
+Plain function listeners are unaffected — they never aggregate, in either
+version.
 
 ### `on()` / `once()` reject a listener they cannot dispatch to
 

@@ -450,7 +450,7 @@ emit(ε, 'foo'); // => "foo"  (called once, not twice)
 ```
 
 > [!IMPORTANT]
-> De-duplication applies **only to listener-object forms of `on()`**. Plain function listeners are **not** deduplicated: registering the same function twice produces two independent listeners that will both run. Neither is `once()` — since v6.0.0 every `once()` call registers its own listener, so two one-shot subscriptions mean two firings. See [_Reference counting_](./docs/off.md#reference-counting) for details.
+> De-duplication applies **only to listener-object forms** — and, since v6.0.0, `once()` shares it with `on()`: subscribing the same listener object through any mixture of the two calls, in any order, still yields one registration. Plain function listeners are **not** deduplicated: registering the same function twice produces two independent listeners that will both run. See [_Reference counting_](./docs/off.md#reference-counting) for details.
 
 ---
 
@@ -469,7 +469,7 @@ emit(ε, 'my-event'); // (nothing happens)
 > With multiple event names, the listener is removed after the _first_ of those events fires.
 
 > [!NOTE]
-> `once()` does **not** de-duplicate (since v6.0.0). Two `once(ε, 'foo', listenerObject)` calls are two independent one-shot subscriptions: the next `emit()` calls the listener twice and removes both. `on()`'s [reference counting](./docs/off.md#reference-counting) is unaffected.
+> `once()` aggregates onto the same listener-object identity `on()` does (since v6.0.0). Two `once(ε, 'foo', listenerObject)` calls land on one listener: the next `emit()` calls it once and discharges both. An `on(ε, 'foo', listenerObject)` on the same identity keeps it subscribed after that. See [_Reference counting_](./docs/off.md#reference-counting).
 
 #### `onceAsync(emitter, eventName | eventName[], options?)`
 
