@@ -619,9 +619,15 @@ describe('lifecycle', () => {
     //
     // Neither helper may hand the listener back. The whole question is what
     // the *handle* still reaches, and a listener held by the test frame keeps
-    // the emitter alive on its own — which would make both assertions below
-    // pass for the wrong reason.
-    it('a consumed handle releases the emitter even when the surviving listener leads back to it', async () => {
+    // the emitter alive on its own — which would make the assertions pass for
+    // the wrong reason.
+    //
+    // One case per spelling, deliberately not one case with four sections: a
+    // failing expectation aborts the rest of its `it()`, so sections after the
+    // first would report nothing on the run that matters. Each spelling parks
+    // the emitter somewhere else, and a release that clears one place and not
+    // another has to be able to fail alone.
+    it('a consumed handle releases the emitter when a foreign listener object survives', async () => {
       const plainSharedRegistration = () => {
         const obj = eventize();
         const listenerObject = {foo: () => {}};
@@ -632,21 +638,24 @@ describe('lifecycle', () => {
       };
 
       const shared = plainSharedRegistration();
-      const sharedVerdict = await collect(shared.ref);
+      const verdict = await collect(shared.ref);
 
       expect(typeof shared.handle).toBe('function');
-      expect(sharedVerdict).toMatch(/^collected/);
+      expect(verdict).toMatch(/^collected/);
+    });
 
-      // The hard case: the surviving listener *is* the emitter, subscribed as
-      // its own listener object. Consuming one of the two deduplicated handles
-      // takes the count from 2 to 1 and detaches nothing, which used to leave
-      // the chain handle -> closure -> listener -> listener object -> ε hanging
-      // off the consumed handle. Nulling the capture cuts it at the first link.
-      //
-      // Up to the aggregation change this case was built from an on() that
-      // deduplicated onto a pending once(), reading the back-reference through
-      // callAfterApply. That hook now closes over the store, which holds no
-      // reference back to the emitter, so the chain it tested no longer exists.
+    // The hard case: the surviving listener *is* the emitter, subscribed as
+    // its own listener object, so the emitter sits in the listener's
+    // `listener` field. Consuming one of the two deduplicated handles takes
+    // the count from 2 to 1 and detaches nothing, which used to leave the
+    // chain handle -> closure -> listener -> listener object -> ε hanging off
+    // the consumed handle. Nulling the capture cuts it at the first link.
+    //
+    // Up to the aggregation change this case was built from an on() that
+    // deduplicated onto a pending once(), reading the back-reference through
+    // callAfterApply. That hook now closes over the store, which holds no
+    // reference back to the emitter, so the chain it tested no longer exists.
+    it('a consumed handle releases an emitter subscribed as its own listener object', async () => {
       const selfSubscribedTwice = () => {
         const obj = eventize();
         on(obj, 'foo', obj);
@@ -656,10 +665,51 @@ describe('lifecycle', () => {
       };
 
       const selfSubscribed = selfSubscribedTwice();
-      const selfVerdict = await collect(selfSubscribed.ref);
+      const verdict = await collect(selfSubscribed.ref);
 
       expect(typeof selfSubscribed.handle).toBe('function');
-      expect(selfVerdict).toMatch(/^collected/);
+      expect(verdict).toMatch(/^collected/);
+    });
+
+    // The same shape in the method-name spelling, which parks the emitter in a
+    // different field: the case above puts it in `listener`, this one in
+    // `listenerObject`. A release that clears one field and not the other
+    // passes there and fails here, which is the whole reason this is its own
+    // case rather than a second section of it.
+    it('a consumed handle releases an emitter subscribed by method name', async () => {
+      const selfSubscribedByMethodName = () => {
+        const obj = eventize({handleFoo: () => {}});
+        on(obj, 'foo', 'handleFoo', obj);
+        const handle = on(obj, 'foo', 'handleFoo', obj); // aggregates
+        handle();
+        return {handle, ref: new WeakRef(obj)};
+      };
+
+      const byMethodName = selfSubscribedByMethodName();
+      const verdict = await collect(byMethodName.ref);
+
+      expect(typeof byMethodName.handle).toBe('function');
+      expect(verdict).toMatch(/^collected/);
+    });
+
+    // And the catch-em-all spelling, which lands the same back-reference in
+    // the wildcard bucket instead of a named one. `dropListener()` reads its
+    // destination off `isCatchEmAll`, so this is the removal branch neither
+    // named case above ever takes.
+    it('a consumed handle releases an emitter subscribed to everything', async () => {
+      const selfSubscribedToEverything = () => {
+        const obj = eventize();
+        on(obj, obj);
+        const handle = on(obj, obj); // aggregates
+        handle();
+        return {handle, ref: new WeakRef(obj)};
+      };
+
+      const everything = selfSubscribedToEverything();
+      const verdict = await collect(everything.ref);
+
+      expect(typeof everything.handle).toBe('function');
+      expect(verdict).toMatch(/^collected/);
     });
 
     // The control group for the case above. Without it, `collected` proves
