@@ -12,7 +12,7 @@ export default defineConfig({
   // the raw tsc output with and without the flag. Overriding it here only for
   // the declaration build keeps the flag intact for the JS bundle (esbuild
   // ignores it anyway) and for ts-jest, while letting editors see @deprecated
-  // and every other doc comment on the published .d.ts / .d.mts (INFO-001).
+  // and every other doc comment on the published .d.ts / .d.mts.
   dts: {compilerOptions: {removeComments: false}},
   splitting: false,
   sourcemap: true,

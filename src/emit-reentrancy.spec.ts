@@ -307,7 +307,7 @@ describe('emit() re-entrancy (sub/unsub during dispatch)', () => {
 
   // Every case above states an outcome — who ran, who didn't — and would pass
   // whether forEach() copies the bucket up front or the store copies it on
-  // mutation (PERF-001, v6.0.0). These say which of the two is in place, and
+  // mutation (v6.0.0). These say which of the two is in place, and
   // how much of it happens, through the one thing the choice is observable in:
   // the identity of the array the store holds for the event name.
   describe('bucket identity across a real emit()', () => {

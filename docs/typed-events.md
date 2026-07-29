@@ -130,4 +130,4 @@ interface ChatEvents {
 
 ## Migrating a class-based codebase to v4.3+ types
 
-If `emit(this, …)` inside your own classes stopped type-checking, see [`skills/using-eventize/references/migration.md`](../skills/using-eventize/references/migration.md) — it covers the declaration-merge fix and the two call sites that still need a cast.
+If `emit(this, …)` inside your own classes stopped type-checking, see [`docs/migration.md`](./migration.md) — it covers the declaration-merge fix and the two call sites that still need a cast.

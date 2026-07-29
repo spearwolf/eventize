@@ -12,15 +12,16 @@ A tiny, clever, and dependency-free library for synchronous event-driven program
 
 Written entirely in TypeScript and targeting modern `ES2022`, it offers a type-safe developer experience without sacrificing performance or adding bloat.
 
-Zero runtime dependencies, `sideEffects: false`, tree-shakeable. The ESM
-build is about 27.5 kB unminified.
+Zero runtime dependencies, `sideEffects: false`, tree-shakeable. The package
+ships unminified — the ESM build is about 36 kB — which comes to roughly
+4.5 kB once a bundler minifies it and the transport gzips it.
 
 ### Features
 
 - 🚀 **Developer-Focused API**: Clean, modern, and functional.
 - ✨ **Wildcards & Priorities**: Subscribe to all events and control listener execution order.
 - 🔷 **Full TypeScript Support**: Optional generic event maps narrow `emit`, `on`, retained-event names and listener arguments — without losing first-class duck-typing for code that doesn't opt in.
-- 📦 **Zero Runtime Dependencies**: Lightweight with a minimal footprint (~5 kB gzipped).
+- 📦 **Zero Runtime Dependencies**: Lightweight with a minimal footprint (~4.5 kB minified + gzipped).
 - ESM & CommonJS Support.
 - Apache 2.0 Licensed.
 
@@ -42,8 +43,12 @@ This repo ships a quick-reference skill for AI coding assistants (Claude Code & 
 | Reference | Covers |
 | --- | --- |
 | [`api-details.md`](./skills/using-eventize/references/api-details.md) | every `on()` / `off()` shape, per-event priorities, retain semantics in full |
+| [`lifecycle.md`](./skills/using-eventize/references/lifecycle.md) | what an emitter holds, what each `off()` form releases, handle lifetime |
 | [`typed-events.md`](./skills/using-eventize/references/typed-events.md) | generic event maps, the `EventMap` trap, symbol escape hatch |
 | [`migration.md`](./skills/using-eventize/references/migration.md) | v5 → v6 breaking changes, the v4 → v5 emit change, the v4.3 type-brand migration for classes |
+
+The skill folder is self-contained: everything it references lives inside it, so
+it works when symlinked out of the repo.
 
 To use it, copy or symlink the folder into your agent's skills directory, e.g. for Claude Code:
 
@@ -60,7 +65,9 @@ The deep material behind the summaries below:
 - [Unsubscribing in depth](./docs/off.md) — every `off()` signature, the interaction with `retain()`, and reference counting
 - [Retained events in depth](./docs/retain.md) — `retain()`, `retainClear()`, `unretain()`, symbol names, and the wildcard bulk forms
 - [Typed event maps](./docs/typed-events.md) — generic event maps, the inject and class forms, symbol events as an escape hatch
-- [Lifecycle & cleanup](./docs/lifecycle.md) — what an emitter holds and what releases it; upgrading from v5 → [migration notes](./docs/lifecycle.md#migrating-from-v5)
+- [Lifecycle & cleanup](./docs/lifecycle.md) — what an emitter holds and what releases it
+- [Migration guide](./docs/migration.md) — upgrading from v5, and the older jumps
+- [Backlog](./docs/backlog.md) — known, accepted and deliberately deferred items
 
 ## 📖 Getting Started
 
@@ -237,7 +244,7 @@ Eventize splits its API into four families by how each function treats a target 
 | ------------------------------------------- | -------------------------------------------- |
 | `on()`, `once()`, `onceAsync()`, `retain()` | Auto-eventizes the object                    |
 | `emit()`, `emitAsync()` (v5+)               | Duck-types: calls `obj[eventName](...args)`  |
-| `off()`, `getSubscriptionCount()`           | Silently does nothing / returns `0`          |
+| `off()`, `getSubscriptionCount()`, `getRetainedCount()`, `getRetainedEventNames()` | Silently does nothing / returns `0` / `[]` |
 | `retainClear()`, `unretain()`               | Throws `"object is not eventized"`           |
 
 **Why the split?**
@@ -283,7 +290,7 @@ unretain({}, 'foo'); // throws: "object is not eventized"
 
 The type guard `isEventized(obj)` (see _Utilities_) lets you check defensively when you need to.
 
-> **Migration from v4 → v5:** Previously `emit()` / `emitAsync()` also threw `"object is not eventized"` on a non-eventized target. If you relied on that as a typo-safety net, either gate the call with `isEventized()` or use a typed emitter (`eventize<TEvents>()`) — typed emitters still reject unknown event names at compile time.
+> **Migration from v4 → v5:** Previously `emit()` / `emitAsync()` also threw `"object is not eventized"` on a non-eventized target. If you relied on that as a typo-safety net, either gate the call with `isEventized()` or use a typed emitter (`eventize<TEvents>()`) — typed emitters still reject unknown event names at compile time. See the [migration guide](./docs/migration.md).
 
 ---
 

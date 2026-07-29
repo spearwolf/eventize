@@ -550,7 +550,7 @@ describe('lifecycle', () => {
 
       unsubscribe();
 
-      // API-001: the handle used to hand the detached EventListener back as
+      // The handle used to hand the detached EventListener back as
       // `.listener`. It carries nothing now — the detachment it used to make
       // visible is asserted on the registration itself.
       expect(Object.keys(unsubscribe)).toEqual([]);

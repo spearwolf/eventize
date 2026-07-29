@@ -106,8 +106,9 @@ retained state before the call that contains it does. Completion order is
 inside-out, the reverse of start order, for every pair of events caught up
 in a nesting. The ordinary way this happens is forwarding: a listener that
 relays one event as another, whether onto the same object or onto a
-downstream emitter (`on(upstream, downstream)` — see the pitfalls list in
-`skills/using-eventize/SKILL.md`). No shared event name and no
+downstream emitter (`on(upstream, downstream)` — see
+[README → Forwarding events between emitters](../README.md#forwarding-events-between-emitters)).
+No shared event name and no
 self-reference are required, just one `emit()` call that hasn't returned
 yet when another one starts:
 
@@ -121,9 +122,9 @@ on(ε, 'a', () => emit(ε, 'b', 'B')); // 'a' forwards to 'b'
 emit(ε, 'a', 'A');
 
 const seen = [];
-// a wildcard function listener never receives the event name (see the
-// pitfalls list) — a listener-object with .emit() does, and is also the
-// catch-all fallback for names it has no method for
+// a wildcard function listener never receives the event name — a
+// listener-object with .emit() does, and is also the catch-all fallback for
+// names it has no method for
 on(ε, {emit: (name, value) => seen.push([name, value])});
 
 console.log(seen);

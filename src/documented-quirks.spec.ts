@@ -239,7 +239,7 @@ describe('documented quirks', () => {
       await expect(emitAsync(ε, 'foo')).resolves.toBeUndefined();
     });
 
-    // TYPE-003: the declared return type used to be `Promise<any>`, which let
+    // The declared return type used to be `Promise<any>`, which let
     // the line below compile and then throw at runtime — on exactly the quirk
     // the two cases above pin. `Promise<any[] | undefined>` makes the compiler
     // say so. This case fails if anyone widens the signature back to `any`:

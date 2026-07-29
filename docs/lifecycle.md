@@ -2,18 +2,45 @@
 
 [← back to README](../README.md)
 
-What an emitter holds, and what actually releases it — the two questions that matter once an app subscribes and unsubscribes for longer than a single test run. Every claim below has an assertion behind it somewhere in the spec suite — most in [`src/lifecycle.spec.ts`](../src/lifecycle.spec.ts), which exists specifically to state cleanup as executable assertions, with the rest in [`src/off.spec.ts`](../src/off.spec.ts) (the `off(ε, ['*', …])` wildcard-array row), [`src/once.spec.ts`](../src/once.spec.ts) (`once()` firing twice per registration), [`src/retain.spec.ts`](../src/retain.spec.ts) (the double-replay of a retained value) and [`src/emit-throwing-listener.spec.ts`](../src/emit-throwing-listener.spec.ts) (the `once()` that throws and stays subscribed). This describes the **v6.0.0** state, closing a 35-finding audit against the last released version, `v5.1.0`, plus three follow-up audits — all of it staged into the one major, which is still unreleased. The two lifecycle changes with the widest blast radius: `off(ε)` and `off(ε, '*')` now clear retained state as well as listeners, where they used to clear only the store, and `once()` no longer shares `on()`'s reference-counted de-duplication (`MEM-002`, described below). Upgrading from v5? See [Migrating from v5](#migrating-from-v5) below for these and the rest of this release's breaking changes.
+What an emitter holds, and what actually releases it — the two questions that
+matter once an app subscribes and unsubscribes for longer than a single test
+run.
+
+Upgrading from v5? See [`docs/migration.md`](./migration.md); this file
+describes the current behaviour, not the change.
 
 ## What an emitter holds
 
-`eventize(obj)` (and `asEventized(obj)` underneath it) attaches one hidden, non-enumerable slot keyed by `Symbol.for('eventize')`. Two collaborators live there:
+`eventize(obj)` — and `asEventized(obj)` underneath it — attaches one hidden,
+non-enumerable slot keyed by `Symbol.for('eventize')`. Two collaborators live
+there:
 
-- **`EventStore`** — the listener registry. One bucket per event name, plus a separate bucket for wildcard (`'*'`) listeners.
-- **`EventKeeper`** — the retained-events log. `eventNames` is the set of names carrying a *retain policy*; `events` is the map of names to their last *retained value*. A name can be in the first without being in the second — retain a name, never emit it, and it carries a policy with nothing to replay yet.
+- **`EventStore`**, the listener registry. One bucket per event name, plus a
+  separate bucket for wildcard (`'*'`) listeners.
+- **`EventKeeper`**, the retained-events log. It keeps two things apart: the set
+  of names carrying a *retain policy*, and the map of names to their last
+  *retained value*. A name can be in the first without being in the second —
+  retain a name, never emit it, and it carries a policy with nothing to replay
+  yet.
 
-That slot needs an extensible object to attach to: `eventize(Object.freeze(obj))`, `eventize(Object.seal(obj))` or `eventize(Object.preventExtensions(obj))` throws a `TypeError` — 'eventize() cannot attach to a non-extensible object — eventize before freezing, or eventize a wrapper' — instead of the same `TypeError` class with the opaque native `defineProperty` message. An object eventized *before* it was frozen is unaffected; the slot already exists by then, and every further call is a no-op that returns the same object.
+That slot needs an extensible object to attach to. `eventize(Object.freeze(obj))`
+— and the same for `Object.seal()` and `Object.preventExtensions()` — throws a
+`TypeError`:
 
-Retained payloads are held by **strong reference, not cloned**. `retain(ε, 'foo'); emit(ε, 'foo', bigObject)` keeps the exact `bigObject` reference alive in the keeper — a later subscriber gets the same object back, `===`, not a copy — until the value is overwritten, cleared, or the emitter itself is garbage collected. Retaining a large buffer or a DOM node pins it for as long as the keeper does.
+> eventize() cannot attach to a non-extensible object — eventize before
+> freezing, or eventize a wrapper
+
+An object eventized *before* it was frozen is unaffected: the slot already
+exists, and every further `eventize()` call is a no-op returning the same
+object.
+
+### Retained payloads are strong references
+
+`retain(ε, 'foo'); emit(ε, 'foo', bigObject)` keeps the exact `bigObject`
+reference alive in the keeper. A later subscriber gets the same object back,
+`===`, not a copy — until the value is overwritten, cleared, or the emitter
+itself is collected. Retaining a large buffer or a DOM node pins it for as long
+as the keeper lives.
 
 ```javascript
 const payload = {big: 'buffer-or-dom-node'};
@@ -25,192 +52,96 @@ on(ε, 'foo', (received) => {
 });
 ```
 
+`retainClear(ε, 'foo')` is the antidote for a large payload, and worth calling
+deliberately.
+
 ## What each `off()` form releases
 
-`off()` always touches the store; whether it also touches the keeper's retained state depends on the exact form. The "everything" forms (`off(ε)`, `off(ε, undefined)`, `off(ε, '*')`, and any array containing a `'*'`, a `null` or an `undefined`) wipe both halves — store and keeper — since v6.0.0. Beyond those, the distinction that trips people up runs the other way from what you'd guess: **`off(ε, eventName, listenerObject)` — the one form that carries both a *concrete* event name and a listener object — reaches the keeper and unretains that name, even though it only removes a single listener's subscription.** The remaining forms follow whether they carry a *concrete* event name at all: the two bare-name forms (`off(ε, eventName)`, `off(ε, [eventName, …])`) unretain; the listener-only forms do not. `off(ε, '*', listenerObject)` reads like the first group and belongs to the second — it removes exactly that object's wildcard subscription, and `'*'` is a name `retain()` rejects, so there is no retained state under it to drop.
+`off()` always touches the store. Whether it also touches retained state depends
+on the form.
 
-| Form                                       | Listeners removed                                          | Retained state                                                                          |
-| ------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| `off(ε)`                                    | all                                                          | every value **and** every policy dropped — same as `unretain(ε, '*')`                     |
-| `off(ε, undefined)`                         | all — same branch as `off(ε)`, **not** a no-op               | every value and every policy dropped                                                       |
-| `off(ε, '*')`                                | all (same as `off(ε)`)                                       | every value and every policy dropped                                                       |
-| `off(ε, ['*', …])` — wildcard anywhere in the array | all (the store recurses into its own wipe branch)       | every value and every policy dropped — the other names in the array add nothing            |
-| `off(ε, [null, …])` / `off(ε, [undefined, …])` — nullish anywhere in the array | all (same recursion, same wipe branch) | every value and every policy dropped — the other names in the array add nothing            |
-| `off(ε, eventName)`                          | every listener for that name                                  | value **and** policy dropped for that name — same as `unretain(ε, eventName)`             |
-| `off(ε, [eventName, …])` — no `'*'` in the array | every listener for each listed name                        | value and policy dropped for each listed name (string and symbol names alike)              |
-| `off(ε, listenerFunc[, context])`            | that function (with that context, if given), from every event | **untouched**                                                                              |
-| `off(ε, listenerObject)`                     | every subscription of that object, both the object-alone and method-name shapes | **untouched**                                                                     |
-| `off(ε, eventName, listenerObject)`          | only that object's subscription to that one event               | value **and** policy dropped for that name — even if a sibling listener for the *same* name is left subscribed |
-| `off(ε, '*', listenerObject)`                | only that object's wildcard subscription — named ones survive     | **untouched** — `'*'` can never carry retained state, so the keeper call finds nothing to drop |
-| `off(ε, [eventName, …], listenerObject)`     | **nothing** — the store's array branch requires `listenerObject == null` | **untouched** since v6.0.0 — the keeper now follows the same condition |
-| the `unsubscribe`/`unsubscribe()` handle from `on()`/`once()` | its own listener(s) only                          | **untouched** — it isn't an event-name form                                                |
+| Form | Listeners removed | Retained state |
+| --- | --- | --- |
+| `off(ε)` | all | every value **and** every policy — same as `unretain(ε, '*')` |
+| `off(ε, undefined)` | all — same branch as `off(ε)`, **not** a no-op | every value and every policy |
+| `off(ε, '*')` | all | every value and every policy |
+| `off(ε, ['*', …])` — wildcard anywhere in the array | all | every value and every policy; the other names in the array add nothing |
+| `off(ε, [null, …])` / `off(ε, [undefined, …])` | all | every value and every policy; the other names add nothing |
+| `off(ε, eventName)` | every listener for that name | value **and** policy for that name — same as `unretain(ε, eventName)` |
+| `off(ε, [eventName, …])` — no `'*'` in the array | every listener for each listed name | value and policy for each listed name, strings and symbols alike |
+| `off(ε, listenerFunc[, context])` | that function, from every event | **untouched** |
+| `off(ε, listenerObject)` | every subscription of that object, in both the object-alone and method-name shapes | **untouched** |
+| `off(ε, eventName, listenerObject)` | only that object's subscription to that one event | value **and** policy for that name — even when a sibling listener for it survives |
+| `off(ε, '*', listenerObject)` | only that object's wildcard subscription; named ones survive | **untouched** — `'*'` can never carry retained state |
+| `off(ε, [eventName, …], listenerObject)` | **nothing** | **untouched** — a complete no-op |
+| the handle returned by `on()` / `once()` | its own listener(s) only | **untouched** |
 
-> [!DANGER]
-> **`off(ε, undefined)` is not a no-op.** `undefined == null`, so it takes the exact same branch as the bare `off(ε)` and removes **every** listener on the emitter. Cleanup code that forwards a possibly-missing value straight through — `off(ε, handlers[name])` for a name that was never registered — wipes the whole emitter instead of doing nothing. Guard the call, or keep the `on()` handle and call that, which no-ops safely however often it runs.
->
-> **Wrapping it in an array does not contain it.** `EventStore.remove()` forwards each element back into itself, so `off(ε, [null])`, `off(ε, [undefined])` and `off(ε, ['foo', undefined])` each hit the same wipe branch — one nullish element takes the whole emitter, and since v6.0.0 the retained state with it. An event-name list assembled at runtime is the realistic way in: `off(ε, ids.map((id) => nameFor(id)))` empties the emitter as soon as one lookup returns `undefined`. Filter the array first.
+Three rows are worth reading twice.
 
-The row worth pausing on is `off(ε, eventName, listenerObject)`: it narrowly removes one listener object's subscription to that name, but it drops the retained value and policy for the name *entirely*. Any sibling listener still subscribed to that name keeps running on future emits exactly as before — nothing is unsubscribed out from under it — but the *next* listener to subscribe to that name gets no replay, because the retained state it would have replayed from is gone.
+**`off(ε, undefined)` is not a no-op.** `undefined == null`, so it takes the same
+branch as the bare `off(ε)` and removes every listener and all retained state.
+Cleanup code that forwards a possibly-missing value straight through —
+`off(ε, handlers[name])` for a name that was never registered — wipes the whole
+emitter instead of doing nothing. Wrapping it in an array does not contain it:
+each element is processed on its own, so `off(ε, [null])` and
+`off(ε, ['foo', undefined])` hit the same branch. An event-name list assembled at
+runtime is the realistic way in — filter it first, or keep the `on()` handle and
+call that, which no-ops safely however often it runs.
 
-`off(ε, [eventName, …], listenerObject)` looks like the array sibling of that row but isn't: the store has no array-plus-listener-object form at all — `EventStore.remove()`'s array branch only runs when `listenerObject == null`, so with one given it falls through to a listener-identity lookup that an array can never match, and no listener is removed. Since v6.0.0 the keeper mirrors that condition instead of clearing retained state on its own, so the call is now a complete no-op on both halves — a call shape that reads as "detach this object from these events" but was never a supported way to do it.
+**`off(ε, eventName, listenerObject)` unretains the whole name.** It narrowly
+removes one listener object's subscription to that event, and drops the retained
+value and policy for the name *entirely*. Any sibling listener still subscribed
+keeps running on future emits — nothing is unsubscribed out from under it — but
+the *next* listener to subscribe gets no replay. This is the one place where the
+narrowest removal form has the widest effect on retained state, and it is
+deliberate rather than overlooked: the branch has been unchanged since the 4.0.0
+functional API, and changing it now would be breaking. See
+[`docs/backlog.md`](./backlog.md).
 
-> [!IMPORTANT]
-> **The bulk `off()` forms clear retained state as of v6.0.0.** Up to v5.1.0 the bare and wildcard forms only emptied the store: every retained value and every retain policy survived, so the call that reads as "reset the emitter" was precisely the one that pinned the payloads and still replayed them to the next subscriber. `off(ε)`, `off(ε, '*')` and `off(ε, ['*', …])` now wipe store and keeper together — the array form worst of all before, since it removed every listener but unretained only the names listed beside the `'*'`, leaving the rest pinned. Code that relied on retained values surviving a bulk `off(ε)` must re-`retain()` and re-`emit()`, or switch to the targeted `off(ε, eventName)` / `off(ε, [names])` forms, which are unchanged as long as no `'*'` appears in the array. The explicit `unretain(ε, '*')` after an `off(ε)` is now redundant, not wrong.
->
-> **`off(ε, eventName, listenerObject)` unretaining the whole name was deliberately left off this release's break list.** Unlike the bulk forms above, this branch has been unchanged since the 4.0.0 functional API, and code may already depend on it — `off(ε, eventName, listenerObject)` reversing a `retain()` on that name is exactly what a caller reaches for when they mean "detach this listener and reset the event." Fixing it was not out of scope because it's impossible; it was left out because this release already carries several breaking changes, and a further, narrower one goes on the next major's list instead of piling onto this one. Treat it as intentional, not overlooked.
+**`off(ε, [eventName, …], listenerObject)` does nothing at all.** The store has
+no array-plus-listener-object form: its array branch only runs when the listener
+object is absent, so with one given it falls through to a listener-identity
+lookup that an array can never match. The keeper follows the same condition. The
+call reads as "detach this object from these events" and has never been a
+supported way to do it — use `off(ε, [names])` without the object, or
+`unretain(ε, [names])`.
 
-See [`docs/off.md`](./off.md) for the full signature reference and [`docs/retain.md`](./retain.md) for `retain()` itself.
-
-## Migrating from v5
-
-Thirteen breaking changes against the last released version, `v5.1.0` — and
-`v6.0.0` is the only `6.x` there is, so this is the whole jump. Most are
-runtime behavior changes on signatures that don't change shape, so the type
-checker won't find the call sites — grep for the patterns below instead. Four
-are type-only (the unsubscribe handle reduced to `() => void`, `emitAsync()`
-narrowed, the marker slot made opaque, a dead type export removed) and
-surface as compile errors instead.
-
-### `off(ε)` now clears retained state
-
-```js
-// v5 — the retained value survived a bulk off()
-retain(ε, 'config');
-emit(ε, 'config', settings);
-off(ε);
-on(ε, 'config', fn); // fn received `settings` — replayed from the keeper
-
-// v6 — off(ε) clears everything, listeners and retained state alike
-retain(ε, 'config');
-emit(ε, 'config', settings);
-off(ε);
-on(ε, 'config', fn); // fn receives nothing — the keeper was wiped too
-
-// if you relied on the old behavior, re-retain and re-emit after the reset:
-retain(ε, 'config');
-emit(ε, 'config', settings);
-
-// or narrow the call to what you actually mean to remove — targeted forms
-// (off(ε, eventName), off(ε, [names])) are unchanged:
-off(ε, 'someOtherEvent');
-```
-
-The same applies to `off(ε, '*')` and any array form containing `'*'`
-(`off(ε, ['*', …])`) — all three take the same wildcard branch in the store
-and now take the matching branch in the keeper. So does an array containing
-a `null` or `undefined` element (`off(ε, [null])`, `off(ε, ['foo', undefined])`)
-— it has always emptied the store the same way a wildcard array does, and
-now empties the keeper along with it. An event-name list assembled at
-runtime (`off(ε, ids.map((id) => nameFor(id)))`) hits this the moment one
-lookup misses — filter nullish values out before passing the array.
-
-### Unsubscribe handles are single-shot
-
-```js
-// v5 — a second call on the same handle could release a SIBLING
-// handle's registration instead of being a no-op
-const u1 = on(ε, 'foo', listenerObject);
-on(ε, 'foo', listenerObject); // same subscription → refCount = 2, no new handle kept
-
-u1();
-u1(); // second call decremented the shared refCount again
-getSubscriptionCount(ε); // => 0 — the OTHER handle's registration is gone too
-
-// v6 — the second call on u1 is inert
-const u1 = on(ε, 'foo', listenerObject);
-const u2 = on(ε, 'foo', listenerObject); // refCount = 2
-
-u1();
-u1(); // no-op — a consumed handle cannot decrement twice
-getSubscriptionCount(ε); // => 1 — u2's registration is untouched
-
-u2();
-getSubscriptionCount(ε); // => 0 — only now released
-```
-
-Since v6.0.0 the handle is the only route to that registration: `.listener` and
-`.listeners` are gone (see [Which handles to keep](#which-handles-to-keep)), so
-a cleanup path cannot reach past `unsub()` to the underlying listener any more.
-Nothing to change unless a cleanup path *relied* on calling `off()` twice to
-force a shared registration to zero — reach for `off(ε, listenerObject)`
-instead, which removes every matching subscription in one call regardless of
-how many handles it was split across.
-
-### `once()` no longer deduplicates
-
-```js
-// v5 — two once() calls on the same listener object collapsed into one
-// listener that then never stopped firing (MEM-002)
-once(ε, 'ready', handlerObject);
-once(ε, 'ready', handlerObject);
-emit(ε, 'ready'); // one call — and the listener is still subscribed
-
-// v6 — two independent one-shot subscriptions
-once(ε, 'ready', handlerObject);
-once(ε, 'ready', handlerObject);
-emit(ε, 'ready'); // two calls — both detached afterward
-```
-
-If code registered the same listener object with `once()` more than once and
-expected a single call, it now receives one call per registration — either
-drop the duplicate `once()` call, or guard the handler itself against being
-invoked twice. `on()` is unaffected; its reference-counted de-duplication is
-unchanged.
-
-### Smaller breaking changes
-
-Nine more, each narrow enough not to need a worked snippet:
-
-- **`on(ε, eventName, methodName, listenerObject)` with a missing or `null` listener object now dispatches to nothing instead of throwing.** `on(ε, 'foo', 'handler', null)` used to throw `TypeError: Cannot read properties of null` the moment the event fired; it now silently does nothing until a real listener object is supplied later, matching how the same branch already tolerated a listener object with no matching method. Code that caught the `TypeError` as a signal no longer sees it — check with `getSubscriptionCount(ε)` instead if that mattered.
-- **`off(ε, <numeric listener id>)` no longer removes anything.** Passing the internal `EventListener`'s numeric id used to detach the listener outright, skipping the reference count every documented removal path honours. It was never documented and had no test. Use `unsub()` instead; with the handle reduced to `() => void` there is no supported way to obtain that id anyway.
-- **`UnsubscribeFunc.listener` and `.listeners` are gone, and so is the `EventListener` type export.** The handle is `() => void` and nothing else. See the entry under [Which handles to keep](#which-handles-to-keep) for why, and use `unsub()` wherever code reached for `off(ε, unsub.listener)`.
-- **`emitAsync()` returns `Promise<any[] | undefined>` instead of `Promise<any>`**, on all three API surfaces. The runtime has always resolved to `undefined` when no listener returned a non-null value — the old `any` did not merely lose precision, it switched checking off, so `(await emitAsync(ε, 'x')).map(…)` compiled and then threw on exactly that case. Guard the result: `(await emitAsync(ε, 'x'))?.map(…)`, or fall back with `?? []`.
-- **The marker slot on `EventizedObject` is opaque**, so `EventStore`, `EventKeeper` and `EventListener` no longer appear in `lib/index.d.ts`. Nothing that calls the API breaks — the slot's key is a non-exported `unique symbol`, so reading it from outside answered `TS7053` either way. Only code that annotated the slot structurally is affected.
-- **`export type ListenerType` is gone.** It was `export type ListenerType = unknown` — an alias nothing in the package referenced. Replace an import of it with `unknown` directly.
-- **An `EventListener` built directly with a `null` or `undefined` listener now dispatches to nothing instead of throwing.** Only reachable by constructing `EventListener` yourself; `on()` / `once()` reject such a listener before one is ever built, and the class is not exported at all — neither as a value nor as a type. No action needed unless code somehow holds a reference to the class itself.
-- **`on()` / `once()` throw on a listener they cannot dispatch to.** The slot used to be tested for truthiness alone, so `on(ε, 'foo', 5)` registered a subscription no `emit()` could ever reach: it counted towards `getSubscriptionCount(ε)`, survived every dispatch, and came off only with an explicit `off()`. The same call with `0` threw, because `0` is falsy — the same mistake behaved in opposite ways depending on the number. Only a function, a string, a symbol or a non-null object passes now; the message is the familiar `subscribeTo() called with insufficient arguments`. Every documented spelling of `on()` is unaffected, so the call sites to grep for are the ones that forward a value into the listener position — a config field, a wrapper's `arguments`, an argument that slipped a place.
-- **`on()` / `once()` throw on a `NaN` priority.** `NaN` is a `number`, so it passed the positional decoding and then poisoned the ordering: `b.priority - a.priority` is `NaN` for every pair, every comparison is false, and the listener was inserted at a position decided by the size of the bucket rather than by any priority relation — no error, no warning, just the wrong call order. All four positions a priority can occupy are covered, `[name, priority]` tuples included; a `NaN` in one tuple registers none of the names in that call, and a `NaN` at call level rejects even when every tuple carries its own priority. `Priority.Max` and `Priority.Min` are `±Infinity` and stay valid — the test is `Number.isNaN`, not a finiteness test. Validate before the call rather than after: `on(ε, 'foo', Number.isNaN(p) ? Priority.Normal : p, fn)` expresses what the old behaviour merely pretended to do. A tuple carries its own priority and needs its own guard — `on(ε, [['a', Number.isNaN(p) ? Priority.Normal : p]], fn)`; the call-level value is not a fallback for a tuple that spells one out.
-
-### Verifying a migration actually worked
-
-[`getRetainedCount(ε)`](#verifying-cleanup) and
-[`getSubscriptionCount(ε)`](#verifying-cleanup) read the two halves of an
-emitter's state without reaching into the internals. A migration that
-touched either breaking change is worth pinning with both, before and after
-the call in question:
-
-```js
-retain(ε, 'config');
-emit(ε, 'config', settings);
-on(ε, 'config', fn);
-
-off(ε);
-
-getSubscriptionCount(ε); // => 0 — always true, v5 and v6 alike
-getRetainedCount(ε); // => 0 in v6, would have been 1 in v5
-```
+See [`docs/off.md`](./off.md) for the full signature reference and
+[`docs/retain.md`](./retain.md) for `retain()` itself.
 
 ## Retain semantics
 
-`retain(ε, eventName)` behaves like a `ReplaySubject(1)` per event name — each name gets its own one-slot buffer, independent of every other name's.
+`retain(ε, eventName)` behaves like a `ReplaySubject(1)` per event name — each
+name gets its own one-slot buffer, independent of every other name's.
 
-- `off(ε, name)` doesn't merely clear the retained *value*, it drops the retain *policy* too — future emits of that name are not retained again until `retain()` is called for it once more. `unretain(ε, name)` does the same thing under a clearer name.
-- `unretain(ε, '*')` and `retainClear(ε, '*')` are the bulk forms: the former drops every retain policy and every retained value; the latter drops only the values, leaving every policy in place so the next emit of each name is retained again.
-- `retain(ε, '*')` throws — `'*'` is subscribe-only, on `retain()` exactly as it is on `emit()`. Subscribing a wildcard listener (`on(ε, '*', fn)`) is unaffected; only asking the keeper to retain `'*'` itself is rejected.
+- `off(ε, name)` does not merely clear the retained *value*; it drops the retain
+  *policy* too, so future emits of that name are not retained until `retain()` is
+  called again. `unretain(ε, name)` does the same thing under a clearer name.
+- `unretain(ε, '*')` and `retainClear(ε, '*')` are the bulk forms. The former
+  drops every policy and every value; the latter drops only the values, leaving
+  every policy in place so the next emit of each name is retained again.
+- `retain(ε, '*')` throws. `'*'` is subscribe-only, on `retain()` exactly as on
+  `emit()`. Subscribing a wildcard listener is unaffected; only asking the keeper
+  to retain `'*'` itself is rejected.
 
 ```javascript
 retain(ε, ['a', 'b', 'c']);
 emit(ε, 'a', 1);
 emit(ε, 'b', 2);
 
-unretain(ε, '*');           // drops every policy and every value
-getRetainedCount(ε);         // => 0
-getRetainedEventNames(ε);    // => []
+unretain(ε, '*'); // drops every policy and every value
+getRetainedCount(ε); // => 0
+getRetainedEventNames(ε); // => []
 ```
 
 ## Dynamically generated names
 
-Retaining events under generated names — per-request IDs, per-entity IDs — is a supported pattern, and the keeper does not second-guess it: no eviction, no cap, no TTL. An event library has no way to know which generated name is still needed by the application and which was abandoned an hour ago; guessing wrong in either direction (evicting something still in use, or never freeing something dead) is worse than not guessing at all. The keeper grows by exactly one entry per distinct name retained and emitted, however many times that name is re-emitted afterwards:
+Retaining events under generated names — per-request IDs, per-entity IDs — is a
+supported pattern, and the keeper does not second-guess it: no eviction, no cap,
+no TTL. An event library has no way to know which generated name is still needed
+and which was abandoned an hour ago, and guessing wrong in either direction is
+worse than not guessing. The keeper grows by exactly one entry per distinct name
+retained and emitted, however often that name is re-emitted afterwards:
 
 ```javascript
 for (let i = 0; i < 500; i++) {
@@ -225,33 +156,33 @@ for (let i = 0; i < 100; i++) {
 getRetainedCount(ε); // still 500
 ```
 
-Cleanup is the caller's job. `unretain(ε, '*')` is the blunt instrument; `unretain(ε, name)` (or `off(ε, name)`) targets one entry. Use [`getRetainedCount(ε)`](#verifying-cleanup) to catch growth in a test, and [`getRetainedEventNames(ε)`](#verifying-cleanup) to see exactly which names are still held when it does.
+Cleanup is the caller's job. `unretain(ε, '*')` is the blunt instrument;
+`unretain(ε, name)` (or `off(ε, name)`) targets one entry. Use
+[`getRetainedCount(ε)`](#verifying-cleanup) to catch growth in a test, and
+[`getRetainedEventNames(ε)`](#verifying-cleanup) to see which names are still
+held when it does.
 
 ## Which handles to keep
 
-Both `on()` and `once()` return an `UnsubscribeFunc`, which since v6.0.0 is exactly `() => void`.
+`on()` and `once()` both return an `UnsubscribeFunc`, which is exactly
+`() => void`. It carries no properties; the call is the whole API.
 
-> [!IMPORTANT]
-> **The handle no longer carries `.listener` / `.listeners`.** It used to expose the underlying `EventListener` — as `.listener` for the single-name forms, `.listeners` for the array form. Both are gone, along with the `EventListener` type export. Three reasons, in the order they matter:
->
-> - The declared type was a union of the two shapes, and TypeScript could never tell the arms apart, so *both* fields were a `TS2339` at every call site. The one pattern the docs described, `off(ε, unsub.listener)`, did not compile against the published declarations.
-> - It handed out an internal class no consumer could construct, subclass or `instanceof` — the runtime bundles never exported it.
-> - The single thing it was good for is what calling the handle already does, through the same reference-counted path, without needing the emitter in scope.
->
-> **Migration:** replace `off(ε, unsub.listener)` with `unsub()`. Both were single-shot and both honoured the reference count, so the behaviour is unchanged. Code that reached further in — `unsub.listener.id`, `unsub.listener.isRemoved` — was reading internals and has no replacement by design.
+Calling a handle releases references on two levels, and only the second is
+conditional:
 
-Calling a handle releases references on two levels, and only the second one is conditional:
+- **The emitter, unconditionally.** The handle closes over the emitter it was
+  created against, and that capture is nulled on the first call. A handle kept in
+  an array after teardown no longer pins the emitter — nor, through it, the
+  store, the keeper, or any retained payload under any event name.
+- **The listener, when it actually left the store.** If the call really removed
+  the listener rather than only decrementing a shared reference count,
+  everything the listener held is nulled: the listener function or object, its
+  context, and the auto-unsubscribe hook.
 
-- **The closure's own reference to the emitter, unconditionally.** The handle closes over the emitter it was created against; that capture is nulled on the first call, so a handle kept in an array after teardown no longer pins the emitter through *its own closure* — and with it the store, the keeper and every retained payload, under *any* event name. Before this fix a single kept handle for `'foo'` was enough to keep a buffer retained under `'bar'` alive for the lifetime of the array.
-- **The listener, when it actually left the store.** If the call really removed the listener (rather than only decrementing a shared reference count, see the note below), everything that listener held is nulled via `EventListener.detach()` — the listener function or object, the listener object's context, and the `callAfterApply` hook.
-
-> [!WARNING]
-> **A consumed handle is reference-free; an unconsumed one is not.** The two levels above are separate on purpose, and up to v5.1.0 the gap between them was visible: when the call only decremented a shared count, the listener stayed populated *and registered*, the handle went on holding it, and a registered listener can lead straight back to the emitter. Since v6.0.0 the first call clears the emitter and the listener capture together, so a handle that has been called holds nothing at all — verified with `WeakRef`, including for the two shapes that used to keep the chain alive:
->
-> - `once(ε, 'foo', service)` whose event never fires, followed by `on(ε, 'foo', service)` — the `on()` deduplicates onto the `once()` listener, so consuming the `on()` handle takes the count from 2 to 1 and detaches nothing. The surviving listener's `callAfterApply` is the `once()` handle's closure, and *that* handle was never called, so it still holds the emitter. Same for the method-name form.
-> - **The emitter subscribed as its own listener object**, registered twice: `on(ε, 'foo', ε)`, the method-name form `on(ε, 'foo', 'method', ε)`, and the wildcard clothing of both, `on(ε, ε)`. All three deduplicate, so the first consumed handle leaves the listener registered — and the emitter sits in one of the listener's own slots, a different one per spelling. Watching only one of them misses half the cases.
->
-> In both shapes the *listener* stays registered and the emitter stays reachable through it — that has not changed, and neither has the reference counting. What changed is that a **consumed** handle is no longer part of that chain. What still is: a handle you never called. In the first bullet the `once()` handle is exactly that, so the emitter survives as long as anything holds it. The rule that follows is the same one as before, for a smaller reason: call your handles on teardown, or use `off(ε, listenerObject)`, which removes every matching registration in one go regardless of how many handles they were split across.
+Nulling the capture doubles as the consumed flag, which is what makes each
+handle single-shot: a second call finds nothing to release and does nothing. That
+matters because `on()` de-duplicates — two handles can share one registration,
+and a handle called twice must not take its sibling's registration down with it.
 
 This makes the common pattern safe:
 
@@ -261,41 +192,72 @@ subs.push(on(ε, 'foo', service));
 subs.push(once(ε, 'bar', service));
 // ... later, on teardown:
 subs.forEach((unsubscribe) => unsubscribe());
-// every handle in `subs` now holds no reference to `service` or its listener
+// every handle in `subs` now holds nothing
 ```
 
-A handle that is never called keeps its listener (and, transitively, whatever the listener closes over) alive for as long as the emitter itself is reachable — the array in the example above is exactly as leaky as any other array of live references if `forEach` is never run.
+> [!WARNING]
+> **A handle you never call still pins the emitter — by design.** The array
+> above is exactly as leaky as any other array of live references if `forEach`
+> is never run. Call your handles on teardown, or use `off(ε, listenerObject)`,
+> which removes every matching registration in one go regardless of how many
+> handles they were split across.
 
-> [!NOTE]
-> **"Calling a handle releases its references" is qualified by reference counting — for `on()`.** Two `on()` calls for the same `(eventName, priority, listener, context)` share one `EventListener` with `refCount = 2` (see [`docs/off.md` → Reference counting](./off.md#reference-counting)); `once()` is exempt and always registers its own. The *first* handle's call only decrements the count — it does not detach, and does not null the listener reference, until the *last* outstanding handle for that shared listener calls back too:
->
-> ```javascript
-> const h1 = on(ε, 'foo', service); // shared EventListener, refCount = 1
-> const h2 = on(ε, 'foo', service); // same subscription, refCount = 2
->
-> h1();
-> // getSubscriptionCount(ε) is still 1 — the shared listener is NOT detached yet
-> h1();
-> // still 1 — a consumed handle is inert, it cannot decrement a second time
-> h2();
-> // getSubscriptionCount(ε) is now 0 — only now is the reference released
-> ```
->
-> **Each handle is single-shot (since v6.0.0).** Calling one a second time does nothing at all — it does not decrement the shared count again, and so it cannot take a *sibling* handle's registration down with it. Up to v5.1.0 only `once()` carried that guard: `h1(); h1();` on the pair above dropped the count straight to 0, unsubscribing `h2`'s registration from under it, and the double call is precisely what defensive cleanup code writes.
->
-> The retention window is what survives, and it belongs to the *registration*, not to the handle. If a listener object may be subscribed more than once, only the last handle's call marks the true release point — until then `service` stays reachable through the still-registered listener, and the count is what decides that. What does *not* keep it alive is `h1` itself: since v6.0.0 the first call clears both of the handle's captures, the emitter and the listener, so holding a consumed `h1` past teardown pins nothing. Up to v5.1.0 it did, which is why v5-era cleanup advice was to drop consumed handles as well. Dropping them is still tidy; it is no longer load-bearing.
+### Reference counting decides when a listener is really released
 
-> [!NOTE]
-> **`once()` is exempt from de-duplication (since v6.0.0).** Calling `once()` twice for the same event name on the same listener object creates two independent one-shot subscriptions: two firings on the first `emit()`, two retained-value replays if the event is retained, and two handles that each release exactly their own listener. Up to v5.1.0 the second call bumped the first listener's reference count instead, while the auto-unsubscribe hook accounted for a single firing — one emit took the count from 2 to 1 and the surviving handle's idempotence guard stopped it ever reaching 0. That listener fired on every subsequent `emit()` and could only be removed with an external `off(ε, listenerObject)` (`MEM-002`). If you upgrade from v5.x and relied on two `once()` calls collapsing into one, use a single `once()`.
+Two `on()` calls for the same `(eventName, priority, listener, context)` share
+one listener with `refCount = 2` (see
+[`docs/off.md` → Reference counting](./off.md#reference-counting)). The *first*
+handle's call only decrements; the listener is detached when the *last*
+outstanding handle calls back:
 
-> [!NOTE]
-> **A `once()` releases itself only when the dispatch actually called something.** An event name that matches nothing on the listener object leaves the subscription — and the reference to that object — in place, which is what makes a late-bound handler work: supply the method later and the one-shot still fires. Since v6.0.0 that set includes a name whose only match is an inherited `Object.prototype` member (`toString`, `valueOf`, `constructor`, `hasOwnProperty` and friends): `once(ε, 'toString', {})` used to be consumed by the first `emit(ε, 'toString')` without calling any handler, and now stays subscribed. A listener object carrying an `.emit()` method is answered by that fallback and released as before. If such a name might never be answered, keep the handle and call it on teardown — `getSubscriptionCount(ε)` shows the difference.
->
-> The same rule holds when the call happened but blew up: a `once()` listener that throws is still "called something", but the auto-unsubscribe runs *after* the call returns, and a throw never returns. The subscription survives the exception and fires again on the next matching `emit()` — a one-shot without a kept handle can turn into a repeat-shot the moment it throws. Stop throwing on some later invocation and that invocation's `callAfterApply()` finally runs, releasing it as usual.
+```javascript
+const h1 = on(ε, 'foo', service); // refCount = 1
+const h2 = on(ε, 'foo', service); // same subscription → refCount = 2
+
+h1();
+getSubscriptionCount(ε); // => 1 — the shared listener is not detached yet
+h1();
+getSubscriptionCount(ε); // => 1 — a consumed handle is inert
+
+h2();
+getSubscriptionCount(ε); // => 0 — only now released
+```
+
+The retention window belongs to the *registration*, not to the handle. Until the
+count reaches zero, `service` stays reachable through the still-registered
+listener. What does *not* keep it alive is `h1` itself — a consumed handle holds
+nothing, so keeping one past teardown is untidy rather than load-bearing.
+
+`once()` is exempt from de-duplication: every `once()` call registers its own
+listener, so two of them mean two firings, two replays of a retained value, and
+two handles that each release exactly their own.
+
+### A `once()` is only spent when something was actually called
+
+An event name that matches nothing on the listener object leaves the
+subscription — and the reference to that object — in place. That is what makes a
+late-bound handler work: supply the method later and the one-shot still fires.
+The same applies to a name whose only match is an inherited `Object.prototype`
+member, since those do not count as a match: `once(ε, 'toString', {})` stays
+subscribed. A listener object carrying an `.emit()` method is answered by that
+fallback and released as usual.
+
+The same rule holds when the call happened but threw. A throwing listener *did*
+get called, but the auto-unsubscribe runs after the call returns, and a throw
+never returns — so the subscription survives the exception and fires again on the
+next matching `emit()`. A one-shot without a kept handle can turn into a
+repeat-shot the moment it throws. Once some later invocation completes normally,
+the hook finally runs and releases it.
+
+If such a name might never be answered, keep the handle and call it on teardown;
+`getSubscriptionCount(ε)` shows the difference.
 
 ## `onceAsync` and cancellation
 
-`onceAsync(ε, eventName, {signal})` accepts an `AbortSignal`, close to the `fetch()` shape. Aborting unsubscribes the internal `once()` listener and rejects the promise — with the signal's `reason` if it has one, otherwise with a synthesized `AbortError` `DOMException`.
+`onceAsync(ε, eventName, {signal})` accepts an `AbortSignal`, close to the
+`fetch()` shape. Aborting unsubscribes the internal `once()` listener and rejects
+the promise — with the signal's `reason` if it has one, otherwise with a
+synthesized `AbortError` `DOMException`.
 
 ```javascript
 const controller = new AbortController();
@@ -306,15 +268,27 @@ await promise; // rejects — name: 'AbortError'
 getSubscriptionCount(ε); // => 0 — the listener is gone
 ```
 
-Without a signal, an `onceAsync()` call on an event that never fires is a leak by construction: the listener, the `resolve` closure, and the caller's entire `await` continuation stay attached to the emitter for its whole lifetime, with no handle available to release them — there is nothing to call `unsubscribe()` on from outside. This is exactly the unmount-before-event / cancelled-request shape: a component awaits `onceAsync()`, unmounts before the event ever arrives, and the promise (plus everything it closed over) is pinned until the emitter itself goes away. Pass a signal tied to the component's own teardown (an `AbortController` aborted on unmount) whenever the event might legitimately never come.
+Without a signal, an `onceAsync()` call on an event that never fires is a leak by
+construction: the listener, the `resolve` closure and the caller's entire `await`
+continuation stay attached to the emitter for its whole lifetime, and there is
+nothing to call `unsubscribe()` on from outside. This is the
+unmount-before-event / cancelled-request shape — a component awaits
+`onceAsync()`, unmounts before the event arrives, and the promise plus everything
+it closed over is pinned until the emitter itself goes away. Pass a signal tied
+to the component's own teardown whenever the event might legitimately never come.
 
 ## Verifying cleanup
 
-Three functions read emitter state from the outside without reaching into `ε[Symbol.for('eventize')]` directly, and all three return a zero-ish value (`0` or `[]`) rather than throwing when called on a non-eventized object:
+Three functions read emitter state from the outside without reaching into
+`ε[Symbol.for('eventize')]`, and all three return a zero-ish value rather than
+throwing on a non-eventized object:
 
-- `getSubscriptionCount(ε)` — how many listeners are currently registered (named + wildcard).
+- `getSubscriptionCount(ε)` — how many listeners are registered, named plus
+  wildcard.
 - `getRetainedCount(ε)` — how many event names currently hold a retained *value*.
-- `getRetainedEventNames(ε)` — every event name carrying a retain *policy*, whether or not it has fired yet. Always `getRetainedEventNames(ε).length >= getRetainedCount(ε)`.
+- `getRetainedEventNames(ε)` — every name carrying a retain *policy*, whether or
+  not it has fired. `getRetainedEventNames(ε).length >= getRetainedCount(ε)`
+  always holds.
 
 A teardown assertion in this shape catches both halves of emitter state at once:
 
@@ -331,4 +305,7 @@ expect(getRetainedCount(component.ε)).toBe(0);
 expect(getRetainedEventNames(component.ε)).toEqual([]);
 ```
 
-The explicit `unretain(ε, '*')` is what makes that teardown work without a bulk `off()`: calling the handles back only empties the store, so a teardown that stops there leaves the keeper exactly as full as it was. A single `off(component.ε)` covers both halves in one call.
+The explicit `unretain(ε, '*')` is what makes that teardown work without a bulk
+`off()`: calling the handles back only empties the store, so a teardown that
+stops there leaves the keeper exactly as full as it was. A single
+`off(component.ε)` covers both halves in one call.
