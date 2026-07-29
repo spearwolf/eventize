@@ -69,6 +69,26 @@ const makeOnUnsubscribe = (
   };
 };
 
+// The once() handle has a second way to be spent, and it is the common one:
+// the dispatch that discharges the obligation. Up to the aggregation change
+// that came for free — once() installed its own unsubscribe as the listener's
+// `callAfterApply`, so firing ran the handle and nulled its capture. That hook
+// now settles obligations instead (one listener can carry several, and a
+// single closure could only ever speak for the last), so the release hangs off
+// the obligation: the handle registers `onSettled`, EventStore's
+// dischargeObligation() clears the field and runs it, and a fired once()
+// releases the emitter without anyone calling the handle. Anything else leaves
+// every emitter whose once() has already fired pinned until the caller's
+// teardown loop runs — the leak the nulled capture exists to prevent, reached
+// by the one route that never reaches the closure below.
+//
+// Capturing {store, obligation} instead would also free the emitter, and
+// earlier: the store holds no back-reference to its host. It would free it too
+// early, though. A handle whose subscription is still pending must pin the
+// emitter — that is deliberate, it is what makeOnUnsubscribe() does, and
+// src/lifecycle.spec.ts keeps a control group on the on() side to prove a
+// `collected` verdict elsewhere means anything at all. A once() whose event
+// never fires is the shape on this side that relies on it.
 const makeOnceUnsubscribe = (
   host: EventizedObject,
   obligation: OnceObligation,
@@ -77,6 +97,18 @@ const makeOnceUnsubscribe = (
     host,
     obligation,
   };
+
+  if (obligation.settled) {
+    // Already discharged before this handle existed: a retained replay settles
+    // the obligation from inside subscribeTo(). A hook installed now would
+    // never run, so the capture is released here instead — the handle is born
+    // spent, which is what it is.
+    held = null;
+  } else {
+    obligation.onSettled = () => {
+      held = null;
+    };
+  }
 
   return () => {
     const target = held;

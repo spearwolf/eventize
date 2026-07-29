@@ -560,9 +560,20 @@ export class EventStore {
    * straight to `EventListener.detach()` without going through here) is
    * skipped: `detach()` already spliced it out of `members` on its way out, so
    * `isRemoved` is a belt-and-braces check, not the one this relies on.
+   *
+   * The settle hook goes first, and it is read and cleared before it is called
+   * so that neither a re-entrant discharge nor a throw from a member below can
+   * run it twice or leave it standing. It is the `once()` handle's capture:
+   * discharging is what spends a `once()`, whichever way it happened, and a
+   * spent handle must hold nothing — see `OnceObligation.onSettled`.
    */
   private dischargeObligation(obligation: OnceObligation): void {
     obligation.settled = true;
+
+    const onSettled = obligation.onSettled;
+    obligation.onSettled = undefined;
+    onSettled?.();
+
     const members = obligation.members.slice();
     obligation.members.length = 0;
 

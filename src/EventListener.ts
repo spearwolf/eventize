@@ -156,11 +156,25 @@ let nextObligationSequence = 0;
  * it is what lets `EventStore.settleOneShots()` tell "existed before this
  * dispatch" from "the callback just created it" without trusting position in
  * an array that removal can reshuffle.
+ *
+ * `onSettled` is the one hook the obligation offers, and it exists for exactly
+ * one caller: `makeOnceUnsubscribe()` installs a closure that nulls the
+ * handle's capture, and `EventStore.dischargeObligation()` clears the field and
+ * runs it. That restores what the pre-aggregation wiring got for free — `once()`
+ * used to install its *own* unsubscribe as `callAfterApply`, so the dispatch
+ * that spent the subscription also consumed the handle and released the
+ * emitter. `callAfterApply` now settles obligations rather than releasing
+ * handles (one listener can carry several), so the release has to hang off the
+ * obligation instead. One `once()` call makes one obligation and one handle, so
+ * a single slot is the whole relationship; it is `undefined` for the
+ * obligations `onceAsync()` and the specs build directly, and it is nulled
+ * before it is called so a re-entrant discharge cannot run it twice.
  */
 export interface OnceObligation {
   settled: boolean;
   members: EventListener[];
   readonly sequence: number;
+  onSettled: (() => void) | undefined;
 }
 
 /** The only place an `OnceObligation` is ever created — see `sequence` above. */
@@ -168,6 +182,7 @@ export const createOnceObligation = (): OnceObligation => ({
   settled: false,
   members: [],
   sequence: nextObligationSequence++,
+  onSettled: undefined,
 });
 
 export class EventListener {

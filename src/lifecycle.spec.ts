@@ -566,6 +566,51 @@ describe('lifecycle', () => {
       });
     });
 
+    // A once() that has fired is spent, and the dispatch that spent it is what
+    // consumes the handle — nobody calls this one. Up to the aggregation
+    // change that fell out of the wiring: once() installed its own unsubscribe
+    // as callAfterApply, so firing ran it. The obligation model replaced that
+    // hook, and without a settle hook of its own the handle went on holding
+    // the emitter, the store, the keeper and every retained payload for as
+    // long as the caller kept it — which the teardown pattern `docs/lifecycle.md`
+    // recommends, `subs.push(once(ε, 'bar', service))`, does by design.
+    it('a fired once() handle releases the emitter without ever being called', async () => {
+      const fireAndKeepHandle = () => {
+        const obj = eventize();
+        const handle = once(obj, 'foo', () => {});
+        emit(obj, 'foo');
+        return {handle, ref: new WeakRef(obj)};
+      };
+
+      const fired = fireAndKeepHandle();
+      const verdict = await collect(fired.ref);
+
+      // Touched after the collection rounds, so the handle is provably still
+      // reachable while they run — the emitter must go anyway.
+      expect(typeof fired.handle).toBe('function');
+      expect(verdict).toMatch(/^collected/);
+    });
+
+    // The same question one step earlier: a retained replay discharges the
+    // obligation from inside subscribeTo(), before the handle exists at all.
+    // There is no settle hook to run for that one, so the handle has to notice
+    // it was born spent.
+    it('a once() spent by a retained replay releases the emitter too', async () => {
+      const replayAndKeepHandle = () => {
+        const obj = eventize();
+        retain(obj, 'foo');
+        emit(obj, 'foo', 'payload');
+        const handle = once(obj, 'foo', () => {});
+        return {handle, ref: new WeakRef(obj)};
+      };
+
+      const replayed = replayAndKeepHandle();
+      const verdict = await collect(replayed.ref);
+
+      expect(typeof replayed.handle).toBe('function');
+      expect(verdict).toMatch(/^collected/);
+    });
+
     // A consumed handle releases the emitter even when the call only
     // decremented a shared reference count and the surviving listener leads
     // straight back to the emitter. That second half is new: up to v5.1.0 the
