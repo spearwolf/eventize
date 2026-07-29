@@ -36,7 +36,7 @@
   },
   "scripts": {
     "update": "npx npm-check --update",
-    "clean": "rimraf tmp build dist types lib && jest --clearCache",
+    "clean": "rimraf tmp build dist types lib coverage && jest --clearCache",
     "clean:all": "run-s clean && rimraf node_modules",
     "build": "tsup",
     "publish:pkg": "node scripts/publishPackage.cjs",
