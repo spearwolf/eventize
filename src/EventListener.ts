@@ -166,9 +166,12 @@ let nextObligationSequence = 0;
  * emitter. `callAfterApply` now settles obligations rather than releasing
  * handles (one listener can carry several), so the release has to hang off the
  * obligation instead. One `once()` call makes one obligation and one handle, so
- * a single slot is the whole relationship; it is `undefined` for the
- * obligations `onceAsync()` and the specs build directly, and it is nulled
- * before it is called so a re-entrant discharge cannot run it twice.
+ * a single slot is the whole relationship. It stays `undefined` in two cases:
+ * an obligation a spec builds directly, and one a retained replay settled from
+ * inside `subscribeTo()` before there was a handle to release — that handle is
+ * born spent and nulls its own capture rather than installing a hook nothing
+ * would ever run. And it is nulled before it is called, so a re-entrant
+ * discharge cannot run it twice.
  */
 export interface OnceObligation {
   settled: boolean;

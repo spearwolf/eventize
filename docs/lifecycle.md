@@ -204,10 +204,13 @@ subs.forEach((unsubscribe) => unsubscribe());
 ```
 
 > [!WARNING]
-> **A handle whose subscription is still pending pins the emitter — by design.**
+> **A handle you have not spent pins the emitter — by design.**
 > The array above is exactly as leaky as any other array of live references if
-> `forEach` is never run. The one exception is a `once()` whose event already
-> fired: the dispatch spent it, and it holds nothing.
+> `forEach` is never run. The one exception is a `once()` whose event actually
+> fired: discharging its obligation releases the handle's capture, so it holds
+> nothing afterwards without anyone calling it. A `once()` that ends any other
+> way never reaches that discharge — `off(ε, 'foo')` before the event fires
+> detaches the listener and leaves the handle pinning the emitter.
 > Call your handles on teardown, or use `off(ε, listenerObject)`,
 > which removes every matching registration in one go regardless of how many
 > handles they were split across.

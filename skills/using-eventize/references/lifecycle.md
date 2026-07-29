@@ -83,10 +83,13 @@ subs.push(once(ε, 'bar', service));
 subs.forEach((unsubscribe) => unsubscribe());
 ```
 
-**A handle whose subscription is still pending pins the emitter — by design.**
+**A handle you have not spent pins the emitter — by design.**
 The array above is as leaky as any array of live references if `forEach` never
-runs. A `once()` whose event already fired is the exception: it was spent by the
-dispatch and holds nothing.
+runs. A `once()` whose event actually fired is the exception: discharging its
+obligation releases the handle's capture, so it holds nothing afterwards without
+anyone calling it. A `once()` that ends any other way never reaches that
+discharge — `off(ε, 'foo')` before the event fires detaches the listener and
+leaves the handle pinning the emitter.
 `off(ε, listenerObject)` is the alternative: it removes every matching
 registration in one call, however many handles they were split across.
 
