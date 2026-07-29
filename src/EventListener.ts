@@ -8,7 +8,16 @@ import type {EventName, EventArgs, ListenerObjectType} from './types';
 import {dispatchableMember, isCatchEmAll, isEventName} from './utils';
 
 type EmitFnType = Function | undefined;
-type CallAfterApplyFnType = (() => void) | undefined;
+// The watermark is the obligation sequence counter's value immediately before
+// this dispatch invoked the listener — read there, not inside this callback,
+// because a handler that re-subscribes itself with once() aggregates onto the
+// very listener being dispatched and appends its brand-new obligation to that
+// same array before this ever runs. Settling has to discharge only the
+// obligations stamped below this watermark, or a once() armed from inside its
+// own dispatch is discharged before it ever gets to fire. See the sequence
+// counter next to `OnceObligation` for why this is a stamped number and not a
+// count of array entries.
+type CallAfterApplyFnType = ((watermark: number) => void) | undefined;
 // A listener may return anything, and this callback only forwards it into
 // emitAsync()'s collector — nothing here inspects the value, so `unknown` is
 // the accurate type. `any` would let a caller do arithmetic on it unchecked.
@@ -104,6 +113,81 @@ export const detectListenerType = (listener: unknown): number | undefined => {
 let lastId = 0;
 const createUniqId = () => ++lastId;
 
+// A listener's own `onceObligations` array is not a stable timeline: releasing
+// a handle (EventStore.releaseObligation()) or a force-removal (detach()) can
+// splice an obligation out of the *middle* of it, which shifts every later
+// entry left. A position — "the first N entries" — stops meaning "the ones
+// that existed before this dispatch" the moment that happens: an obligation
+// created *during* a dispatch can end up sitting at the same index one
+// removed *from* that same array a moment earlier just vacated, and a
+// position-based watermark would settle it as if it had been there all along.
+// A number stamped once at creation and never touched again has no such
+// problem — wherever the obligation ends up in whatever array, the number
+// that says when it was created stays exactly what it always was. Same
+// pattern as `EventListener.lastId` above and `EventKeeper.nextOrderId`: a
+// module-global counter, scoped to one loaded module instance rather than one
+// realm. That scoping is safe for `lastId`: a mis-ordered comparison there
+// only reorders equal-priority listeners, and every listener `lastId` is ever
+// compared against belongs to the same emitter, hence the same module
+// instance that constructed it. It is not safe here in the same way:
+// `asEventized()`'s marker is realm-wide by design, so if both the ESM and
+// CJS builds are loaded against the same objects, a store obtained from one
+// module instance can still receive a listener `new EventListener()`'d by the
+// other — `EventStore.add()` matches structurally, not by module identity —
+// and gain an obligation whose `sequence` was stamped by that other
+// instance's counter. That listener's `apply()` then reads its watermark from
+// *this* instance's counter, which shares nothing with the counter that
+// stamped the obligation; if the foreign counter is ahead, `sequence <
+// watermark` is never true and the obligation never discharges — a `once()`
+// that fires on every emit instead of settling once. Loading both builds
+// against the same eventized objects is unsupported for exactly this reason,
+// not merely a guarantee this counter happens to provide. See AGENTS.md,
+// "Counters are per module instance".
+let nextObligationSequence = 0;
+
+/**
+ * One `once()` call's promise to fire at most once. A multi-name call shares a
+ * single obligation across every listener it registers, so whichever name
+ * fires first discharges it for all of them — the race `once(ε, ['a','b'], h)`
+ * has always been. `members` is the back-reference that makes that reachable
+ * from the listener the dispatch happened on.
+ *
+ * `sequence` is stamped once, by `createOnceObligation()`, and never changes:
+ * it is what lets `EventStore.settleOneShots()` tell "existed before this
+ * dispatch" from "the callback just created it" without trusting position in
+ * an array that removal can reshuffle.
+ *
+ * `onSettled` is the one hook the obligation offers, and it exists for exactly
+ * one caller: `makeOnceUnsubscribe()` installs a closure that nulls the
+ * handle's capture, and `EventStore.dischargeObligation()` clears the field and
+ * runs it. That restores what the pre-aggregation wiring got for free — `once()`
+ * used to install its *own* unsubscribe as `callAfterApply`, so the dispatch
+ * that spent the subscription also consumed the handle and released the
+ * emitter. `callAfterApply` now settles obligations rather than releasing
+ * handles (one listener can carry several), so the release has to hang off the
+ * obligation instead. One `once()` call makes one obligation and one handle, so
+ * a single slot is the whole relationship. It stays `undefined` in two cases:
+ * an obligation a spec builds directly, and one a retained replay settled from
+ * inside `subscribeTo()` before there was a handle to release — that handle is
+ * born spent and nulls its own capture rather than installing a hook nothing
+ * would ever run. And it is nulled before it is called, so a re-entrant
+ * discharge cannot run it twice.
+ */
+export interface OnceObligation {
+  settled: boolean;
+  members: EventListener[];
+  readonly sequence: number;
+  onSettled: (() => void) | undefined;
+}
+
+/** The only place an `OnceObligation` is ever created — see `sequence` above. */
+export const createOnceObligation = (): OnceObligation => ({
+  settled: false,
+  members: [],
+  sequence: nextObligationSequence++,
+  onSettled: undefined,
+});
+
 export class EventListener {
   readonly id: number;
   readonly eventName: EventName;
@@ -117,9 +201,23 @@ export class EventListener {
   // Read by EventStore.isSimilar(), which needs a value it can compare with
   // `===`. Never read by apply() — see the note there.
   readonly listenerType: number | undefined;
+  // Runs after a dispatch that actually invoked the listener. It means "settle
+  // the pending one-shot obligations", not "release a handle" — one listener
+  // can carry several once() registrations, and a single closure per handle
+  // could only ever speak for the last one. Takes the pre-dispatch watermark
+  // `apply()` captured, so it settles only the obligations stamped before the
+  // dispatch began — never one the callback just added by re-subscribing.
   callAfterApply: CallAfterApplyFnType;
   isRemoved: boolean;
+  // refCount is what on() adds — the listener lives while it is above zero,
+  // independent of whatever once() obligations it also carries.
   refCount: number;
+  // undefined means no pending obligations — the invariant every reader relies
+  // on, and why removing the last one sets this back to undefined rather than
+  // leaving an empty array. Lazy on purpose: a listener that never sees a
+  // once() must not pay an allocation for the possibility. A listener is alive
+  // while `refCount > 0 || onceObligations !== undefined`.
+  onceObligations: OnceObligation[] | undefined;
 
   constructor(
     eventName: EventName,
@@ -136,7 +234,8 @@ export class EventListener {
     this.listenerType = detectListenerType(listener);
     this.callAfterApply = undefined;
     this.isRemoved = false;
-    this.refCount = 1;
+    this.refCount = 0;
+    this.onceObligations = undefined;
   }
 
   /**
@@ -155,9 +254,10 @@ export class EventListener {
    * one, so neither shape arrives here. And a match on the listener instance
    * itself lost its last caller in v6.0.0, when association-matching removal
    * stopped collecting its victims and handing each one back in for an identity
-   * search — it tests and splices in a single pass now — while `remove()` routes
-   * an `EventListener` to `removeByEventListener()` two branches before this
-   * method is reachable at all.
+   * search — it tests and splices in a single pass now. `remove()` no longer
+   * has an `EventListener` branch at all: the unsubscribe handle gives its
+   * registration back through `EventStore.release()` instead, so an
+   * `EventListener` instance never reaches `remove()` to begin with.
    */
   isEqual(listener: unknown, listenerObject: unknown = null): boolean {
     return this.listener === listener && this.listenerObject === listenerObject;
@@ -168,12 +268,31 @@ export class EventListener {
    * listeners are spliced out of their bucket, so nothing looks them up
    * again; `apply()` bails on `isRemoved` before touching any of the nulled
    * fields.
+   *
+   * `refCount` is left as it is — a detached listener is out of its bucket, so
+   * no dedup search finds it again, and every reader bails on `isRemoved`
+   * first. `onceObligations` is not: a force-removal (`off()`, `remove()`) does
+   * not go through `EventStore.dischargeObligation()`, so nothing else ever
+   * splices this listener out of the obligations it still holds. Left alone, a
+   * later dispatch of some *other* member would discharge the obligation over
+   * a `members` array still listing a detached listener — harmless by itself,
+   * since `apply()` bails on `isRemoved`, but a bucket that grows without
+   * bound is still a leak. This is the one piece of store bookkeeping `detach()`
+   * has to do itself, precisely because the store isn't the one calling it here.
    */
   detach(): void {
     this.isRemoved = true;
     this.listener = null;
     this.listenerObject = null;
     this.callAfterApply = undefined;
+
+    if (this.onceObligations !== undefined) {
+      for (const obligation of this.onceObligations) {
+        const idx = obligation.members.indexOf(this);
+        if (idx >= 0) obligation.members.splice(idx, 1);
+      }
+      this.onceObligations = undefined;
+    }
   }
 
   // `args` defaults rather than staying `EventArgs | undefined`: the two
@@ -196,13 +315,23 @@ export class EventListener {
     if (this.isRemoved) return;
 
     const {listener, listenerObject} = this;
+    // Read before the dispatch below, not after: the callback it is about to
+    // run may itself call once() and aggregate onto this very listener, which
+    // appends a brand-new obligation before this method gets anywhere near
+    // settling anything. The obligation sequence counter's *current* value —
+    // not a count of this listener's own onceObligations entries, and not
+    // derived from that array at all — is the watermark: every obligation
+    // that already existed anywhere was stamped with a lower number, and
+    // anything the callback creates during this dispatch gets a number at or
+    // above it, regardless of where either one ends up sitting in the array.
+    const watermark = nextObligationSequence;
 
     // LISTENER_IS_FUNC
     if (typeof listener === 'function') {
       apply(listenerObject, listener, args, returnValue);
       // Unconditional: a function listener is callable by construction, so the
       // dispatch above always invoked it. Nothing to survive here.
-      if (this.callAfterApply) this.callAfterApply();
+      if (this.callAfterApply) this.callAfterApply(watermark);
       return;
     }
 
@@ -214,7 +343,7 @@ export class EventListener {
       // A once() must survive a dispatch that found no method — late-bound
       // listener objects are a normal pattern, and so is a listener object
       // that is not there at all.
-      if (didCall && this.callAfterApply) this.callAfterApply();
+      if (didCall && this.callAfterApply) this.callAfterApply(watermark);
       return;
     }
 
@@ -233,7 +362,7 @@ export class EventListener {
           args,
           returnValue,
         ) || emit(eventName, listener, args, returnValue);
-      if (didCall && this.callAfterApply) this.callAfterApply();
+      if (didCall && this.callAfterApply) this.callAfterApply(watermark);
     }
   }
 }

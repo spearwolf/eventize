@@ -1,6 +1,7 @@
 import {EventKeeper} from './EventKeeper';
 import type {KeeperEvent} from './EventKeeper';
 import {detectListenerType, EventListener} from './EventListener';
+import type {OnceObligation} from './EventListener';
 import type {EventStore} from './EventStore';
 import {Priority} from './Priority';
 import {EVENT_CATCH_EM_ALL} from './constants';
@@ -15,7 +16,7 @@ const registerEventListener = (
   listener: unknown,
   listenerObject: ListenerObjectType,
   retainedEvents: KeeperEvent[],
-  noDedup: boolean,
+  obligation: OnceObligation | null,
 ): EventListener => {
   const newListener = new EventListener(
     eventName,
@@ -23,13 +24,46 @@ const registerEventListener = (
     listener,
     listenerObject,
   );
-  const el = store.add(newListener, noDedup);
-  // store.add() returns the argument when it inserted, or an existing similar
-  // listener whose refCount it bumped. Replaying to the latter would deliver
-  // the retained event a second time to a listener that already got it.
-  if (el === newListener) {
-    keeper.replayTo(eventName, el, retainedEvents);
+  const el = store.add(newListener, obligation);
+
+  if (obligation !== null && el.callAfterApply === undefined) {
+    // One hook per listener, however many once() obligations it carries. It
+    // outlives none of them: settleOneShots() clears it when the last one
+    // discharges. The watermark comes from apply() at the moment it calls
+    // this — see settleOneShots() for why it has to be the sequence counter's
+    // value, not a count or a position.
+    el.callAfterApply = (watermark) => store.settleOneShots(el, watermark);
   }
+
+  // An aggregating on() gets no replay — the handler already saw that value.
+  // An aggregating once() does: its obligation is new, and without the replay
+  // whether a once() fires on a retained event would depend on the incidental
+  // existence of an on() with the same handler.
+  //
+  // A multi-name once() queues one such replay per name it covers, all
+  // against the one obligation it shares, and EventKeeper.publish() runs
+  // every replay queued by this call in sequence before returning. Whichever
+  // one runs first can settle that obligation — through the real dispatch it
+  // triggers, same as any other emit — and a once() promises at most one
+  // invocation in total, retained replay included. `isRemoved` cannot be what
+  // stops a later replay in the same batch: a member kept alive by an on()
+  // registration is never removed at all, so its queued replay would call the
+  // listener a second time with nothing left to guard it. The obligation
+  // itself is the guard, checked when the replay actually runs — never at
+  // queue time, since nothing queued by this call has run yet while this call
+  // is still queueing.
+  if (el === newListener || obligation !== null) {
+    const replayTarget: {apply: (name: EventName, args?: EventArgs) => void} =
+      obligation === null
+        ? el
+        : {
+            apply: (name, args) => {
+              if (!obligation.settled) el.apply(name, args);
+            },
+          };
+    keeper.replayTo(eventName, replayTarget, retainedEvents);
+  }
+
   return el;
 };
 
@@ -60,7 +94,7 @@ const _subscribeTo = (
   keeper: EventKeeper,
   args: EventArgs,
   retainedEvents: KeeperEvent[],
-  noDedup: boolean,
+  obligation: OnceObligation | null,
 ): EventListener | Array<EventListener> => {
   const len = args.length;
   const typeOfFirstArg = typeof args[0];
@@ -130,7 +164,7 @@ const _subscribeTo = (
       listener,
       listenerObject,
       retainedEvents,
-      noDedup,
+      obligation,
     );
 
   if (Array.isArray(eventName)) {
@@ -160,27 +194,16 @@ export const subscribeTo = (
   store: EventStore,
   keeper: EventKeeper,
   args: EventArgs,
-  noDedup = false,
+  obligation: OnceObligation | null = null,
 ): EventListener | Array<EventListener> => {
   const retainedEvents: KeeperEvent[] = [];
-  const listener = _subscribeTo(store, keeper, args, retainedEvents, noDedup);
+  const listeners = _subscribeTo(
+    store,
+    keeper,
+    args,
+    retainedEvents,
+    obligation,
+  );
   EventKeeper.publish(retainedEvents);
-  return listener;
-};
-
-export const subscribeToDeferred = (
-  store: EventStore,
-  keeper: EventKeeper,
-  args: EventArgs,
-  noDedup: boolean,
-): {
-  listeners: EventListener | Array<EventListener>;
-  publishRetained: () => void;
-} => {
-  const retainedEvents: KeeperEvent[] = [];
-  const listeners = _subscribeTo(store, keeper, args, retainedEvents, noDedup);
-  return {
-    listeners,
-    publishRetained: () => EventKeeper.publish(retainedEvents),
-  };
+  return listeners;
 };

@@ -10,24 +10,23 @@ type-only (the unsubscribe handle reduced to `() => void`, `emitAsync()`
 narrowed, the marker slot made opaque, a dead type export removed) and
 surface as compile errors instead.
 
-Not fixed in v6, and worth knowing when reasoning about reference counts:
-`on()` still deduplicates onto a `once()` that has not fired yet, so one
-count serves two subscriptions with different lifetimes — the first emit
-consumes the `once()`, decrements, and leaves the `on()` registration
-standing. Held for the next major.
-
 - **Bulk `off()` now clears retained state.** `off(ε)`, `off(ε, '*')`, and
   any array containing `'*'`, `null` or `undefined` (`off(ε, ['*', …])`,
   `off(ε, [null, …])`) used to empty only the listener registry, leaving
   retained values and retain policies intact. All of them now wipe the
   keeper too. Targeted forms — `off(ε, eventName)`, `off(ε, [names])`,
   `off(ε, eventName, listenerObject)` — are unchanged.
-- **`once()` no longer deduplicates.** Two `once(ε, 'foo', listenerObject)`
-  calls on the same object used to collapse into one listener that then
-  fired on every subsequent emit and could not be released through its own
-  handles. Each `once()` now gets its own listener: two registrations mean
-  two firings, each releasing independently. `on()`'s reference-counted
-  dedup is unaffected.
+- **`on()` and `once()` aggregate by listener identity.** A listener object
+  subscribed to the same event at the same priority is one registration,
+  however many `on()` and `once()` calls produced it and in whatever order —
+  up to `v5.1.0` the collapse happened in one registration order only, and the
+  collapsed listener then fired on every emit and could not be released
+  through its own handles. Both orders now behave identically: `once(); on()`
+  and `on(); once()` both leave one registration, dispatched once per emit,
+  with every pending `once()` on it discharged by the first dispatch and the
+  registration surviving as long as an `on()` still holds it. Where two
+  invocations were the point, subscribe two distinct handlers instead of
+  calling twice on the same identity. Function listeners never aggregate.
 - **Unsubscribe handles are single-shot.** Calling one a second time used to
   decrement a shared reference count again, releasing a *sibling* handle's
   registration out from under it. A second call is now inert.

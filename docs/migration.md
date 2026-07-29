@@ -83,22 +83,44 @@ force a shared registration to zero. Reach for `off(ε, listenerObject)`, which
 removes every matching subscription in one call however many handles they were
 split across.
 
-### `once()` no longer deduplicates
+### `on()` and `once()` aggregate by listener identity
 
-```js
-// v5 — two once() calls collapsed into one listener that then never stopped
-once(ε, 'ready', handlerObject);
-once(ε, 'ready', handlerObject);
-emit(ε, 'ready'); // one call — and the listener is still subscribed
+A listener object — or a `(methodName, listenerObject)` pair — subscribed to
+the same event at the same priority is one registration, however many `on()`
+and `once()` calls produced it, in whatever order. The first dispatch
+discharges every pending `once()` on that identity; the registration survives
+for as long as an `on()` still holds it.
 
-// v6 — two independent one-shot subscriptions
-once(ε, 'ready', handlerObject);
-once(ε, 'ready', handlerObject);
-emit(ε, 'ready'); // two calls — both detached afterwards
+Only calls whose listener is an **object** — or a `(methodName, object)` pair —
+can aggregate. A function listener never does, in either version. No text
+pattern tells those apart reliably, so list every `once()` call site and narrow
+by hand:
+
+```bash
+grep -rnE '\bonce\s*\(' --include='*.ts' --include='*.js' \
+  --exclude-dir=node_modules .
 ```
 
-Drop the duplicate `once()`, or guard the handler against being invoked twice.
-`on()`'s reference-counted de-duplication is unaffected.
+For each hit, check whether the same object is also subscribed to that event
+name with `on()` at the same priority. Those are the pairs whose call count
+changes; everything else is untouched.
+
+Two calls on one identity used to mean two invocations in one registration
+order and one in the other. They now always mean one. Where two invocations
+were the point, give the second subscription its own handler:
+
+```js
+// before — two invocations only if the on() came first
+on(ε, 'ready', handlers);
+once(ε, 'ready', handlers);
+
+// after — two invocations in either order
+on(ε, 'ready', handlers);
+once(ε, 'ready', {ready: () => handlers.ready()});
+```
+
+Plain function listeners are unaffected — they never aggregate, in either
+version.
 
 ### `on()` / `once()` reject a listener they cannot dispatch to
 

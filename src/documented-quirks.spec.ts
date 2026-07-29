@@ -146,22 +146,30 @@ describe('documented quirks', () => {
       expect(seen).toEqual([]);
     });
 
-    it('does not mistake an unsubscribe listener array for event names', () => {
+    it('ignores an array element that is not an event name', () => {
       const ε = eventize();
-      const calls: string[] = [];
 
-      retain(ε, 'kept');
-      emit(ε, 'kept', 'value');
+      retain(ε, ['kept', 'dropped']);
+      emit(ε, 'kept', 'K');
+      emit(ε, 'dropped', 'D');
 
-      // the unsubscribe of a multi-event on() passes an array of
-      // EventListener instances into off() — those must not touch the keeper
-      const unsubscribe = on(ε, ['one', 'two'], () => calls.push('hit'));
-      unsubscribe();
+      // off()'s array branch takes whatever the caller assembled, and the
+      // isEventName filter in front of the keeper is what keeps a stray
+      // element from being read as a name. It is not a bulk marker either —
+      // isBulkRemoval() only reads null, undefined and '*' that way — so
+      // 'kept' survives untouched.
+      //
+      // Until v6.0.0 this branch had a second caller: the unsubscribe handle
+      // of a multi-event on() passed an array of EventListener instances
+      // through off(). It gives its registrations back through the store now
+      // and never enters off() at all, so a user-supplied array is the only
+      // thing the filter still has to survive.
+      off(ε, ['dropped', 42 as unknown as string]);
 
       const seen: unknown[] = [];
       on(ε, 'kept', (v: unknown) => seen.push(v));
-      expect(seen).toEqual(['value']);
-      expect(calls).toEqual([]);
+      on(ε, 'dropped', (v: unknown) => seen.push(v));
+      expect(seen).toEqual(['K']);
     });
 
     it('clears the retained value for an array of string names', () => {

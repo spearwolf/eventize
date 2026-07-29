@@ -115,12 +115,14 @@ compile time) or an explicit `isEventized()` guard.
    the case that surprises most, because both calls compete for one slot:
    `retain(ε,'ping')` with a listener counting `0 → 1 → 2` by re-emission leaves
    `0` retained, not `2`.
-7. **Listener-objects dedupe under `on()`, functions never do, `once()` never
-   does.** `on(ε, 'foo', listenerObj)` twice yields one listener with refcount 2;
-   each unsubscribe decrements. The same *function* subscribed twice fires twice.
-   Match key: `(eventName, priority, listener, listenerContext)`. Every `once()`
-   registers its own listener, so two `once()` calls fire twice, replay a retained
-   value twice, and release independently.
+7. **Listener-object forms aggregate across `on()` and `once()` alike;
+   functions never do.** `on(ε, 'foo', listenerObj)` twice, `once()` twice, or
+   any mixture of the two, all yield one listener for that identity —
+   `(eventName, priority, listener, listenerContext)` — dispatched once per
+   emit; each `once()` call adds its own obligation, discharged as a batch by
+   the first matching dispatch, while an `on()` on the same identity keeps the
+   registration alive independently of them. The same *function* subscribed
+   twice always fires twice.
 8. **`off()` mid-emit** skips listeners that haven't run yet in that dispatch.
 9. **`emitAsync()` resolves `undefined`, not `[]`**, when nothing was collected.
    `null`/`undefined` returns are dropped; arrays of promises are flattened via

@@ -1,4 +1,4 @@
-import {EventListener} from './EventListener';
+import {createOnceObligation, EventListener} from './EventListener';
 import {EventStore} from './EventStore';
 
 import {EVENT_CATCH_EM_ALL} from './constants';
@@ -84,12 +84,12 @@ describe('EventStore', () => {
   });
 
   describe('namedListeners memory cleanup', () => {
-    it('removing the last listener for an event name deletes the map entry (off via EventListener)', () => {
+    it('removing the last listener for an event name deletes the map entry (release())', () => {
       const store = new EventStore();
       const listener = store.add(new EventListener('foo', 0, () => {}));
       expect(store.namedListeners.has('foo')).toBe(true);
 
-      store.remove(listener, null);
+      store.release(listener);
 
       expect(store.namedListeners.has('foo')).toBe(false);
       expect(store.namedListeners.size).toBe(0);
@@ -136,7 +136,7 @@ describe('EventStore', () => {
       for (let i = 0; i < 1000; i++) {
         const name = `event-${i}`;
         const listener = store.add(new EventListener(name, 0, () => {}));
-        store.remove(listener, null);
+        store.release(listener);
       }
       expect(store.namedListeners.size).toBe(0);
       expect(store.getSubscriptionCount()).toBe(0);
@@ -264,7 +264,7 @@ describe('EventStore', () => {
       const target = store.add(new EventListener('target', 0, () => {}));
       expect(store.namedListeners.size).toBe(101);
 
-      store.remove(target, null);
+      store.release(target);
 
       expect(store.namedListeners.has('target')).toBe(false);
       expect(store.namedListeners.size).toBe(100);
@@ -278,7 +278,7 @@ describe('EventStore', () => {
       );
       store.add(new EventListener('named', 0, () => {}));
 
-      store.remove(target, null);
+      store.release(target);
 
       expect(store.catchEmAllListeners).toHaveLength(0);
       expect(store.getSubscriptionCount()).toBe(1);
@@ -297,25 +297,169 @@ describe('EventStore', () => {
       expect(store.getSubscriptionCount()).toBe(1);
     });
 
-    it('inserts instead of deduplicating when noDedup is set', () => {
+    it('aggregates a once() obligation onto a similar listener', () => {
       const store = new EventStore();
       const listenerObject = {};
       const first = store.add(new EventListener('foo', 0, listenerObject));
-      // what once() passes: a similar listener is present, and it is ignored
+      const obligation = createOnceObligation();
+      // what once() passes: the identity is already registered, so the
+      // obligation joins it instead of inserting a second listener
       const second = store.add(
         new EventListener('foo', 0, listenerObject),
-        true,
+        obligation,
       );
 
-      expect(second).not.toBe(first);
+      expect(second).toBe(first);
       expect(first.refCount).toBe(1);
-      expect(second.refCount).toBe(1);
-      expect(store.getSubscriptionCount()).toBe(2);
-
-      store.remove(second, null);
+      expect(first.onceObligations).toEqual([obligation]);
+      expect(obligation.members).toEqual([first]);
       expect(store.getSubscriptionCount()).toBe(1);
-      store.remove(first, null);
+
+      store.releaseObligation(obligation);
+      expect(store.getSubscriptionCount()).toBe(1);
+      store.release(first);
       expect(store.getSubscriptionCount()).toBe(0);
+    });
+
+    it('releasing an already-settled obligation is a no-op', () => {
+      const store = new EventStore();
+      const listenerObject = {};
+      const obligation = createOnceObligation();
+      const listener = store.add(
+        new EventListener('foo', 0, listenerObject),
+        obligation,
+      );
+      store.add(new EventListener('foo', 0, listenerObject));
+
+      store.settleOneShots(listener, obligation.sequence + 1);
+      expect(obligation.settled).toBe(true);
+      expect(listener.onceObligations).toBe(undefined);
+
+      // A handle calling in after its obligation was already discharged by a
+      // dispatch — the shape that, under the old counter model, needed a
+      // generation check to keep from decrementing a count that had moved on
+      // to a later registration. `settled` makes the same guarantee directly:
+      // there is no count to miscount, only a flag that is already true.
+      store.releaseObligation(obligation);
+
+      expect(listener.refCount).toBe(1);
+      expect(store.getSubscriptionCount()).toBe(1);
+    });
+
+    it('settleOneShots() is a no-op for a listener with no pending obligations', () => {
+      const store = new EventStore();
+      const listener = store.add(new EventListener('foo', 0, {}));
+
+      expect(() => store.settleOneShots(listener, 0)).not.toThrow();
+
+      expect(listener.refCount).toBe(1);
+      expect(store.getSubscriptionCount()).toBe(1);
+    });
+
+    it('settleOneShots() leaves an obligation created after the watermark untouched', () => {
+      const store = new EventStore();
+      const listenerObject = {};
+      const before = createOnceObligation();
+      const listener = store.add(
+        new EventListener('foo', 0, listenerObject),
+        before,
+      );
+      // The watermark a dispatch would have captured right here — before
+      // anything re-subscribes. `reArmed` is created after it on purpose,
+      // simulating a once() that re-subscribed itself from inside its own
+      // dispatch: it shares the listener's onceObligations array, but not
+      // this watermark.
+      const watermark = before.sequence + 1;
+      const reArmed = createOnceObligation();
+      store.add(new EventListener('foo', 0, listenerObject), reArmed);
+
+      store.settleOneShots(listener, watermark);
+
+      expect(before.settled).toBe(true);
+      expect(reArmed.settled).toBe(false);
+      expect(listener.onceObligations).toEqual([reArmed]);
+      expect(store.getSubscriptionCount()).toBe(1);
+    });
+
+    // Position cannot substitute for the watermark check above: if a listener
+    // holds an *older* obligation that ends up sitting after a *newer* one in
+    // `onceObligations` — exactly what a mid-array release or force-removal
+    // produces — a position-based cutoff would settle the wrong one. Ordering
+    // it deliberately out of sequence is what makes this case different from
+    // the one above rather than a duplicate of it.
+    it('settleOneShots() finds a qualifying obligation regardless of its position in the array', () => {
+      const store = new EventStore();
+      const listenerObject = {};
+      const older = createOnceObligation();
+      const newer = createOnceObligation();
+      const listener = store.add(new EventListener('foo', 0, listenerObject));
+      // Built out of registration order on purpose: `newer` occupies index 0,
+      // `older` index 1 — the reverse of creation order.
+      listener.onceObligations = [newer, older];
+      newer.members.push(listener);
+      older.members.push(listener);
+
+      store.settleOneShots(listener, older.sequence + 1);
+
+      expect(older.settled).toBe(true);
+      expect(newer.settled).toBe(false);
+      expect(listener.onceObligations).toEqual([newer]);
+    });
+
+    // The four cases below construct states EventStore.add() never actually
+    // produces — it always pairs a listener's onceObligations entry with the
+    // matching obligation.members entry, on both sides, in the same call. What
+    // they pin is dischargeObligation()'s and detach()'s own half of that
+    // pairing: neither trusts the other side of a relationship it did not
+    // just create, the same caution EventStore.spec.ts already applies to a
+    // holey bucket.
+    describe('mismatched obligation bookkeeping is tolerated, not trusted', () => {
+      it('settleOneShots() skips an obligation that is already settled', () => {
+        const store = new EventStore();
+        const obligation = createOnceObligation();
+        obligation.settled = true;
+        const listener = new EventListener('foo', 0, {});
+        listener.onceObligations = [obligation];
+        store.add(listener);
+
+        expect(() =>
+          store.settleOneShots(listener, obligation.sequence + 1),
+        ).not.toThrow();
+        // Left exactly as found: skipping a settled obligation must not
+        // silently clear it from a listener that was never actually
+        // discharged for it.
+        expect(listener.onceObligations).toEqual([obligation]);
+      });
+
+      it('releaseObligation() tolerates a member with no obligations of its own', () => {
+        const store = new EventStore();
+        const persistentOnly = store.add(new EventListener('foo', 0, {}));
+        const obligation = {
+          ...createOnceObligation(),
+          members: [persistentOnly],
+        };
+
+        expect(() => store.releaseObligation(obligation)).not.toThrow();
+
+        expect(obligation.settled).toBe(true);
+        expect(persistentOnly.refCount).toBe(1);
+        expect(store.getSubscriptionCount()).toBe(1);
+      });
+
+      it('releaseObligation() tolerates a member whose obligations list a different one', () => {
+        const store = new EventStore();
+        const listener = store.add(new EventListener('foo', 0, {}));
+        const otherObligation = createOnceObligation();
+        listener.onceObligations = [otherObligation];
+        const obligation = {...createOnceObligation(), members: [listener]};
+
+        expect(() => store.releaseObligation(obligation)).not.toThrow();
+
+        // The mismatch is left alone rather than corrupting the unrelated
+        // obligation the listener actually holds.
+        expect(listener.onceObligations).toEqual([otherObligation]);
+        expect(store.getSubscriptionCount()).toBe(1);
+      });
     });
 
     it('honours refCount before removing anything', () => {
@@ -326,10 +470,10 @@ describe('EventStore', () => {
       expect(second).toBe(first);
       expect(first.refCount).toBe(2);
 
-      store.remove(first, null);
+      store.release(first);
       expect(store.getSubscriptionCount()).toBe(1);
 
-      store.remove(first, null);
+      store.release(first);
       expect(store.getSubscriptionCount()).toBe(0);
     });
 
@@ -343,11 +487,14 @@ describe('EventStore', () => {
       expect(store.getSubscriptionCount()).toBe(1);
     });
 
-    // Pins a pre-existing quirk rather than fixing one: the foreign listener is
-    // detach()ed and its refCount decremented while it stays in its own store's
-    // array. The pre-refactor full scan did exactly the same — documentation,
-    // not a behaviour change.
-    it('ignores a listener that belongs to another store', () => {
+    // remove() no longer special-cases an EventListener instance at all — that
+    // branch is gone along with removeByEventListener(), and a handle now
+    // gives its registration back through release() instead. What is left is
+    // the generic identity comparison every unrecognized object hits: a
+    // foreign listener never equals anything in another store's buckets, in
+    // its own store's namedListeners entry, or in the catch-em-all bucket, so
+    // remove() harmlessly matches nothing.
+    it('a foreign EventListener instance never matches by identity', () => {
       const a = new EventStore();
       const b = new EventStore();
       const target = a.add(new EventListener('foo', 0, () => {}));
@@ -355,14 +502,37 @@ describe('EventStore', () => {
 
       expect(() => b.remove(target, null)).not.toThrow();
       expect(b.getSubscriptionCount()).toBe(1);
+      expect(a.getSubscriptionCount()).toBe(1);
     });
 
-    it('ignores a foreign listener whose event name is unknown here', () => {
+    // release() takes the caller's word for which store a listener belongs
+    // to — it has no way to check. Pins the same pre-existing quirk the
+    // instanceof-EventListener branch of remove() used to reach: a foreign
+    // listener is detach()ed and its own count decremented, while it stays put
+    // in its own store's bucket. dropListener() still has to visit *this*
+    // store's bucket for the name (or the absence of one) without throwing.
+    it('releasing a foreign listener detaches it without touching this store’s bucket for that name', () => {
+      const a = new EventStore();
+      const b = new EventStore();
+      const target = a.add(new EventListener('foo', 0, () => {}));
+      b.add(new EventListener('foo', 0, () => {})); // same name, different instance, own bucket
+
+      expect(() => b.release(target)).not.toThrow();
+
+      expect(target.isRemoved).toBe(true);
+      expect(a.getSubscriptionCount()).toBe(1);
+      expect(b.getSubscriptionCount()).toBe(1);
+    });
+
+    it('releasing a foreign listener whose event name has no bucket here does not throw', () => {
       const a = new EventStore();
       const b = new EventStore();
       const target = a.add(new EventListener('foo', 0, () => {}));
 
-      expect(() => b.remove(target, null)).not.toThrow();
+      expect(() => b.release(target)).not.toThrow();
+
+      expect(target.isRemoved).toBe(true);
+      expect(a.getSubscriptionCount()).toBe(1);
     });
   });
 
@@ -440,7 +610,7 @@ describe('EventStore', () => {
       let dispatched = 0;
       store.forEach('foo', () => {
         dispatched += 1;
-        store.remove(doomed, null);
+        store.release(doomed);
       });
 
       const after = store.namedListeners.get('foo');
@@ -461,7 +631,7 @@ describe('EventStore', () => {
       const before = store.catchEmAllListeners;
 
       store.forEach('foo', () => {
-        store.remove(doomed, null);
+        store.release(doomed);
       });
 
       expect(store.catchEmAllListeners).not.toBe(before);
@@ -591,10 +761,10 @@ describe('EventStore', () => {
       store.forEach('foo', () => {
         step += 1;
         if (step === 1) {
-          store.remove(namedDoomed, null);
+          store.release(namedDoomed);
           namedAfterFirst = store.namedListeners.get('foo');
         } else if (step === 2) {
-          store.remove(wildcardDoomed, null);
+          store.release(wildcardDoomed);
         } else {
           store.add(new EventListener('foo', 1, () => {}));
         }
@@ -681,7 +851,7 @@ describe('EventStore', () => {
         dispatched += 1;
         if (++step > 1) return;
         store.forEach('inner', () => {
-          store.remove(doomed, null);
+          store.release(doomed);
         });
       });
 

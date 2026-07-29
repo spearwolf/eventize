@@ -1,4 +1,4 @@
-import {EventListener} from './EventListener';
+import {createOnceObligation, EventListener} from './EventListener';
 import {
   emit,
   emitAsync,
@@ -110,7 +110,7 @@ describe('EventListener', () => {
       // detectListenerType() gives no tag, truthy or not. Registering the
       // listener by hand is what still puts a primitive in front of a real
       // dispatch, which is the case this asserts.
-      storeOf(obj).add(new EventListener('toFixed', 0, 42), true);
+      storeOf(obj).add(new EventListener('toFixed', 0, 42));
       // Anchors the assertion below: without this, the same expectation would
       // stay green if the listener had never landed in the bucket the dispatch
       // reads. The sibling case underneath proves the path does collect.
@@ -122,7 +122,6 @@ describe('EventListener', () => {
       const obj = eventize();
       storeOf(obj).add(
         new EventListener('toFixed', 0, {toFixed: () => 'COLLECTED'}),
-        true,
       );
       await expect(emitAsync(obj, 'toFixed', 2)).resolves.toEqual([
         'COLLECTED',
@@ -344,6 +343,32 @@ describe('EventListener', () => {
       listener.apply(bar, [null, 'plah!', 666]);
       // expect(fn).toHaveBeenCalledWith(null, 'plah!', 666);
       expect(fn.mock.calls[0]).toEqual([null, 'plah!', 666]);
+    });
+  });
+
+  describe('detach()', () => {
+    // A force-removal (off()) calls detach() directly, without going through
+    // EventStore.dischargeObligation() — so it is detach() itself that has to
+    // splice the listener out of every obligation it still holds. Covered
+    // indirectly by off.spec.ts's "force-removes an aggregated once()
+    // registration" cases; this is the defensive half, the mismatch
+    // EventStore.add() never actually produces (it always pairs a listener's
+    // onceObligations entry with the matching obligation.members entry), the
+    // same way EventStore.spec.ts pins its holey-bucket throws.
+    it('tolerates an obligation whose members list does not include this listener', () => {
+      const listener = new EventListener('foo', 0, {});
+      const sibling = new EventListener('foo', 0, {});
+      const obligation = createOnceObligation();
+      listener.onceObligations = [obligation];
+      // A member the mismatch is *not* about: detach() splices out itself and
+      // nothing else, and finding no entry for itself must not take anyone
+      // else's with it.
+      obligation.members.push(sibling);
+
+      expect(() => listener.detach()).not.toThrow();
+      expect(listener.onceObligations).toBe(undefined);
+      expect(obligation.members).toHaveLength(1);
+      expect(obligation.members[0]).toBe(sibling);
     });
   });
 });

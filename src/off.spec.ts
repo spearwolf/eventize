@@ -213,17 +213,20 @@ describe('off()', () => {
 
   // off(ε, listenerObject) promises "every subscription of that object", and
   // the store's removal used to splice only the first findIndex match per
-  // bucket. Anything that can put two similar listeners into one bucket — two
-  // once() calls (v6.0.0), or two on() calls at differing priorities (always) —
-  // left the rest subscribed and still firing.
+  // bucket. Two on() calls at differing priorities are the case that still
+  // puts two similar listeners in one bucket — priority is part of the
+  // identity key, so they never aggregate. Two once() calls on the same
+  // identity aggregate into one listener now, so off() only ever finds one
+  // entry there; it still has to force it out regardless of how many pending
+  // once() obligations it carries, which is what the first two cases pin.
   describe('by object, with duplicate registrations in one bucket', () => {
-    it('off(ε, listenerObject) removes every once() subscription of that object', () => {
+    it('off(ε, listenerObject) force-removes an aggregated once() registration', () => {
       const obj = eventize();
       const listenerObject = {foo: fake()};
 
       once(obj, 'foo', listenerObject);
       once(obj, 'foo', listenerObject);
-      expect(getSubscriptionCount(obj)).toBe(2);
+      expect(getSubscriptionCount(obj)).toBe(1);
 
       off(obj, listenerObject);
 
@@ -238,7 +241,7 @@ describe('off()', () => {
 
       once(obj, listenerObject);
       once(obj, listenerObject);
-      expect(getSubscriptionCount(obj)).toBe(2);
+      expect(getSubscriptionCount(obj)).toBe(1);
 
       off(obj, listenerObject);
 
@@ -824,10 +827,10 @@ describe('off()', () => {
       const ε = eventize();
       const listenerObject = {foo: fake()};
 
-      // once() is exempt from dedup: two listeners, one bucket.
+      // the two once() calls aggregate: one listener in the wildcard bucket.
       once(ε, '*', listenerObject);
       once(ε, '*', listenerObject);
-      expect(getSubscriptionCount(ε)).toBe(2);
+      expect(getSubscriptionCount(ε)).toBe(1);
 
       off(ε, '*', listenerObject);
 
@@ -1276,18 +1279,25 @@ describe('off()', () => {
       expect(late.callCount).toBe(0);
     });
 
-    it('leaves a multi-event unsubscribe handle on the name path', () => {
+    // The negative control for the three cases above: an array carrying no
+    // bulk marker at all must take the name path, however many names are in
+    // it. Written when the multi-event unsubscribe handle still passed
+    // EventListener instances through off(); that route is gone since v6.0.0
+    // — makeOnUnsubscribe() releases each listener through the store — so the
+    // case now pins the direction that is still reachable.
+    it('an array of plain names takes the name path, leaving unlisted names retained', () => {
       const obj = eventize();
-      retain(obj, 'keep');
+      retain(obj, ['keep', 'a']);
       emit(obj, 'keep', 'value');
-      const unsubscribe = on(obj, ['a', 'b'], fake());
+      emit(obj, 'a', 'gone');
+      on(obj, 'a', fake());
+      on(obj, 'b', fake());
 
-      unsubscribe();
+      off(obj, ['a', 'b']);
 
       expect(getSubscriptionCount(obj)).toBe(0);
-      // the handle passes EventListener instances, not names — the bulk path
-      // must not trigger, so 'keep' survives
       expect(getRetainedCount(obj)).toBe(1);
+      expect(getRetainedEventNames(obj)).toEqual(['keep']);
     });
   });
 });

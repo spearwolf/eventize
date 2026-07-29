@@ -1,4 +1,4 @@
-import {EventListener} from './EventListener';
+import type {EventListener, OnceObligation} from './EventListener';
 import {
   EVENT_CATCH_EM_ALL,
   LISTENER_IS_NAMED_FUNC,
@@ -306,12 +306,14 @@ export class EventStore {
   /**
    * Splices out *every* entry under `eventName` that `listenerObject` takes
    * part in — not just the first — detaching each, and returns the bucket the
-   * store holds afterwards. One bucket can hold several matches: two `once()`
-   * registrations (exempt from dedup since v6.0.0), two `on()` calls at
-   * differing priorities (priority is part of the similarity key, so they
-   * never collapse), or the same function subscribed twice (functions never
-   * dedup). `off(ε, eventName, listenerObject)` promises to remove all of
-   * them, and splicing only the first left the rest subscribed and firing.
+   * store holds afterwards. Two shapes still put several matches in one
+   * bucket: two `on()` calls at differing priorities (priority is part of the
+   * similarity key, so they never collapse), and the same function subscribed
+   * twice (functions never dedup). Two `once()` calls on one identity were a
+   * third until v6.0.0; they aggregate into a single registration now, so this
+   * pass finds one entry there however many obligations it carries.
+   * `off(ε, eventName, listenerObject)` promises to remove all of them, and
+   * splicing only the first left the rest subscribed and firing.
    *
    * One backward pass, reading from the array it was handed. Backwards keeps
    * the indices of the entries not yet visited valid across each splice, and
@@ -389,31 +391,45 @@ export class EventStore {
   }
 
   /**
-   * Returns the given listener, or — when an identical one is already
-   * registered and `noDedup` is false — the existing one with its reference
-   * count increased.
+   * Returns the listener the registration landed on: the given one when it was
+   * inserted, or an existing one with the same identity. Either way the
+   * registration is recorded on it, which is what makes `on()` and `once()`
+   * aggregate in both registration orders.
    *
-   * `once()` passes `noDedup: true`: two one-shot subscriptions mean two
-   * firings, and collapsing them leaves a listener whose own idempotence
-   * guard blocks its handles from ever releasing it.
+   * `obligation` is what used to be a `noDedup`/`kind` flag: `null` for a
+   * persistent `on()`, an `OnceObligation` for a `once()`. Its *presence*, not
+   * a tag compared against it, is the whole test — the obligation itself is
+   * the thing that later has to know every listener it was added to, so
+   * threading it through here is what lets `once(ε, ['a','b'], h)` share one
+   * obligation across two listeners instead of building two.
    */
-  add(listener: EventListener, noDedup = false): EventListener {
+  add(
+    listener: EventListener,
+    obligation: OnceObligation | null = null,
+  ): EventListener {
     const bucket = listener.isCatchEmAll
       ? this.catchEmAllBucket
       : this.getListenersForEventName(listener.eventName);
 
-    if (!noDedup) {
-      const similarListener = findSimilarListener(listener, bucket);
-      if (similarListener) {
-        // A dedup bumps a reference count and touches no array, so it owes no
-        // clone. Searching the live bucket is safe for the same reason.
-        similarListener.refCount += 1;
-        return similarListener;
-      }
+    const similar = findSimilarListener(listener, bucket);
+    const target = similar ?? listener;
+
+    if (obligation === null) {
+      target.refCount += 1;
+    } else if (!target.onceObligations?.includes(obligation)) {
+      // The guard is for a duplicated name in one call — once(ε, ['a','a'], h)
+      // aggregates onto the listener it just created, and one obligation must
+      // not be counted on the same listener twice.
+      (target.onceObligations ??= []).push(obligation);
+      obligation.members.push(target);
     }
 
-    const target = this.bucketForMutation(listener.eventName, bucket);
-    target.splice(findInsertIndex(target, listener), 0, listener);
+    // An aggregation touches no array, so it owes no clone — searching the
+    // live bucket above is safe for the same reason.
+    if (similar) return similar;
+
+    const arr = this.bucketForMutation(listener.eventName, bucket);
+    arr.splice(findInsertIndex(arr, listener), 0, listener);
     return listener;
   }
 
@@ -440,12 +456,6 @@ export class EventStore {
     // off('foo') / off(Symbol('foo'))
     if (listenerObject == null && isEventName(listener)) {
       this.removeByEventName(listener);
-      return;
-    }
-
-    // off(EventListener) — used by the unsubscribe function returned from on()
-    if (listener instanceof EventListener) {
-      this.removeByEventListener(listener);
       return;
     }
 
@@ -480,14 +490,123 @@ export class EventStore {
     this.namedListeners.delete(eventName);
   }
 
-  private removeByEventListener(listener: EventListener): void {
+  /**
+   * Gives one persistent (`on()`) registration back. `once()`'s handle calls
+   * `releaseObligation()` instead — it holds no listener at all, only the
+   * obligation, so there is nothing for this method to accept for that case.
+   */
+  release(listener: EventListener): void {
     if (listener.isRemoved) return;
     listener.refCount -= 1;
-    if (listener.refCount >= 1) return;
+    if (listener.refCount > 0 || listener.onceObligations !== undefined) return;
+    this.dropListener(listener);
+  }
 
-    // A listener lives in exactly one bucket: the catch-em-all array, or the
-    // named array for its own eventName. A multi-event on() creates one
-    // EventListener per name, so there is never more than one home to visit.
+  /**
+   * Gives one `once()` obligation back by hand, before anything discharged it.
+   * A settled obligation is inert here on purpose: whichever name fired first
+   * already ended it for every listener it was ever added to, and a handle
+   * calling in after that has nothing left to give back.
+   */
+  releaseObligation(obligation: OnceObligation): void {
+    if (obligation.settled) return;
+    this.dischargeObligation(obligation);
+  }
+
+  /**
+   * Discharges the obligations a listener carried *before* the dispatch that
+   * just called this — all of them at once: they were satisfied by the same
+   * call, and settling them one per dispatch would make a second `once()` on
+   * the same identity fire on the next emit instead of this one.
+   *
+   * `watermark` is `EventListener.apply()`'s pre-dispatch snapshot of the
+   * obligation sequence counter, not a count or an array slice boundary. Every
+   * obligation this listener carries whose `sequence` is below that value
+   * existed before the dispatch began, wherever it sits in the array — a
+   * position cannot say that, because releasing a handle or a force-removal
+   * can splice an obligation out of the *middle* of `onceObligations` and
+   * shift every later entry left, including one the callback added *during*
+   * this very dispatch by re-subscribing. Filtering by `sequence` instead of
+   * position is what keeps that reshuffle from mattering.
+   *
+   * Runs from inside `EventListener.apply()`, so from inside a live `forEach()`
+   * walk. `dischargeObligation()` → `dropListener()` routes through
+   * `bucketForMutation()`, which is what keeps the walk's array intact.
+   *
+   * A copy, not the live array: discharging an obligation removes it from
+   * every member's own list, this listener's included, out from under the
+   * loop that is currently iterating it.
+   */
+  settleOneShots(listener: EventListener, watermark: number): void {
+    const obligations = listener.onceObligations;
+    if (obligations === undefined) return;
+
+    for (const obligation of obligations.slice()) {
+      if (obligation.sequence < watermark && !obligation.settled) {
+        this.dischargeObligation(obligation);
+      }
+    }
+  }
+
+  /**
+   * Ends one obligation everywhere it is held. `settled` and the emptied
+   * `members` list go first, so a `dropListener()` below — which detaches,
+   * which walks the dropped listener's own remaining obligations — cannot come
+   * back into this one.
+   *
+   * This is the one place that knows about the race a multi-name `once()`
+   * promises: `members` may hold several listeners, one per name the call
+   * covered, and whichever of them got here first — through a real dispatch or
+   * a handle calling `releaseObligation()` by hand — takes all of them out
+   * together. A member already gone (force-removed by `off()`, which walks
+   * straight to `EventListener.detach()` without going through here) is
+   * skipped: `detach()` already spliced it out of `members` on its way out, so
+   * `isRemoved` is a belt-and-braces check, not the one this relies on.
+   *
+   * The settle hook goes first, and it is read and cleared before it is called
+   * so that neither a re-entrant discharge nor a throw from a member below can
+   * run it twice or leave it standing. It is the `once()` handle's capture:
+   * discharging is what spends a `once()`, whichever way it happened, and a
+   * spent handle must hold nothing — see `OnceObligation.onSettled`.
+   */
+  private dischargeObligation(obligation: OnceObligation): void {
+    obligation.settled = true;
+
+    const onSettled = obligation.onSettled;
+    obligation.onSettled = undefined;
+    onSettled?.();
+
+    const members = obligation.members.slice();
+    obligation.members.length = 0;
+
+    for (const member of members) {
+      const held = member.onceObligations;
+      if (held !== undefined) {
+        const idx = held.indexOf(obligation);
+        if (idx >= 0) held.splice(idx, 1);
+        if (held.length === 0) {
+          member.onceObligations = undefined;
+          member.callAfterApply = undefined;
+        }
+      }
+
+      if (
+        !member.isRemoved &&
+        member.refCount === 0 &&
+        member.onceObligations === undefined
+      ) {
+        this.dropListener(member);
+      }
+    }
+  }
+
+  /**
+   * Takes a listener out of the registry, unconditionally. A listener lives in
+   * exactly one bucket: the catch-em-all array, or the named array for its own
+   * eventName. A multi-event `on()` creates one EventListener per name, so
+   * there is never more than one home to visit.
+   */
+  private dropListener(listener: EventListener): void {
     if (listener.isCatchEmAll) {
       this.removeItem(listener.eventName, this.catchEmAllBucket, listener);
     } else {

@@ -566,6 +566,51 @@ describe('lifecycle', () => {
       });
     });
 
+    // A once() that has fired is spent, and the dispatch that spent it is what
+    // consumes the handle — nobody calls this one. Up to the aggregation
+    // change that fell out of the wiring: once() installed its own unsubscribe
+    // as callAfterApply, so firing ran it. The obligation model replaced that
+    // hook, and without a settle hook of its own the handle went on holding
+    // the emitter, the store, the keeper and every retained payload for as
+    // long as the caller kept it — which the teardown pattern `docs/lifecycle.md`
+    // recommends, `subs.push(once(ε, 'bar', service))`, does by design.
+    it('a fired once() handle releases the emitter without ever being called', async () => {
+      const fireAndKeepHandle = () => {
+        const obj = eventize();
+        const handle = once(obj, 'foo', () => {});
+        emit(obj, 'foo');
+        return {handle, ref: new WeakRef(obj)};
+      };
+
+      const fired = fireAndKeepHandle();
+      const verdict = await collect(fired.ref);
+
+      // Touched after the collection rounds, so the handle is provably still
+      // reachable while they run — the emitter must go anyway.
+      expect(typeof fired.handle).toBe('function');
+      expect(verdict).toMatch(/^collected/);
+    });
+
+    // The same question one step earlier: a retained replay discharges the
+    // obligation from inside subscribeTo(), before the handle exists at all.
+    // There is no settle hook to run for that one, so the handle has to notice
+    // it was born spent.
+    it('a once() spent by a retained replay releases the emitter too', async () => {
+      const replayAndKeepHandle = () => {
+        const obj = eventize();
+        retain(obj, 'foo');
+        emit(obj, 'foo', 'payload');
+        const handle = once(obj, 'foo', () => {});
+        return {handle, ref: new WeakRef(obj)};
+      };
+
+      const replayed = replayAndKeepHandle();
+      const verdict = await collect(replayed.ref);
+
+      expect(typeof replayed.handle).toBe('function');
+      expect(verdict).toMatch(/^collected/);
+    });
+
     // A consumed handle releases the emitter even when the call only
     // decremented a shared reference count and the surviving listener leads
     // straight back to the emitter. That second half is new: up to v5.1.0 the
@@ -592,27 +637,29 @@ describe('lifecycle', () => {
       expect(typeof shared.handle).toBe('function');
       expect(sharedVerdict).toMatch(/^collected/);
 
-      // The hard case: the surviving listener is a once() whose event never
-      // fired, so its callAfterApply is the once() handle's closure — and that
-      // handle was never called, so it still holds the emitter. Consuming the
-      // on() handle takes the count from 2 to 1 and detaches nothing, which
-      // used to leave this whole chain hanging off the consumed handle:
-      //   handle -> closure -> listener -> callAfterApply -> once closure -> ε
-      // Nulling the capture cuts it at the first link.
-      const onDedupedOntoAPendingOnce = () => {
+      // The hard case: the surviving listener *is* the emitter, subscribed as
+      // its own listener object. Consuming one of the two deduplicated handles
+      // takes the count from 2 to 1 and detaches nothing, which used to leave
+      // the chain handle -> closure -> listener -> listener object -> ε hanging
+      // off the consumed handle. Nulling the capture cuts it at the first link.
+      //
+      // Up to the aggregation change this case was built from an on() that
+      // deduplicated onto a pending once(), reading the back-reference through
+      // callAfterApply. That hook now closes over the store, which holds no
+      // reference back to the emitter, so the chain it tested no longer exists.
+      const selfSubscribedTwice = () => {
         const obj = eventize();
-        const listenerObject = {foo: () => {}};
-        once(obj, 'foo', listenerObject); // handle dropped, never fires
-        const handle = on(obj, 'foo', listenerObject); // dedups, refCount = 2
+        on(obj, 'foo', obj);
+        const handle = on(obj, 'foo', obj); // aggregates, refCount = 2
         handle();
         return {handle, ref: new WeakRef(obj)};
       };
 
-      const deduped = onDedupedOntoAPendingOnce();
-      const dedupedVerdict = await collect(deduped.ref);
+      const selfSubscribed = selfSubscribedTwice();
+      const selfVerdict = await collect(selfSubscribed.ref);
 
-      expect(typeof deduped.handle).toBe('function');
-      expect(dedupedVerdict).toMatch(/^collected/);
+      expect(typeof selfSubscribed.handle).toBe('function');
+      expect(selfVerdict).toMatch(/^collected/);
     });
 
     // The control group for the case above. Without it, `collected` proves
