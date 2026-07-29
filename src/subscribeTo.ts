@@ -29,16 +29,39 @@ const registerEventListener = (
   if (obligation !== null && el.callAfterApply === undefined) {
     // One hook per listener, however many once() obligations it carries. It
     // outlives none of them: settleOneShots() clears it when the last one
-    // discharges.
-    el.callAfterApply = () => store.settleOneShots(el);
+    // discharges. The count comes from apply() at the moment it calls this —
+    // see settleOneShots() for why that has to be a snapshot, not a live read.
+    el.callAfterApply = (settledCount) =>
+      store.settleOneShots(el, settledCount);
   }
 
   // An aggregating on() gets no replay — the handler already saw that value.
   // An aggregating once() does: its obligation is new, and without the replay
   // whether a once() fires on a retained event would depend on the incidental
   // existence of an on() with the same handler.
+  //
+  // A multi-name once() queues one such replay per name it covers, all
+  // against the one obligation it shares, and EventKeeper.publish() runs
+  // every replay queued by this call in sequence before returning. Whichever
+  // one runs first can settle that obligation — through the real dispatch it
+  // triggers, same as any other emit — and a once() promises at most one
+  // invocation in total, retained replay included. `isRemoved` cannot be what
+  // stops a later replay in the same batch: a member kept alive by an on()
+  // registration is never removed at all, so its queued replay would call the
+  // listener a second time with nothing left to guard it. The obligation
+  // itself is the guard, checked when the replay actually runs — never at
+  // queue time, since nothing queued by this call has run yet while this call
+  // is still queueing.
   if (el === newListener || obligation !== null) {
-    keeper.replayTo(eventName, el, retainedEvents);
+    const replayTarget: {apply: (name: EventName, args?: EventArgs) => void} =
+      obligation === null
+        ? el
+        : {
+            apply: (name, args) => {
+              if (!obligation.settled) el.apply(name, args);
+            },
+          };
+    keeper.replayTo(eventName, replayTarget, retainedEvents);
   }
 
   return el;

@@ -153,6 +153,53 @@ describe('on()/once() aggregate by listener identity', () => {
       emit(ε, 'a');
       expect(h.a.callCount).toBe(1); // 'a' is gone; no further calls
     });
+
+    // A once() call promises at most one invocation, retained replay
+    // included — the same race as above, but triggered by subscribeTo()'s
+    // own queued replays instead of a live emit(). Each name the call covers
+    // queues its own replay against the one shared obligation, and
+    // EventKeeper.publish() runs every one of them before returning. Without
+    // a guard, whichever runs first settles the obligation through a real
+    // dispatch — same as any once() firing — and every later replay in the
+    // same batch would go on to call the listener again anyway, because
+    // `isRemoved` never applies to a member an on() is still keeping alive.
+    it('a retained replay does not fire twice through a member kept alive by on()', () => {
+      const ε = eventize();
+      const h = {a: fake(), b: fake()};
+
+      retain(ε, ['a', 'b']);
+      emit(ε, 'a', 'A');
+      emit(ε, 'b', 'B');
+
+      on(ε, ['a', 'b'], h);
+      expect(h.a.callCount).toBe(1);
+      expect(h.b.callCount).toBe(1);
+
+      once(ε, ['a', 'b'], h);
+
+      // one invocation for the once() call, total — not one per name it
+      // covers. Both listeners survive on their on() registrations either way.
+      expect(h.a.callCount + h.b.callCount).toBe(3);
+      expect(getSubscriptionCount(ε)).toBe(2);
+    });
+
+    it('a retained replay does not fire twice through a duplicated name aggregating onto an on()', () => {
+      const ε = eventize();
+      const h = {foo: fake()};
+
+      retain(ε, 'foo');
+      emit(ε, 'foo', 'V');
+
+      on(ε, 'foo', h);
+      expect(h.foo.callCount).toBe(1);
+
+      once(ε, ['foo', 'foo'], h);
+
+      // the duplicated name aggregates onto the same listener and the same
+      // obligation twice, but the call still delivers exactly one invocation
+      expect(h.foo.callCount).toBe(2);
+      expect(getSubscriptionCount(ε)).toBe(1);
+    });
   });
 
   describe('the handles stay independent', () => {
@@ -398,6 +445,36 @@ describe('on()/once() aggregate by listener identity', () => {
 
       emit(ε, 'foo');
       expect(listenerObject.foo.callCount).toBe(2);
+    });
+
+    // The on() mirror of this case, above, keeps firing forever — refCount
+    // just keeps growing, and nothing ever settles it. once() promises the
+    // opposite: each dispatch must settle only the obligation that triggered
+    // it, or a re-arm from inside the callback would be discharged before it
+    // ever gets a chance to fire, and the once() would silently stop after
+    // the first emit instead of firing once per emit indefinitely.
+    it('a once() re-armed from inside its own dispatch fires again on the next emit', () => {
+      const ε = eventize();
+      const listenerObject = {
+        foo: fake(() => {
+          once(ε, 'foo', listenerObject);
+        }),
+      };
+
+      once(ε, 'foo', listenerObject);
+
+      emit(ε, 'foo');
+      expect(listenerObject.foo.callCount).toBe(1);
+      // the re-arm aggregated its brand-new obligation onto the listener the
+      // walk was still dispatching — settlement must leave that one alone
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      emit(ε, 'foo');
+      expect(listenerObject.foo.callCount).toBe(2);
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      emit(ε, 'foo');
+      expect(listenerObject.foo.callCount).toBe(3);
     });
   });
 });

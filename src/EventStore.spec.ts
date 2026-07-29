@@ -332,7 +332,7 @@ describe('EventStore', () => {
       );
       store.add(new EventListener('foo', 0, listenerObject));
 
-      store.settleOneShots(listener);
+      store.settleOneShots(listener, 1);
       expect(obligation.settled).toBe(true);
       expect(listener.onceObligations).toBe(undefined);
 
@@ -351,9 +351,31 @@ describe('EventStore', () => {
       const store = new EventStore();
       const listener = store.add(new EventListener('foo', 0, {}));
 
-      expect(() => store.settleOneShots(listener)).not.toThrow();
+      expect(() => store.settleOneShots(listener, 0)).not.toThrow();
 
       expect(listener.refCount).toBe(1);
+      expect(store.getSubscriptionCount()).toBe(1);
+    });
+
+    it('settleOneShots() leaves obligations beyond the given count untouched', () => {
+      const store = new EventStore();
+      const listenerObject = {};
+      const before: OnceObligation = {settled: false, members: []};
+      const listener = store.add(
+        new EventListener('foo', 0, listenerObject),
+        before,
+      );
+      // Simulates a once() that re-subscribed itself from inside its own
+      // dispatch: a second obligation, appended after apply() already took
+      // its pre-dispatch snapshot of the count.
+      const reArmed: OnceObligation = {settled: false, members: []};
+      store.add(new EventListener('foo', 0, listenerObject), reArmed);
+
+      store.settleOneShots(listener, 1);
+
+      expect(before.settled).toBe(true);
+      expect(reArmed.settled).toBe(false);
+      expect(listener.onceObligations).toEqual([reArmed]);
       expect(store.getSubscriptionCount()).toBe(1);
     });
 
@@ -372,7 +394,7 @@ describe('EventStore', () => {
         listener.onceObligations = [obligation];
         store.add(listener);
 
-        expect(() => store.settleOneShots(listener)).not.toThrow();
+        expect(() => store.settleOneShots(listener, 1)).not.toThrow();
         // Left exactly as found: skipping a settled obligation must not
         // silently clear it from a listener that was never actually
         // discharged for it.

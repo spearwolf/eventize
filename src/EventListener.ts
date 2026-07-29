@@ -8,7 +8,14 @@ import type {EventName, EventArgs, ListenerObjectType} from './types';
 import {dispatchableMember, isCatchEmAll, isEventName} from './utils';
 
 type EmitFnType = Function | undefined;
-type CallAfterApplyFnType = (() => void) | undefined;
+// The count is how many obligations `onceObligations` held immediately before
+// this dispatch invoked the listener — read there, not inside this callback,
+// because a handler that re-subscribes itself with once() aggregates onto the
+// very listener being dispatched and appends its brand-new obligation to that
+// same array before this ever runs. Settling has to stop at the boundary the
+// count marks, or a once() armed from inside its own dispatch is discharged
+// before it ever gets to fire.
+type CallAfterApplyFnType = ((settledCount: number) => void) | undefined;
 // A listener may return anything, and this callback only forwards it into
 // emitAsync()'s collector — nothing here inspects the value, so `unknown` is
 // the accurate type. `any` would let a caller do arithmetic on it unchecked.
@@ -132,7 +139,9 @@ export class EventListener {
   // Runs after a dispatch that actually invoked the listener. It means "settle
   // the pending one-shot obligations", not "release a handle" — one listener
   // can carry several once() registrations, and a single closure per handle
-  // could only ever speak for the last one.
+  // could only ever speak for the last one. Takes the pre-dispatch obligation
+  // count `apply()` captured, so it settles only the obligations that were
+  // already there — never one the callback just added by re-subscribing.
   callAfterApply: CallAfterApplyFnType;
   isRemoved: boolean;
   // refCount is what on() adds — the listener lives while it is above zero,
@@ -241,13 +250,20 @@ export class EventListener {
     if (this.isRemoved) return;
 
     const {listener, listenerObject} = this;
+    // Read before the dispatch below, not after: the callback it is about to
+    // run may itself call once() and aggregate onto this very listener, which
+    // appends a brand-new obligation to `onceObligations` before this method
+    // gets anywhere near settling it. Obligations are only ever appended, so
+    // this count marks exactly the boundary between "existed before this
+    // dispatch" and "the dispatch's own callback just added it".
+    const settledCount = this.onceObligations?.length ?? 0;
 
     // LISTENER_IS_FUNC
     if (typeof listener === 'function') {
       apply(listenerObject, listener, args, returnValue);
       // Unconditional: a function listener is callable by construction, so the
       // dispatch above always invoked it. Nothing to survive here.
-      if (this.callAfterApply) this.callAfterApply();
+      if (this.callAfterApply) this.callAfterApply(settledCount);
       return;
     }
 
@@ -259,7 +275,7 @@ export class EventListener {
       // A once() must survive a dispatch that found no method — late-bound
       // listener objects are a normal pattern, and so is a listener object
       // that is not there at all.
-      if (didCall && this.callAfterApply) this.callAfterApply();
+      if (didCall && this.callAfterApply) this.callAfterApply(settledCount);
       return;
     }
 
@@ -278,7 +294,7 @@ export class EventListener {
           args,
           returnValue,
         ) || emit(eventName, listener, args, returnValue);
-      if (didCall && this.callAfterApply) this.callAfterApply();
+      if (didCall && this.callAfterApply) this.callAfterApply(settledCount);
     }
   }
 }

@@ -512,24 +512,32 @@ export class EventStore {
   }
 
   /**
-   * Discharges every pending obligation of a listener that has just been
-   * dispatched. All of them at once: they were satisfied by the same call, and
-   * settling them one per dispatch would make a second `once()` on the same
-   * identity fire on the next emit instead of this one.
+   * Discharges the obligations a listener carried *before* the dispatch that
+   * just called this — all of them at once: they were satisfied by the same
+   * call, and settling them one per dispatch would make a second `once()` on
+   * the same identity fire on the next emit instead of this one.
+   *
+   * `settledCount` is `EventListener.apply()`'s pre-dispatch snapshot of
+   * `onceObligations.length`, not the live length read now. Obligations are
+   * only ever appended, so the leading `settledCount` entries are exactly the
+   * ones that existed when the dispatch began — anything the callback itself
+   * just added by re-subscribing with `once()` sits after them and is left
+   * alone, to be settled by a dispatch of its own. Reading the live length
+   * here instead would discharge that one too, before it ever gets to fire.
    *
    * Runs from inside `EventListener.apply()`, so from inside a live `forEach()`
    * walk. `dischargeObligation()` → `dropListener()` routes through
    * `bucketForMutation()`, which is what keeps the walk's array intact.
    *
-   * A copy of `onceObligations`, not the live array: discharging an obligation
-   * removes it from every member's own list, this listener's included, out
-   * from under the loop that is currently iterating it.
+   * A slice of the leading entries, not the live array: discharging an
+   * obligation removes it from every member's own list, this listener's
+   * included, out from under the loop that is currently iterating it.
    */
-  settleOneShots(listener: EventListener): void {
+  settleOneShots(listener: EventListener, settledCount: number): void {
     const obligations = listener.onceObligations;
-    if (obligations === undefined) return;
+    if (obligations === undefined || settledCount === 0) return;
 
-    for (const obligation of obligations.slice()) {
+    for (const obligation of obligations.slice(0, settledCount)) {
       if (!obligation.settled) this.dischargeObligation(obligation);
     }
   }
