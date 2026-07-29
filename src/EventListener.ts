@@ -104,6 +104,18 @@ export const detectListenerType = (listener: unknown): number | undefined => {
 let lastId = 0;
 const createUniqId = () => ++lastId;
 
+/**
+ * One `once()` call's promise to fire at most once. A multi-name call shares a
+ * single obligation across every listener it registers, so whichever name
+ * fires first discharges it for all of them — the race `once(ε, ['a','b'], h)`
+ * has always been. `members` is the back-reference that makes that reachable
+ * from the listener the dispatch happened on.
+ */
+export interface OnceObligation {
+  settled: boolean;
+  members: EventListener[];
+}
+
 export class EventListener {
   readonly id: number;
   readonly eventName: EventName;
@@ -123,17 +135,15 @@ export class EventListener {
   // could only ever speak for the last one.
   callAfterApply: CallAfterApplyFnType;
   isRemoved: boolean;
-  // Two counters, not one, because two kinds of registration share a listener:
-  // refCount is what on() adds, onceCount is the pending obligations once()
-  // adds. The listener lives while their sum is above zero. Folding them into
-  // one number is what made the registration order decide the behaviour.
+  // refCount is what on() adds — the listener lives while it is above zero,
+  // independent of whatever once() obligations it also carries.
   refCount: number;
-  onceCount: number;
-  // Bumped every time a dispatch discharges the pending obligations. An
-  // unsubscribe handle captures it at registration and compares on release: a
-  // handle whose obligation is already discharged must not decrement a counter
-  // that now belongs to somebody else.
-  settleId: number;
+  // undefined means no pending obligations — the invariant every reader relies
+  // on, and why removing the last one sets this back to undefined rather than
+  // leaving an empty array. Lazy on purpose: a listener that never sees a
+  // once() must not pay an allocation for the possibility. A listener is alive
+  // while `refCount > 0 || onceObligations !== undefined`.
+  onceObligations: OnceObligation[] | undefined;
 
   constructor(
     eventName: EventName,
@@ -151,8 +161,7 @@ export class EventListener {
     this.callAfterApply = undefined;
     this.isRemoved = false;
     this.refCount = 0;
-    this.onceCount = 0;
-    this.settleId = 0;
+    this.onceObligations = undefined;
   }
 
   /**
@@ -186,15 +195,30 @@ export class EventListener {
    * again; `apply()` bails on `isRemoved` before touching any of the nulled
    * fields.
    *
-   * The counters are left as they are: a detached listener is out of its
-   * bucket, so no dedup search finds it again, and every reader bails on
-   * `isRemoved` first.
+   * `refCount` is left as it is — a detached listener is out of its bucket, so
+   * no dedup search finds it again, and every reader bails on `isRemoved`
+   * first. `onceObligations` is not: a force-removal (`off()`, `remove()`) does
+   * not go through `EventStore.dischargeObligation()`, so nothing else ever
+   * splices this listener out of the obligations it still holds. Left alone, a
+   * later dispatch of some *other* member would discharge the obligation over
+   * a `members` array still listing a detached listener — harmless by itself,
+   * since `apply()` bails on `isRemoved`, but a bucket that grows without
+   * bound is still a leak. This is the one piece of store bookkeeping `detach()`
+   * has to do itself, precisely because the store isn't the one calling it here.
    */
   detach(): void {
     this.isRemoved = true;
     this.listener = null;
     this.listenerObject = null;
     this.callAfterApply = undefined;
+
+    if (this.onceObligations !== undefined) {
+      for (const obligation of this.onceObligations) {
+        const idx = obligation.members.indexOf(this);
+        if (idx >= 0) obligation.members.splice(idx, 1);
+      }
+      this.onceObligations = undefined;
+    }
   }
 
   // `args` defaults rather than staying `EventArgs | undefined`: the two

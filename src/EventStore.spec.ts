@@ -1,11 +1,8 @@
 import {EventListener} from './EventListener';
+import type {OnceObligation} from './EventListener';
 import {EventStore} from './EventStore';
 
-import {
-  EVENT_CATCH_EM_ALL,
-  REGISTER_ONE_SHOT,
-  REGISTER_PERSISTENT,
-} from './constants';
+import {EVENT_CATCH_EM_ALL} from './constants';
 
 // A stand-in listener for the fixtures that only care about bookkeeping, not
 // about dispatch. It has to be a *real* listener value: a `null` listener has
@@ -93,7 +90,7 @@ describe('EventStore', () => {
       const listener = store.add(new EventListener('foo', 0, () => {}));
       expect(store.namedListeners.has('foo')).toBe(true);
 
-      store.release(listener, REGISTER_PERSISTENT, 0);
+      store.release(listener);
 
       expect(store.namedListeners.has('foo')).toBe(false);
       expect(store.namedListeners.size).toBe(0);
@@ -140,7 +137,7 @@ describe('EventStore', () => {
       for (let i = 0; i < 1000; i++) {
         const name = `event-${i}`;
         const listener = store.add(new EventListener(name, 0, () => {}));
-        store.release(listener, REGISTER_PERSISTENT, 0);
+        store.release(listener);
       }
       expect(store.namedListeners.size).toBe(0);
       expect(store.getSubscriptionCount()).toBe(0);
@@ -268,7 +265,7 @@ describe('EventStore', () => {
       const target = store.add(new EventListener('target', 0, () => {}));
       expect(store.namedListeners.size).toBe(101);
 
-      store.release(target, REGISTER_PERSISTENT, 0);
+      store.release(target);
 
       expect(store.namedListeners.has('target')).toBe(false);
       expect(store.namedListeners.size).toBe(100);
@@ -282,7 +279,7 @@ describe('EventStore', () => {
       );
       store.add(new EventListener('named', 0, () => {}));
 
-      store.release(target, REGISTER_PERSISTENT, 0);
+      store.release(target);
 
       expect(store.catchEmAllListeners).toHaveLength(0);
       expect(store.getSubscriptionCount()).toBe(1);
@@ -301,45 +298,119 @@ describe('EventStore', () => {
       expect(store.getSubscriptionCount()).toBe(1);
     });
 
-    it('aggregates a one-shot registration onto a similar listener', () => {
+    it('aggregates a once() obligation onto a similar listener', () => {
       const store = new EventStore();
       const listenerObject = {};
       const first = store.add(new EventListener('foo', 0, listenerObject));
+      const obligation: OnceObligation = {settled: false, members: []};
       // what once() passes: the identity is already registered, so the
       // obligation joins it instead of inserting a second listener
       const second = store.add(
         new EventListener('foo', 0, listenerObject),
-        REGISTER_ONE_SHOT,
+        obligation,
       );
 
       expect(second).toBe(first);
       expect(first.refCount).toBe(1);
-      expect(first.onceCount).toBe(1);
+      expect(first.onceObligations).toEqual([obligation]);
+      expect(obligation.members).toEqual([first]);
       expect(store.getSubscriptionCount()).toBe(1);
 
-      store.release(first, REGISTER_ONE_SHOT, 0);
+      store.releaseObligation(obligation);
       expect(store.getSubscriptionCount()).toBe(1);
-      store.release(first, REGISTER_PERSISTENT, 0);
+      store.release(first);
       expect(store.getSubscriptionCount()).toBe(0);
     });
 
-    it('a settled obligation cannot be released by its old generation', () => {
+    it('releasing an already-settled obligation is a no-op', () => {
       const store = new EventStore();
       const listenerObject = {};
+      const obligation: OnceObligation = {settled: false, members: []};
       const listener = store.add(
         new EventListener('foo', 0, listenerObject),
-        REGISTER_ONE_SHOT,
+        obligation,
       );
       store.add(new EventListener('foo', 0, listenerObject));
 
       store.settleOneShots(listener);
-      expect(listener.onceCount).toBe(0);
-      expect(listener.settleId).toBe(1);
+      expect(obligation.settled).toBe(true);
+      expect(listener.onceObligations).toBe(undefined);
 
-      store.release(listener, REGISTER_ONE_SHOT, 0);
+      // A handle calling in after its obligation was already discharged by a
+      // dispatch — the shape that, under the old counter model, needed a
+      // generation check to keep from decrementing a count that had moved on
+      // to a later registration. `settled` makes the same guarantee directly:
+      // there is no count to miscount, only a flag that is already true.
+      store.releaseObligation(obligation);
 
       expect(listener.refCount).toBe(1);
       expect(store.getSubscriptionCount()).toBe(1);
+    });
+
+    it('settleOneShots() is a no-op for a listener with no pending obligations', () => {
+      const store = new EventStore();
+      const listener = store.add(new EventListener('foo', 0, {}));
+
+      expect(() => store.settleOneShots(listener)).not.toThrow();
+
+      expect(listener.refCount).toBe(1);
+      expect(store.getSubscriptionCount()).toBe(1);
+    });
+
+    // The four cases below construct states EventStore.add() never actually
+    // produces — it always pairs a listener's onceObligations entry with the
+    // matching obligation.members entry, on both sides, in the same call. What
+    // they pin is dischargeObligation()'s and detach()'s own half of that
+    // pairing: neither trusts the other side of a relationship it did not
+    // just create, the same caution EventStore.spec.ts already applies to a
+    // holey bucket.
+    describe('mismatched obligation bookkeeping is tolerated, not trusted', () => {
+      it('settleOneShots() skips an obligation that is already settled', () => {
+        const store = new EventStore();
+        const obligation: OnceObligation = {settled: true, members: []};
+        const listener = new EventListener('foo', 0, {});
+        listener.onceObligations = [obligation];
+        store.add(listener);
+
+        expect(() => store.settleOneShots(listener)).not.toThrow();
+        // Left exactly as found: skipping a settled obligation must not
+        // silently clear it from a listener that was never actually
+        // discharged for it.
+        expect(listener.onceObligations).toEqual([obligation]);
+      });
+
+      it('releaseObligation() tolerates a member with no obligations of its own', () => {
+        const store = new EventStore();
+        const persistentOnly = store.add(new EventListener('foo', 0, {}));
+        const obligation: OnceObligation = {
+          settled: false,
+          members: [persistentOnly],
+        };
+
+        expect(() => store.releaseObligation(obligation)).not.toThrow();
+
+        expect(obligation.settled).toBe(true);
+        expect(persistentOnly.refCount).toBe(1);
+        expect(store.getSubscriptionCount()).toBe(1);
+      });
+
+      it('releaseObligation() tolerates a member whose obligations list a different one', () => {
+        const store = new EventStore();
+        const listener = store.add(new EventListener('foo', 0, {}));
+        const otherObligation: OnceObligation = {settled: false, members: []};
+        listener.onceObligations = [otherObligation];
+        const obligation: OnceObligation = {
+          settled: false,
+          members: [listener],
+        };
+
+        expect(() => store.releaseObligation(obligation)).not.toThrow();
+
+        // The mismatch is left alone rather than corrupting the unrelated
+        // obligation the listener actually holds.
+        expect(listener.onceObligations).toEqual([otherObligation]);
+        expect(store.getSubscriptionCount()).toBe(1);
+      });
     });
 
     it('honours refCount before removing anything', () => {
@@ -350,10 +421,10 @@ describe('EventStore', () => {
       expect(second).toBe(first);
       expect(first.refCount).toBe(2);
 
-      store.release(first, REGISTER_PERSISTENT, 0);
+      store.release(first);
       expect(store.getSubscriptionCount()).toBe(1);
 
-      store.release(first, REGISTER_PERSISTENT, 0);
+      store.release(first);
       expect(store.getSubscriptionCount()).toBe(0);
     });
 
@@ -397,7 +468,7 @@ describe('EventStore', () => {
       const target = a.add(new EventListener('foo', 0, () => {}));
       b.add(new EventListener('foo', 0, () => {})); // same name, different instance, own bucket
 
-      expect(() => b.release(target, REGISTER_PERSISTENT, 0)).not.toThrow();
+      expect(() => b.release(target)).not.toThrow();
 
       expect(target.isRemoved).toBe(true);
       expect(a.getSubscriptionCount()).toBe(1);
@@ -409,7 +480,7 @@ describe('EventStore', () => {
       const b = new EventStore();
       const target = a.add(new EventListener('foo', 0, () => {}));
 
-      expect(() => b.release(target, REGISTER_PERSISTENT, 0)).not.toThrow();
+      expect(() => b.release(target)).not.toThrow();
 
       expect(target.isRemoved).toBe(true);
       expect(a.getSubscriptionCount()).toBe(1);
@@ -490,7 +561,7 @@ describe('EventStore', () => {
       let dispatched = 0;
       store.forEach('foo', () => {
         dispatched += 1;
-        store.release(doomed, REGISTER_PERSISTENT, 0);
+        store.release(doomed);
       });
 
       const after = store.namedListeners.get('foo');
@@ -511,7 +582,7 @@ describe('EventStore', () => {
       const before = store.catchEmAllListeners;
 
       store.forEach('foo', () => {
-        store.release(doomed, REGISTER_PERSISTENT, 0);
+        store.release(doomed);
       });
 
       expect(store.catchEmAllListeners).not.toBe(before);
@@ -641,10 +712,10 @@ describe('EventStore', () => {
       store.forEach('foo', () => {
         step += 1;
         if (step === 1) {
-          store.release(namedDoomed, REGISTER_PERSISTENT, 0);
+          store.release(namedDoomed);
           namedAfterFirst = store.namedListeners.get('foo');
         } else if (step === 2) {
-          store.release(wildcardDoomed, REGISTER_PERSISTENT, 0);
+          store.release(wildcardDoomed);
         } else {
           store.add(new EventListener('foo', 1, () => {}));
         }
@@ -731,7 +802,7 @@ describe('EventStore', () => {
         dispatched += 1;
         if (++step > 1) return;
         store.forEach('inner', () => {
-          store.release(doomed, REGISTER_PERSISTENT, 0);
+          store.release(doomed);
         });
       });
 

@@ -1,11 +1,8 @@
-import type {EventListener} from './EventListener';
+import type {EventListener, OnceObligation} from './EventListener';
 import {
   EVENT_CATCH_EM_ALL,
   LISTENER_IS_NAMED_FUNC,
   LISTENER_IS_OBJ,
-  REGISTER_ONE_SHOT,
-  REGISTER_PERSISTENT,
-  type RegisterKind,
 } from './constants';
 import type {EventName} from './types';
 import {isCatchEmAll, isEventName} from './utils';
@@ -204,14 +201,6 @@ const findSimilarListener = (
   return undefined;
 };
 
-const countRegistration = (listener: EventListener, kind: RegisterKind) => {
-  if (kind === REGISTER_ONE_SHOT) {
-    listener.onceCount += 1;
-  } else {
-    listener.refCount += 1;
-  }
-};
-
 export class EventStore {
   readonly namedListeners: Map<EventName, ListenerBucket>;
 
@@ -402,32 +391,43 @@ export class EventStore {
   /**
    * Returns the listener the registration landed on: the given one when it was
    * inserted, or an existing one with the same identity. Either way the
-   * counter for `kind` is incremented on it, which is what makes `on()` and
-   * `once()` aggregate in both registration orders.
+   * registration is recorded on it, which is what makes `on()` and `once()`
+   * aggregate in both registration orders.
    *
-   * The `noDedup` flag this replaced only ever guarded the incoming call, so a
-   * later `on()` still folded onto a pending `once()` while the reverse order
-   * did not. Identity decides which listener, the counters decide how long.
+   * `obligation` is what used to be a `noDedup`/`kind` flag: `null` for a
+   * persistent `on()`, an `OnceObligation` for a `once()`. Its *presence*, not
+   * a tag compared against it, is the whole test — the obligation itself is
+   * the thing that later has to know every listener it was added to, so
+   * threading it through here is what lets `once(ε, ['a','b'], h)` share one
+   * obligation across two listeners instead of building two.
    */
   add(
     listener: EventListener,
-    kind: RegisterKind = REGISTER_PERSISTENT,
+    obligation: OnceObligation | null = null,
   ): EventListener {
     const bucket = listener.isCatchEmAll
       ? this.catchEmAllBucket
       : this.getListenersForEventName(listener.eventName);
 
-    const similarListener = findSimilarListener(listener, bucket);
-    if (similarListener) {
-      // An aggregation bumps a counter and touches no array, so it owes no
-      // clone. Searching the live bucket is safe for the same reason.
-      countRegistration(similarListener, kind);
-      return similarListener;
+    const similar = findSimilarListener(listener, bucket);
+    const target = similar ?? listener;
+
+    if (obligation === null) {
+      target.refCount += 1;
+    } else if (!target.onceObligations?.includes(obligation)) {
+      // The guard is for a duplicated name in one call — once(ε, ['a','a'], h)
+      // aggregates onto the listener it just created, and one obligation must
+      // not be counted on the same listener twice.
+      (target.onceObligations ??= []).push(obligation);
+      obligation.members.push(target);
     }
 
-    countRegistration(listener, kind);
-    const target = this.bucketForMutation(listener.eventName, bucket);
-    target.splice(findInsertIndex(target, listener), 0, listener);
+    // An aggregation touches no array, so it owes no clone — searching the
+    // live bucket above is safe for the same reason.
+    if (similar) return similar;
+
+    const arr = this.bucketForMutation(listener.eventName, bucket);
+    arr.splice(findInsertIndex(arr, listener), 0, listener);
     return listener;
   }
 
@@ -489,48 +489,89 @@ export class EventStore {
   }
 
   /**
-   * Gives one registration back. The handle returned by `on()` / `once()` is
-   * the only caller, and it knows which kind it holds.
-   *
-   * A one-shot release compares the generation it was registered in: a dispatch
-   * that already discharged the obligation bumped `settleId`, and decrementing
-   * `onceCount` from a spent handle would take a count that now belongs to a
-   * later registration — the shape that once let one handle unsubscribe
-   * another's listener.
+   * Gives one persistent (`on()`) registration back. `once()`'s handle calls
+   * `releaseObligation()` instead — it holds no listener at all, only the
+   * obligation, so there is nothing for this method to accept for that case.
    */
-  release(listener: EventListener, kind: RegisterKind, settleId: number): void {
+  release(listener: EventListener): void {
     if (listener.isRemoved) return;
-
-    if (kind === REGISTER_ONE_SHOT) {
-      if (listener.settleId !== settleId) return;
-      listener.onceCount -= 1;
-    } else {
-      listener.refCount -= 1;
-    }
-
-    if (listener.refCount + listener.onceCount > 0) return;
+    listener.refCount -= 1;
+    if (listener.refCount > 0 || listener.onceObligations !== undefined) return;
     this.dropListener(listener);
   }
 
   /**
-   * Discharges every pending one-shot obligation of a listener that has just
-   * been dispatched. All of them at once: they were satisfied by the same call,
-   * and counting them down one per dispatch would make a second `once()` on the
-   * same identity fire on the next emit instead of this one.
+   * Gives one `once()` obligation back by hand, before anything discharged it.
+   * A settled obligation is inert here on purpose: whichever name fired first
+   * already ended it for every listener it was ever added to, and a handle
+   * calling in after that has nothing left to give back.
+   */
+  releaseObligation(obligation: OnceObligation): void {
+    if (obligation.settled) return;
+    this.dischargeObligation(obligation);
+  }
+
+  /**
+   * Discharges every pending obligation of a listener that has just been
+   * dispatched. All of them at once: they were satisfied by the same call, and
+   * settling them one per dispatch would make a second `once()` on the same
+   * identity fire on the next emit instead of this one.
    *
    * Runs from inside `EventListener.apply()`, so from inside a live `forEach()`
-   * walk. `dropListener()` routes through `bucketForMutation()`, which is what
-   * keeps the walk's array intact.
+   * walk. `dischargeObligation()` → `dropListener()` routes through
+   * `bucketForMutation()`, which is what keeps the walk's array intact.
+   *
+   * A copy of `onceObligations`, not the live array: discharging an obligation
+   * removes it from every member's own list, this listener's included, out
+   * from under the loop that is currently iterating it.
    */
   settleOneShots(listener: EventListener): void {
-    if (listener.onceCount === 0) return;
+    const obligations = listener.onceObligations;
+    if (obligations === undefined) return;
 
-    listener.onceCount = 0;
-    listener.settleId += 1;
-    listener.callAfterApply = undefined;
+    for (const obligation of obligations.slice()) {
+      if (!obligation.settled) this.dischargeObligation(obligation);
+    }
+  }
 
-    if (listener.refCount === 0) {
-      this.dropListener(listener);
+  /**
+   * Ends one obligation everywhere it is held. `settled` and the emptied
+   * `members` list go first, so a `dropListener()` below — which detaches,
+   * which walks the dropped listener's own remaining obligations — cannot come
+   * back into this one.
+   *
+   * This is the one place that knows about the race a multi-name `once()`
+   * promises: `members` may hold several listeners, one per name the call
+   * covered, and whichever of them got here first — through a real dispatch or
+   * a handle calling `releaseObligation()` by hand — takes all of them out
+   * together. A member already gone (force-removed by `off()`, which walks
+   * straight to `EventListener.detach()` without going through here) is
+   * skipped: `detach()` already spliced it out of `members` on its way out, so
+   * `isRemoved` is a belt-and-braces check, not the one this relies on.
+   */
+  private dischargeObligation(obligation: OnceObligation): void {
+    obligation.settled = true;
+    const members = obligation.members.slice();
+    obligation.members.length = 0;
+
+    for (const member of members) {
+      const held = member.onceObligations;
+      if (held !== undefined) {
+        const idx = held.indexOf(obligation);
+        if (idx >= 0) held.splice(idx, 1);
+        if (held.length === 0) {
+          member.onceObligations = undefined;
+          member.callAfterApply = undefined;
+        }
+      }
+
+      if (
+        !member.isRemoved &&
+        member.refCount === 0 &&
+        member.onceObligations === undefined
+      ) {
+        this.dropListener(member);
+      }
     }
   }
 

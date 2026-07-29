@@ -1,4 +1,5 @@
 import {EventListener} from './EventListener';
+import type {OnceObligation} from './EventListener';
 import {
   emit,
   emitAsync,
@@ -343,6 +344,26 @@ describe('EventListener', () => {
       listener.apply(bar, [null, 'plah!', 666]);
       // expect(fn).toHaveBeenCalledWith(null, 'plah!', 666);
       expect(fn.mock.calls[0]).toEqual([null, 'plah!', 666]);
+    });
+  });
+
+  describe('detach()', () => {
+    // A force-removal (off()) calls detach() directly, without going through
+    // EventStore.dischargeObligation() — so it is detach() itself that has to
+    // splice the listener out of every obligation it still holds. Covered
+    // indirectly by off.spec.ts's "force-removes an aggregated once()
+    // registration" cases; this is the defensive half, the mismatch
+    // EventStore.add() never actually produces (it always pairs a listener's
+    // onceObligations entry with the matching obligation.members entry), the
+    // same way EventStore.spec.ts pins its holey-bucket throws.
+    it('tolerates an obligation whose members list does not include this listener', () => {
+      const listener = new EventListener('foo', 0, {});
+      const obligation: OnceObligation = {settled: false, members: []};
+      listener.onceObligations = [obligation];
+
+      expect(() => listener.detach()).not.toThrow();
+      expect(listener.onceObligations).toBe(undefined);
+      expect(obligation.members).toEqual([]);
     });
   });
 });

@@ -120,6 +120,41 @@ describe('on()/once() aggregate by listener identity', () => {
     });
   });
 
+  describe('a multi-name once() shares one obligation across its listeners', () => {
+    // once(ε, ['a', 'b'], h) is a race: whichever name fires first discharges
+    // the obligation for both. This case is the one where discharging it must
+    // not be the same as detaching every member — 'b' also carries an on()
+    // registration on the very listener the obligation was added to, and that
+    // listener has to survive the race the once() half of it just lost.
+    it('a sibling aggregated onto an existing on() survives the race, the other member is dropped', () => {
+      const ε = eventize();
+      const h = {a: fake(), b: fake()};
+
+      on(ε, 'b', h);
+      once(ε, ['a', 'b'], h);
+
+      expect(getSubscriptionCount(ε)).toBe(2);
+
+      emit(ε, 'a');
+
+      // the obligation is discharged for both 'a' and 'b' alike, but 'b' is
+      // still held up by its own on() — only 'a', which had nothing else
+      // keeping it alive, is actually dropped from the registry
+      expect(h.a.callCount).toBe(1);
+      expect(h.b.callCount).toBe(0);
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      // 'b' still dispatches, through the on() alone — the once() half of it
+      // is spent, not the listener itself
+      emit(ε, 'b');
+      expect(h.b.callCount).toBe(1);
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      emit(ε, 'a');
+      expect(h.a.callCount).toBe(1); // 'a' is gone; no further calls
+    });
+  });
+
   describe('the handles stay independent', () => {
     it('releasing the once() handle leaves the on() registration', () => {
       const ε = eventize();
@@ -195,8 +230,11 @@ describe('on()/once() aggregate by listener identity', () => {
       once(ε, 'foo', listenerObject);
       unsubOnce();
 
-      // the second obligation is still standing: it is discharged by the emit,
-      // not by the handle of the first one
+      // unsubOnce() holds the *first* once()'s obligation, which the emit
+      // above already discharged — releaseObligation() bails on `settled` and
+      // never touches the listener at all. The second once() made its own,
+      // fresh obligation, and that one is still standing: it is discharged by
+      // the emit below, not by a handle that was never released to it.
       emit(ε, 'foo');
       expect(listenerObject.foo.callCount).toBe(2);
       expect(getSubscriptionCount(ε)).toBe(1);

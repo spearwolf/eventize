@@ -1,28 +1,12 @@
 import {EventKeeper} from './EventKeeper';
 import type {KeeperEvent} from './EventKeeper';
 import {detectListenerType, EventListener} from './EventListener';
+import type {OnceObligation} from './EventListener';
 import type {EventStore} from './EventStore';
 import {Priority} from './Priority';
-import {
-  EVENT_CATCH_EM_ALL,
-  REGISTER_ONE_SHOT,
-  REGISTER_PERSISTENT,
-  type RegisterKind,
-} from './constants';
+import {EVENT_CATCH_EM_ALL} from './constants';
 import type {EventArgs, EventName, ListenerObjectType} from './types';
 import {warn} from './utils';
-
-/**
- * What a subscription hands back to its unsubscribe handle. The listener alone
- * is not enough: a one-shot release has to prove it is giving back the
- * obligation it registered, not one a later `once()` made on the same listener.
- * `settleId` is read before the retained replay runs, because that replay can
- * discharge the obligation on the spot.
- */
-export interface Registration {
-  listener: EventListener;
-  settleId: number;
-}
 
 const registerEventListener = (
   store: EventStore,
@@ -32,20 +16,20 @@ const registerEventListener = (
   listener: unknown,
   listenerObject: ListenerObjectType,
   retainedEvents: KeeperEvent[],
-  kind: RegisterKind,
-): Registration => {
+  obligation: OnceObligation | null,
+): EventListener => {
   const newListener = new EventListener(
     eventName,
     priority,
     listener,
     listenerObject,
   );
-  const el = store.add(newListener, kind);
-  const settleId = el.settleId;
+  const el = store.add(newListener, obligation);
 
-  if (kind === REGISTER_ONE_SHOT && el.callAfterApply === undefined) {
-    // One hook per listener, however many once() registrations it carries. It
-    // outlives none of them: settleOneShots() clears it when it discharges.
+  if (obligation !== null && el.callAfterApply === undefined) {
+    // One hook per listener, however many once() obligations it carries. It
+    // outlives none of them: settleOneShots() clears it when the last one
+    // discharges.
     el.callAfterApply = () => store.settleOneShots(el);
   }
 
@@ -53,11 +37,11 @@ const registerEventListener = (
   // An aggregating once() does: its obligation is new, and without the replay
   // whether a once() fires on a retained event would depend on the incidental
   // existence of an on() with the same handler.
-  if (el === newListener || kind === REGISTER_ONE_SHOT) {
+  if (el === newListener || obligation !== null) {
     keeper.replayTo(eventName, el, retainedEvents);
   }
 
-  return {listener: el, settleId};
+  return el;
 };
 
 /**
@@ -87,8 +71,8 @@ const _subscribeTo = (
   keeper: EventKeeper,
   args: EventArgs,
   retainedEvents: KeeperEvent[],
-  kind: RegisterKind,
-): Registration | Array<Registration> => {
+  obligation: OnceObligation | null,
+): EventListener | Array<EventListener> => {
   const len = args.length;
   const typeOfFirstArg = typeof args[0];
 
@@ -157,7 +141,7 @@ const _subscribeTo = (
       listener,
       listenerObject,
       retainedEvents,
-      kind,
+      obligation,
     );
 
   if (Array.isArray(eventName)) {
@@ -187,10 +171,16 @@ export const subscribeTo = (
   store: EventStore,
   keeper: EventKeeper,
   args: EventArgs,
-  kind: RegisterKind = REGISTER_PERSISTENT,
-): Registration | Array<Registration> => {
+  obligation: OnceObligation | null = null,
+): EventListener | Array<EventListener> => {
   const retainedEvents: KeeperEvent[] = [];
-  const registrations = _subscribeTo(store, keeper, args, retainedEvents, kind);
+  const listeners = _subscribeTo(
+    store,
+    keeper,
+    args,
+    retainedEvents,
+    obligation,
+  );
   EventKeeper.publish(retainedEvents);
-  return registrations;
+  return listeners;
 };

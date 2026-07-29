@@ -1,14 +1,9 @@
 import {asEventized} from './asEventized';
-import {
-  EVENT_CATCH_EM_ALL,
-  REGISTER_ONE_SHOT,
-  REGISTER_PERSISTENT,
-  type RegisterKind,
-} from './constants';
+import {EVENT_CATCH_EM_ALL} from './constants';
+import type {EventListener, OnceObligation} from './EventListener';
 import {internalsOf} from './internals';
 import {isEventized} from './isEventized';
 import {subscribeTo} from './subscribeTo';
-import type {Registration} from './subscribeTo';
 import type {
   AnyEventNames,
   ArgsFor,
@@ -42,37 +37,52 @@ import {dispatchableMember, isEventName} from './utils';
 // both references in the closure forever. Both go in one slot so a single null
 // test releases them together and TypeScript narrows both at once.
 //
-// Releasing goes through the store rather than the public `off()`: a handle
-// gives back the one registration it made, which is a different operation from
-// `off(ε, 'foo', obj)` force-removing everything under an identity. The kind
-// and the settle generation travel with the capture because only the handle
-// knows them.
-const makeUnsubscribe = (
+// on() and once() release through two different store calls now — a listener
+// list against release(), one obligation against releaseObligation() — so they
+// get their own handle makers below instead of sharing one shaped around
+// whichever the store used to take. A once() handle in particular holds no
+// listener at all: the obligation already knows every listener it was added
+// to, which is exactly what lets whichever name fires first release the
+// others too. Both makers keep the same guard for the same reason: reaching
+// the emitter (and through it every retained payload) from a spent handle is
+// the leak this design exists to prevent, whichever shape the capture is in.
+const makeOnUnsubscribe = (
   host: EventizedObject,
-  registrations: Registration | Array<Registration>,
-  kind: RegisterKind,
+  listeners: EventListener | Array<EventListener>,
 ): UnsubscribeFunc => {
   let held: {
     host: EventizedObject;
-    registrations: Registration | Array<Registration>;
-  } | null = {host, registrations};
+    listeners: EventListener | Array<EventListener>;
+  } | null = {host, listeners};
 
   return () => {
     const target = held;
     if (target === null) return;
     held = null;
     const {store} = internalsOf(target.host);
-    if (Array.isArray(target.registrations)) {
-      target.registrations.forEach((registration) =>
-        store.release(registration.listener, kind, registration.settleId),
-      );
+    if (Array.isArray(target.listeners)) {
+      target.listeners.forEach((listener) => store.release(listener));
     } else {
-      store.release(
-        target.registrations.listener,
-        kind,
-        target.registrations.settleId,
-      );
+      store.release(target.listeners);
     }
+  };
+};
+
+const makeOnceUnsubscribe = (
+  host: EventizedObject,
+  obligation: OnceObligation,
+): UnsubscribeFunc => {
+  let held: {host: EventizedObject; obligation: OnceObligation} | null = {
+    host,
+    obligation,
+  };
+
+  return () => {
+    const target = held;
+    if (target === null) return;
+    held = null;
+    const {store} = internalsOf(target.host);
+    store.releaseObligation(target.obligation);
   };
 };
 
@@ -317,11 +327,7 @@ export function on<T extends object>(
 export function on(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
   const eventizedObj = asEventized(obj);
   const {store, keeper} = internalsOf(eventizedObj);
-  return makeUnsubscribe(
-    eventizedObj,
-    subscribeTo(store, keeper, args, REGISTER_PERSISTENT),
-    REGISTER_PERSISTENT,
-  );
+  return makeOnUnsubscribe(eventizedObj, subscribeTo(store, keeper, args));
 }
 
 // ---------------------------------------------------------------------------
@@ -449,16 +455,17 @@ export function once<T extends object>(
 export function once(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
   const eventizedObj = asEventized(obj);
   const {store, keeper} = internalsOf(eventizedObj);
-  // The auto-unsubscribe is not this handle's job any more: the store settles
-  // every pending obligation on the listener after a dispatch, which is what
-  // lets two once() calls on one identity share a single registration. A
-  // retained event therefore fires inside subscribeTo(), before this handle
-  // exists — release() bails on `isRemoved` if it already took the listener.
-  return makeUnsubscribe(
-    eventizedObj,
-    subscribeTo(store, keeper, args, REGISTER_ONE_SHOT),
-    REGISTER_ONE_SHOT,
-  );
+  // One obligation per call, however many names it covers. A multi-name
+  // once() shares this same object across every listener it registers, which
+  // is what makes firing any one of them discharge the rest — the race
+  // once(ε, ['a', 'b'], h) has always promised. The auto-unsubscribe is not
+  // this handle's job: the store discharges the obligation from inside the
+  // dispatch that satisfies it, retained replay included, which can happen
+  // before this handle even exists — releaseObligation() bails on `settled`
+  // if it already did.
+  const obligation: OnceObligation = {settled: false, members: []};
+  subscribeTo(store, keeper, args, obligation);
+  return makeOnceUnsubscribe(eventizedObj, obligation);
 }
 
 // ---------------------------------------------------------------------------

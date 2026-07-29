@@ -40,13 +40,6 @@ describe('once()', () => {
     });
   });
 
-  // A multi-name once() builds one EventListener per name — different names
-  // never aggregate — so each name now carries its own independent one-shot
-  // obligation. Up to v5.1.0 all of them shared a single unsubscribe closure,
-  // so firing any one name detached every other name in the same call too;
-  // that coupling lived in the two-phase subscribeToDeferred() this refactor
-  // removes, and settlement is per-listener now, matching how on() with an
-  // array of names already always behaved.
   it('called with multiple event names', () => {
     const e = eventize();
 
@@ -59,10 +52,19 @@ describe('once()', () => {
     expect(sub).toHaveBeenCalledWith(42);
     sub.mockClear();
 
-    // 'bar' is its own obligation and is still pending
     emit(e, 'bar');
+    expect(sub).not.toHaveBeenCalled(); // is no longer called because 'foo' has already been called back
+
+    // ---
+    once(e, ['foo', 'bar'], sub);
+
+    emit(e, 'bar', 666);
     expect(sub).toHaveBeenCalledTimes(1);
-    expect(getSubscriptionCount(e)).toBe(0);
+    expect(sub).toHaveBeenCalledWith(666);
+    sub.mockClear();
+
+    emit(e, 'foo');
+    expect(sub).not.toHaveBeenCalled();
   });
 
   describe('with retained event', () => {
@@ -80,10 +82,7 @@ describe('once()', () => {
       expect(getSubscriptionCount(e)).toBe(0);
     });
 
-    // 'bar' carries no retained value and no relationship to 'foo' any more —
-    // see the comment on 'called with multiple event names' above — so it
-    // stays subscribed on its own account after 'foo' replays and detaches.
-    it('unsubscribes the replayed name only (array of event names)', () => {
+    it('unsubscribes after retained replay (array of event names)', () => {
       const e = eventize();
 
       retain(e, 'foo');
@@ -94,11 +93,6 @@ describe('once()', () => {
 
       expect(sub).toHaveBeenCalledTimes(1);
       expect(sub).toHaveBeenCalledWith(42);
-      expect(getSubscriptionCount(e)).toBe(1);
-
-      emit(e, 'bar', 666);
-      expect(sub).toHaveBeenCalledTimes(2);
-      expect(sub).toHaveBeenCalledWith(666);
       expect(getSubscriptionCount(e)).toBe(0);
     });
   });
