@@ -15,13 +15,22 @@
   "module": "lib/index.mjs",
   "types": "lib/index.d.ts",
   "exports": {
-    "import": "./lib/index.mjs",
-    "require": "./lib/index.js"
+    ".": {
+      "types": {
+        "import": "./lib/index.d.mts",
+        "require": "./lib/index.d.ts"
+      },
+      "import": "./lib/index.mjs",
+      "require": "./lib/index.js",
+      "default": "./lib/index.mjs"
+    },
+    "./package.json": "./package.json"
   },
   "sideEffects": false,
   "files": [
     "lib",
     "docs",
+    "!docs/backlog.md",
     "skills",
     "README.md",
     "CHANGELOG.md",

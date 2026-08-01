@@ -51,6 +51,8 @@ Four more are type-only and surface as compile errors rather than as behaviour c
 - **`lib/index.d.ts` no longer exports `EventListener` in the value namespace**, where it contradicted both `src/index.ts` and the runtime bundles — `import {EventListener}` from the ESM build threw a `SyntaxError`. The class stays as an unexported `declare class` inside the file.
 - **`tsconfig.json`'s `removeComments: true` was stripping every JSDoc comment**, `@deprecated` included, from the declarations tsup emits. `tsup.config.js` now overrides it for the `dts` pass only, so the shared config, `ts-jest` and the JS bundle are untouched.
 - **`subscribeTo() called with insufficient arguments` now names its cause on `Error.cause`** — `'missing-listener'`, `'not-dispatchable'` or `'empty-method-name'` — instead of only on the console via `warn()`. The thrown message is unchanged, so code that matches on the string sees no difference.
+- **`exports` in `package.json` now declares `types` and `default`, and adds `./package.json`.** The map used to carry only `import` and `require`; a resolver honouring neither got no entry point at all, and the declared types rested on tsup's filename convention (`index.d.mts` beside `index.mjs`) rather than on a stated `types` condition. `require('@spearwolf/eventize/package.json')` now resolves instead of throwing `ERR_PACKAGE_PATH_NOT_EXPORTED`.
+- **`docs/backlog.md` no longer ships in the npm tarball.** It is a working file for this repository, not a document for consumers; `files` excludes it while leaving the rest of `docs/` and the file itself untouched in the repository.
 
 ### Performance
 
