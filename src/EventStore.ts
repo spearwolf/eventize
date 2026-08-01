@@ -201,6 +201,16 @@ const findSimilarListener = (
   return undefined;
 };
 
+/**
+ * `peekListeners()`'s answer for a name nothing is registered under. One
+ * frozen array, reused for every miss instead of allocating a throwaway one
+ * per call. Freezing it matters *because* it is shared: a caller reaching
+ * past the `ReadonlyArray` type with a cast would otherwise corrupt every
+ * other name's empty answer along with its own, which a per-bucket array
+ * never risks.
+ */
+const EMPTY_LISTENERS: ReadonlyArray<EventListener> = Object.freeze([]);
+
 export class EventStore {
   readonly namedListeners: Map<EventName, ListenerBucket>;
 
@@ -221,6 +231,18 @@ export class EventStore {
     this.catchEmAllBucket = createBucket();
   }
 
+  /**
+   * `eventName === '*'` is not special-cased here: `'*'` is a legal key in
+   * `namedListeners` as far as this method knows, so it gets a bucket of its
+   * own like any other name, distinct from `catchEmAllBucket`. `forEach()`
+   * never walks that key — a `'*'` dispatch reads `catchEmAllBucket` only —
+   * so a bucket created this way is never held and never seen by a running
+   * emit. `peekListeners('*')` disagrees on purpose: it reads
+   * `catchEmAllBucket` for `'*'`, the array wildcard listeners actually land
+   * in. Calling both with `'*'` therefore answers from two different arrays;
+   * see `EventStore.spec.ts`'s impostor-bucket case for the mechanism, and
+   * `peekListeners()`'s own doc comment for the reading side of it.
+   */
   getListenersForEventName(eventName: string | symbol): ListenerBucket {
     let namedListeners = this.namedListeners.get(eventName);
     if (!namedListeners) {
@@ -228,6 +250,43 @@ export class EventStore {
       this.namedListeners.set(eventName, namedListeners);
     }
     return namedListeners;
+  }
+
+  /**
+   * The second door promised for a caller that only wants to look:
+   * `getListenersForEventName()` stays the creating one — `add()` needs a
+   * bucket to insert into, and lazy creation plus the `'*'`-as-key edge are
+   * both pinned by spec against it — while this one never adds a bucket or a
+   * map entry. An unknown name reads back the same frozen empty array every
+   * time; a known one is handed back by reference, not copied, because
+   * nothing here is a snapshot promise, only a no-mutation one — reading it
+   * again after a mutation may hand back the pre-clone array, same as
+   * `getListenersForEventName()` (see AGENTS.md).
+   *
+   * That no-mutation promise is the return type, not a runtime copy: what
+   * comes back is `ReadonlyArray`, so a caller cannot `push()` or `splice()`
+   * their way into the registry without reaching past the type first. The
+   * use-it-immediately discipline `getListenersForEventName()` can only ask
+   * for in a comment is half enforced here instead: the compiler takes the
+   * no-mutation half, and freshness stays the caller's problem either way. Frozen-ness is not part of that promise and is not uniform: it
+   * holds only for the shared empty answer to an unknown name — a known
+   * bucket, `'*'` included, is a live array underneath and stays mutable via
+   * a cast, because `bucketForMutation()` still has to splice it in place.
+   * Nobody outside this file may rely on either state.
+   *
+   * `eventName === '*'` reads `catchEmAllBucket`, not a `'*'` key in
+   * `namedListeners` — the array wildcard listeners are actually in.
+   * `getListenersForEventName('*')` disagrees: it treats `'*'` as an
+   * ordinary name and creates a bucket of its own for it, a bucket
+   * `forEach()` never walks. The two methods answer `'*'` from different
+   * arrays; see the doc comment there and `EventStore.spec.ts`'s
+   * impostor-bucket case.
+   */
+  peekListeners(eventName: EventName): ReadonlyArray<EventListener> {
+    if (isCatchEmAll(eventName)) {
+      return this.catchEmAllBucket;
+    }
+    return this.namedListeners.get(eventName) ?? EMPTY_LISTENERS;
   }
 
   /**

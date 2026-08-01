@@ -42,19 +42,30 @@ export const allListeners = <T extends EventMap>(
 
 /**
  * The listeners registered for one event name, in dispatch order within their
- * bucket. `'*'` reads the wildcard bucket — it is not a key in `namedListeners`,
- * the same special case `EventStore.removeByEventNameAndListenerObject()` has
- * to make.
+ * bucket. Reads through `EventStore.peekListeners()`, which folds in the same
+ * `'*'`-reads-the-wildcard-bucket special case
+ * `EventStore.removeByEventNameAndListenerObject()` has to make, and neither
+ * creates a bucket for an unknown name nor hands back a mutable reference —
+ * the `ReadonlyArray` return type is the guarantee, not a defensive copy, so
+ * there is nothing left for this helper to spread. A spec that needs to
+ * mutate the result (sorting in place, for instance) still has to copy it
+ * itself.
+ *
+ * The old spread did two more things besides stripping mutability, and
+ * neither is needed here either: it took a snapshot, and it dropped the
+ * `HELD_BY` symbol a live bucket carries. That symbol is why a spec must
+ * compare this method's result by identity and length, not `toEqual()` — a
+ * known name's bucket carries it and fails a `toEqual()` against a plain
+ * array literal, while the shared empty answer for an unknown name is a
+ * plain frozen `[]` and passes. Same return type, two different comparable
+ * shapes depending on state; see AGENTS.md, "compare buckets by identity and
+ * length".
  */
 export const listenersOf = <T extends EventMap>(
   obj: EventizedObject<T>,
   eventName: EventName,
-): EventListener[] => {
-  const {store} = internalsOf(obj);
-  return eventName === '*'
-    ? [...store.catchEmAllListeners]
-    : [...store.getListenersForEventName(eventName)];
-};
+): ReadonlyArray<EventListener> =>
+  internalsOf(obj).store.peekListeners(eventName);
 
 /**
  * The most recently *created* listener on this emitter, identified by the

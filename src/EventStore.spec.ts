@@ -143,6 +143,114 @@ describe('EventStore', () => {
     });
   });
 
+  // peekListeners() is the read-only counterpart to getListenersForEventName():
+  // same data for a name that already has a bucket, no side effect for one
+  // that doesn't. The two promises worth pinning are exactly the two things
+  // that make it worth having a second method at all — see AGENTS.md.
+  describe('peekListeners()', () => {
+    it('creates no bucket and no map entry for an unknown event name', () => {
+      const store = new EventStore();
+      expect(store.namedListeners.has('foo')).toBe(false);
+
+      const result = store.peekListeners('foo');
+
+      expect(result).toHaveLength(0);
+      // Unlike getListenersForEventName('foo'), which would have set this —
+      // that contrast is the whole point of this method existing.
+      expect(store.namedListeners.has('foo')).toBe(false);
+      expect(store.namedListeners.size).toBe(0);
+    });
+
+    it('creates no map entry across repeated misses on different names', () => {
+      const store = new EventStore();
+      store.peekListeners('a');
+      store.peekListeners('b');
+      store.peekListeners('c');
+      expect(store.namedListeners.size).toBe(0);
+    });
+
+    it('answers every unknown name with the same frozen, empty array', () => {
+      const store = new EventStore();
+      const a = store.peekListeners('a');
+      const b = store.peekListeners('unrelated-name');
+
+      // Shared, not one allocation per miss.
+      expect(a).toBe(b);
+      expect(a).toHaveLength(0);
+      // Frozen, not just typed ReadonlyArray: this array is shared across
+      // every unknown name, so a caller reaching past the type with a cast
+      // must not be able to corrupt every other name's empty answer too.
+      expect(Object.isFrozen(a)).toBe(true);
+      expect(() =>
+        (a as EventListener[]).push(new EventListener('a', 0, () => {})),
+      ).toThrow();
+    });
+
+    it('reads the live bucket once one exists, by reference — not a copy', () => {
+      const store = new EventStore();
+      const listener = store.add(new EventListener('foo', 0, () => {}));
+
+      const result = store.peekListeners('foo');
+
+      // Identity and length, not toEqual() — the live bucket carries the
+      // HELD_BY symbol a plain array literal doesn't, and toEqual() compares
+      // own enumerable symbols too. See AGENTS.md, "compare buckets by
+      // identity and length".
+      expect(result).toBe(store.namedListeners.get('foo'));
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe(listener);
+    });
+
+    it("reads the wildcard bucket for '*', the same special case listenersOf() makes", () => {
+      const store = new EventStore();
+      const wildcard = store.add(
+        new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}),
+      );
+
+      const result = store.peekListeners(EVENT_CATCH_EM_ALL);
+
+      expect(result).toBe(store.catchEmAllListeners);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toBe(wildcard);
+    });
+
+    // The impostor-bucket case above (in the clone-on-mutate block) shows
+    // getListenersForEventName('*') creating a '*' key in namedListeners that
+    // forEach() never walks. peekListeners('*') must not do that: it answers
+    // from catchEmAllBucket instead, so the no-map-entry promise has to hold
+    // for '*' too, not just for an ordinary unknown name. A naive refactor
+    // that routed peekListeners() through getListenersForEventName() for '*'
+    // fails here in addition to the wildcard-identity case above, and is the
+    // only case that catches the map-entry side of it.
+    it("leaves namedListeners without a '*' key, unlike getListenersForEventName('*')", () => {
+      const store = new EventStore();
+      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}));
+      expect(store.namedListeners.has(EVENT_CATCH_EM_ALL)).toBe(false);
+
+      store.peekListeners(EVENT_CATCH_EM_ALL);
+
+      expect(store.namedListeners.has(EVENT_CATCH_EM_ALL)).toBe(false);
+    });
+
+    it('refuses mutation through its declared type — reaching the live array needs a cast', () => {
+      const store = new EventStore();
+      store.add(new EventListener('foo', 0, () => {}));
+      const result = store.peekListeners('foo');
+
+      // @ts-expect-error ReadonlyArray<EventListener> has no push(): the
+      // no-mutation promise is enforced by the compiler, not by a runtime
+      // copy — this line is the proof. If the return type ever widens back
+      // to a mutable array, this directive itself starts failing typecheck.
+      // It also actually mutates the live store bucket, past
+      // bucketForMutation() and every clone-on-mutate protection — visible
+      // below, not left silent: this is the exact operation AGENTS.md
+      // forbids for anything that isn't the store's own internals.
+      result.push(new EventListener('foo', 0, () => {}));
+
+      expect(store.namedListeners.get('foo')).toHaveLength(2);
+    });
+  });
+
   describe('insertion order with mixed priorities', () => {
     it('keeps listeners sorted by descending priority then ascending id, regardless of insertion order', () => {
       const store = new EventStore();
