@@ -70,14 +70,28 @@ type PropertyKey = string | symbol;
 // costs nothing and stops the alias from being an `any` in disguise.
 type PropertyValue = unknown;
 
-export const defineHiddenPropertyRO = <T extends object>(
+/**
+ * Defines a property that is invisible, unwritable and — since v6.0.0 —
+ * unremovable: `enumerable`, `writable` and `configurable` all stay at their
+ * `false` default.
+ *
+ * `configurable: true` used to make `delete ε[Symbol.for('eventize')]` legal,
+ * and the fallout was entirely silent: the object read as not eventized
+ * afterwards while the store and the keeper went on holding listeners and
+ * retained values nobody could reach any more, and the next `on()` built a
+ * second, empty set without a word. The name said read-only and meant the
+ * value, not the existence of the property. Now it means both.
+ *
+ * `asEventized()` is the only caller and never removes the slot again.
+ */
+export const defineSealedHiddenProperty = <T extends object>(
   obj: T,
   name: PropertyKey,
   value: PropertyValue,
 ): T => {
   Object.defineProperty(obj, name, {
     value,
-    configurable: true,
+    configurable: false,
   });
   return obj;
 };

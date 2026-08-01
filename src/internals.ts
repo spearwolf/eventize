@@ -1,4 +1,4 @@
-import {NAMESPACE} from './constants';
+import {NAMESPACE, PROTOCOL_VERSION} from './constants';
 
 import type {EventKeeper} from './EventKeeper';
 import type {EventStore} from './EventStore';
@@ -20,9 +20,27 @@ import type {EventMap, EventizedObject} from './types';
  * keeper through `internalsOf()`.
  */
 export interface EventizeInternals {
+  /**
+   * Which copy of the library wrote this marker — see `PROTOCOL_VERSION`.
+   * Read on every `on`/`emit`/`off`, so it sits first in the payload and stays
+   * a plain number.
+   */
+  protocol: number;
   keeper: EventKeeper;
   store: EventStore;
 }
+
+/**
+ * Out of line on purpose: `internalsOf()` is on every dispatch path, and the
+ * success case must cost one property load and one compare — no call, no
+ * string building. Everything expensive lives here, where it runs once and
+ * then the program is over anyway.
+ */
+const throwProtocolMismatch = (protocol: unknown): never => {
+  throw new TypeError(
+    `two incompatible copies of @spearwolf/eventize are active on this object (marker protocol ${String(protocol)}, expected ${PROTOCOL_VERSION}) — dedupe @spearwolf/eventize in your dependency tree so a single copy is loaded`,
+  );
+};
 
 /**
  * The one cast on the boundary, and the reason it is safe: nothing can be an
@@ -33,7 +51,20 @@ export interface EventizeInternals {
  *
  * If a second cast ever becomes necessary to make this boundary work, the
  * boundary is drawn in the wrong place and belongs redrawn, not patched.
+ *
+ * It is also the one chokepoint where "is this marker mine?" can be asked
+ * once for the whole library. The slot is realm-wide, so an object eventized
+ * by another copy passes `isEventized()` and arrives here with a payload this
+ * code cannot drive; without the compare below the mismatch surfaced calls
+ * later as `store.add is not a function`, from a stack frame that named
+ * neither eventize nor the cause.
  */
 export const internalsOf = <T extends EventMap>(
   obj: EventizedObject<T>,
-): EventizeInternals => obj[NAMESPACE] as unknown as EventizeInternals;
+): EventizeInternals => {
+  const internals = obj[NAMESPACE] as unknown as EventizeInternals;
+  if (internals.protocol !== PROTOCOL_VERSION) {
+    throwProtocolMismatch(internals.protocol);
+  }
+  return internals;
+};

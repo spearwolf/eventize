@@ -105,6 +105,19 @@ getSubscriptionCount(ε); // => 0 — in v5 and v6 alike
 getRetainedCount(ε); // => 0 in v6, would have been 1 in v5
 ```
 
+One step comes **before** the install rather than after it: dedupe
+`@spearwolf/eventize` in the dependency tree. The marker key is
+`Symbol.for('eventize')` and therefore realm-wide, so a `^5` and a `^6`
+resolved side by side — which npm does without complaint as soon as one
+transitive dependent asks for the older range — share one slot per object and
+each copy reads the other's payload as its own. Up to v5.1.0 that dispatched
+across the versions for a while and then threw from inside the dispatch,
+naming nothing useful. v6.0.0 versions the marker payload, so the same tree
+now fails at the boundary with a `TypeError` that names both protocols and the
+remedy. Check with `npm ls @spearwolf/eventize`, fix with `npm dedupe` or an
+`overrides` / `resolutions` entry pinning `^6.0.0`. At runtime,
+`getEventizeProtocol(obj)` says which copy owns an object without throwing.
+
 Two more runtime changes ride along, both filed as **fixes** rather than
 breaking changes — one stopped dispatching to code the subscriber never
 wrote, the other made a call do the one thing its arguments ask for — but a

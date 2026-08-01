@@ -663,6 +663,22 @@ console.log(eventize.is({}));         // => false
 
 The low-level primitive behind `eventize(obj)`: attaches the hidden emitter slot and returns the object, without injecting any API methods. Idempotent — an already-eventized object is returned untouched. Reach for `eventize()` unless you specifically need the primitive.
 
+#### `getEventizeProtocol(obj)`
+
+Which copy of eventize eventized this object. The marker is keyed by `Symbol.for('eventize')` — realm-wide, so two majors installed side by side share one slot and each reads the other's payload as its own. Since v6.0.0 the payload carries a protocol number, and this is how you read it.
+
+```javascript
+import {eventize, getEventizeProtocol, isEventized} from '@spearwolf/eventize';
+
+console.log(getEventizeProtocol(eventize())); // => 6
+console.log(getEventizeProtocol({}));         // => undefined
+console.log(getEventizeProtocol(null));       // => undefined
+```
+
+It never throws — it is the tool for diagnosing the situation *before* something else does. Two kinds of `undefined` come back, and `isEventized()` separates them: `false` means the object was never eventized, `true` means a copy from before the field existed (up to v5.1.0) got there first.
+
+Any other number means two incompatible copies are live on the same object, and every `on()` / `emit()` / `off()` against it throws a `TypeError` naming both protocols and the remedy — dedupe `@spearwolf/eventize` in your dependency tree. See the [migration guide](./docs/migration.md).
+
 #### `getSubscriptionCount(emitter)`
 
 Returns the number of active subscriptions (named + wildcard listeners). Useful for debugging, testing, or verifying that cleanup actually happened.
@@ -705,14 +721,22 @@ Edge cases worth knowing:
 - `getSubscriptionCount(ε)` — how many listeners are registered.
 - `getRetainedCount(ε)` — how many events hold a retained value.
 - `getRetainedEventNames(ε)` — every name carrying a retain policy, fired or not.
+- `getEventizeProtocol(ε)` — which copy of eventize owns the marker.
 
-All three return `0` / `[]` for objects that were never eventized. Their
+The first three return `0` / `[]` for objects that were never eventized. Their
 TypeScript signature takes `object`, which is the typed contract — but the
 runtime check underneath is a plain truthy/property probe with no `typeof`
 guard, so none of them throw even when a `null`, `undefined`, or primitive
 value reaches them past the type system (an untyped call site, a teardown
 helper). They exist for debugging, testing, and verifying that cleanup
 actually happened.
+
+The one input they do not survive is an object marked by an incompatible copy
+of the library: the three counters read the emitter's internals and therefore
+raise the same protocol-mismatch `TypeError` every other entry point does. That
+is deliberate — a plausible-looking `0` from a store nobody can reach is worse
+than a diagnosis. `getEventizeProtocol()` is the one that answers without
+throwing.
 
 #### `EVENT_CATCH_EM_ALL`
 

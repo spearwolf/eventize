@@ -6,6 +6,7 @@ export * from './eventize-api';
 export * from './Priority';
 export * from './isEventized';
 export * from './asEventized';
+export * from './getEventizeProtocol';
 export * from './getSubscriptionCount';
 export * from './getRetainedCount';
 

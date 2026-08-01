@@ -17,6 +17,51 @@ errors.
 Two further changes are filed as fixes rather than breaks, but a v5 consumer
 meets them in the same install; they are at the end.
 
+### Dedupe `@spearwolf/eventize` before you install v6
+
+This is the one step to take *before* the upgrade rather than after it. The
+eventized marker is keyed by `Symbol.for('eventize')` — realm-wide, so every
+copy of the library in the process writes and reads the same slot. npm resolves
+`^5` and `^6` side by side without complaint the moment one of your dependencies
+asks for the older range, and then both copies consider the same objects theirs.
+
+Up to `v5.1.0` that mixture was silent until it wasn't: `on()` and `emit()`
+worked across the versions, dispatching to listeners of both, and the first call
+that reached a method the other major does not have threw something like
+`TypeError: store.settleOneShots is not a function` from inside the dispatch,
+naming neither eventize nor the cause.
+
+`v6.0.0` versions the marker payload and checks it wherever the internals are
+read, so the same tree fails at the boundary instead:
+
+```
+TypeError: two incompatible copies of @spearwolf/eventize are active on this
+object (marker protocol undefined, expected 6) — dedupe @spearwolf/eventize in
+your dependency tree so a single copy is loaded
+```
+
+Check the tree, and resolve it to one copy:
+
+```sh
+npm ls @spearwolf/eventize   # more than one version listed is the problem
+npm dedupe
+```
+
+If a transitive dependent pins `^5` and cannot be updated, an `overrides` entry
+(npm) or a `resolutions` entry (yarn / pnpm) forces the single copy:
+
+```json
+{
+  "overrides": {
+    "@spearwolf/eventize": "^6.0.0"
+  }
+}
+```
+
+To find out which copy owns an object at runtime, ask
+`getEventizeProtocol(obj)`: `6` is this one, `undefined` on an object that
+`isEventized()` reports as `true` is a copy from before the field existed.
+
 ### `off(ε)` and the other bulk forms now clear retained state
 
 ```js

@@ -123,6 +123,58 @@ const values = await emitAsync(ε, 'load')
 
 A listener that throws synchronously aborts the dispatch in both functions. A listener returning a rejected promise only rejects the awaited result of `emitAsync` — by then every listener has already run, since invocation is synchronous.
 
+## The marker slot and its protocol
+
+`asEventized(obj)` — which `eventize()`, `on()`, `once()` and `retain()` all
+run for you — defines one property on the target, keyed by
+`Symbol.for('eventize')`, holding `{protocol, keeper, store}`. All three
+descriptor flags stay `false`: not enumerable (nothing leaks onto the public
+surface), not writable, not configurable. That last one means
+`delete ε[Symbol.for('eventize')]` throws in strict mode since v6.0.0; up to
+v5.1.0 it succeeded silently and left the emitter's listeners and retained
+values in collaborators nothing could reach, with the object reading as
+non-eventized and the next `on()` quietly building a second, empty set.
+
+`Symbol.for()` registers per realm, so the key is the same for *every* copy of
+the library in the process. npm will happily resolve `@spearwolf/eventize@^5`
+and `@^6` side by side as soon as one transitive dependent asks for the older
+range, and both copies then read the same slot as theirs. Up to v5.1.0 that
+mixture worked for a while — `on()` and `emit()` dispatched across the versions
+— and then failed calls later from inside the dispatch, with a `TypeError`
+naming neither the library nor the cause.
+
+The `protocol` field is checked wherever the internals are read. A mismatch
+throws immediately, at the call the caller made:
+
+```
+TypeError: two incompatible copies of @spearwolf/eventize are active on this
+object (marker protocol undefined, expected 6) — dedupe @spearwolf/eventize in
+your dependency tree so a single copy is loaded
+```
+
+That covers `on()`, `once()`, `emit()`, `emitAsync()`, `off()`, `retain()` and
+the read-only helpers `getSubscriptionCount()` / `getRetainedCount()` /
+`getRetainedEventNames()` alike — a plausible-looking `0` from a store nobody
+can reach would be worse than the diagnosis. `asEventized()` and `eventize()`
+throw it too rather than handing back a foreign emitter.
+
+Two functions deliberately stay quiet:
+
+- `isEventized(obj)` is a type guard and probes the slot only. It answers `true`
+  for a foreign marker, because the object *is* eventized — just not by this
+  copy.
+- `getEventizeProtocol(obj)` returns the number, or `undefined` for anything
+  without one, and never throws. It is the tool for diagnosing the situation
+  before something else does. `undefined` together with
+  `isEventized(obj) === true` means a copy that predates the field (up to
+  v5.1.0) owns the object.
+
+The check does not catch the ESM and CJS builds of *one* version loaded against
+the same objects: same library, same protocol number. That combination stays
+unsupported for a different reason — the module-level counters exist once per
+loaded module instance, and a `once()` obligation stamped by one instance never
+settles against the other's watermark.
+
 ## `retain()` semantics
 
 `retain(ε, name)` makes an event sticky: the **last** emitted args are replayed to every new subscriber, synchronously during `on()`/`once()`/`onceAsync()`. Details that matter:

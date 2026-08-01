@@ -39,7 +39,7 @@ eventized objects `ε` (epsilon).
 ```ts
 import {eventize, on, once, onceAsync, emit, emitAsync,
         off, retain, retainClear, unretain, Priority,
-        isEventized, asEventized, getSubscriptionCount,
+        isEventized, asEventized, getEventizeProtocol, getSubscriptionCount,
         getRetainedCount, getRetainedEventNames,
         Eventize, EVENT_CATCH_EM_ALL} from '@spearwolf/eventize';
 ```
@@ -57,6 +57,7 @@ import {eventize, on, once, onceAsync, emit, emitAsync,
 | `unretain(ε, name)` | drop value and policy | `void` |
 | `isEventized(obj)` / `eventize.is(obj)` | type guard | `boolean` |
 | `asEventized(obj)` | attach the slot only, no API methods | `obj` |
+| `getEventizeProtocol(obj)` | which copy of eventize owns the marker; `6` for this one, `undefined` without one — never throws | `number \| undefined` |
 | `getSubscriptionCount(obj)` | listener count, `0` for non-eventized | `number` |
 | `getRetainedCount(obj)` | count of events holding a retained value, `0` for non-eventized | `number` |
 | `getRetainedEventNames(obj)` | every name carrying a retain policy (fired or not), `[]` for non-eventized | `EventName[]` |
@@ -144,7 +145,21 @@ compile time) or an explicit `isEventized()` guard.
     (`{toString: Object.prototype.toString}`). A skipped name falls through to the
     `.emit()` fallback. The method-name form `on(ε, 'evt', 'toString', obj)` is
     exempt — it names what it wants.
-12. **`on()` rejects what it cannot dispatch.** The listener slot is type-checked,
+12. **Two majors of eventize in one tree throw at the boundary.** The marker is
+    keyed by `Symbol.for('eventize')`, which is realm-wide, so a `^5` and a `^6`
+    installed side by side share one slot per object. Since v6.0.0 the marker
+    carries a protocol number: a mismatch makes every `on()` / `emit()` / `off()`
+    — and `getSubscriptionCount()` and friends, which read the same internals —
+    throw a `TypeError` that names both protocols and the fix (`npm dedupe`, or
+    an `overrides` / `resolutions` entry). `isEventized()` still answers `true`,
+    because it only probes for the slot; `getEventizeProtocol(obj)` is the one
+    that says whose slot it is, and it never throws. `undefined` from it plus
+    `isEventized(obj) === true` means a copy older than the field.
+13. **The marker slot cannot be deleted.** `delete ε[Symbol.for('eventize')]`
+    throws in strict mode since v6.0.0. Up to v5.1.0 it silently succeeded and
+    left the listeners and retained values stranded in collaborators nothing
+    could reach any more.
+14. **`on()` rejects what it cannot dispatch.** The listener slot is type-checked,
     not truthiness-checked: a function, a string, a symbol or a non-null object
     passes, anything else throws. A `NaN` priority throws as well, in every
     position, tuples included, and a `NaN` inside `on(ε, ['a', ['b', NaN]], fn)`
