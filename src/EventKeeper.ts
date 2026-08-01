@@ -63,10 +63,6 @@ export class EventKeeper {
     }
   }
 
-  isKnown(eventName: EventName): boolean {
-    return this.eventNames.has(eventName);
-  }
-
   replayTo(
     eventName: EventName,
     eventListener: {apply: (eventName: EventName, args?: EventArgs) => void},

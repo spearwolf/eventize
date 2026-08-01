@@ -14,38 +14,38 @@ describe('EventKeeper', () => {
     keeper.add('foo');
     keeper.add(bar);
 
-    expect(keeper.isKnown('foo')).toBe(true);
-    expect(keeper.isKnown(bar)).toBe(true);
-    expect(keeper.isKnown('plah')).toBe(false);
+    expect(keeper.eventNames.has('foo')).toBe(true);
+    expect(keeper.eventNames.has(bar)).toBe(true);
+    expect(keeper.eventNames.has('plah')).toBe(false);
   });
 
   it('add([eventNames])', () => {
     const keeper = new EventKeeper();
     keeper.add(['foo', 'plah']);
 
-    expect(keeper.isKnown('foo')).toBe(true);
-    expect(keeper.isKnown(bar)).toBe(false);
-    expect(keeper.isKnown('plah')).toBe(true);
+    expect(keeper.eventNames.has('foo')).toBe(true);
+    expect(keeper.eventNames.has(bar)).toBe(false);
+    expect(keeper.eventNames.has('plah')).toBe(true);
   });
 
   it('remove(eventName)', () => {
     const keeper = new EventKeeper();
 
     keeper.add('foo');
-    expect(keeper.isKnown('foo')).toBe(true);
+    expect(keeper.eventNames.has('foo')).toBe(true);
 
     keeper.remove('foo');
-    expect(keeper.isKnown('foo')).toBe(false);
+    expect(keeper.eventNames.has('foo')).toBe(false);
   });
 
   it('remove(eventName as symbol)', () => {
     const keeper = new EventKeeper();
 
     keeper.add(bar);
-    expect(keeper.isKnown(bar)).toBe(true);
+    expect(keeper.eventNames.has(bar)).toBe(true);
 
     keeper.remove(bar);
-    expect(keeper.isKnown(bar)).toBe(false);
+    expect(keeper.eventNames.has(bar)).toBe(false);
   });
 
   it('remove([eventNames])', () => {
@@ -54,20 +54,20 @@ describe('EventKeeper', () => {
     keeper.add(['foo', bar]);
     keeper.add('plah');
 
-    expect(keeper.isKnown('foo')).toBe(true);
-    expect(keeper.isKnown(bar)).toBe(true);
-    expect(keeper.isKnown('plah')).toBe(true);
+    expect(keeper.eventNames.has('foo')).toBe(true);
+    expect(keeper.eventNames.has(bar)).toBe(true);
+    expect(keeper.eventNames.has('plah')).toBe(true);
 
     keeper.remove([bar, 'foo', 'plah']);
 
-    expect(keeper.isKnown('foo')).toBe(false);
-    expect(keeper.isKnown(bar)).toBe(false);
-    expect(keeper.isKnown('plah')).toBe(false);
+    expect(keeper.eventNames.has('foo')).toBe(false);
+    expect(keeper.eventNames.has(bar)).toBe(false);
+    expect(keeper.eventNames.has('plah')).toBe(false);
   });
 
   it('retain (a previously unknown eventName) should not retain event arguments', () => {
     const keeper = new EventKeeper();
-    expect(keeper.isKnown('foo')).toBe(false);
+    expect(keeper.eventNames.has('foo')).toBe(false);
 
     keeper.retain('foo', [1, 2, 3]);
 
@@ -80,7 +80,7 @@ describe('EventKeeper', () => {
   it('replayTo (a known and retained event) should replay the event with retained arguments', () => {
     const keeper = new EventKeeper();
     keeper.add('foo');
-    expect(keeper.isKnown('foo')).toBe(true);
+    expect(keeper.eventNames.has('foo')).toBe(true);
 
     keeper.retain('foo', [1, 2, 3]);
 
@@ -97,7 +97,7 @@ describe('EventKeeper', () => {
 
     keeper.clear('foo');
 
-    expect(keeper.isKnown('foo')).toBe(true); // Still known
+    expect(keeper.eventNames.has('foo')).toBe(true); // Still known
     expect(keeper.events.has('foo')).toBe(false); // But event data cleared
   });
 
@@ -122,7 +122,7 @@ describe('EventKeeper', () => {
 
     keeper.clear(bar);
 
-    expect(keeper.isKnown(bar)).toBe(true);
+    expect(keeper.eventNames.has(bar)).toBe(true);
     expect(keeper.events.has(bar)).toBe(false);
   });
 
@@ -131,12 +131,12 @@ describe('EventKeeper', () => {
     keeper.add('foo');
     keeper.retain('foo', [1, 2, 3]);
 
-    expect(keeper.isKnown('foo')).toBe(true);
+    expect(keeper.eventNames.has('foo')).toBe(true);
     expect(keeper.events.has('foo')).toBe(true);
 
     keeper.remove('foo');
 
-    expect(keeper.isKnown('foo')).toBe(false);
+    expect(keeper.eventNames.has('foo')).toBe(false);
     expect(keeper.events.has('foo')).toBe(false);
   });
 
@@ -254,8 +254,8 @@ describe('EventKeeper', () => {
 
     expect(keeper.eventNames.size).toBe(0);
     expect(keeper.events.size).toBe(0);
-    expect(keeper.isKnown('foo')).toBe(false);
-    expect(keeper.isKnown(bar)).toBe(false);
+    expect(keeper.eventNames.has('foo')).toBe(false);
+    expect(keeper.eventNames.has(bar)).toBe(false);
 
     // nothing left to replay, and a later retain() is a no-op without a policy
     keeper.retain('foo', ['afterwards']);
@@ -275,9 +275,9 @@ describe('EventKeeper', () => {
 
     expect(keeper.events.size).toBe(0);
     expect(keeper.eventNames.size).toBe(3);
-    expect(keeper.isKnown('foo')).toBe(true);
-    expect(keeper.isKnown(bar)).toBe(true);
-    expect(keeper.isKnown('plah')).toBe(true);
+    expect(keeper.eventNames.has('foo')).toBe(true);
+    expect(keeper.eventNames.has(bar)).toBe(true);
+    expect(keeper.eventNames.has('plah')).toBe(true);
 
     // the policies survived, so the next retain() stores again
     keeper.retain('foo', ['afterwards']);
