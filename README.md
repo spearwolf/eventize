@@ -259,6 +259,8 @@ Eventize splits its API into four families by how each function treats a target 
 
 Step 1 ignores a member that is identical to `Object.prototype`'s member of the same name, so an event called `toString`, `valueOf`, `constructor`, `hasOwnProperty`, `isPrototypeOf`, `propertyIsEnumerable` or `toLocaleString` does not dispatch to the function every object inherits — it moves on to step 2. Define your own `toString` — on the object or on its class — and it is called as normal, because the check compares the resolved member against `Object.prototype`'s function by identity rather than going by the name. The one own property that is still skipped is an alias of that same function, `{toString: Object.prototype.toString}`. The same boundary applies to listener-object dispatch on an eventized target.
 
+One collision: on a target with its own `.emit`, `emit(obj, 'emit', ...args)` hits step 1 and calls `obj.emit(...args)` without the event name — it never reaches step 2. A target with no `.emit` is unaffected (both steps fail, silent no-op). This is the protocol applied literally; the collision occurs when the event name matches the fallback method itself.
+
 That lets you point `emit()` at adapters, mocks, or plain method-bags without ceremony. `null` / `undefined` / non-object targets silently no-op. **`'*'` still throws** — it remains subscribe-only.
 
 `retainClear` / `unretain` _operate on retain state_ that only exists on eventized objects. There is no meaningful duck-typed equivalent, so they keep throwing — pointing them at a plain `{}` is almost always a bug.

@@ -165,6 +165,13 @@ compile time) or an explicit `isEventized()` guard.
     position, tuples included, and a `NaN` inside `on(ε, ['a', ['b', NaN]], fn)`
     registers nothing at all. `Priority.Max` / `Priority.Min` (`±Infinity`) and `0`
     stay valid — the test is `Number.isNaN`.
+15. **The event name `'emit'` collides with the fallback method.** On a target with
+    its own `.emit`, `emit(obj, 'emit', ...args)` calls `obj.emit(...args)`
+    instead of `obj.emit('emit', ...args)` — the object's method matches in stage 1,
+    so the fallback is never reached. The listener sees only the trailing args, not
+    the event name. A target without `.emit` is unaffected (silent no-op). This is
+    the protocol applied literally, unavoidable when the event name matches the
+    fallback method.
 
 ## Idiomatic shape
 
