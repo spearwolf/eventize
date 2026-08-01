@@ -67,7 +67,7 @@ The deep material behind the summaries below:
 - [Typed event maps](./docs/typed-events.md) — generic event maps, the inject and class forms, symbol events as an escape hatch
 - [Lifecycle & cleanup](./docs/lifecycle.md) — what an emitter holds and what releases it
 - [Migration guide](./docs/migration.md) — upgrading from v5, and the older jumps
-- [Backlog](./docs/backlog.md) — known, accepted and deliberately deferred items
+- [Backlog](./docs/backlog.md) — decisions with no other home in the repository
 
 ## 📖 Getting Started
 

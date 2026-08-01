@@ -104,6 +104,14 @@ const _subscribeTo = (
   let listener: unknown;
   let listenerObject: ListenerObjectType;
 
+  // The mapping from branch to call shape lives only in the comments below —
+  // nothing enforces that `SubscribeArgs` in types.ts still agrees with it,
+  // which is why AGENTS.md requires the two to be changed together (see
+  // "`subscribeTo` and `types.ts` move in lockstep"). Changing one without
+  // the other is how a shape silently stops parsing (or starts parsing as
+  // the wrong thing). A declarative shape table checked against
+  // `SubscribeArgs` would make the mapping mechanical; large, and not urgent
+  // enough to justify the size yet.
   if (len >= 2 && len <= 3 && typeOfFirstArg === 'number') {
     // (4) catch-all with priority: on(priority, listener[, listenerObject])
     eventName = EVENT_CATCH_EM_ALL;

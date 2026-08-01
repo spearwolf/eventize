@@ -95,8 +95,7 @@ keeps running on future emits — nothing is unsubscribed out from under it — 
 the *next* listener to subscribe gets no replay. This is the one place where the
 narrowest removal form has the widest effect on retained state, and it is
 deliberate rather than overlooked: the branch has been unchanged since the 4.0.0
-functional API, and changing it now would be breaking. See
-[`docs/backlog.md`](./backlog.md).
+functional API, and changing it now would be breaking.
 
 **`off(ε, [eventName, …], listenerObject)` does nothing at all.** The store has
 no array-plus-listener-object form: its array branch only runs when the listener

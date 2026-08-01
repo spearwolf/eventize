@@ -148,6 +148,22 @@ Expected: exit `13`, the filename in `patches.failed`, and no test run at all.
 The same fixture proves the baseline phase ignores patches entirely — run it
 with `--phase=baseline` and both `patches` arrays stay empty.
 
+## Why this stays manual
+
+Wired into no pipeline, on purpose: `npm run test:integrations`, by hand, or
+not at all. The run needs Docker and takes far longer than the unit suite —
+folding it into `cbt` or the CI matrix would make the fast gate slow for
+everyone.
+
+If it is ever automated, it belongs in a workflow of its own — push to
+`main`, `workflow_dispatch`, a nightly schedule — ahead of the deploy job,
+not folded into `cbt`.
+
+One gap the harness leaves as is: signalize consumes the ESM build, so
+nothing in a baseline or patched run touches CJS at runtime, and
+`attw --pack` checks type resolution rather than behaviour. A companion smoke
+test that `require()`s `lib/index.js` would close it.
+
 ## Patches
 
 `patches/signalize/NNN-<slug>.patch`, applied in filename order, each carrying:
