@@ -17,7 +17,9 @@ import type {
   EventizedObject,
   ListenerFor,
   ListenerFuncType,
+  ListenerObjectSlot,
   ListenerObjectType,
+  MultiArgsFor,
   NonTypedEmitter,
   OnEventNames,
   OnceAsyncOptions,
@@ -262,13 +264,13 @@ export function on<
 export function on<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
   obj: EventizedObject<TEvents>,
   eventNames: Array<K | [K, number]>,
-  listener: (...args: ArgsFor<TEvents, K>) => void,
+  listener: (...args: MultiArgsFor<TEvents, K>) => void,
 ): UnsubscribeFunc;
 export function on<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
   obj: EventizedObject<TEvents>,
   eventNames: Array<K | [K, number]>,
   priority: number,
-  listener: (...args: ArgsFor<TEvents, K>) => void,
+  listener: (...args: MultiArgsFor<TEvents, K>) => void,
 ): UnsubscribeFunc;
 // (1b) typed listener-object (method names = event names)
 export function on<TEvents extends EventMap>(
@@ -314,17 +316,51 @@ export function on<T extends object>(
   methodName: EventName,
   listenerObject: ListenerObjectType,
 ): UnsubscribeFunc;
-// (3) listener object alone
+// The catch-all sibling of the method-name form. Reachable at runtime only
+// with a leading priority — without one, `on(ε, 'handler', obj)` reads the
+// string as an event name. The explicit spelling `on(ε, '*', 'handler', obj)`
+// is the priority-free equivalent and always compiled.
 export function on<T extends object>(
   obj: NonTypedEmitter<T>,
-  eventNames: OnEventNames,
+  priority: number,
+  methodName: EventName,
   listenerObject: ListenerObjectType,
 ): UnsubscribeFunc;
-export function on<T extends object>(
+// (3) listener object alone
+export function on<T extends object, L>(
+  obj: NonTypedEmitter<T>,
+  eventNames: OnEventNames,
+  listenerObject: ListenerObjectSlot<L>,
+): UnsubscribeFunc;
+export function on<T extends object, L>(
   obj: NonTypedEmitter<T>,
   eventNames: OnEventNames,
   priority: number,
-  listenerObject: ListenerObjectType,
+  listenerObject: ListenerObjectSlot<L>,
+): UnsubscribeFunc;
+export function on<T extends object, L>(
+  obj: NonTypedEmitter<T>,
+  eventNames: OnEventNames,
+  priority: number,
+  listenerObject: ListenerObjectSlot<L>,
+  listenerContext: ListenerObjectType,
+): UnsubscribeFunc;
+export function on<T extends object, L>(
+  obj: NonTypedEmitter<T>,
+  eventNames: OnEventNames,
+  listenerObject: ListenerObjectSlot<L>,
+  listenerContext: ListenerObjectType,
+): UnsubscribeFunc;
+export function on<T extends object, L>(
+  obj: NonTypedEmitter<T>,
+  priority: number,
+  listenerObject: ListenerObjectSlot<L>,
+  listenerContext: ListenerObjectType,
+): UnsubscribeFunc;
+export function on<T extends object, L>(
+  obj: NonTypedEmitter<T>,
+  listenerObject: ListenerObjectSlot<L>,
+  listenerContext: ListenerObjectType,
 ): UnsubscribeFunc;
 // (4) catch-all (no event name)
 export function on<T extends object>(
@@ -347,14 +383,14 @@ export function on<T extends object>(
   listener: ListenerFuncType,
   listenerObject: ListenerObjectType,
 ): UnsubscribeFunc;
-export function on<T extends object>(
+export function on<T extends object, L>(
   obj: NonTypedEmitter<T>,
-  listenerObject: ListenerObjectType,
+  listenerObject: ListenerObjectSlot<L>,
 ): UnsubscribeFunc;
-export function on<T extends object>(
+export function on<T extends object, L>(
   obj: NonTypedEmitter<T>,
   priority: number,
-  listenerObject: ListenerObjectType,
+  listenerObject: ListenerObjectSlot<L>,
 ): UnsubscribeFunc;
 // implementation
 export function on(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
@@ -390,13 +426,13 @@ export function once<
 export function once<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
   obj: EventizedObject<TEvents>,
   eventNames: Array<K | [K, number]>,
-  listener: (...args: ArgsFor<TEvents, K>) => void,
+  listener: (...args: MultiArgsFor<TEvents, K>) => void,
 ): UnsubscribeFunc;
 export function once<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
   obj: EventizedObject<TEvents>,
   eventNames: Array<K | [K, number]>,
   priority: number,
-  listener: (...args: ArgsFor<TEvents, K>) => void,
+  listener: (...args: MultiArgsFor<TEvents, K>) => void,
 ): UnsubscribeFunc;
 // (1b) typed listener-object (method names = event names)
 export function once<TEvents extends EventMap>(
@@ -442,17 +478,51 @@ export function once<T extends object>(
   methodName: EventName,
   listenerObject: ListenerObjectType,
 ): UnsubscribeFunc;
-// (3) listener object alone
+// The catch-all sibling of the method-name form. Reachable at runtime only
+// with a leading priority — without one, `on(ε, 'handler', obj)` reads the
+// string as an event name. The explicit spelling `on(ε, '*', 'handler', obj)`
+// is the priority-free equivalent and always compiled.
 export function once<T extends object>(
   obj: NonTypedEmitter<T>,
-  eventNames: OnEventNames,
+  priority: number,
+  methodName: EventName,
   listenerObject: ListenerObjectType,
 ): UnsubscribeFunc;
-export function once<T extends object>(
+// (3) listener object alone
+export function once<T extends object, L>(
+  obj: NonTypedEmitter<T>,
+  eventNames: OnEventNames,
+  listenerObject: ListenerObjectSlot<L>,
+): UnsubscribeFunc;
+export function once<T extends object, L>(
   obj: NonTypedEmitter<T>,
   eventNames: OnEventNames,
   priority: number,
-  listenerObject: ListenerObjectType,
+  listenerObject: ListenerObjectSlot<L>,
+): UnsubscribeFunc;
+export function once<T extends object, L>(
+  obj: NonTypedEmitter<T>,
+  eventNames: OnEventNames,
+  priority: number,
+  listenerObject: ListenerObjectSlot<L>,
+  listenerContext: ListenerObjectType,
+): UnsubscribeFunc;
+export function once<T extends object, L>(
+  obj: NonTypedEmitter<T>,
+  eventNames: OnEventNames,
+  listenerObject: ListenerObjectSlot<L>,
+  listenerContext: ListenerObjectType,
+): UnsubscribeFunc;
+export function once<T extends object, L>(
+  obj: NonTypedEmitter<T>,
+  priority: number,
+  listenerObject: ListenerObjectSlot<L>,
+  listenerContext: ListenerObjectType,
+): UnsubscribeFunc;
+export function once<T extends object, L>(
+  obj: NonTypedEmitter<T>,
+  listenerObject: ListenerObjectSlot<L>,
+  listenerContext: ListenerObjectType,
 ): UnsubscribeFunc;
 // (4) catch-all (no event name)
 export function once<T extends object>(
@@ -475,14 +545,14 @@ export function once<T extends object>(
   listener: ListenerFuncType,
   listenerObject: ListenerObjectType,
 ): UnsubscribeFunc;
-export function once<T extends object>(
+export function once<T extends object, L>(
   obj: NonTypedEmitter<T>,
-  listenerObject: ListenerObjectType,
+  listenerObject: ListenerObjectSlot<L>,
 ): UnsubscribeFunc;
-export function once<T extends object>(
+export function once<T extends object, L>(
   obj: NonTypedEmitter<T>,
   priority: number,
-  listenerObject: ListenerObjectType,
+  listenerObject: ListenerObjectSlot<L>,
 ): UnsubscribeFunc;
 // implementation
 export function once(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {

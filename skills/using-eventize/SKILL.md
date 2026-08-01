@@ -30,6 +30,11 @@ sharing one implementation:
 | Injected methods | `eventize.inject(obj)` | `obj.on(…)`, `obj.emit(…)` |
 | Class inheritance | `class X extends Eventize {}` | `this.on(…)`, `this.emit(…)` |
 
+A typed event map narrows on all three surfaces since v6.0.0 — the standalone
+functions, `eventize.inject<M>()` and `class Eventize<M>`. Declare
+`[key: string]: any[]` in the map if you want dynamic names alongside the
+declared ones.
+
 Listeners run **synchronously**, highest priority first. `emitAsync` changes only
 how return values are aggregated, never when listeners run. Convention: name
 eventized objects `ε` (epsilon).

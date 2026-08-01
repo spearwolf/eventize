@@ -104,20 +104,19 @@ const _subscribeTo = (
   let listener: unknown;
   let listenerObject: ListenerObjectType;
 
-  // The mapping from branch to call shape lives only in the comments below —
-  // nothing enforces that `SubscribeArgs` in types.ts still agrees with it,
-  // which is why AGENTS.md requires the two to be changed together (see
-  // "`subscribeTo` and `types.ts` move in lockstep"). Changing one without
-  // the other is how a shape silently stops parsing (or starts parsing as
-  // the wrong thing). A declarative shape table checked against
-  // `SubscribeArgs` would make the mapping mechanical; large, and not urgent
-  // enough to justify the size yet.
+  // Each branch below names the `SubscribeArgs` arm it decodes (see the arm
+  // definitions in types.ts, which are grouped by these very branches).
+  // Nothing mechanically enforces that the two stay in step, which is why
+  // AGENTS.md requires them to be changed together — but a renamed arm is now
+  // a grep away instead of a paragraph away.
   if (len >= 2 && len <= 3 && typeOfFirstArg === 'number') {
-    // (4) catch-all with priority: on(priority, listener[, listenerObject])
+    // Branch A: CatchAllPriorityFuncArgs | CatchAllPriorityMethodArgs
+    //         | CatchAllPriorityObjectArgs
     eventName = EVENT_CATCH_EM_ALL;
     [priority, listener, listenerObject] = args;
   } else if (len >= 3 && len <= 4 && typeof args[1] === 'number') {
-    // (1)-(3) with an explicit priority: on(eventNames, priority, …)
+    // Branch B: NamedPriorityFuncArgs | NamedPriorityMethodArgs
+    //         | NamedPriorityObjectArgs
     [eventName, priority, listener, listenerObject] = args;
   } else {
     priority = Priority.Normal;
@@ -126,10 +125,10 @@ const _subscribeTo = (
       typeOfFirstArg === 'symbol' ||
       Array.isArray(args[0])
     ) {
-      // (1)-(3) at default priority: on(eventNames, listener|methodName|obj[, obj])
+      // Branch C1: NamedFuncArgs | NamedMethodArgs | NamedObjectArgs
       [eventName, listener, listenerObject] = args;
     } else {
-      // (4) catch-all at default priority: on(listener|obj[, listenerObject])
+      // Branch C2: CatchAllFuncArgs | CatchAllObjectArgs
       eventName = EVENT_CATCH_EM_ALL;
       [listener, listenerObject] = args;
     }

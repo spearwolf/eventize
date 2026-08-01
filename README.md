@@ -748,7 +748,7 @@ The wildcard event name (`'*'`) as a named export, so you don't have to write th
 
 ## TypeScript: Typed Event Maps
 
-Eventize ships an _opt-in_ generic event map for `eventize<TEvents>()`, `eventize.inject<TEvents>()`, and `class extends Eventize<TEvents>`. The map describes each event's argument tuple, and the standalone API picks the types up automatically.
+Eventize ships an _opt-in_ generic event map for `eventize<TEvents>()`, `eventize.inject<TEvents>()`, and `class extends Eventize<TEvents>`. The map describes each event's argument tuple, and all three surfaces pick the types up automatically — the standalone functions since v4.1, the injected methods and the class since v6.0.0.
 
 ```ts
 import {eventize, emit, on} from '@spearwolf/eventize';

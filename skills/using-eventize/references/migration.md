@@ -3,12 +3,11 @@
 ## v5 → v6
 
 Against the last released version, `v5.1.0` — and `v6.0.0` is the only
-`6.x` there is, so this is the whole jump. Most are runtime changes on
-signatures that don't change shape, so grep for the call patterns rather
-than relying on the type checker to find affected sites. Four are
-type-only (the unsubscribe handle reduced to `() => void`, `emitAsync()`
-narrowed, the marker slot made opaque, a dead type export removed) and
-surface as compile errors instead.
+`6.x` there is, so this is the whole jump. Fifteen breaking changes.
+Eight are runtime changes on signatures that don't change shape, so grep
+for the call patterns rather than relying on the type checker to find
+affected sites. Seven are type-only and surface as compile errors
+instead.
 
 - **Bulk `off()` now clears retained state.** `off(ε)`, `off(ε, '*')`, and
   any array containing `'*'`, `null` or `undefined` (`off(ε, ['*', …])`,
@@ -70,10 +69,24 @@ surface as compile errors instead.
   slot used to be checked for truthiness only, so `on(ε, 'foo', 5)`
   registered a listener no `emit()` could ever reach — it counted towards
   `getSubscriptionCount(ε)` and needed an explicit `off()` to remove. The
-  same call with `0` threw, because `0` is falsy. Only a function, a string,
-  a symbol or a non-null object passes now. Grep for values forwarded into
-  the listener position from config or from a wrapper's arguments; every
-  documented spelling of `on()` is unaffected.
+  same call with `0` threw, because `0` is falsy. At runtime a function, a
+  string, a symbol or a non-null object gets through and nothing else does.
+  Grep for values forwarded into the listener position from config or from a
+  wrapper's arguments; every documented spelling of `on()` is unaffected.
+- **The listener slot no longer accepts an array, `null` or `undefined` —
+  as a compile error.** This is the type half of the runtime check above,
+  and it catches what that one cannot: an array *is* a non-null object, so
+  `on(ε, ['a', 'b'])` looked dispatchable to the runtime test and threw
+  `subscribeTo() called with insufficient arguments` anyway. That call, and
+  `on(ε, null)` / `on(ε, undefined)`, are compile errors now. The *trailing*
+  listener-object slot is unchanged and still nullish —
+  `on(ε, 'foo', 'handler', null)` is the documented late-bound shape, not a
+  lookup that missed. Guard the lookup, or keep the handle `on()` returned:
+
+  ```ts
+  const handler = handlers[name];
+  if (handler) on(ε, 'foo', handler);
+  ```
 - **`on()` / `once()` throw on a `NaN` priority.** `NaN` is a `number`, so it
   passed as a priority and then made every comparison in the insertion sort
   false — the listener landed wherever the bucket size put it, silently. The
@@ -88,6 +101,54 @@ surface as compile errors instead.
   — so validate before the call: `Number.isNaN(p) ? Priority.Normal : p`, and
   apply the same guard inside a tuple, which the call-level value does not
   cover.
+- **A typed event map now narrows on `eventize.inject()` and on
+  `class Eventize`.** Both surfaces used to accept every wrong event name and
+  every wrong argument tuple, and both inferred their listener parameters as
+  `any`: the guard that closes the loose overloads sat on the standalone
+  functions' `obj` parameter, and a method has none. It sits on the event-name
+  slot now, where both surfaces reach it. The class needed a second fix — it
+  declared its own `on` / `emit` / … in the class body, and a member declared
+  there wins over the same name inherited from the merged `EventizeApi`
+  interface, so the loose implementation signature was the public one however
+  well the interface was tuned. Those implementations live on the prototype
+  now — same functions, still non-enumerable, no runtime change — which leaves
+  the merged interface as the class's only type source. Grep for
+  `eventize\.inject<` and `extends Eventize<`, then fix the names, or declare
+  an index signature to keep the dynamic ones open:
+
+  ```ts
+  interface ChatEvents {
+    joined: [user: string];
+    [key: string]: any[]; // dynamic names stay open
+  }
+  ```
+
+  Untyped emitters are unaffected: every duck-typing route stays open,
+  including dynamic names, symbols, catch-all subscriptions and late-bound
+  method names. So does a call with no event name for the guard to close — a
+  catch-all, or a listener-object passed alone, is accepted on the method
+  surfaces even when its method names are not in the map, where the standalone
+  `on()` rejects the same literal.
+- **A subclass that narrows an override of one of those methods is a
+  `TS2416`.** The override has to be assignable to the whole merged
+  `EventizeApi` overload set now, and a name-narrowed
+  `emit(eventName: 'data', …)` does not satisfy the array arm. It compiled up
+  to `v5.1.0`, where the class's own loose declaration was the only base
+  member it had to match. Declare the override with the loose implementation
+  signature instead:
+
+  ```ts
+  class Chat extends Eventize<ChatEvents> {
+    override emit(eventNames: AnyEventNames, ...args: EventArgs): void {
+      super.emit(eventNames as never, ...args);
+    }
+  }
+  ```
+
+  And for as long as it is declared, that one member is loose again for
+  callers of the subclass — a member in a class body wins over the merged
+  interface, which is the whole reason the base class stopped declaring its
+  own.
 
 Verify an upgrade with `getSubscriptionCount(ε)` and `getRetainedCount(ε)`
 around the call in question — they read both halves of an emitter's state

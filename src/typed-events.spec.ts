@@ -10,6 +10,7 @@ import {
   retainClear,
   unretain,
 } from './index';
+import type {AnyEventNames} from './index';
 
 // Compile-time tests are interleaved with runtime assertions. The runtime
 // assertions verify duck-typing & backwards compatibility actually works;
@@ -23,6 +24,13 @@ interface MyEvents {
   data: [payload: string, code: number];
   ready: [];
   shutdown: [reason?: string];
+}
+
+// The documented escape hatch: an index signature makes `IsLooseMap` true
+// again, which reopens every loose overload on all three surfaces.
+interface OpenEvents {
+  data: [payload: string, code: number];
+  [key: string]: any[];
 }
 
 describe('typed events — generic event-map support', () => {
@@ -270,6 +278,200 @@ describe('typed events — generic event-map support', () => {
       unretain(ε, 'nope');
       // @ts-expect-error
       retainClear(ε, 'nope');
+      expect(true).toBe(true);
+    });
+
+    // Not parity with the standalone functions: `NonTypedEmitter` closes every
+    // loose overload there, while the guard here sits on the event-name slot
+    // and leaves the forms that carry no name open. See `docs/backlog.md`.
+    it('rejects wrong event names and wrong tuples on the inject surface', () => {
+      const ε = eventize.inject<MyEvents>({});
+      // @ts-expect-error 'wrong' is not a key of MyEvents
+      ε.emit('wrong', 1);
+      // @ts-expect-error data expects [string, number]
+      ε.emit('data', 42, 'flipped');
+      // @ts-expect-error 'wrong' is not a key of MyEvents
+      ε.on('wrong', () => {});
+      // @ts-expect-error
+      ε.retain('nope');
+      expect(true).toBe(true);
+    });
+
+    it('keeps every duck-typing route open on an untyped inject surface', () => {
+      const ε = eventize.inject({});
+      const seen: string[] = [];
+      // Typed `string`, not the literal type — this is how a name read from
+      // config or assembled at runtime arrives.
+      const dynamic: string = 'runtime';
+      const SECRET = Symbol('secret');
+
+      ε.on('anything', () => seen.push('fn'));
+      ε.on({whatever() {}});
+      ε.on('anything', 'handler', {handler: () => seen.push('method')});
+      ε.on(() => seen.push('catchAll'));
+      ε.on(dynamic, () => seen.push('dynamic'));
+      ε.on(SECRET, () => seen.push('symbol'));
+      // Late-bound: the listener object may be supplied later, so this one
+      // dispatches to nothing rather than throwing. Compiling is the assertion.
+      ε.on('anything', 'suppliedLater', null);
+
+      ε.emit('anything');
+      ε.emit(dynamic);
+      ε.emit(SECRET);
+
+      expect(seen).toEqual(
+        expect.arrayContaining([
+          'fn',
+          'method',
+          'catchAll',
+          'dynamic',
+          'symbol',
+        ]),
+      );
+    });
+
+    it('reopens dynamic names for a map that declares an index signature', () => {
+      const ε = eventize.inject<OpenEvents>({});
+      const fake = jest.fn();
+      ε.on('anythingAtAll', fake);
+      ε.emit('anythingAtAll', 1);
+      expect(fake).toHaveBeenCalledWith(1);
+    });
+
+    // The index signature is the remedy `CHANGELOG.md` and `docs/migration.md`
+    // prescribe for the narrowing break, and the skill offers it for all three
+    // surfaces. The inject case above was the only one pinned; a remedy that
+    // works on one surface and not the others is worse than no remedy.
+    it('reopens dynamic names on the class surface too', () => {
+      class Open extends Eventize<OpenEvents> {}
+      const ε = new Open();
+      const fake = jest.fn();
+      ε.on('anythingAtAll', fake);
+      ε.emit('anythingAtAll', 1);
+      expect(fake).toHaveBeenCalledWith(1);
+    });
+
+    it('reopens dynamic names on the standalone surface too', () => {
+      const ε = eventize<OpenEvents>();
+      const fake = jest.fn();
+      on(ε, 'anythingAtAll', fake);
+      emit(ε, 'anythingAtAll', 1);
+      expect(fake).toHaveBeenCalledWith(1);
+    });
+
+    // The divergence `docs/backlog.md` accepts rather than fixes: the guard on
+    // the method surfaces sits on the event-name slot, and a listener-object
+    // passed alone carries no name for it to close. The standalone rejection
+    // of the same literal is pinned above.
+    it('accepts an undeclared listener-object method on the method surfaces', () => {
+      const injectedBanana = jest.fn();
+      const classBanana = jest.fn();
+
+      const injected = eventize.inject<MyEvents>({});
+      injected.on({banana: injectedBanana});
+
+      class Chat extends Eventize<MyEvents> {
+        subscribe() {
+          this.on({banana: classBanana});
+        }
+      }
+      const chat = new Chat();
+      chat.subscribe();
+
+      // Registered and live on both — but no *typed* emit can name the event
+      // they wait for, which is what makes the acceptance a silent one. The
+      // declared events go straight past them.
+      injected.emit('data', 'x', 1);
+      chat.emit('data', 'x', 1);
+      expect(injectedBanana).not.toHaveBeenCalled();
+      expect(classBanana).not.toHaveBeenCalled();
+
+      // @ts-expect-error 'banana' is not a key of MyEvents
+      injected.emit('banana');
+      // @ts-expect-error 'banana' is not a key of MyEvents
+      chat.emit('banana');
+      expect(injectedBanana).toHaveBeenCalledTimes(1);
+      expect(classBanana).toHaveBeenCalledTimes(1);
+    });
+
+    // The loose overloads stay and get the guard rather than being deleted.
+    // Deleting them covers every *literal* call — `EventKeysOf<DefaultEventMap>`
+    // is already `string | symbol` — but not a value that already carries
+    // `AnyEventNames`, which is exactly how a forwarding wrapper types its own
+    // parameter: `EventName | EventName[]` matches neither `K` nor `K[]`.
+    it('still forwards an AnyEventNames-typed value on an untyped emitter', () => {
+      const ε = eventize.inject({});
+      const names: AnyEventNames = ['a', 'b'];
+      const fake = jest.fn();
+      ε.on(names, fake);
+      ε.emit(names, 1);
+      expect(fake).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // `LooseEmitNames<TEvents>` is `never` for a typed map, so the loose array
+  // route is closed on the method surfaces. The typed `K[]` arms of `emit()`
+  // and `emitAsync()` on `EventizeApi` are what is left — without them a typed
+  // inject or class surface could not emit an array at all.
+  describe('the typed array arms of emit() and emitAsync()', () => {
+    interface PairEvents {
+      opened: [id: number];
+      closed: [id: number];
+    }
+
+    it('emits several declared names in one call on the inject surface', async () => {
+      const ε = eventize.inject<PairEvents>({});
+      const seen: Array<[string, number]> = [];
+      ε.on('opened', (id) => {
+        seen.push(['opened', id]);
+      });
+      ε.on('closed', (id) => {
+        seen.push(['closed', id]);
+      });
+
+      ε.emit(['opened', 'closed'], 7);
+      expect(seen).toEqual([
+        ['opened', 7],
+        ['closed', 7],
+      ]);
+
+      await expect(
+        ε.emitAsync(['opened', 'closed'], 8),
+      ).resolves.toBeUndefined();
+      expect(seen).toHaveLength(4);
+    });
+
+    it('emits several declared names in one call on the class surface', async () => {
+      class Pair extends Eventize<PairEvents> {}
+      const ε = new Pair();
+      const seen: Array<[string, number]> = [];
+      ε.on('opened', (id) => {
+        seen.push(['opened', id]);
+      });
+      ε.on('closed', (id) => {
+        seen.push(['closed', id]);
+      });
+
+      ε.emit(['opened', 'closed'], 7);
+      expect(seen).toEqual([
+        ['opened', 7],
+        ['closed', 7],
+      ]);
+
+      await expect(
+        ε.emitAsync(['opened', 'closed'], 8),
+      ).resolves.toBeUndefined();
+      expect(seen).toHaveLength(4);
+    });
+
+    it('still checks every name in the array and the argument tuple', () => {
+      const ε = eventize.inject<PairEvents>({});
+      // @ts-expect-error 'nope' is not a key of PairEvents
+      ε.emit(['opened', 'nope'], 9);
+      // @ts-expect-error opened expects [number]
+      ε.emit(['opened'], 'nine');
+      // @ts-expect-error 'nope' is not a key of PairEvents
+      ε.emitAsync(['opened', 'nope'], 9);
       expect(true).toBe(true);
     });
   });

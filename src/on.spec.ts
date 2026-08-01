@@ -20,6 +20,7 @@ import {
   on,
   once,
   emit,
+  off,
 } from './index';
 
 describe('on()', () => {
@@ -959,6 +960,158 @@ describe('on()', () => {
 
       emit(obj, 'foo');
       expect(calls).toEqual(['tuple', 'plain']);
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  describe('an object listener with a trailing context object', () => {
+    it('registers, dispatches, and is removable by the context', () => {
+      const ε = eventize();
+      const owner = {};
+      const listenerObject = {foo: jest.fn()};
+
+      on(ε, 'foo', listenerObject, owner);
+      emit(ε, 'foo', 42);
+
+      expect(listenerObject.foo).toHaveBeenCalledWith(42);
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      off(ε, owner);
+      expect(getSubscriptionCount(ε)).toBe(0);
+    });
+
+    it('makes the context part of the dedup identity', () => {
+      const ε = eventize();
+      const listenerObject = {foo: jest.fn()};
+      const ownerA = {};
+      const ownerB = {};
+
+      on(ε, 'foo', listenerObject, ownerA);
+      on(ε, 'foo', listenerObject, ownerB);
+      expect(getSubscriptionCount(ε)).toBe(2);
+
+      on(ε, 'foo', listenerObject, ownerA);
+      expect(getSubscriptionCount(ε)).toBe(2);
+    });
+
+    it('takes the same shape as a catch-all, with and without a priority', () => {
+      const ε = eventize();
+      const owner = {};
+      const listenerObjectA = {foo: jest.fn()};
+      const listenerObjectB = {foo: jest.fn()};
+
+      on(ε, listenerObjectA, owner);
+      on(ε, 10, listenerObjectB, owner);
+      expect(getSubscriptionCount(ε)).toBe(2);
+
+      emit(ε, 'foo', 42);
+      expect(listenerObjectA.foo).toHaveBeenCalledWith(42);
+      expect(listenerObjectB.foo).toHaveBeenCalledWith(42);
+
+      off(ε, owner);
+      expect(getSubscriptionCount(ε)).toBe(0);
+    });
+
+    // The fourth position an object listener can occupy: a named subscription
+    // that also carries a priority. Branch B of `_subscribeTo()` decodes it,
+    // so the fourth argument lands in `listenerObject` exactly as it does in
+    // the three siblings above.
+    it('registers, dispatches, and is removable by the context, with a name and a priority', () => {
+      const ε = eventize();
+      const owner = {};
+      const listenerObject = {foo: jest.fn()};
+
+      on(ε, 'foo', 10, listenerObject, owner);
+      emit(ε, 'foo', 42);
+
+      expect(listenerObject.foo).toHaveBeenCalledWith(42);
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      off(ε, owner);
+      expect(getSubscriptionCount(ε)).toBe(0);
+    });
+
+    it('makes the context part of the dedup identity, with a name and a priority', () => {
+      const ε = eventize();
+      const listenerObject = {foo: jest.fn()};
+      const ownerA = {};
+      const ownerB = {};
+
+      on(ε, 'foo', 10, listenerObject, ownerA);
+      on(ε, 'foo', 10, listenerObject, ownerB);
+      expect(getSubscriptionCount(ε)).toBe(2);
+
+      on(ε, 'foo', 10, listenerObject, ownerA);
+      expect(getSubscriptionCount(ε)).toBe(2);
+    });
+
+    it('honours the priority of a named object listener with a context', () => {
+      const ε = eventize();
+      const order: string[] = [];
+      const owner = {};
+
+      on(ε, 'foo', Priority.Low, () => order.push('low'));
+      on(ε, 'foo', 10, {foo: () => order.push('object')}, owner);
+      on(ε, 'foo', Priority.High, () => order.push('high'));
+
+      emit(ε, 'foo');
+      expect(order).toEqual(['high', 'object', 'low']);
+    });
+
+    // The four shapes are only ever exercised against on() elsewhere in this
+    // file, on the grounds that on() and once() carry byte-identical overload
+    // sets. That holds exactly as long as nobody edits one of them, so the
+    // once() side gets its own witness for the family.
+    it('is accepted by once(), which fires one dispatch and releases the context', () => {
+      const ε = eventize();
+      const owner = {};
+      const named = {foo: jest.fn()};
+      const namedWithPriority = {foo: jest.fn()};
+      const catchAll = {foo: jest.fn()};
+      const catchAllWithPriority = {foo: jest.fn()};
+
+      once(ε, 'foo', named, owner);
+      once(ε, 'foo', 10, namedWithPriority, owner);
+      once(ε, catchAll, owner);
+      once(ε, 20, catchAllWithPriority, owner);
+      expect(getSubscriptionCount(ε)).toBe(4);
+
+      emit(ε, 'foo', 42);
+      emit(ε, 'foo', 43);
+
+      expect(named.foo).toHaveBeenCalledTimes(1);
+      expect(named.foo).toHaveBeenCalledWith(42);
+      expect(namedWithPriority.foo).toHaveBeenCalledTimes(1);
+      expect(catchAll.foo).toHaveBeenCalledTimes(1);
+      expect(catchAllWithPriority.foo).toHaveBeenCalledTimes(1);
+      expect(getSubscriptionCount(ε)).toBe(0);
+    });
+  });
+
+  describe('a catch-all method-name subscription with a priority', () => {
+    it('resolves the method on the listener object for every event', () => {
+      const ε = eventize();
+      const host = {handler: jest.fn()};
+
+      on(ε, 10, 'handler', host);
+      emit(ε, 'foo', 1, 2);
+      emit(ε, 'bar', 3);
+
+      expect(host.handler).toHaveBeenNthCalledWith(1, 1, 2);
+      expect(host.handler).toHaveBeenNthCalledWith(2, 3);
+    });
+
+    it('honours the priority against other catch-all listeners', () => {
+      const ε = eventize();
+      const order: string[] = [];
+      const host = {handler: () => order.push('method')};
+
+      on(ε, Priority.High, () => order.push('high'));
+      on(ε, 10, 'handler', host);
+      on(ε, Priority.Low, () => order.push('low'));
+      emit(ε, 'foo');
+
+      expect(order).toEqual(['high', 'method', 'low']);
     });
   });
 });

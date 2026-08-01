@@ -21,17 +21,19 @@ import type {
   EventizerFuncAPI,
   OnceAsyncOptions,
   SubscribeArgs,
+  SubscribeImpl,
   UnsubscribeFunc,
 } from './types';
 
 // Internal: the class- and inject-side delegations call into the standalone
-// API on a typed `this`, but with arbitrary runtime arg shapes. The public
-// overload sets are tuned for end users (typed first, loose fallback) and
-// don't accept either a spread of `SubscribeArgs` or a typed emitter passed
-// to the loose fallback. So we cast to the implementation-shape signature
-// for internal use; the public exports retain their full overload set.
-const on = _on as (obj: object, ...args: SubscribeArgs) => UnsubscribeFunc;
-const once = _once as (obj: object, ...args: SubscribeArgs) => UnsubscribeFunc;
+// API on a typed `this`, but with arbitrary runtime arg shapes. Two things
+// stop a plain assignment. TypeScript will not spread a union of tuples into
+// a fixed-arity call, so no overload set could accept `on(obj, ...args)`; and
+// `object` is not assignable to `EventizedObject`, whose brand slots `{}` does
+// not carry. `SubscribeImpl` is the shape that answers both, and it is
+// exported so consumers writing the same wrapper do not have to rediscover it.
+const on = _on as SubscribeImpl;
+const once = _once as SubscribeImpl;
 const offLoose = off as (
   obj: unknown,
   listener?: unknown,
@@ -122,56 +124,75 @@ export interface Eventize<
   TEvents extends EventMap = DefaultEventMap,
 > extends EventizeApi<TEvents> {}
 
-// The interface declaration above grafts `EventizeApi<TEvents>`'s tuned
-// public overloads onto this class. The rule guards against an interface
-// promising members that have no runtime implementation — every member of
-// `EventizeApi` is implemented below, the merge only replaces the loose
-// implementation-shape signatures with the public ones.
+// The class declares no members of its own, and that is the whole point. A
+// method in the class body wins over the same name inherited through the
+// merged interface, so `on(...args: SubscribeArgs)` used to replace
+// `SubscribeFunc<TEvents>` outright — the class surface accepted every wrong
+// event name and inferred every listener parameter as `any`, while
+// `eventize.inject()` did not. Installing the implementations on the prototype
+// leaves the merged interface as the single type source, so the class inherits
+// whatever the other two surfaces get.
+//
+// `Object.defineProperties`, not `Object.assign`: class methods are
+// non-enumerable, and an enumerable prototype method shows up in every
+// `for…in` over an instance. The descriptors below reproduce exactly what
+// `class { on() {} }` produced.
+//
+// The rule below guards against an interface promising members that have no
+// runtime implementation. The implementations are installed on the prototype
+// below, so every member of `EventizeApi` is there — the merge is what gives
+// them their public signatures.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Eventize<TEvents extends EventMap = DefaultEventMap> {
   constructor() {
     eventize<TEvents>(this);
   }
+}
 
-  on(...args: SubscribeArgs): UnsubscribeFunc {
+const eventizeMethods = {
+  on(this: object, ...args: SubscribeArgs): UnsubscribeFunc {
     return on(this, ...args);
-  }
-
-  once(...args: SubscribeArgs): UnsubscribeFunc {
+  },
+  once(this: object, ...args: SubscribeArgs): UnsubscribeFunc {
     return once(this, ...args);
-  }
-
+  },
   onceAsync<ReturnType = void>(
+    this: object,
     eventNames: AnyEventNames,
     options?: OnceAsyncOptions,
   ): Promise<ReturnType> {
     return onceAsyncLoose<ReturnType>(this, eventNames, options);
-  }
-
-  off(listener?: unknown, listenerObject?: unknown): void {
+  },
+  off(this: object, listener?: unknown, listenerObject?: unknown): void {
     offLoose(this, listener, listenerObject);
-  }
-
-  emit(eventNames: AnyEventNames, ...args: EventArgs): void {
+  },
+  emit(this: object, eventNames: AnyEventNames, ...args: EventArgs): void {
     emitLoose(this, eventNames, ...args);
-  }
-
+  },
   emitAsync(
+    this: object,
     eventNames: AnyEventNames,
     ...args: EventArgs
   ): Promise<any[] | undefined> {
     return emitAsyncLoose(this, eventNames, ...args);
-  }
-
-  retain(eventNames: AnyEventNames): void {
+  },
+  retain(this: object, eventNames: AnyEventNames): void {
     retainLoose(this, eventNames);
-  }
-
-  retainClear(eventNames: AnyEventNames): void {
+  },
+  retainClear(this: object, eventNames: AnyEventNames): void {
     retainClearLoose(this, eventNames);
-  }
-
-  unretain(eventNames: AnyEventNames): void {
+  },
+  unretain(this: object, eventNames: AnyEventNames): void {
     unretainLoose(this, eventNames);
-  }
-}
+  },
+};
+
+Object.defineProperties(
+  Eventize.prototype,
+  Object.fromEntries(
+    Object.entries(eventizeMethods).map(([name, value]) => [
+      name,
+      {value, writable: true, enumerable: false, configurable: true},
+    ]),
+  ),
+);

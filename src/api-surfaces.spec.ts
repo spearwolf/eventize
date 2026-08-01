@@ -8,6 +8,8 @@
 // Eventize.emitAsync.
 
 import {apiSurfaces} from './__test-utils__/expect2ImplEventizeApi';
+import {Eventize, eventize} from './index';
+import type {AnyEventNames, EventArgs, OnEventNames} from './types';
 
 describe.each(apiSurfaces)('$name', ({create}) => {
   it('on() + emit() pass arguments through', () => {
@@ -140,5 +142,168 @@ describe.each(apiSurfaces)('$name', ({create}) => {
     api.on('foo', joinsAfterReemit);
 
     expect(joinsAfterReemit).toHaveBeenCalledWith('second');
+  });
+});
+
+describe('the class surface is the same contract as the other two', () => {
+  interface MyEvents {
+    data: [payload: string, code: number];
+  }
+
+  it('narrows event names and infers listener arguments', () => {
+    class Chat extends Eventize<MyEvents> {}
+    const chat = new Chat();
+    const seen: Array<[string, number]> = [];
+
+    chat.on('data', (payload, code) => {
+      // Both parameters must be inferred from the map. If the class ever goes
+      // back to declaring its own loose signature they become `any`, and the
+      // two directives below stop being necessary.
+      seen.push([payload, code]);
+    });
+    chat.emit('data', 'x', 1);
+    expect(seen).toEqual([['x', 1]]);
+
+    // @ts-expect-error 'wrong' is not a key of MyEvents
+    chat.emit('wrong', 1);
+    // @ts-expect-error 'wrong' is not a key of MyEvents
+    chat.on('wrong', () => {});
+  });
+
+  it('keeps its methods non-enumerable on the prototype', () => {
+    class Chat extends Eventize<MyEvents> {}
+    const chat = new Chat();
+    const enumerated: string[] = [];
+    for (const key in chat) enumerated.push(key);
+
+    expect(enumerated).toEqual([]);
+    expect(typeof chat.on).toBe('function');
+    expect(Object.prototype.hasOwnProperty.call(Eventize.prototype, 'on')).toBe(
+      true,
+    );
+    // All three flags, not just `enumerable`. A later simplification to a bare
+    // `{value}` descriptor would ship methods that are non-writable and
+    // non-configurable — breaking `jest.spyOn` and every monkey-patch — and a
+    // check on `enumerable` alone would still pass.
+    expect(
+      Object.getOwnPropertyDescriptor(Eventize.prototype, 'on'),
+    ).toMatchObject({writable: true, configurable: true, enumerable: false});
+  });
+
+  // A member declared in a class body still wins over the merged interface —
+  // that mechanism did not go away, the base class stopped using it. So an
+  // override has to be assignable to the whole merged overload set, which
+  // only the loose implementation signature is, and while it is declared the
+  // subclass is loose in that one member again.
+  it('lets a subclass override a method and reach the base through super', () => {
+    class Chat extends Eventize<MyEvents> {
+      seen: AnyEventNames[] = [];
+      override emit(eventNames: AnyEventNames, ...args: EventArgs): void {
+        this.seen.push(eventNames);
+        super.emit(eventNames as never, ...args);
+      }
+    }
+
+    const chat = new Chat();
+    const listener = jest.fn();
+
+    chat.on('data', listener);
+    chat.emit('data', 'x', 1);
+
+    expect(chat.seen).toEqual(['data']);
+    expect(listener).toHaveBeenCalledWith('x', 1);
+  });
+
+  // The other half of the same rule, and the one the CHANGELOG calls a
+  // breaking change: narrowing the override is what stopped compiling. Up to
+  // v5.1.0 the class's own loose declaration was the only base member an
+  // override had to match; the merged interface is a whole overload set now,
+  // and a name-narrowed emit() satisfies neither the array arm nor the loose
+  // one.
+  it('rejects a subclass override that narrows one of the merged signatures', () => {
+    class Chat extends Eventize<MyEvents> {
+      // @ts-expect-error TS2416 — not assignable to the merged EventizeApi
+      // overload set. The loose implementation signature is the one that is.
+      override emit(eventName: 'data', ...args: [string, number]): void {
+        super.emit(eventName, ...args);
+      }
+    }
+
+    const chat = new Chat();
+    const listener = jest.fn();
+
+    chat.on('data', listener);
+    chat.emit('data', 'x', 1);
+
+    expect(listener).toHaveBeenCalledWith('x', 1);
+  });
+});
+
+// `ConformityApi` above erases the real signatures to run one behaviour case
+// against three surfaces, so nothing in that suite makes `tsc` resolve a
+// `SubscribeFunc` arm. These two do, for the object-listener-with-context
+// family: `src/on.spec.ts` covers the standalone spelling of the same shapes
+// and the method surfaces carry their own arms. Both arms that take
+// `eventNames + priority + listenerObject` are reached — the `EventKeysOf`
+// one through a typed map, the `LooseNames` one through an untyped emitter —
+// and each call dispatches, so these stay behavioural specs.
+describe('the object-listener-with-context arms on the method surfaces', () => {
+  interface MyEvents {
+    data: [payload: string, code: number];
+  }
+
+  it('takes a context on the typed inject surface, with and without a priority', () => {
+    const ε = eventize.inject<MyEvents>({});
+    const owner = {};
+    const plain = {data: jest.fn()};
+    const prioritised = {data: jest.fn()};
+
+    ε.on('data', plain, owner);
+    ε.on('data', 10, prioritised, owner);
+    ε.emit('data', 'x', 1);
+
+    expect(plain.data).toHaveBeenCalledWith('x', 1);
+    expect(prioritised.data).toHaveBeenCalledWith('x', 1);
+
+    // The context is the key `off()` removes by, on this surface too.
+    ε.off(owner);
+    ε.emit('data', 'y', 2);
+
+    expect(plain.data).toHaveBeenCalledTimes(1);
+    expect(prioritised.data).toHaveBeenCalledTimes(1);
+  });
+
+  it('takes a context on the untyped class surface, in all four positions', () => {
+    class Bus extends Eventize {}
+    const ε = new Bus();
+    const owner = {};
+    const named = {data: jest.fn()};
+    const namedWithPriority = {data: jest.fn()};
+    const catchAll = {data: jest.fn()};
+    const catchAllWithPriority = {data: jest.fn()};
+
+    // A value already typed as `OnEventNames` matches neither `K` nor `K[]`,
+    // which is what sends these two calls to the `LooseNames`-guarded arms
+    // rather than to the typed ones a string literal would bind.
+    const names: OnEventNames = 'data';
+
+    ε.on(names, named, owner);
+    ε.on(names, 10, namedWithPriority, owner);
+    ε.on(catchAll, owner);
+    ε.on(20, catchAllWithPriority, owner);
+    ε.emit('data', 'x', 1);
+
+    expect(named.data).toHaveBeenCalledWith('x', 1);
+    expect(namedWithPriority.data).toHaveBeenCalledWith('x', 1);
+    expect(catchAll.data).toHaveBeenCalledWith('x', 1);
+    expect(catchAllWithPriority.data).toHaveBeenCalledWith('x', 1);
+
+    ε.off(owner);
+    ε.emit('data', 'y', 2);
+
+    expect(named.data).toHaveBeenCalledTimes(1);
+    expect(namedWithPriority.data).toHaveBeenCalledTimes(1);
+    expect(catchAll.data).toHaveBeenCalledTimes(1);
+    expect(catchAllWithPriority.data).toHaveBeenCalledTimes(1);
   });
 });

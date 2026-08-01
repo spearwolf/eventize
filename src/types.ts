@@ -69,6 +69,48 @@ export type ArgsFor<T, K> = K extends keyof T
     : EventArgs
   : EventArgs;
 
+type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
+  k: infer I,
+) => void
+  ? I
+  : never;
+
+/**
+ * One argument list for a listener serving several event names at once.
+ *
+ * `ArgsFor` distributes over a union of keys, so the multi-name form used to
+ * build a listener type that was a *union of signatures* — and a function
+ * declaring one parameter is not assignable to a signature taking none. The
+ * documented common-listener pattern therefore failed to compile the moment
+ * two of the listed events carried different tuples, with a diagnostic that
+ * named only the last overload and never mentioned the event.
+ *
+ * Collapsing the union before the signature is built is what fixes it. When
+ * every listed event carries the same tuple, that tuple survives unchanged and
+ * the listener stays positionally typed. When they differ, positional
+ * information genuinely does not exist for one function, so it degrades to the
+ * union of all element types rather than to `any` or to an error.
+ *
+ * The `[U] extends [UnionToIntersection<U>]` test is the non-distributive way
+ * to ask "is this one type or several"; written bare it would distribute and
+ * always answer yes.
+ */
+type MergeArgs<U> = [U] extends [UnionToIntersection<U>]
+  ? U
+  : Array<U extends readonly any[] ? U[number] : never>;
+
+/**
+ * The argument list of a listener serving `K` — one event name or a union of
+ * them. For a single name, or several that carry the same tuple, this *is*
+ * that tuple and the listener stays positionally typed. For names whose tuples
+ * differ it degrades to an array of every element type, because positional
+ * information does not exist for one function serving two shapes.
+ *
+ * The collapsing rule and why the multi-name form needs it are in the
+ * `MergeArgs` comment directly above.
+ */
+export type MultiArgsFor<T, K> = MergeArgs<ArgsFor<T, K>>;
+
 declare const __TEventsBrand: unique symbol;
 declare const __EventizeInternalsBrand: unique symbol;
 
@@ -108,7 +150,68 @@ export interface EventizedObject<TEvents extends EventMap = DefaultEventMap> {
 export type NonTypedEmitter<T> =
   T extends EventizedObject<infer M> ? (string extends keyof M ? T : never) : T;
 
+/**
+ * True for the permissive default map — the same question `NonTypedEmitter`
+ * asks, phrased about the map rather than about the emitter.
+ *
+ * Not exported: this and the two guards below are the mechanism that closes an
+ * overload, not vocabulary a consumer has any reason to write. Each is shorter
+ * spelled out than imported — `true` / `false` here, `OnEventNames` or `never`
+ * for `LooseNames`, `AnyEventNames` or `never` for `LooseEmitNames`. Those last
+ * two are not interchangeable, which is the reason to spell them rather than
+ * name a guard: `OnEventNames` also admits `[name, priority]` tuples, and the
+ * emit family has no notion of a priority. tsup inlines all three into the
+ * declarations unexported, the way it already does with `MergeArgs`.
+ */
+type IsLooseMap<T> = string extends EventKeysOf<T> ? true : false;
+
+/**
+ * Closes a loose overload for a typed map by making its event-name slot
+ * unmatchable, the way `NonTypedEmitter` closes one by making `obj` `never`.
+ *
+ * The method surfaces have no `obj` parameter, so `NonTypedEmitter` cannot
+ * reach them — up to v5.1.0 that is why `eventize.inject<MyEvents>()` and
+ * `class Eventize<MyEvents>` accepted every wrong event name while the
+ * standalone functions rejected it. A consumer who wants a mostly-typed map
+ * plus dynamic names declares an index signature (`[key: string]: any[]`),
+ * which makes `IsLooseMap` true again and reopens everything.
+ */
+type LooseNames<T> = IsLooseMap<T> extends true ? OnEventNames : never;
+/**
+ * `LooseNames` for the members that take no priority, and therefore no
+ * `[name, priority]` tuples either: `onceAsync`, `emit`, `emitAsync`,
+ * `retain`, `retainClear` and `unretain`. The priority is what decides which
+ * of the two a member gets — a list of member names goes stale the moment the
+ * interface grows one, which is how this one came to name three of six.
+ */
+type LooseEmitNames<T> = IsLooseMap<T> extends true ? AnyEventNames : never;
+
 export type ListenerObjectType = object | null | undefined;
+
+/**
+ * The *listener* slot, as opposed to the trailing listener-object slot above.
+ * Rejects the two values that only ever reach it by mistake: an array, which
+ * is a mis-typed event-name list, and `null` / `undefined`, which is a lookup
+ * that missed. `_subscribeTo()` throws for all three.
+ *
+ * A function is excluded from this *slot*, not from the listener *role*: it is
+ * a perfectly good listener, and the function arms take it. What it must not do
+ * is match an arm that means "an object listener, specifically" — the runtime
+ * tags a function as a function listener, so a function reaching an object arm
+ * is decoded as something the arm never described, bypassing whatever that arm
+ * checks. Hence the `L extends Function ? never` below.
+ *
+ * The generic is load-bearing: a tuple element cannot carry a conditional over
+ * its own argument, so this can only be applied on an overload parameter. The
+ * arms below therefore narrow to `object`, which is enough to reject `null`
+ * and `undefined`, and the overloads add the array test on top.
+ */
+export type ListenerObjectSlot<L> = L extends readonly any[]
+  ? never
+  : L extends Function
+    ? never
+    : L & object;
+
 export type ListenerFuncType = (...args: EventArgs) => void;
 
 /**
@@ -152,36 +255,107 @@ export type OnceAsyncOptions = {
   signal?: AbortSignal;
 };
 
+// The arms below are grouped by the branch of `_subscribeTo()` that decodes
+// them, not by how the docs list the call forms. That is the whole point: the
+// decoding is a chain of arity and `typeof` tests, and until these names
+// existed the mapping from branch to shape lived only in comments on both
+// sides. Renaming or regrouping an arm means editing the matching comment in
+// `src/subscribeTo.ts` in the same commit — see AGENTS.md, "`subscribeTo` and
+// `types.ts` move in lockstep".
+
+/** Branch C1 — `args[0]` is an event name or a list of them, no priority. */
+export type NamedFuncArgs = [
+  eventNames: OnEventNames,
+  listener: ListenerFuncType,
+  listenerObject?: ListenerObjectType,
+];
+export type NamedMethodArgs = [
+  eventNames: OnEventNames,
+  methodName: EventName,
+  listenerObject: ListenerObjectType,
+];
+export type NamedObjectArgs = [
+  eventNames: OnEventNames,
+  listenerObject: object,
+  listenerContext?: ListenerObjectType,
+];
+
+/** Branch B — `args[1]` is a number, so it is the priority. */
+export type NamedPriorityFuncArgs = [
+  eventNames: OnEventNames,
+  priority: number,
+  listener: ListenerFuncType,
+  listenerObject?: ListenerObjectType,
+];
+export type NamedPriorityMethodArgs = [
+  eventNames: OnEventNames,
+  priority: number,
+  methodName: EventName,
+  listenerObject: ListenerObjectType,
+];
+export type NamedPriorityObjectArgs = [
+  eventNames: OnEventNames,
+  priority: number,
+  listenerObject: object,
+  listenerContext?: ListenerObjectType,
+];
+
+/** Branch C2 — `args[0]` is the listener itself; the event name is `'*'`. */
+export type CatchAllFuncArgs = [
+  listener: ListenerFuncType,
+  listenerObject?: ListenerObjectType,
+];
+export type CatchAllObjectArgs = [
+  listenerObject: object,
+  listenerContext?: ListenerObjectType,
+];
+
+/** Branch A — `args[0]` is a number and the call has two or three arguments. */
+export type CatchAllPriorityFuncArgs = [
+  priority: number,
+  listener: ListenerFuncType,
+  listenerObject?: ListenerObjectType,
+];
+export type CatchAllPriorityMethodArgs = [
+  priority: number,
+  methodName: EventName,
+  listenerObject: ListenerObjectType,
+];
+export type CatchAllPriorityObjectArgs = [
+  priority: number,
+  listenerObject: object,
+  listenerContext?: ListenerObjectType,
+];
+
 export type SubscribeArgs =
-  //
-  // .on( eventName*, [ priority, ] listenerFunc [, listenerObject] )
-  //
-  | [OnEventNames, number, ListenerFuncType, ListenerObjectType]
-  | [OnEventNames, number, ListenerFuncType]
-  | [OnEventNames, ListenerFuncType, ListenerObjectType]
-  | [OnEventNames, ListenerFuncType]
-  //
-  // .on( eventName*, [ priority, ] listenerFuncName, listenerObject )
-  //
-  | [OnEventNames, number, EventName, ListenerObjectType]
-  | [OnEventNames, EventName, ListenerObjectType]
-  //
-  // .on( eventName*, [ priority, ] listenerObject )
-  //
-  | [OnEventNames, number, ListenerObjectType]
-  | [OnEventNames, ListenerObjectType]
-  //
-  // .on( [ priority, ] listenerFunc [, listenerObject] )
-  //
-  | [number, ListenerFuncType, ListenerObjectType]
-  | [number, ListenerFuncType]
-  | [ListenerFuncType, ListenerObjectType]
-  | [ListenerFuncType]
-  //
-  // .on( [ priority, ] listenerObject )
-  //
-  | [number, ListenerObjectType]
-  | [ListenerObjectType];
+  | NamedFuncArgs
+  | NamedMethodArgs
+  | NamedObjectArgs
+  | NamedPriorityFuncArgs
+  | NamedPriorityMethodArgs
+  | NamedPriorityObjectArgs
+  | CatchAllFuncArgs
+  | CatchAllObjectArgs
+  | CatchAllPriorityFuncArgs
+  | CatchAllPriorityMethodArgs
+  | CatchAllPriorityObjectArgs;
+
+/**
+ * The signature `on()` and `once()` have as an implementation, exported so a
+ * consumer can build a forwarding wrapper without inventing the cast this
+ * package makes for itself in `src/eventize.ts`.
+ *
+ * It exists because TypeScript refuses to spread a union of tuples into a
+ * fixed-arity call — no overload set, however exactly tuned, accepts
+ * `on(target, ...args)` for `args: SubscribeArgs`. A rest parameter does, and
+ * that is the only difference between this type and the public one. It is not
+ * a second API: it performs no narrowing, and a typed emitter passed through
+ * it is checked by nothing.
+ */
+export type SubscribeImpl = (
+  obj: object,
+  ...args: SubscribeArgs
+) => UnsubscribeFunc;
 
 /**
  * Overloaded call signatures for `on()` / `once()`.
@@ -189,14 +363,19 @@ export type SubscribeArgs =
  * Ordered specific → generic so TypeScript picks the most precise match first:
  *   1a. typed listener function for a known (or symbol) event key
  *   1c. typed array of event keys, optionally with per-event priorities
+ *   2t. method-name and object forms with a checked event name
  *   1b. typed listener-object (method names = event names)
  *   1.  listener function (with/without priority, with/without listenerObject)
  *   2.  listener method name on a listener object
  *   3.  listener object alone
  *   4.  catch-all (no event name)
+ *
+ * The event-name slot of every loose arm is `LooseNames<TEvents>`, which is
+ * `never` for a typed map. That is `NonTypedEmitter`'s job moved one slot over:
+ * this interface types a *method*, so there is no `obj` parameter to close.
  */
 export interface SubscribeFunc<TEvents extends EventMap = DefaultEventMap> {
-  // (1a) typed listener function for a known event key (or any symbol)
+  // (1a) typed function listener for a known event key (or any symbol)
   <K extends EventKeysOf<TEvents> | symbol>(
     eventName: K,
     listener: ListenerFor<TEvents, K>,
@@ -207,78 +386,106 @@ export interface SubscribeFunc<TEvents extends EventMap = DefaultEventMap> {
     listener: ListenerFor<TEvents, K>,
   ): UnsubscribeFunc;
 
-  // (1c) typed array of event names — common-listener form. Elements may carry
-  // their own priority as a [name, priority] tuple, mixed freely with names.
+  // (1c) typed array of event names, per-event priorities allowed
   <K extends EventKeysOf<TEvents>>(
     eventNames: Array<K | [K, number]>,
-    listener: (...args: ArgsFor<TEvents, K>) => void,
+    listener: (...args: MultiArgsFor<TEvents, K>) => void,
   ): UnsubscribeFunc;
   <K extends EventKeysOf<TEvents>>(
     eventNames: Array<K | [K, number]>,
     priority: number,
-    listener: (...args: ArgsFor<TEvents, K>) => void,
+    listener: (...args: MultiArgsFor<TEvents, K>) => void,
+  ): UnsubscribeFunc;
+
+  // (2t) the method-name and object forms keep the *name* checked and leave
+  //      everything after it loose — the method is resolved at dispatch and is
+  //      not required to exist, which is what late binding means.
+  <K extends EventKeysOf<TEvents>>(
+    eventNames: K | K[],
+    methodName: EventName,
+    listenerObject: ListenerObjectType,
+  ): UnsubscribeFunc;
+  <K extends EventKeysOf<TEvents>>(
+    eventNames: K | K[],
+    priority: number,
+    methodName: EventName,
+    listenerObject: ListenerObjectType,
+  ): UnsubscribeFunc;
+  <K extends EventKeysOf<TEvents>, L>(
+    eventNames: K | K[],
+    listenerObject: ListenerObjectSlot<L>,
+    listenerContext?: ListenerObjectType,
+  ): UnsubscribeFunc;
+  <K extends EventKeysOf<TEvents>, L>(
+    eventNames: K | K[],
+    priority: number,
+    listenerObject: ListenerObjectSlot<L>,
+    listenerContext?: ListenerObjectType,
   ): UnsubscribeFunc;
 
   // (1b) typed listener-object (method names = event names)
   (listenerObject: EventListenerMethods<TEvents>): UnsubscribeFunc;
 
-  // (1) listener function with event name(s) — loose
-  (eventNames: OnEventNames, listener: ListenerFuncType): UnsubscribeFunc;
+  // (1)-(3) loose event-name forms — unmatchable once the map is typed
   (
-    eventNames: OnEventNames,
+    eventNames: LooseNames<TEvents>,
     listener: ListenerFuncType,
-    listenerObject: ListenerObjectType,
+    listenerObject?: ListenerObjectType,
   ): UnsubscribeFunc;
   (
-    eventNames: OnEventNames,
+    eventNames: LooseNames<TEvents>,
     priority: number,
     listener: ListenerFuncType,
+    listenerObject?: ListenerObjectType,
   ): UnsubscribeFunc;
   (
-    eventNames: OnEventNames,
-    priority: number,
-    listener: ListenerFuncType,
-    listenerObject: ListenerObjectType,
-  ): UnsubscribeFunc;
-
-  // (2) listener method name on listener object
-  (
-    eventNames: OnEventNames,
+    eventNames: LooseNames<TEvents>,
     methodName: EventName,
     listenerObject: ListenerObjectType,
   ): UnsubscribeFunc;
   (
-    eventNames: OnEventNames,
+    eventNames: LooseNames<TEvents>,
     priority: number,
     methodName: EventName,
     listenerObject: ListenerObjectType,
   ): UnsubscribeFunc;
-
-  // (3) listener object alone (event-named methods on the object are the listeners)
-  (
-    eventNames: OnEventNames,
-    listenerObject: ListenerObjectType,
+  <L>(
+    eventNames: LooseNames<TEvents>,
+    listenerObject: ListenerObjectSlot<L>,
+    listenerContext?: ListenerObjectType,
   ): UnsubscribeFunc;
-  (
-    eventNames: OnEventNames,
+  <L>(
+    eventNames: LooseNames<TEvents>,
     priority: number,
-    listenerObject: ListenerObjectType,
+    listenerObject: ListenerObjectSlot<L>,
+    listenerContext?: ListenerObjectType,
   ): UnsubscribeFunc;
 
-  // (4) catch-all (no event name; equivalent to subscribing to '*')
-  (listener: ListenerFuncType): UnsubscribeFunc;
+  // (4) catch-all — no event name, so there is no typo to guard against, and
+  //     these stay open for a typed map too.
   (
     listener: ListenerFuncType,
-    listenerObject: ListenerObjectType,
+    listenerObject?: ListenerObjectType,
   ): UnsubscribeFunc;
-  (priority: number, listener: ListenerFuncType): UnsubscribeFunc;
   (
     priority: number,
     listener: ListenerFuncType,
+    listenerObject?: ListenerObjectType,
+  ): UnsubscribeFunc;
+  (
+    priority: number,
+    methodName: EventName,
     listenerObject: ListenerObjectType,
   ): UnsubscribeFunc;
-  (listenerObject: ListenerObjectType): UnsubscribeFunc;
-  (priority: number, listenerObject: ListenerObjectType): UnsubscribeFunc;
+  <L>(
+    listenerObject: ListenerObjectSlot<L>,
+    listenerContext?: ListenerObjectType,
+  ): UnsubscribeFunc;
+  <L>(
+    priority: number,
+    listenerObject: ListenerObjectSlot<L>,
+    listenerContext?: ListenerObjectType,
+  ): UnsubscribeFunc;
 }
 
 export interface EventizeApi<
@@ -287,13 +494,20 @@ export interface EventizeApi<
   on: SubscribeFunc<TEvents>;
   once: SubscribeFunc<TEvents>;
 
+  // Every loose second overload below keeps its place and takes the guard on
+  // the event-name slot. Dropping it instead would look equivalent — with the
+  // default map `EventKeysOf` is already `string | symbol` and `ArgsFor` is
+  // already `any[]` — and it covers every *literal* call, but not a value that
+  // already carries `AnyEventNames`, which is how a forwarding wrapper types
+  // its own parameter: `EventName | EventName[]` matches neither `K` nor `K[]`.
+
   // typed onceAsync — return type matches the first arg of the tuple for K
   onceAsync<K extends EventKeysOf<TEvents>>(
     eventName: K,
     options?: OnceAsyncOptions,
   ): Promise<TEvents[K] extends [infer A, ...any[]] ? A : void>;
   onceAsync<ReturnType = void>(
-    eventNames: AnyEventNames,
+    eventNames: LooseEmitNames<TEvents>,
     options?: OnceAsyncOptions,
   ): Promise<ReturnType>;
 
@@ -304,29 +518,37 @@ export interface EventizeApi<
     eventName: K,
     ...args: ArgsFor<TEvents, K>
   ): void;
-  emit(eventNames: AnyEventNames, ...args: EventArgs): void;
+  emit<K extends EventKeysOf<TEvents>>(
+    eventNames: K[],
+    ...args: ArgsFor<TEvents, K>
+  ): void;
+  emit(eventNames: LooseEmitNames<TEvents>, ...args: EventArgs): void;
 
   emitAsync<K extends EventKeysOf<TEvents> | symbol>(
     eventName: K,
     ...args: ArgsFor<TEvents, K>
   ): Promise<any[] | undefined>;
+  emitAsync<K extends EventKeysOf<TEvents>>(
+    eventNames: K[],
+    ...args: ArgsFor<TEvents, K>
+  ): Promise<any[] | undefined>;
   emitAsync(
-    eventNames: AnyEventNames,
+    eventNames: LooseEmitNames<TEvents>,
     ...args: EventArgs
   ): Promise<any[] | undefined>;
 
   retain(eventNames: EventKeysOf<TEvents> | Array<EventKeysOf<TEvents>>): void;
-  retain(eventNames: AnyEventNames): void;
+  retain(eventNames: LooseEmitNames<TEvents>): void;
 
   retainClear(
     eventNames: EventKeysOf<TEvents> | Array<EventKeysOf<TEvents>>,
   ): void;
-  retainClear(eventNames: AnyEventNames): void;
+  retainClear(eventNames: LooseEmitNames<TEvents>): void;
 
   unretain(
     eventNames: EventKeysOf<TEvents> | Array<EventKeysOf<TEvents>>,
   ): void;
-  unretain(eventNames: AnyEventNames): void;
+  unretain(eventNames: LooseEmitNames<TEvents>): void;
 }
 
 export interface EventizerFunc {
@@ -335,7 +557,24 @@ export interface EventizerFunc {
   ): T & EventizedObject<TEvents>;
 }
 
+/**
+ * The `isEventized()` type guard. Two signatures, and the order matters.
+ *
+ * The first is a no-op narrowing that exists purely to preserve what the
+ * caller already knew: narrowing an `EventizedObject<MyEvents>` with the
+ * second signature intersects it with `EventizedObject<DefaultEventMap>`,
+ * whose `keyof` includes `string`, which makes `NonTypedEmitter` resolve to
+ * the emitter instead of `never` and opens every loose overload. The guard
+ * then silently disabled the narrowing it was supposed to guard — a typed
+ * `emit(ε, 'nope')` was an error outside the `if` and legal inside it.
+ *
+ * The guard still never throws and still learns nothing about protocols; that
+ * question belongs to `getEventizeProtocol()`.
+ */
 export interface EventizeGuard {
+  <TEvents extends EventMap>(
+    obj: EventizedObject<TEvents>,
+  ): obj is EventizedObject<TEvents>;
   (obj: unknown): obj is EventizedObject;
 }
 

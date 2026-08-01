@@ -9,9 +9,9 @@ to grep for and what to write instead.
 ## v5 → v6
 
 `v6.0.0` is the only `6.x` there is, so a `v5.1.0` consumer takes the whole jump
-at once. Twelve breaking changes. Most are runtime changes on signatures that do
-not change shape, so the type checker will not find the call sites for you —
-grep for the patterns below. Four are type-only and do surface as compile
+at once. Fifteen breaking changes. Eight are runtime changes on signatures that
+do not change shape, so the type checker will not find the call sites for you —
+grep for the patterns below. Seven are type-only and do surface as compile
 errors.
 
 Two further changes are filed as fixes rather than breaks, but a v5 consumer
@@ -201,6 +201,92 @@ Rejection is atomic: a `NaN` in one tuple registers none of the names in that
 call, and a call-level `NaN` throws even when every tuple carries its own
 priority. `Priority.Max` and `Priority.Min` are `±Infinity` and stay valid — the
 test is `Number.isNaN`, not a finiteness test.
+
+### The listener slot is type-checked
+
+Grep for a possibly-missing value forwarded into the listener position:
+
+```
+rg "\.on\(\s*[^,)]+,\s*\w+\[" src/
+rg "\bon\([^,]+,\s*[^,)]*\?\." src/
+```
+
+Before — compiles, throws at runtime when the lookup misses:
+
+```ts
+on(ε, 'foo', handlers[name]);
+```
+
+After — guard it, or keep the handle:
+
+```ts
+const handler = handlers[name];
+if (handler) on(ε, 'foo', handler);
+```
+
+An array, `null` or `undefined` in the listener position is now a compile
+error the same way: `on(ε, ['a', 'b'])`, `on(ε, null)` and
+`on(ε, undefined)` used to compile and throw
+`subscribeTo() called with insufficient arguments` at runtime. The *trailing*
+listener-object slot — `on(ε, 'foo', 'handler', null)` — is unchanged and
+still accepts `null` / `undefined`; that is the documented late-bound shape,
+not a lookup that missed.
+
+### Typed maps now narrow on `eventize.inject()` and `class Eventize`
+
+Grep for the two surfaces that changed:
+
+```
+rg "eventize\.inject<" src/
+rg "extends Eventize<" src/
+```
+
+Before — compiled, and did nothing the map said:
+
+```ts
+const ε = eventize.inject<ChatEvents>({});
+ε.emit('joind', 'carol'); // typo, accepted
+
+class Chat extends Eventize<ChatEvents> {
+  greet(user: string) {
+    this.emit('joind', user); // typo, accepted
+    this.on('joined', (u) => {
+      /* u: any */
+    });
+  }
+}
+```
+
+After — a compile error, and `u` is `string`. Either fix the name, or open the
+map:
+
+```ts
+interface ChatEvents {
+  joined: [user: string];
+  [key: string]: any[];
+}
+```
+
+The guard that closes the loose overloads used to sit on the standalone
+functions' `obj` parameter, which a method does not have; it now sits on the
+event-name slot, where both surfaces reach it. The class needed one thing more:
+it declared its own `on` / `emit` / … in the class body, and a member declared
+there wins over the same name inherited from the merged `EventizeApi`
+interface, so the loose implementation signature was the public one. Those
+implementations live on the prototype now — same functions, still
+non-enumerable, no runtime change — and the merged interface is the class's
+only type source. Untyped emitters are unaffected — every duck-typing route
+stays open, including dynamic names, symbols, catch-all subscriptions and
+late-bound method names.
+
+A subclass that _overrides_ one of those methods feels it too. The override has
+to be assignable to the merged overload set, so it carries the loose
+implementation signature — `emit(eventNames: AnyEventNames, ...args: EventArgs)`
+and `super.emit(eventNames as never, ...args)`, not a narrowed
+`emit(eventName: 'data', …)`, which compiled up to `v5.1.0` and is a `TS2416`
+now. And for as long as it is declared, that one member is loose again for
+callers of that subclass: a member in a class body wins over the merged
+interface, which is the whole reason the base class stopped declaring its own.
 
 ### The smaller ones
 
