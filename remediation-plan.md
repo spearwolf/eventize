@@ -343,3 +343,7 @@ Bewusst nicht behoben, sie gehören ins nächste Audit:
 - Versiegelt ist die Marker-Property, nicht ihre Nutzlast: `ε[Symbol.for('eventize')].protocol = 5` bleibt erlaubt.
 - `detectListenerType(listener)` wird in `_subscribeTo()` weiterhin bis zu zweimal aufgerufen — vorbestehend, keine Regression.
 - `coverageThreshold` steht auf 99/98/99/99 bei einem Ist-Stand von 100/98.93/99.29/100. Anheben erst nach TEST-003, so wie das Audit es sortiert.
+
+## Nachtrag vom 01.08.2026
+
+`off(ε, eventName, listenerObject)` hebt das Retain des ganzen Event-Namens auf — im Anhang von `audit.html` stand der Punkt als »auf den nächsten Major verschoben«, also als Defekt mit Termin. Er ist keiner: das Verhalten ist gewollt und bleibt. Der Eintrag ist aus dem Anhang entfernt (der zählt seitdem fünf Punkte statt sechs, die Zählungen im Report sind mitgezogen), und `AGENTS.md`, `docs/lifecycle.md` und `skills/using-eventize/references/lifecycle.md` beschreiben es jetzt als API statt als aufgeschobene Korrektur. Kein Codeeingriff, keine CHANGELOG-Zeile — beobachtbar hat sich nichts geändert.

@@ -93,9 +93,13 @@ removes one listener object's subscription to that event, and drops the retained
 value and policy for the name *entirely*. Any sibling listener still subscribed
 keeps running on future emits — nothing is unsubscribed out from under it — but
 the *next* listener to subscribe gets no replay. This is the one place where the
-narrowest removal form has the widest effect on retained state, and it is
-deliberate rather than overlooked: the branch has been unchanged since the 4.0.0
-functional API, and changing it now would be breaking.
+narrowest removal form has the widest effect on retained state, and it is the
+intended API rather than an oversight: the call means "detach this listener
+object and reset the event", and the retained value plus its policy are part of
+the reset. The branch has been unchanged since the 4.0.0 functional API and is
+not scheduled to change. Want the detach without the reset? Keep the handle
+`on()` returned and call that — it goes through the store and never reaches the
+keeper.
 
 **`off(ε, [eventName, …], listenerObject)` does nothing at all.** The store has
 no array-plus-listener-object form: its array branch only runs when the listener

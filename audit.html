@@ -357,8 +357,8 @@ Performance-Invarianten des Dispatch-Kerns und die Auflösungsgleichheit von <co
 
 <p>Dreizehn der dreißig Befunde führt <code>docs/backlog.md</code> bereits — sie sind hier mit
 <span class="tag known" style="display:inline-block;transform:translateY(1px)">bekannt</span> markiert und stehen
-im Backlog, weil ein Audit den Ist-Zustand abbildet, nicht den Kenntnisstand. Sechs weitere Punkte hat das
-Projekt bewusst zurückgestellt; die stehen im Anhang und zählen nicht in den Score.</p>
+im Backlog, weil ein Audit den Ist-Zustand abbildet, nicht den Kenntnisstand. Fünf weitere Punkte hat das
+Projekt bewusst akzeptiert oder zurückgestellt; die stehen im Anhang und zählen nicht in den Score.</p>
 
 <p>Der Rest ist ungewöhnlich solide. <code>npm run cbt</code> läuft grün durch: 754 Tests in 30 Suites,
 100 % Statements und Lines, 98,89 % Branches, sauberer <code>tsc --noEmit</code>, <code>attw</code> ohne
@@ -490,7 +490,7 @@ und der Abgleich etwas aussagt. Ergebnis:</p>
   Marker-Slot, das fehlende <code>noEmit</code>, der nicht typgeprüfte Linter, die fehlende
   <code>concurrency</code>-Gruppe und die fehlenden Release-Tags. Alle acht wurden vor der Aufnahme in diesen
   Report nachgeprüft, keiner ungeprüft übernommen.</li>
-  <li><strong>6 Punkte stehen als bewusst akzeptiert oder zurückgestellt im Anhang</strong> und tragen kein
+  <li><strong>5 Punkte stehen als bewusst akzeptiert oder zurückgestellt im Anhang</strong> und tragen kein
   Score-Gewicht. Zwei davon hatte dieses Audit unabhängig gefunden (TypeScript-Blockade,
   Dev-Advisories) — die Bewertung des Projekts trägt in beiden Fällen, und sie sind deshalb aus dem aktiven
   Backlog in den Anhang gewandert statt dort doppelt zu zählen.</li>
@@ -530,14 +530,18 @@ als die Zahl vermuten lässt.</p>
 überschrieben wird.</p>
 
 <h2>Anhang: Akzeptierte / zurückgestellte Punkte</h2>
-<p class="muted">Diese Punkte ruhen auf Entscheidung des Projekts — festgehalten in
-<code>docs/backlog.md</code> unter »Deferred to the next major« und »Accepted, not scheduled«. Sie sind
-keine Backlog-Befunde und tragen kein Score-Gewicht. Jeder von ihnen ist jederzeit reaktivierbar; die
-Begründungen sind unten unverändert wiedergegeben, weil sie trägt, was sie trägt.</p>
+<p class="muted">Diese Punkte ruhen auf Entscheidung des Projekts. Sie sind keine Backlog-Befunde und
+tragen kein Score-Gewicht. Jeder von ihnen ist jederzeit reaktivierbar; die Begründungen sind unten
+unverändert wiedergegeben, weil sie trägt, was sie trägt.</p>
+<p class="muted">Zurückgezogen am 01.08.2026: <code>off(ε, eventName, listenerObject)</code> hebt das Retain
+des ganzen Event-Namens auf. Der Punkt stand hier als »auf den nächsten Major verschoben« und ist keiner:
+das Verhalten ist so gewollt und bleibt es. Es ist beschrieben in <code>AGENTS.md</code> unter »Known
+asymmetries«, in <code>docs/lifecycle.md</code> und in <code>docs/off.md</code> — als API, nicht als Defekt.
+Der Anhang zählt seitdem fünf Punkte statt sechs.</p>
 <div class="grid d2 ack" id="ack-grid"></div>
 
 <footer>
-  Erstellt am 29.07.2026 · Erstlauf · Health-Score 67 / 100 · 30 Befunde, 6 akzeptierte Punkte im Anhang ·
+  Erstellt am 29.07.2026 · Erstlauf · Health-Score 67 / 100 · 30 Befunde, 5 akzeptierte Punkte im Anhang ·
   Alle Befunde mit Datei- und Zeilenreferenz, alle Laufzeitaussagen reproduziert.
 </footer>
 
@@ -594,7 +598,7 @@ Begründungen sind unten unverändert wiedergegeben, weil sie trägt, was sie tr
       "newFindings": 17,
       "alreadyKnown": 13,
       "foundOnlyByBacklog": 8,
-      "movedToAcknowledged": 6
+      "movedToAcknowledged": 5
     }
   },
   "findings": [
@@ -930,13 +934,6 @@ Begründungen sind unten unverändert wiedergegeben, weil sie trägt, was sie tr
     }
   ],
   "acknowledged": [
-    {
-      "title": "`off(ε, eventName, listenerObject)` hebt das Retain des ganzen Event-Namens auf",
-      "category": "Bugs & Korrektheitsrisiken",
-      "location": "src/eventize-api.ts:619-621, docs/lifecycle.md",
-      "reason": "Bewusst auf den nächsten Major verschoben. Der Zweig ist seit der funktionalen API von 4.0.0 unverändert, Code kann also bereits darauf bauen — ein `retain()` zusammen mit dem Detach zurückzunehmen ist plausibel das, was ein Aufrufer mit »diesen Listener abhängen und das Event zurücksetzen« meint. Die Änderung wäre breaking, und v6.0.0 trägt davon schon genug.",
-      "acknowledgedDate": "2026-07-29"
-    },
     {
       "title": "Die Legacy-Aliase auf `Priority` (`AAA`, `BB`, `C`, `Default`)",
       "category": "Öffentliche API",

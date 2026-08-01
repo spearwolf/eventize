@@ -48,8 +48,9 @@ Three rows to watch:
   is processed on its own, so `off(ε, ['foo', undefined])` wipes too. A name list
   built at runtime is the realistic way in — filter it, or keep the handle.
 - **`off(ε, eventName, listenerObject)` unretains the whole name**, even though it
-  detaches one object's subscription and leaves siblings running. Deliberate and
-  unchanged since v4.0.0.
+  detaches one object's subscription and leaves siblings running. Intended API,
+  unchanged since v4.0.0 — the call resets the event, not just the subscription.
+  Keep the `on()` handle and call that if you want the detach alone.
 - **`off(ε, [eventName, …], listenerObject)` does nothing at all.** The store has
   no array-plus-object form. Use `off(ε, [names])` without the object, or
   `unretain(ε, [names])`.
