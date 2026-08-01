@@ -50,6 +50,7 @@ Four more are type-only and surface as compile errors rather than as behaviour c
 - **`eventize()` on a non-extensible object names the cause** instead of leaking an opaque native error: `eventize() cannot attach to a non-extensible object — eventize before freezing, or eventize a wrapper`. Still a `TypeError`, so call sites branching on error class see no difference. An object eventized _before_ it was frozen is unaffected.
 - **`lib/index.d.ts` no longer exports `EventListener` in the value namespace**, where it contradicted both `src/index.ts` and the runtime bundles — `import {EventListener}` from the ESM build threw a `SyntaxError`. The class stays as an unexported `declare class` inside the file.
 - **`tsconfig.json`'s `removeComments: true` was stripping every JSDoc comment**, `@deprecated` included, from the declarations tsup emits. `tsup.config.js` now overrides it for the `dts` pass only, so the shared config, `ts-jest` and the JS bundle are untouched.
+- **`subscribeTo() called with insufficient arguments` now names its cause on `Error.cause`** — `'missing-listener'`, `'not-dispatchable'` or `'empty-method-name'` — instead of only on the console via `warn()`. The thrown message is unchanged, so code that matches on the string sees no difference.
 
 ### Performance
 

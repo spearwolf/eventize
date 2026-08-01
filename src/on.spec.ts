@@ -742,6 +742,55 @@ describe('on()', () => {
   });
 
   // ---------------------------------------------------------------------------------------------
+  // One thrown message, `subscribeTo() called with insufficient arguments`,
+  // covers three distinct causes — a missing listener, a value that cannot be
+  // dispatched at all, and an empty method name. The wording is frozen (it
+  // predates v4 and is documented), but the cause that produced it now rides
+  // along on Error.cause so a bug report doesn't have to guess from a string
+  // that is wrong two times out of three.
+  describe('Error.cause distinguishes the three causes', () => {
+    it('is "missing-listener" when the listener argument is absent', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        // @ts-expect-error - intentionally calling with insufficient args
+        on(obj, 'foo');
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).message).toMatch(/insufficient arguments/);
+      expect((caught as Error).cause).toBe('missing-listener');
+    });
+
+    it('is "not-dispatchable" for a value that can never be a listener', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        on(obj, 'foo', 5 as any);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).message).toMatch(/insufficient arguments/);
+      expect((caught as Error).cause).toBe('not-dispatchable');
+    });
+
+    it('is "empty-method-name" for an empty string in the method slot', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        on(obj, 'foo', '' as any, {});
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).message).toMatch(/insufficient arguments/);
+      expect((caught as Error).cause).toBe('empty-method-name');
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
   // A truthy value that can never be dispatched used to be registered anyway:
   // `on(ε, 'foo', 5)` created an EventListener with no listenerType, every
   // emit() fell through all three branches of apply(), and the dead entry could

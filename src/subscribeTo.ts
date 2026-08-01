@@ -140,17 +140,30 @@ const _subscribeTo = (
   if (!listener || detectListenerType(listener) === undefined) {
     // Three ways in, and the log line is where anyone actually looks — so it
     // says which one it was. The last branch is `''` and nothing else: it is
-    // the only falsy value `detectListenerType()` still tags.
-    warn(
+    // the only falsy value `detectListenerType()` still tags. The ternary is
+    // evaluated once and its result feeds both the warn() line and the
+    // thrown Error's cause — recomputing it for the cause would let the two
+    // drift apart.
+    const cause =
       listener == null
-        ? 'called with insufficient arguments!'
+        ? 'missing-listener'
         : detectListenerType(listener) === undefined
+          ? 'not-dispatchable'
+          : 'empty-method-name';
+    warn(
+      cause === 'missing-listener'
+        ? 'called with insufficient arguments!'
+        : cause === 'not-dispatchable'
           ? 'called with a value that cannot be a listener!'
           : 'called with an empty method name!',
       args,
     );
-    // One thrown message for all three, unchanged since v4 and documented.
-    throw new Error('subscribeTo() called with insufficient arguments');
+    // The thrown message stays exactly this string for all three causes —
+    // unchanged since v4 and documented — but the cause itself now rides
+    // along on Error.cause, so it no longer only reaches the console.
+    throw new Error('subscribeTo() called with insufficient arguments', {
+      cause,
+    });
   }
 
   assertPriorityIsUsable(priority, args);
