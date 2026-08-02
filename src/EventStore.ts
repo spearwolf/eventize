@@ -148,6 +148,12 @@ const isSimilar = (
  * measured the same mutation-free 64-listener dispatch at 535 ns and 653 ns —
  * stably, one value each. Moving the loop out took both to ~535.
  *
+ * Two traps when re-measuring any of this. Loading two library variants into
+ * one process makes the call site polymorphic and moves results by double
+ * digits, so a comparison run wants one variant per process — and this
+ * function wants a process of its own either way. Individual cells move by ten
+ * points between runs: quote ranges, never a single cell.
+ *
  * Both lengths are read once, up front. That is safe because the walk holds
  * these two arrays: a mutation from inside `fn` clones the bucket it changes
  * and leaves these alone, so neither can grow, shrink or acquire a hole while
