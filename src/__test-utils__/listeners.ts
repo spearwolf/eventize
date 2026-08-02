@@ -37,6 +37,9 @@ export const storeOf = <T extends EventMap>(
  * `retain()` still shares both empty stand-ins instead of owning a Map and a
  * Set of its own. `getRetainedCount()` cannot answer that: it reports 0 either
  * way, which is exactly why the promise needs a spec that reads the fields.
+ * Same name as the module-private `keeperOf()` in `getRetainedCount.ts`, but a
+ * different contract: that one checks `isEventized()` and returns
+ * `EventKeeper | undefined`, this one assumes an eventized object and asserts.
  */
 export const keeperOf = <T extends EventMap>(
   obj: EventizedObject<T>,

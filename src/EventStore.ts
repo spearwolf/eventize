@@ -1040,15 +1040,19 @@ export class EventStore {
    *
    * The three slots are typed against the callback's own parameters, so passing
    * them in the wrong order is a compile error rather than a listener called
-   * with its arguments shuffled. A callback that declares fewer parameters —
-   * every spec in this repo — leaves them unconstrained and may omit them.
+   * with its arguments shuffled. A context-typed callback requires all three —
+   * optional slots would let `forEach(eventName, applyListener)` compile and
+   * dispatch under `eventName === undefined` three times over. A callback that
+   * takes only the listener — every spec in this repo — uses the other overload
+   * instead, and needs no context at all.
    */
+  forEach(eventName: EventName, fn: (listener: EventListener) => void): void;
   forEach<A, B, C>(
     eventName: EventName,
     fn: (listener: EventListener, a: A, b: B, c: C) => void,
-    a?: A,
-    b?: B,
-    c?: C,
+    a: A,
+    b: B,
+    c: C,
   ): void;
   forEach(
     eventName: EventName,

@@ -60,7 +60,10 @@ export const dispatchableMember = (
  * `[eventName, ...args]`; measured roughly 9x and 5x respectively for a
  * single forwarded argument. Shared by the two `emit()` fallbacks
  * (`EventListener.ts`'s listener-object path, `eventize-api.ts`'s duck-typed
- * path) so the two dispatch paths keep building the same shape one way.
+ * path) so the two dispatch paths keep building the same shape one way. One
+ * difference from `concat`: a hole in `args` comes out as a real `undefined`
+ * entry, harmless here since `args` is always a dense rest parameter at both
+ * call sites.
  */
 export const prependEventName = (
   eventName: EventName,

@@ -45,7 +45,10 @@ const rejectMutation = (field: string) => (): never => {
  * the CJS build side by side creates a second pair, but a keeper is only ever
  * touched by the methods of the class that built it, so the identity test in
  * the materializers always compares against its own module's stand-in. A
- * foreign pair is simply a pair this code never sees.
+ * foreign pair is simply a pair this code never sees. `getRetainedCount.ts`
+ * reads `events`/`eventNames` straight off the field, past the class — harmless
+ * as long as it only reads; the premise would stop holding the day something
+ * outside the class assigns one of these fields instead.
  */
 const EMPTY_EVENTS: Map<EventName, KeeperEventItem> = Object.freeze(
   Object.defineProperties(new Map<EventName, KeeperEventItem>(), {

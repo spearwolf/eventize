@@ -605,6 +605,10 @@ describe('retain()', () => {
       expect(subscriber.callCount).toBe(1);
     });
 
+    // Documents the API, not a guard on the pre-check above: replayTo('*')
+    // walks `events` regardless of what `hasRetainedFor('*')` consulted, so
+    // this stays green even if that pre-check reads the wrong field — the
+    // unit case in EventKeeper.spec.ts is what would catch that.
     it('stays armed while nothing is held, then fires on the next emit', () => {
       const obj = eventize({});
       const subscriber = fake();
