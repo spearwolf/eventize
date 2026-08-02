@@ -3,10 +3,10 @@
 ## v5 → v6
 
 Against the last released version, `v5.1.0` — and `v6.0.0` is the only
-`6.x` there is, so this is the whole jump. Fifteen breaking changes.
-Eight are runtime changes on signatures that don't change shape, so grep
+`6.x` there is, so this is the whole jump. Thirteen breaking changes.
+Seven are runtime changes on signatures that don't change shape, so grep
 for the call patterns rather than relying on the type checker to find
-affected sites. Seven are type-only and surface as compile errors
+affected sites. Six are type-only and surface as compile errors
 instead.
 
 - **Bulk `off()` now clears retained state.** `off(ε)`, `off(ε, '*')`, and
@@ -17,15 +17,15 @@ instead.
   `off(ε, eventName, listenerObject)` — are unchanged.
 - **`on()` and `once()` aggregate by listener identity.** A listener object
   subscribed to the same event at the same priority is one registration,
-  however many `on()` and `once()` calls produced it and in whatever order —
-  up to `v5.1.0` the collapse happened in one registration order only, and the
-  collapsed listener then fired on every emit and could not be released
-  through its own handles. Both orders now behave identically: `once(); on()`
-  and `on(); once()` both leave one registration, dispatched once per emit,
-  with every pending `once()` on it discharged by the first dispatch and the
-  registration surviving as long as an `on()` still holds it. Where two
-  invocations were the point, subscribe two distinct handlers instead of
-  calling twice on the same identity. Function listeners never aggregate.
+  however many `on()` and `once()` calls produced it and in whatever order.
+  Every pending `once()` on it is discharged by the first dispatch, and the
+  registration survives as long as an `on()` still holds it. Up to `v5.1.0`
+  the collapse itself already worked in both orders; what did not was the
+  settling. Two `once()` calls on one identity produced a registration that
+  never discharged and fired on every emit instead of once — that pair is the
+  only one whose behaviour changes, and where the repeated firing was being
+  relied on, the subscription wanted `on()`. A `once()` paired with an `on()`
+  needs no migration. Function listeners never aggregate.
 - **Unsubscribe handles are single-shot.** Calling one a second time used to
   decrement a shared reference count again, releasing a *sibling* handle's
   registration out from under it. A second call is now inert.
@@ -43,7 +43,7 @@ instead.
   that declared the two fields made either access a `TS2339` at every call
   site, so `off(ε, unsub.listener)` never compiled against the published
   declarations in the first place — and the `EventListener` it named was
-  the **DOM** global, not this package's class, because `src/types.ts`
+  the **DOM** global, not this package's class, because the declarations
   used the name without importing it. Replace it with `unsub()` — same
   reference-counted path, same single-shot guard, no emitter needed in
   scope. Reads past it (`unsub.listener.id`, `.isRemoved`) were internals
@@ -54,17 +54,8 @@ instead.
   did not merely lose precision, it switched checking off, so
   `(await emitAsync(ε, 'x')).map(…)` compiled and then threw on exactly
   that case. Add a guard: `(await emitAsync(ε, 'x'))?.map(…)`, or `?? []`.
-- **The marker slot on `EventizedObject` is opaque**, so `EventStore`,
-  `EventKeeper` and `EventListener` no longer appear in `lib/index.d.ts`.
-  Nothing that calls the API breaks — the slot's key is a non-exported
-  `unique symbol`, so reading it from outside was a `TS7053` either way.
-  Only code that annotated the slot structurally is affected.
 - **`export type ListenerType` is gone** — an alias for `unknown` nothing
   referenced. Replace an import with `unknown` directly.
-- **An `EventListener` built directly with a `null`/`undefined` listener
-  now dispatches to nothing instead of throwing.** Only reachable by
-  constructing the class yourself, which the package does not export at
-  all — neither as a value nor as a type.
 - **`on()` / `once()` throw on a listener they cannot dispatch to.** The
   slot used to be checked for truthiness only, so `on(ε, 'foo', 5)`
   registered a listener no `emit()` could ever reach — it counted towards
@@ -103,8 +94,8 @@ instead.
   cover.
 - **A typed event map now narrows on `eventize.inject()` and on
   `class Eventize`.** Both surfaces used to accept every wrong event name and
-  every wrong argument tuple, and both inferred their listener parameters as
-  `any`: the guard that closes the loose overloads sat on the standalone
+  every wrong argument tuple, and on the class surface the listener parameters
+  inferred as `any`: the guard that closes the loose overloads sat on the standalone
   functions' `obj` parameter, and a method has none. It sits on the event-name
   slot now, where both surfaces reach it. The class needed a second fix — it
   declared its own `on` / `emit` / … in the class body, and a member declared

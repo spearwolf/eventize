@@ -9,13 +9,15 @@
 | Signature                                 | Description                                                         |
 | ----------------------------------------- | ------------------------------------------------------------------- |
 | `off(emitter)`                            | Unsubscribes **all** listeners from the emitter, and clears **all** retained state. |
+| `off(emitter, undefined)`                 | The same branch as `off(emitter)` — **not** a no-op. All listeners, all retained state. |
 | `off(emitter, '*')`                       | Same as above — all listeners (named and wildcard), all retained state. |
-| `off(emitter, eventName)`                 | Unsubscribes all listeners for a specific event (string or symbol), and unretains it. |
+| `off(emitter, eventName)`                 | Unsubscribes all listeners registered *for that name* (string or symbol), and unretains it. Wildcard listeners are not touched and keep seeing the event. |
 | `off(emitter, [eventName1, eventName2])`  | Same, for several events at once. A `'*'`, `null` or `undefined` anywhere in the array makes it the bulk form. |
-| `off(emitter, listenerFunc)`              | Unsubscribes a specific listener function from all events.          |
-| `off(emitter, listenerFunc, context)`     | Unsubscribes a listener function with a specific context.           |
-| `off(emitter, listenerObject)`            | Unsubscribes all listeners associated with an object.               |
-| `off(emitter, eventName, listenerObject)` | Unsubscribes a listener object from a specific event only — but still unretains that event, whole, even if other listeners for it survive. |
+| `off(emitter, listenerFunc)`              | Unsubscribes a listener function that was registered **without** a context, from all events. |
+| `off(emitter, listenerFunc, context)`     | Unsubscribes a listener function registered with exactly that context. The context is part of the match key, not a filter on the row above — neither row matches the other's registrations. |
+| `off(emitter, listenerObject)`            | Unsubscribes every subscription associated with that object: the object-alone shape, the method-name shape, and the function-with-context shape `on(ε, name, fn, obj)`, whose context sits in the same slot. |
+| `off(emitter, eventName, listenerObject)` | Unsubscribes a listener object from a specific event only — but still unretains that event, whole, even if other listeners for it survive, and even if it detached nothing. |
+| `off(emitter, [eventName, …], listenerObject)` | **Nothing at all** — a complete no-op on listeners *and* retained state. Use `off(emitter, [names])` without the object, or `unretain(emitter, [names])`. |
 | `off(emitter, '*', listenerObject)`       | Unsubscribes a listener object from the **wildcard** bucket only. Named subscriptions of the same object stay, and retained state is untouched. |
 
 > [!NOTE]
@@ -72,7 +74,7 @@ off(ε, ['foo', null]);  // also identical — the 'foo' narrows nothing
 ```
 
 > [!WARNING]
-> A list of event names assembled at runtime — `off(ε, names.map((n) => lookup[n]))` — wipes the entire emitter the moment one lookup misses. Filter the array before passing it.
+> A lookup that misses wipes the emitter. The scalar shape is the common one: `off(ε, handlers[name])` for a `name` that is not in `handlers` passes `undefined` and takes the bulk branch — every listener gone, every retained value and policy gone. The array shape does the same the moment one element misses: `off(ε, names.map((n) => lookup[n]))`. Guard the lookup, filter the array, or keep the handle `on()` returned and call that.
 
 ## Removing listeners by event name
 
@@ -227,7 +229,9 @@ emit(ε, 'test');
 
 ## Reference counting
 
-When the *same* listener-object subscription is registered more than once — through `on()`, `once()`, or a mixture of the two — eventize collapses the duplicates into a single entry. `on()` and `once()` track their share of it separately: a persistent reference count for `on()`, and a list of pending one-shot obligations for `once()`. Each `on()` call increments the reference count, each of its unsubscribe handles decrements it; each `once()` call adds one obligation, discharged as a batch by whichever matching dispatch reaches the listener first. The listener is only really removed once both are empty — no `on()` holding it and no obligation pending.
+When the *same* listener-object subscription is registered more than once — through `on()`, `once()`, or a mixture of the two — eventize collapses the duplicates into a single entry. This covers listener objects and method-name subscriptions only: a plain function listener never de-duplicates, so two `on(ε, 'foo', fn)` calls, or two `once(ε, 'foo', fn)` calls, stay two registrations and fire twice. `on()` and `once()` track their share of it separately: a persistent reference count for `on()`, and a list of pending one-shot obligations for `once()`. Each `on()` call increments the reference count, each of its unsubscribe handles decrements it; each `once()` call adds one obligation, discharged as a batch by whichever matching dispatch reaches the listener first. The listener is only really removed once both are empty — no `on()` holding it and no obligation pending.
+
+That accounting belongs to the handles. `off()` overrides it: every `off()` form detaches outright without consulting either, so `off(ε, listenerObject)`, `off(ε, eventName)`, `off(ε, eventName, listenerObject)` and `off(ε, '*', listenerObject)` each release a `refCount`-2 registration — and any pending `once()` obligation riding on it — in a single call. That is what makes `off()` the teardown hammer, and why a handle still held afterwards is inert rather than dangerous.
 
 ```javascript
 const ε = eventize();
@@ -259,7 +263,7 @@ emit(ε, 'foo'); // (nothing happens)
 > emit(ε, 'foo'); // => "foo" once — both obligations discharge together
 > ```
 >
-> Each `once()` call still returns its own handle, and each handle releases only its own obligation — calling one early is a no-op if the matching dispatch already discharged it. An `on()` on the same identity keeps the listener alive independently of any `once()` obligations riding on it: `on(ε, 'foo', listener); once(ε, 'foo', listener); emit(ε, 'foo');` fires once, discharges the `once()`, and leaves the `on()` registration subscribed. Up to v5.1.0 this held only when the `once()` came first — the reverse order produced two independent listeners that both fired.
+> Each `once()` call still returns its own handle, and each handle releases only its own obligation — calling one early is a no-op if the matching dispatch already discharged it. An `on()` on the same identity keeps the listener alive independently of any `once()` obligations riding on it: `on(ε, 'foo', listener); once(ε, 'foo', listener); emit(ε, 'foo');` fires once, discharges the `once()`, and leaves the `on()` registration subscribed. That much held up to v5.1.0 too, in either order. What did not is the settling: two `once()` calls on one identity collapsed into a registration that never discharged and fired on every emit instead of once.
 
 Function listeners behave differently — each `on()` is an independent registration:
 

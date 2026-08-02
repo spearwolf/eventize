@@ -9,10 +9,10 @@ to grep for and what to write instead.
 ## v5 → v6
 
 `v6.0.0` is the only `6.x` there is, so a `v5.1.0` consumer takes the whole jump
-at once. Fifteen breaking changes. Eight are runtime changes on signatures that
+at once. Thirteen breaking changes. Seven are runtime changes on signatures that
 do not change shape, so the type checker will not find the call sites for you —
-grep for the patterns below. Seven are type-only and do surface as compile
-errors.
+grep for the patterns below where one is given. Six are type-only and do surface
+as compile errors.
 
 Two further changes are filed as fixes rather than breaks, but a v5 consumer
 meets them in the same install; they are at the end.
@@ -146,26 +146,29 @@ grep -rnE '\bonce\s*\(' --include='*.ts' --include='*.js' \
   --exclude-dir=node_modules .
 ```
 
-For each hit, check whether the same object is also subscribed to that event
-name with `on()` at the same priority. Those are the pairs whose call count
-changes; everything else is untouched.
+For each hit, check whether the same object is subscribed to that event name
+by a *second* `once()` at the same priority. That pair is the one whose call
+count changes; a `once()` paired with an `on()` is untouched, and so is
+everything else.
 
-Two calls on one identity used to mean two invocations in one registration
-order and one in the other. They now always mean one. Where two invocations
-were the point, give the second subscription its own handler:
+Two `once()` calls on one identity used to collapse into a registration that
+never settled: it fired on every emit instead of once. It now fires once and
+is gone. Where the repeated firing was being relied on, that subscription
+wanted `on()`:
 
 ```js
-// before — two invocations only if the on() came first
-on(ε, 'ready', handlers);
+// before — collapsed into one registration that fired on every emit
+once(ε, 'ready', handlers);
 once(ε, 'ready', handlers);
 
-// after — two invocations in either order
+// after — say what was meant
 on(ε, 'ready', handlers);
-once(ε, 'ready', {ready: () => handlers.ready()});
 ```
 
-Plain function listeners are unaffected — they never aggregate, in either
-version.
+An `on()` paired with a `once()` needs no migration: both orders already left
+one registration, dispatched once per emit and alive while the `on()` held it,
+and they still do. Plain function listeners are unaffected — they never
+aggregate, in either version.
 
 ### `on()` / `once()` reject a listener they cannot dispatch to
 
@@ -204,11 +207,13 @@ test is `Number.isNaN`, not a finiteness test.
 
 ### The listener slot is type-checked
 
-Grep for a possibly-missing value forwarded into the listener position:
+Grep for a possibly-missing value forwarded into the listener position. Both
+patterns cover the standalone spelling `on(ε, …)` and the method spelling
+`ε.on(…)`, and both cover `once()`:
 
 ```
-rg "\.on\(\s*[^,)]+,\s*\w+\[" src/
-rg "\bon\([^,]+,\s*[^,)]*\?\." src/
+rg "\b(on|once)\([^;]*?[,(]\s*\w+\[" src/
+rg "\b(on|once)\([^;]*\?\." src/
 ```
 
 Before — compiles, throws at runtime when the lookup misses:
@@ -429,11 +434,8 @@ only ways to satisfy the constraint without `as any`.
 method signatures (`on`, `emit`, `retain`, …) and will collide with any
 same-named method on the host class.
 
-Two call sites still need help after the merge:
+One call site still needs help after the merge:
 
-- **Polymorphic `this` plus the listener-object form.** `on(this, listenerObj)`
-  fails because TS cannot reduce `NonTypedEmitter<this>` while `this` is generic.
-  Cast to the concrete class: `on(this as MyClass, listenerObj)`.
 - **`on.bind(undefined, this, eventName)` patterns.** TS picks the
   priority-as-number overload and rejects the string event name. Cast the
   reference: `(on as (...args: unknown[]) => unknown).bind(undefined, this, eventName)`.

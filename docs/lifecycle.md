@@ -69,8 +69,9 @@ on the form.
 | `off(ε, [null, …])` / `off(ε, [undefined, …])` | all | every value and every policy; the other names add nothing |
 | `off(ε, eventName)` | every listener for that name | value **and** policy for that name — same as `unretain(ε, eventName)` |
 | `off(ε, [eventName, …])` — no `'*'` in the array | every listener for each listed name | value and policy for each listed name, strings and symbols alike |
-| `off(ε, listenerFunc[, context])` | that function, from every event | **untouched** |
-| `off(ε, listenerObject)` | every subscription of that object, in both the object-alone and method-name shapes | **untouched** |
+| `off(ε, listenerFunc)` | that function, from every event — but only where it was registered **without** a context; an `on(ε, name, fn, ctx)` survives it | **untouched** |
+| `off(ε, listenerFunc, context)` | that function, from every event, where it was registered with exactly that context — a registration made without one is not matched | **untouched** |
+| `off(ε, listenerObject)` | every subscription of that object — the object-alone shape, the method-name shape, and the function-with-context shape `on(ε, name, fn, obj)`, whose context sits in the same slot | **untouched** |
 | `off(ε, eventName, listenerObject)` | only that object's subscription to that one event | value **and** policy for that name — even when a sibling listener for it survives |
 | `off(ε, '*', listenerObject)` | only that object's wildcard subscription; named ones survive | **untouched** — `'*'` can never carry retained state |
 | `off(ε, [eventName, …], listenerObject)` | **nothing** | **untouched** — a complete no-op |
@@ -90,7 +91,10 @@ call that, which no-ops safely however often it runs.
 
 **`off(ε, eventName, listenerObject)` unretains the whole name.** It narrowly
 removes one listener object's subscription to that event, and drops the retained
-value and policy for the name *entirely*. Any sibling listener still subscribed
+value and policy for the name *entirely*. It does that even when it detaches
+nothing: the keeper call is unconditional, so `off(ε, 'foo', obj)` for an `obj`
+that was never subscribed — or for a name with no listeners at all — still drops
+the retained value and the policy. Any sibling listener still subscribed
 keeps running on future emits — nothing is unsubscribed out from under it — but
 the *next* listener to subscribe gets no replay. This is the one place where the
 narrowest removal form has the widest effect on retained state, and it is the
@@ -221,12 +225,18 @@ subs.forEach((unsubscribe) => unsubscribe());
 ### Reference counting decides when a listener is really released
 
 Two `on()` calls for the same `(eventName, priority, listener, context)` share
-one listener with `refCount = 2` (see
-[`docs/off.md` → Reference counting](./off.md#reference-counting)). The *first*
-handle's call only decrements; the listener is detached when the *last*
-outstanding handle calls back:
+one listener with `refCount = 2` — for listener-object and method-name
+subscriptions *only* (see
+[`docs/off.md` → Reference counting](./off.md#reference-counting)). A plain
+function listener never de-duplicates, with or without a context: two
+`on(ε, 'foo', fn)` calls are two independent registrations, and the function
+fires twice. Where the count does apply, the *first* handle's call only
+decrements; the listener is detached when the *last* outstanding handle calls
+back:
 
 ```javascript
+const service = {foo: () => {}}; // a listener object — a function would not de-dup
+
 const h1 = on(ε, 'foo', service); // refCount = 1
 const h2 = on(ε, 'foo', service); // same subscription → refCount = 2
 
@@ -244,8 +254,11 @@ count reaches zero, `service` stays reachable through the still-registered
 listener. What does *not* keep it alive is `h1` itself — a consumed handle holds
 nothing, so keeping one past teardown is untidy rather than load-bearing.
 
-`once()` aggregates onto the same identity as `on()` (since v6.0.0): two
-`once()` calls, or a `once()` next to an existing `on()`, land on one listener.
+`once()` aggregates onto the same identity as `on()` (since v6.0.0), and onto
+the same identities — listener objects and method-name subscriptions, never a
+plain function. Two `once()` calls, or a `once()` next to an existing `on()`,
+land on one listener; two `once(ε, 'foo', fn)` calls with the same *function*
+stay two subscriptions and fire twice.
 Each `once()` call adds its own *obligation* rather than a second listener, and
 the store — not either handle — discharges every pending obligation on a
 listener together, in a batch, from inside the dispatch that first reaches it:
@@ -273,6 +286,13 @@ getSubscriptionCount(ε); // => 1 — the on() registration is untouched
 
 A listener is only actually detached once nothing is left holding it — no
 `on()` registration and no pending `once()` obligation.
+
+That is the *handles'* contract, and `off()` takes no part in it. Every `off()`
+form detaches outright without reading the reference count or the pending
+obligations, so a single `off(ε, service)` releases a `refCount`-2 registration
+and cancels any `once()` still riding on it, in one call. That is the point of
+`off(ε, listenerObject)` as a teardown hammer — and the reason a handle held
+afterwards is inert rather than dangerous.
 
 ### A `once()` is only spent when something was actually called
 

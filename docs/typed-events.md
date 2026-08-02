@@ -65,7 +65,9 @@ class Chat extends Eventize<ChatEvents> {
 
 Since v6.0.0 both method forms reject an event name the map does not declare and an argument tuple that does not match it. Up to v5.1.0 both accepted them: the guard that closes the loose overloads sat on the standalone functions' `obj` parameter, and a method has none. It sits on the event-name slot now. The class needed a second fix — it declared its own `on` / `emit` / … in the class body, and a member declared there wins over the same name inherited from the merged interface, so the loose implementation signature was the public one however well the interface was tuned. The implementations sit on the prototype instead, which leaves the merged interface as the class's only type source.
 
-That leaves the method surfaces narrow in a different place than the standalone functions. A call with no event name to check — a catch-all, or a listener-object alone — stays open on both of them, and a listener-object passed _with_ an event name has its name checked and its method names not. So the `banana()` above is a compile error on the standalone `on()` and an accepted, unreachable subscription on `ε.on()` and `this.on()` alike.
+That leaves the method surfaces narrow in a different place than the standalone functions, and the difference runs the other way from what the shared interface suggests. On `ε.on()` and `this.on()` every form carrying no event name stays open — a catch-all function, a listener-object alone — and a listener-object passed _with_ an event name has its name checked and its method names not. The standalone `on()` closes all of that: its guard sits on the `obj` parameter, which resolves to `never` for a typed emitter and takes the whole loose overload set with it, so what survives is `on(ε, name, fn)`, `on(ε, [names], fn)` (with or without a priority) and `on(ε, listenerObject)` — and that last one is typed as `EventListenerMethods<TEvents>`, so its method names _are_ checked.
+
+So `on(ε, {banana() {}})` is a compile error while `ε.on({banana() {}})` and `this.on({banana() {}})` are accepted, unreachable subscriptions. The same split covers `on(ε, fn)`, `on(ε, 'message', obj)`, `on(ε, 'message', 'method', obj)` and `on(ε, 'message', fn, thisArg)`: all four are `never` errors on the standalone spelling and legal on the two method surfaces. Closing them there would take the catch-all listener-object subscription away from typed maps entirely, which is a larger design question than the guard; it is accepted rather than fixed.
 
 If you want a typed map _and_ dynamic names, say so in the map:
 
@@ -87,15 +89,17 @@ interface MyEvents {
   bar: [];
 }
 
-// ❌ avoid — extending EventMap inherits an index signature, which widens
-// keyof MyEvents back to `string | symbol` and defeats the narrowing on
-// emit/on/retain.
+// ❌ pointless, not dangerous — `EventMap` is `object`, so this inherits
+// nothing. `keyof MyEventsBad` is still 'foo' and every narrowing survives;
+// the heritage clause and its import just buy you nothing.
 interface MyEventsBad extends EventMap {
   foo: [string];
 }
 ```
 
 The constraint on `TEvents` is intentionally as loose as `object` so a plain interface satisfies it without an index signature. This is the price of strict narrowing.
+
+What *does* widen `keyof` back to `string | symbol` is an index signature written into the map itself — `[key: string]: any[]`. That is a deliberate escape hatch, covered above, and it reopens every loose overload along with the names.
 
 ## Backwards compatibility & duck-typing
 
@@ -137,11 +141,38 @@ interface ChatEvents {
 
 ## Caveats worth knowing
 
-- Multi-event-name calls to `emit(ε, ['a', 'b'], …)` on typed emitters require all listed events to share the same argument tuple — one call carries one set of arguments, so there is nothing else it could mean. If they don't, fall back to two separate `emit()` calls.
+- Multi-event-name calls to `emit(ε, ['a', 'b'], …)` on typed emitters are checked against the *union* of the listed tuples, not against a shared one: the call compiles as soon as the arguments match at least one listed name. `emit(ε, ['message', 'joined'], 'alice')` type-checks and then dispatches `'message'` one argument short, because the runtime hands the same arguments to every name. Only arguments fitting none of the listed events are rejected. Use separate `emit()` calls when the tuples differ — not because the compiler stops you, but because it will not.
 - `on()` and `once()` are the other way round, deliberately: since v6.0.0 a common listener for several names compiles even when the tuples differ. Identical tuples keep the listener positionally typed; differing ones give every parameter the union of all element types, because positional information genuinely does not exist for one function serving two shapes. Per-event priority tuples (`on(ε, [['a', Priority.High], 'b'], fn)`) work on typed emitters either way, and the names inside the tuples are still checked against the map.
 - The `__TEventsBrand` phantom field on `EventizedObject<T>` is a compile-time-only contrivance: it's never present at runtime and the symbol is not exported, so user code can't accidentally mismatch it.
-- `getSubscriptionCount(ε)` and `EVENT_CATCH_EM_ALL` are intentionally untyped against `TEvents` — they are diagnostic or structural and don't depend on the event map. `isEventized()` is no longer in that group: since v6.0.0 it preserves the map of the emitter it narrows, so a typed `emit()` inside the `if` is checked exactly as it is outside.
+- `getSubscriptionCount(ε)` and `EVENT_CATCH_EM_ALL` are intentionally untyped against `TEvents` — they are diagnostic or structural and don't depend on the event map. Untyped is not the same as usable, though: `EVENT_CATCH_EM_ALL` is `'*'`, which no typed map declares, so `on(ε, '*', fn)`, `ε.on('*', fn)` and both spelled with the constant are compile errors on a typed emitter. Reach the wildcard through a form that carries no event name — `ε.on(fn)`, or a listener object with an `emit()` member. `isEventized()` is no longer in that group: since v6.0.0 it preserves the map of the emitter it narrows, so a typed `emit()` inside the `if` is checked exactly as it is outside.
 - `off(ε, …)` is also intentionally untyped against `TEvents`. Cleanup paths routinely hand off arbitrary values (a saved unsubscribe handle, an event name from a config, a listener object of unknown origin), so `off()` accepts `unknown` for every argument and the runtime decides what to remove. This matches its permissive runtime contract — no type-level surprises in teardown code.
+
+## Wrapping `on()` / `once()`
+
+TypeScript refuses to spread a union of tuples into a fixed-arity call, so no
+overload set — however carefully tuned — accepts `on(target, ...args)` for
+`args: SubscribeArgs`. Writing a forwarding wrapper therefore needs one cast,
+and the package exports the signature to cast to rather than leaving everyone
+to invent it:
+
+```ts
+import {on} from '@spearwolf/eventize';
+import type {SubscribeArgs, SubscribeImpl, UnsubscribeFunc} from '@spearwolf/eventize';
+
+const rawOn = on as SubscribeImpl;
+
+export const subscribe = (target: object, ...args: SubscribeArgs): UnsubscribeFunc =>
+  rawOn(target, ...args);
+```
+
+`SubscribeImpl` is the implementation signature `on()` and `once()` already
+have internally — `src/eventize.ts` makes this exact cast for the inject and
+class surfaces. It is not a second API: it performs no narrowing, so a typed
+emitter passed through a wrapper built on it is checked by nothing. Where a
+wrapper only handles one call shape, name that shape instead: `SubscribeArgs`
+is a union of eleven named arms (`NamedFuncArgs`, `NamedPriorityMethodArgs`,
+`CatchAllObjectArgs` and their siblings), all exported, so the wrapper's
+parameter can say which one it takes and keep its checking.
 
 ## Migrating a class-based codebase to v4.3+ types
 

@@ -68,8 +68,10 @@ interface MyEvents {
   bar: [];
 }
 
-// ❌ extending EventMap inherits an index signature, widening keyof back to
-// string | symbol and defeating every narrowing on emit/on/retain
+// ❌ pointless, not dangerous — `EventMap` is `object`, so nothing is
+// inherited: keyof stays 'foo' and every narrowing survives. The heritage
+// clause and its import buy nothing. What *does* reopen the map is an index
+// signature written into it — see "Symbols are an escape hatch" below.
 interface MyEventsBad extends EventMap {
   foo: [string];
 }
@@ -92,7 +94,7 @@ Add the symbol to the map (`[PRIVATE]: [reason: string]`) if you want it checked
 
 ## Caveats
 
-- Multi-event `emit(ε, ['a', 'b'], …)` requires all listed events to share one argument tuple — one call carries one set of arguments. If they don't, use separate calls.
+- Multi-event `emit(ε, ['a', 'b'], …)` is checked against the **union** of the listed tuples, not a shared one: it compiles as soon as the arguments match at least one listed name, and the runtime then hands the same arguments to every name. `emit(ε, ['message', 'joined'], 'alice')` compiles and dispatches `message` one argument short. Use separate calls when the tuples differ — the compiler will not stop you.
 - Multi-event `on()` / `once()` does **not**: since v6.0.0 a common listener compiles even when the tuples differ. Identical tuples keep it positionally typed; differing ones give each parameter the union of all element types, since positional information does not exist for one function serving two shapes.
 - Per-event priority tuples (`on(ε, [['a', Priority.High], 'b'], fn)`) work on typed emitters, and names inside tuples are still checked against the map — see `api-details.md`.
 - `off()` is intentionally **untyped** against `TEvents` — every parameter accepts `unknown`. Cleanup code routinely handles values of unknown origin, and the runtime is permissive anyway.

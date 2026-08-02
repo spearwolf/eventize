@@ -13,15 +13,15 @@ A tiny, clever, and dependency-free library for synchronous event-driven program
 Written entirely in TypeScript and targeting modern `ES2022`, it offers a type-safe developer experience without sacrificing performance or adding bloat.
 
 Zero runtime dependencies, `sideEffects: false`, tree-shakeable. The package
-ships unminified — the ESM build is about 36 kB — which comes to roughly
-4.5 kB once a bundler minifies it and the transport gzips it.
+ships unminified — the ESM build is about 48 kB — which comes to roughly
+5 kB once a bundler minifies it and the transport gzips it.
 
 ### Features
 
 - 🚀 **Developer-Focused API**: Clean, modern, and functional.
 - ✨ **Wildcards & Priorities**: Subscribe to all events and control listener execution order.
 - 🔷 **Full TypeScript Support**: Optional generic event maps narrow `emit`, `on`, retained-event names and listener arguments — without losing first-class duck-typing for code that doesn't opt in.
-- 📦 **Zero Runtime Dependencies**: Lightweight with a minimal footprint (~4.5 kB minified + gzipped).
+- 📦 **Zero Runtime Dependencies**: Lightweight with a minimal footprint (~5 kB minified + gzipped).
 - ESM & CommonJS Support.
 - Apache 2.0 Licensed.
 
@@ -67,7 +67,6 @@ The deep material behind the summaries below:
 - [Typed event maps](./docs/typed-events.md) — generic event maps, the inject and class forms, symbol events as an escape hatch
 - [Lifecycle & cleanup](./docs/lifecycle.md) — what an emitter holds and what releases it
 - [Migration guide](./docs/migration.md) — upgrading from v5, and the older jumps
-- [Backlog](./docs/backlog.md) — decisions with no other home in the repository
 
 ## 📖 Getting Started
 
@@ -191,6 +190,8 @@ on(ε, 'foo', () => console.log('foo called'));
 emit(ε, 'foo'); // => "foo called"
 ```
 
+The target must be extensible: `eventize(Object.freeze(obj))` throws a `TypeError` naming the cause — frozen, sealed and `preventExtensions()`ed alike. An object frozen *after* it was eventized keeps working.
+
 #### `eventize.inject(obj)`
 
 Modifies the object, attaching the entire API as methods.
@@ -257,11 +258,13 @@ Eventize splits its API into four families by how each function treats a target 
 2. Else if `obj.emit` is a function → call `obj.emit(eventName, ...args)`.
 3. Otherwise → silently no-op.
 
-Step 1 ignores a member that is identical to `Object.prototype`'s member of the same name, so an event called `toString`, `valueOf`, `constructor`, `hasOwnProperty`, `isPrototypeOf`, `propertyIsEnumerable` or `toLocaleString` does not dispatch to the function every object inherits — it moves on to step 2. Define your own `toString` — on the object or on its class — and it is called as normal, because the check compares the resolved member against `Object.prototype`'s function by identity rather than going by the name. The one own property that is still skipped is an alias of that same function, `{toString: Object.prototype.toString}`. The same boundary applies to listener-object dispatch on an eventized target.
+Step 1 ignores a member that is identical to `Object.prototype`'s member of the same name, so an event called `toString`, `valueOf`, `constructor`, `hasOwnProperty`, `isPrototypeOf`, `propertyIsEnumerable` or `toLocaleString` does not dispatch to the function every object inherits — it moves on to step 2. The list is not a list: the test is identity against `Object.prototype`, so it covers every member that object carries, V8's `__defineGetter__` / `__lookupSetter__` family included. Define your own `toString` — on the object or on its class — and it is called as normal, because the check compares the resolved member against `Object.prototype`'s function by identity rather than going by the name. The one own property that is still skipped is an alias of that same function, `{toString: Object.prototype.toString}`. The same boundary applies to listener-object dispatch on an eventized target.
 
 One collision: on a target with its own `.emit`, `emit(obj, 'emit', ...args)` hits step 1 and calls `obj.emit(...args)` without the event name — it never reaches step 2. A target with no `.emit` is unaffected (both steps fail, silent no-op). This is the protocol applied literally; the collision occurs when the event name matches the fallback method itself.
 
 That lets you point `emit()` at adapters, mocks, or plain method-bags without ceremony. `null` / `undefined` / non-object targets silently no-op. **`'*'` still throws** — it remains subscribe-only.
+
+Inside an array it throws *late*: `emit(ε, ['a', '*', 'b'])` dispatches `'a'`, then throws, and never dispatches `'b'` — a half-completed emit. `retain(ε, [names])` is the opposite and rejects atomically: a `'*'` anywhere in the array retains nothing at all.
 
 `retainClear` / `unretain` _operate on retain state_ that only exists on eventized objects. There is no meaningful duck-typed equivalent, so they keep throwing — pointing them at a plain `{}` is almost always a bug.
 
@@ -525,15 +528,18 @@ Removes listeners from an emitter — the counterpart to `on()`, for cleanup whe
 
 ```javascript
 off(ε);                       // all listeners — and all retained state
+off(ε, undefined);            // ⚠️ the same branch — wipes everything
 off(ε, 'foo');                // all listeners for 'foo' (also unretains 'foo')
 off(ε, ['foo', 'bar']);       // several events
-off(ε, listenerFunc);         // that function, across all events
+off(ε, listenerFunc);         // that function, where it was registered without a context
 off(ε, listenerObject);       // every subscription of that object
-off(ε, 'foo', listenerObject); // that object, on 'foo' only
+off(ε, 'foo', listenerObject); // that object, on 'foo' only — but still unretains 'foo'
 off(ε, '*', listenerObject);   // that object's wildcard subscription only
 ```
 
-Calling `off()` on a non-eventized object (or on `null`/`undefined`) is a no-op, which makes it safe in cleanup paths without an `isEventized()` check.
+A nullish second argument is **not** a no-op. `off(ε, handlers[name])` empties the whole emitter when the lookup misses, and one `null` or `undefined` element turns an array form into the same total wipe. Guard the lookup, or keep the handle `on()` returned and call that.
+
+Calling `off()` on a non-eventized object (or on `null`/`undefined` as the *emitter*) is a no-op, which makes it safe in cleanup paths without an `isEventized()` check.
 
 Since v6.0.0 the bulk forms `off(ε)` and `off(ε, '*')` also empty the retained-events keeper — every retained value and every retain policy goes with the listeners. Before that they cleared only the listeners, so a subscriber arriving afterwards was still handed the old payload.
 
@@ -574,7 +580,7 @@ const results = await emitAsync(ε, 'load');
 console.log(results); // => ["Data from source 1", "Simple data"]
 ```
 
-Arrays are flattened with `Promise.all`, so a listener returning `[1, Promise.resolve(2)]` contributes `[1, 2]`.
+A listener returning an array has its elements awaited with `Promise.all`, but the array stays one entry of the result: a lone listener returning `[1, Promise.resolve(2)]` gives `[[1, 2]]`, not `[1, 2]`. Flatten yourself if you want the elements inline.
 
 > [!NOTE]
 > When nothing was collected — no listeners, or every listener returned `null`/`undefined` — the promise resolves to **`undefined`**, not to an empty array.
@@ -614,6 +620,9 @@ console.log(calls); // => ["first"]
 > [!NOTE]
 > `emitAsync()` aggregates listener return values into a single `Promise.all`. A listener returning a **rejected promise** rejects the awaited result, but the other listeners — being dispatched synchronously — have already run by then. A listener that throws synchronously still aborts dispatch in the same way as with `emit()`.
 
+> [!WARNING]
+> Do not mix the two in one dispatch. The aggregation is built *after* the dispatch returns, so a synchronous throw — from a listener, or from `'*'` inside a name array — leaves every promise already collected with no handler attached. Node's default `--unhandled-rejections=throw` then terminates the process even though the caller caught the synchronous error, and a browser fires `unhandledrejection`. There is no way to reach those promises from outside; keep promise-returning and throwing listeners on separate events, or wrap the throwing one in `try/catch`.
+
 ---
 
 ### State Management
@@ -651,7 +660,7 @@ Only the **last** emission is kept, events emitted _before_ the `retain()` call 
 
 #### `isEventized(obj)`
 
-A type guard returning `true` if an object has been processed by `eventize()`. Also available as `eventize.is(obj)`.
+A type guard returning `true` if an object has been processed by `eventize()`. Also available as `eventize.is(obj)`. On a typed emitter it preserves the event map it narrows, so a wrong event name stays a compile error *inside* the `if` — up to v5.1.0 the narrowing widened the map back to the permissive default and silently reopened every loose overload.
 
 ```javascript
 import {eventize, isEventized} from '@spearwolf/eventize';
@@ -663,7 +672,7 @@ console.log(eventize.is({}));         // => false
 
 #### `asEventized(obj)`
 
-The low-level primitive behind `eventize(obj)`: attaches the hidden emitter slot and returns the object, without injecting any API methods. Idempotent — an already-eventized object is returned untouched. Reach for `eventize()` unless you specifically need the primitive.
+The low-level primitive behind `eventize(obj)`: attaches the hidden emitter slot and returns the object, without injecting any API methods. Idempotent — an already-eventized object is returned untouched, unless *another copy* of the library eventized it, in which case it throws the protocol-mismatch `TypeError` rather than handing back an emitter it cannot drive. Like `eventize()`, it refuses a non-extensible target. Reach for `eventize()` unless you specifically need the primitive.
 
 #### `getEventizeProtocol(obj)`
 
@@ -770,8 +779,23 @@ emit(ε, 'message', 'alice', 'hello'); // ✅
 // emit(ε, 'message', 'alice');       // ❌ missing 'text'
 ```
 
-Define the map as a **plain interface** — do _not_ `extends EventMap`, which would inherit an index signature and widen `keyof` back to `string | symbol`.
+Define the map as a **plain interface**. `extends EventMap` buys nothing — `EventMap` is `object`, so nothing is inherited and the narrowing survives — but it costs an import for no effect. What actually reopens the map is an index signature written into it (`[key: string]: any[]`), which is the deliberate escape hatch for dynamic names.
 
 Without a generic, every API behaves exactly like v4.0.x: arbitrary event names, arbitrary arguments, listener-objects with whatever method names you like.
+
+#### Exported types
+
+Everything below is exported from the package root, and each exists to be written by a consumer rather than merely inferred:
+
+| Type | What it is for |
+| --- | --- |
+| `EventMap`, `DefaultEventMap` | the constraint on an event map, and the permissive default |
+| `UnsubscribeFunc` | what `on()` and `once()` hand back — `() => void`, nothing else |
+| `OnceAsyncOptions` | the `{signal?: AbortSignal}` bag `onceAsync()` takes |
+| `EventNameWithPriority` | the `[eventName, priority]` tuple the array form of `on()` accepts |
+| `SubscribeImpl` | the implementation signature to cast to when writing a forwarding wrapper around `on()` / `once()` |
+| `SubscribeArgs` | the union of every accepted argument shape, plus eleven named arms so a wrapper can name the one it handles |
+
+The last two are the ones worth knowing about: TypeScript refuses to spread a union of tuples into a fixed-arity call, so `on(target, ...args)` never compiles against the public overloads. `const rawOn = on as SubscribeImpl` is the sanctioned escape — see [`docs/typed-events.md` → Wrapping `on()` / `once()`](./docs/typed-events.md#wrapping-on--once).
 
 📖 **[Full typed-events reference →](./docs/typed-events.md)** — typed listener-objects, the inject and class forms, symbol events as an escape hatch, and the caveats around `off()` and multi-event calls.

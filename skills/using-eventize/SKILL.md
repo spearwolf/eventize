@@ -1,12 +1,12 @@
 ---
 name: using-eventize
-description: Use when code imports `@spearwolf/eventize`, mentions `eventize`/`Eventize`, or when writing/reviewing synchronous event-emitter code using this library (on, once, emit, emitAsync, off, retain). Covers the API surface, the auto-eventize vs strict split, wildcard quirks, retain semantics, priorities, and common pitfalls.
+description: Use when code imports `@spearwolf/eventize`, mentions `eventize`/`Eventize`, or when writing/reviewing synchronous event-emitter code using this library (on, once, emit, emitAsync, off, retain). Covers the API surface, the four behaviour families on non-eventized targets, wildcard quirks, retain semantics, priorities, cleanup and handle lifetime, typed event maps, the v5 → v6 migration, and common pitfalls.
 ---
 
 # @spearwolf/eventize
 
 A zero-dependency **synchronous** event emitter for any JS/TS object. ESM + CJS,
-opt-in generic event maps. Ships unminified (~36 kB ESM); around 4.5 kB once a
+opt-in generic event maps. Ships unminified (~48 kB ESM); around 5 kB once a
 bundler minifies it and the transport gzips it.
 
 Deeper material — load only when the task needs it:
@@ -131,8 +131,9 @@ compile time) or an explicit `isEventized()` guard.
    twice always fires twice.
 8. **`off()` mid-emit** skips listeners that haven't run yet in that dispatch.
 9. **`emitAsync()` resolves `undefined`, not `[]`**, when nothing was collected.
-   `null`/`undefined` returns are dropped; arrays of promises are flattened via
-   `Promise.all`.
+   `null`/`undefined` returns are dropped. An array return has its elements
+   awaited via `Promise.all` but stays **one** entry — `[1, Promise.resolve(2)]`
+   from a lone listener gives `[[1, 2]]`, not `[1, 2]`.
 10. **`off(ε, name)` unretains that event** — it drops the stored value *and* the
     retain policy, so later emits aren't retained until `retain()` is called
     again. The bulk forms `off(ε)`, `off(ε, '*')` and any array holding a `'*'` or
