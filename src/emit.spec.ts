@@ -64,4 +64,22 @@ describe('emit()', () => {
       }).not.toThrow();
     });
   });
+
+  // A class instance's `constructor` is the class itself — never identical to
+  // `Object.prototype.constructor` — so the Object.prototype identity check
+  // that keeps other inherited members from being dispatchable does not catch
+  // it here, and `constructor` is never a legitimate handler name regardless.
+  describe('event name "constructor" against a class-instance listener object', () => {
+    it('does not invoke the class constructor and falls back instead', () => {
+      class Thing {}
+      const obj = eventize();
+      const emitFn = fake();
+      const listenerObject = Object.assign(new Thing(), {emit: emitFn});
+
+      on(obj, listenerObject);
+
+      expect(() => emit(obj, 'constructor', 1, 2)).not.toThrow();
+      expect(emitFn.calledOnceWith('constructor', 1, 2)).toBe(true);
+    });
+  });
 });

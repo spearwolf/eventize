@@ -145,6 +145,38 @@ describe('emit() duck-typing on non-eventized targets (v5+)', () => {
       expect(seen).toEqual([[1, 2]]);
     });
 
+    // `constructor` is never a legitimate handler name, yet the identity test
+    // alone cannot see that: a class instance's `constructor` is the class
+    // itself, never identical to `Object.prototype.constructor`, so on a
+    // class instance (unlike on a plain `{}`) the naive identity check let it
+    // through as dispatchable and `apply()` called the class as a plain
+    // function — a TypeError from inside dispatch instead of the emit()
+    // fallback an unanswered name should reach.
+    it('does not invoke the class constructor for the event name "constructor"', () => {
+      class Thing {}
+      const emitFn = fake();
+      const target = Object.assign(new Thing(), {emit: emitFn});
+
+      expect(() => emit(target, 'constructor', 1, 2)).not.toThrow();
+      expect(emitFn.calledOnceWith('constructor', 1, 2)).toBe(true);
+    });
+
+    // Deliberate trade-off, not an oversight: every other name in this
+    // describe block lets an own property win over the inherited one (see
+    // 'still calls a class override' above), but `constructor` is carved out
+    // unconditionally because no handler under that name is legitimate — so
+    // an own `constructor` handler is skipped too, unlike an own `toString`.
+    it('skips an own "constructor" handler and falls back instead', () => {
+      const myHandler = fake();
+      const emitFn = fake();
+      const target = {constructor: myHandler, emit: emitFn};
+
+      emit(target, 'constructor', 1, 2);
+
+      expect(myHandler.called).toBe(false);
+      expect(emitFn.calledOnceWith('constructor', 1, 2)).toBe(true);
+    });
+
     // Identity, not ownership: an own property holding the very same function
     // is skipped here too, so both dispatch paths agree on the edge as well.
     it('skips an own property aliasing the inherited function', () => {

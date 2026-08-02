@@ -27,10 +27,11 @@ const objectPrototype = Object.prototype as Record<EventName, unknown>;
  * aggregation and consumed a `once()` while no user method ever ran. This is
  * `isObjListener()`'s reasoning about primitives, one prototype up.
  *
- * Function identity is the whole test, which is what keeps it narrow: a target
- * that defines its own method under that name — own property or anywhere on its
- * prototype chain — resolves as normal, and a `Object.create(null)` target has
- * nothing to subtract. The literal edge follows from the same rule rather than
+ * Function identity is the whole test for every name but one (`constructor`,
+ * see below), which is what keeps it narrow: a target that defines its own
+ * method under that name — own property or anywhere on its prototype chain —
+ * resolves as normal, and a `Object.create(null)` target has nothing to
+ * subtract. The literal edge follows from the same rule rather than
  * contradicting it: aliasing the inherited function under its own name
  * (`{toString: Object.prototype.toString}`) is skipped too, because there is no
  * way to tell that apart from inheriting it, and no reason to want it.
@@ -39,11 +40,21 @@ const objectPrototype = Object.prototype as Record<EventName, unknown>;
  *
  * Deliberately not applied to the method-name form `on(ε, 'evt', 'toString',
  * obj)`: there the inherited hit is the caller's own choice.
+ *
+ * `constructor` is the one name where an own property does *not* win: it is
+ * carved out unconditionally, ahead of the identity check, because identity
+ * alone cannot answer it — a class instance's `target.constructor` is the
+ * class itself, never identical to `Object.prototype.constructor`, so the
+ * general rule let it through as dispatchable and `apply()` invoked the class
+ * as a plain function. No handler named `constructor` is legitimate, own
+ * property included, so the `undefined` here costs nothing real and is
+ * unconditional rather than identity-checked.
  */
 export const dispatchableMember = (
   target: Record<EventName, unknown>,
   eventName: EventName,
 ): unknown => {
+  if (eventName === 'constructor') return undefined;
   const member = target[eventName];
   // The `undefined` shortcut is the common case — an event name matches no
   // member at all — and it skips a second property read on the hottest path in
