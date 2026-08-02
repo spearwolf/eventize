@@ -13,9 +13,12 @@ export type KeeperEvent = {
 
 let nextOrderId = 0;
 
+const byOrder = (a: KeeperEvent, b: KeeperEvent) => a.order - b.order;
+
 export class EventKeeper {
   static publish(events: KeeperEvent[]): void {
-    events.sort((a, b) => a.order - b.order).forEach((event) => event.replay());
+    if (events.length === 0) return;
+    events.sort(byOrder).forEach((event) => event.replay());
   }
 
   events = new Map<EventName, KeeperEventItem>();

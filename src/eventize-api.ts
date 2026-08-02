@@ -768,7 +768,7 @@ export function emitAsync(
   eventNames: AnyEventNames,
   ...args: EventArgs
 ): Promise<any[] | undefined> {
-  let values: any[] = [];
+  const values: any[] = [];
   const returnValue = (val: unknown) => {
     values.push(val);
   };
@@ -777,14 +777,22 @@ export function emitAsync(
   } else if (isDuckTarget(target)) {
     _duckEmit(target, eventNames, args, returnValue);
   }
-  values = values.map((val: any) =>
-    Array.isArray(val) ? Promise.all(val) : Promise.resolve(val),
-  );
   // `Promise.resolve(undefined)`, not the argument-less `Promise.resolve()`:
   // the latter is `Promise<void>`, and the declared `Promise<any[] | undefined>`
   // rejects it. Same value at runtime, and the distinction is the point of
   // narrowing the type — a caller has to handle the empty case.
-  return values.length > 0 ? Promise.all(values) : Promise.resolve(undefined);
+  //
+  // The map() only runs once there is something to map: with no listener
+  // (or none that returned a value) `values` is empty, and building a second
+  // array just to hand it to Promise.all() would be work for a result nobody
+  // asked for.
+  return values.length > 0
+    ? Promise.all(
+        values.map((val: any) =>
+          Array.isArray(val) ? Promise.all(val) : Promise.resolve(val),
+        ),
+      )
+    : Promise.resolve(undefined);
 }
 
 // ---------------------------------------------------------------------------
