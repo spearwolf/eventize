@@ -301,9 +301,15 @@ describe('EventKeeper', () => {
     // `events` (not `eventNames`), so that's the structure the isCatchEmAll
     // guard now has to protect. Without it, a '*' entry here would recurse
     // into itself and blow the stack.
-    keeper.events.set('*', {order: -1, args: []});
+    //
+    // The real retain has to come first: until something is held, `events` is
+    // the shared empty stand-in, and writing into that one would seed a '*'
+    // entry into every other keeper this module built rather than into this
+    // one. The stand-in throws on set(), so getting this order wrong fails
+    // here instead of somewhere downstream.
     keeper.add('foo');
     keeper.retain('foo', ['payload']);
+    keeper.events.set('*', {order: -1, args: []});
 
     const emitter = {apply: jest.fn()};
     const result = keeper.replayTo('*', emitter);
@@ -339,5 +345,127 @@ describe('EventKeeper', () => {
 
     expect(emitter.apply).toHaveBeenCalledTimes(1);
     expect(emitter.apply.mock.calls[0]).toEqual(['policy-137', ['onlyValue']]);
+  });
+
+  // The two containers are lazy, and until the first write both fields point
+  // at one pair shared by every keeper this module instance built. That makes
+  // every write path a place where a forgotten materialization would leak
+  // entries into all of them at once — a corruption no behavioural spec can
+  // see, because the emitter under test would still behave correctly. These
+  // cases watch the stand-in itself instead.
+  describe('the shared empty containers', () => {
+    it('a fresh keeper builds no containers of its own', () => {
+      const a = new EventKeeper();
+      const b = new EventKeeper();
+
+      expect(a.events).toBe(b.events);
+      expect(a.eventNames).toBe(b.eventNames);
+      expect(a.events.size).toBe(0);
+      expect(a.eventNames.size).toBe(0);
+    });
+
+    it('the first write replaces the stand-in, and only for that keeper', () => {
+      const a = new EventKeeper();
+      const untouched = new EventKeeper();
+
+      a.add('foo');
+      expect(a.eventNames).not.toBe(untouched.eventNames);
+      expect(a.events).toBe(untouched.events); // no value held yet
+
+      a.retain('foo', ['payload']);
+      expect(a.events).not.toBe(untouched.events);
+
+      expect(untouched.eventNames.size).toBe(0);
+      expect(untouched.events.size).toBe(0);
+    });
+
+    it('rejects mutation instead of corrupting every keeper this module built', () => {
+      const keeper = new EventKeeper();
+
+      expect(() => keeper.events.set('foo', {order: 0, args: []})).toThrow(
+        /shared empty stand-in/,
+      );
+      expect(() => keeper.events.delete('foo')).toThrow();
+      expect(() => keeper.events.clear()).toThrow();
+      expect(() => keeper.eventNames.add('foo')).toThrow(
+        /shared empty stand-in/,
+      );
+      expect(() => keeper.eventNames.delete('foo')).toThrow();
+      expect(() => keeper.eventNames.clear()).toThrow();
+    });
+
+    it('removeAll() and clearAll() release the containers rather than emptying them', () => {
+      const fresh = new EventKeeper();
+
+      const removed = new EventKeeper();
+      removed.add('foo');
+      removed.retain('foo', ['payload']);
+      removed.removeAll();
+
+      expect(removed.events).toBe(fresh.events);
+      expect(removed.eventNames).toBe(fresh.eventNames);
+
+      const cleared = new EventKeeper();
+      cleared.add('foo');
+      cleared.retain('foo', ['payload']);
+      cleared.clearAll();
+
+      expect(cleared.events).toBe(fresh.events);
+      // the policies survive clearAll(), so that container is not released
+      expect(cleared.eventNames).not.toBe(fresh.eventNames);
+    });
+
+    it('a no-op remove(), clear() or retain() leaves the stand-in in place', () => {
+      const fresh = new EventKeeper();
+
+      const keeper = new EventKeeper();
+      expect(() => keeper.remove('foo')).not.toThrow();
+      expect(() => keeper.remove(['foo', bar])).not.toThrow();
+      expect(() => keeper.clear('foo')).not.toThrow();
+      expect(() => keeper.add([])).not.toThrow();
+      // no retain policy, so nothing is stored
+      expect(() => keeper.retain('foo', ['payload'])).not.toThrow();
+
+      expect(keeper.events).toBe(fresh.events);
+      expect(keeper.eventNames).toBe(fresh.eventNames);
+    });
+  });
+
+  describe('hasRetainedFor()', () => {
+    it('answers for a name, and for the catch-em-all across every name', () => {
+      const keeper = new EventKeeper();
+
+      expect(keeper.hasRetainedFor('foo')).toBe(false);
+      expect(keeper.hasRetainedFor('*')).toBe(false);
+
+      // a policy without a value is nothing to replay yet
+      keeper.add('foo');
+      expect(keeper.hasRetainedFor('foo')).toBe(false);
+      expect(keeper.hasRetainedFor('*')).toBe(false);
+
+      keeper.retain('foo', ['payload']);
+      expect(keeper.hasRetainedFor('foo')).toBe(true);
+      expect(keeper.hasRetainedFor('bar')).toBe(false);
+      // '*' asks about every held value, never about a value named '*'
+      expect(keeper.hasRetainedFor('*')).toBe(true);
+
+      keeper.clearAll();
+      expect(keeper.hasRetainedFor('foo')).toBe(false);
+      expect(keeper.hasRetainedFor('*')).toBe(false);
+    });
+
+    it('agrees with replayTo() on whether there is anything to queue', () => {
+      const keeper = new EventKeeper();
+      const emitter = {apply: jest.fn()};
+
+      keeper.add(['foo', bar]);
+      keeper.retain(bar, ['barData']);
+
+      for (const name of ['foo', bar, 'plah', '*'] as const) {
+        expect(keeper.hasRetainedFor(name)).toBe(
+          keeper.replayTo(name, emitter).length > 0,
+        );
+      }
+    });
   });
 });

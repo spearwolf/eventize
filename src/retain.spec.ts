@@ -10,6 +10,7 @@ import {
   emit,
   retain,
 } from './index';
+import {keeperOf} from './__test-utils__/listeners';
 
 describe('retain()', () => {
   it('calls the listener function after registration with on()', () => {
@@ -517,6 +518,107 @@ describe('retain()', () => {
 
       on(obj, 'foo', listenerObject);
       expect(listenerObject.foo.callCount).toBe(2);
+    });
+  });
+
+  describe('the retain index is built on demand', () => {
+    // The keeper builds its Map and its Set at the first write, so an emitter
+    // that never retains anything carries neither. Nothing observable from
+    // outside says so — getRetainedCount() reports 0 in both cases — which is
+    // why this reads the fields directly. Without it, a future change that
+    // materializes a container somewhere on the on/emit/off path would give up
+    // the whole saving and every other spec would stay green.
+    it('an emitter driven only by on/once/emit/off keeps both stand-ins', () => {
+      const pristine = keeperOf(eventize({}));
+      const obj = eventize({});
+      const handler = fake();
+      const listenerObject = {foo: fake()};
+
+      on(obj, 'foo', handler);
+      once(obj, 'bar', handler);
+      on(obj, '*', handler);
+      on(obj, 'foo', listenerObject);
+      emit(obj, 'foo', 'payload');
+      emit(obj, 'bar', 'payload');
+      off(obj, 'foo');
+      off(obj, listenerObject);
+
+      const keeper = keeperOf(obj);
+      expect(keeper.events).toBe(pristine.events);
+      expect(keeper.eventNames).toBe(pristine.eventNames);
+
+      // Asserted before the bulk wipe on purpose: off(ε) releases both
+      // containers, so it would hide anything the calls above had built.
+      off(obj);
+      expect(keeperOf(obj).events).toBe(pristine.events);
+      expect(keeperOf(obj).eventNames).toBe(pristine.eventNames);
+    });
+
+    // The two containers are independent: a policy is not a held value, so
+    // retain() alone must not build the value side.
+    it('retain() builds the policy container, the first emit builds the value one', () => {
+      const pristine = keeperOf(eventize({}));
+      const obj = eventize({});
+
+      retain(obj, 'foo');
+      expect(keeperOf(obj).eventNames).not.toBe(pristine.eventNames);
+      expect(keeperOf(obj).events).toBe(pristine.events);
+
+      emit(obj, 'foo', 'payload');
+      expect(keeperOf(obj).events).not.toBe(pristine.events);
+    });
+
+    // An emit on a name carrying no retain policy is the common case on an
+    // emitter that uses retain() for something else entirely.
+    it('an emit on an unretained name builds nothing', () => {
+      const pristine = keeperOf(eventize({}));
+      const obj = eventize({});
+
+      emit(obj, 'foo', 'payload');
+
+      expect(keeperOf(obj).events).toBe(pristine.events);
+      expect(keeperOf(obj).eventNames).toBe(pristine.eventNames);
+    });
+  });
+
+  // once(ε, '*') is where both new conditions meet: the catch-em-all branch of
+  // the keeper's "is anything held" test, and the once() obligation that
+  // guards the replay. Named once() and plain on('*') are pinned elsewhere;
+  // neither covers the pair.
+  describe("once(ε, '*') on retained values", () => {
+    it('fires exactly once, however many values are held', () => {
+      const obj = eventize({});
+      const subscriber = fake();
+
+      retain(obj, ['foo', 'bar', 'plah']);
+      emit(obj, 'foo', 'fooData');
+      emit(obj, 'bar', 'barData');
+      emit(obj, 'plah', 'plahData');
+
+      once(obj, '*', subscriber);
+
+      expect(subscriber.callCount).toBe(1);
+      // the obligation settled on the replay, so nothing is left to fire
+      expect(getSubscriptionCount(obj)).toBe(0);
+
+      emit(obj, 'foo', 'afterwards');
+      expect(subscriber.callCount).toBe(1);
+    });
+
+    it('stays armed while nothing is held, then fires on the next emit', () => {
+      const obj = eventize({});
+      const subscriber = fake();
+
+      retain(obj, 'foo');
+      once(obj, '*', subscriber);
+
+      expect(subscriber.callCount).toBe(0);
+      expect(getSubscriptionCount(obj)).toBe(1);
+
+      emit(obj, 'foo', 'payload');
+
+      expect(subscriber.calledWith('payload')).toBeTruthy();
+      expect(subscriber.callCount).toBe(1);
     });
   });
 });

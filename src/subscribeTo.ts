@@ -52,7 +52,17 @@ const registerEventListener = (
   // itself is the guard, checked when the replay actually runs — never at
   // queue time, since nothing queued by this call has run yet while this call
   // is still queueing.
-  if (el === newListener || obligation !== null) {
+  //
+  // `hasRetainedFor()` in front of all that answers a different question, and
+  // only that one: whether the keeper holds anything this name could replay.
+  // It never decides whether a listener is entitled to a replay — that stays
+  // with the obligation, below and at replay time. Most emitters never see
+  // retain(), so it is false for most registrations, and then neither the
+  // wrapper object nor its closure gets built for a once().
+  if (
+    keeper.hasRetainedFor(eventName) &&
+    (el === newListener || obligation !== null)
+  ) {
     const replayTarget: {apply: (name: EventName, args?: EventArgs) => void} =
       obligation === null
         ? el

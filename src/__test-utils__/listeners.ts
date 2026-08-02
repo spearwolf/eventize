@@ -1,11 +1,13 @@
 import {internalsOf} from '../internals';
 
+import type {EventKeeper} from '../EventKeeper';
 import type {EventListener} from '../EventListener';
 import type {EventStore} from '../EventStore';
 import type {EventMap, EventName, EventizedObject} from '../types';
 
 /**
- * Reach into an emitter's `EventStore` from a spec.
+ * Reach into an emitter's internals from a spec — the `EventStore`, and for
+ * the one promise that is invisible from the outside, the `EventKeeper`.
  *
  * Up to v5.1.0 the specs got at the `EventListener` a subscription produced
  * through `unsubscribe.listener` / `.listeners`. Those properties are gone from
@@ -28,6 +30,17 @@ import type {EventMap, EventName, EventizedObject} from '../types';
 export const storeOf = <T extends EventMap>(
   obj: EventizedObject<T>,
 ): EventStore => internalsOf(obj).store;
+
+/**
+ * The emitter's retain index, for the specs that assert on its *shape* rather
+ * than on replay behaviour — chiefly that an emitter which never sees
+ * `retain()` still shares both empty stand-ins instead of owning a Map and a
+ * Set of its own. `getRetainedCount()` cannot answer that: it reports 0 either
+ * way, which is exactly why the promise needs a spec that reads the fields.
+ */
+export const keeperOf = <T extends EventMap>(
+  obj: EventizedObject<T>,
+): EventKeeper => internalsOf(obj).keeper;
 
 /** Every registered listener, named buckets first, then the wildcard bucket. */
 export const allListeners = <T extends EventMap>(
