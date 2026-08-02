@@ -531,7 +531,8 @@ off(ε);                       // all listeners — and all retained state
 off(ε, undefined);            // ⚠️ the same branch — wipes everything
 off(ε, 'foo');                // all listeners for 'foo' (also unretains 'foo')
 off(ε, ['foo', 'bar']);       // several events
-off(ε, listenerFunc);         // that function, where it was registered without a context
+off(ε, listenerFunc);         // that function, under every context it was registered with
+off(ε, listenerFunc, ctx);    // only where it was registered with exactly that context
 off(ε, listenerObject);       // every subscription of that object
 off(ε, 'foo', listenerObject); // that object, on 'foo' only — but still unretains 'foo'
 off(ε, '*', listenerObject);   // that object's wildcard subscription only

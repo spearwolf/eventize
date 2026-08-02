@@ -119,6 +119,125 @@ describe('off()', () => {
     });
   });
 
+  // Since v6.0.0 an off() that names no listener object matches the function
+  // alone. Up to v5.1.0 the stored context had to be null as well, so a
+  // subscription drawn as on(ε, 'foo', this.handler, this) survived
+  // off(ε, this.handler) without a word — and kept both the function and the
+  // context object alive on the emitter.
+  describe('by function, with no listener object given', () => {
+    it('detaches a subscription that was registered with a context', () => {
+      const ε = eventize();
+      const ctx = {};
+      const listenerFunc = fake();
+
+      on(ε, 'foo', listenerFunc, ctx);
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      off(ε, listenerFunc);
+
+      expect(getSubscriptionCount(ε)).toBe(0);
+      emit(ε, 'foo');
+      expect(listenerFunc.callCount).toBe(0);
+    });
+
+    it('detaches every context the same function was registered under', () => {
+      const ε = eventize();
+      const listenerFunc = fake();
+      const other = fake();
+
+      on(ε, 'foo', listenerFunc, {});
+      on(ε, 'bar', listenerFunc, {});
+      on(ε, 'foo', listenerFunc);
+      on(ε, 'foo', other, {});
+      expect(getSubscriptionCount(ε)).toBe(4);
+
+      off(ε, listenerFunc);
+
+      expect(getSubscriptionCount(ε)).toBe(1);
+      emit(ε, 'foo');
+      emit(ε, 'bar');
+      expect(listenerFunc.callCount).toBe(0);
+      expect(other.callCount).toBe(1);
+    });
+
+    it('reaches a context-bound wildcard subscription too', () => {
+      const ε = eventize();
+      const listenerFunc = fake();
+
+      on(ε, listenerFunc, {});
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      off(ε, listenerFunc);
+
+      expect(getSubscriptionCount(ε)).toBe(0);
+      emit(ε, 'anything');
+      expect(listenerFunc.callCount).toBe(0);
+    });
+
+    // The escape hatch for callers who do not want the broad reading: naming
+    // the context makes the match exact again, on both halves.
+    it('off(ε, fn, ctx) stays exact — only that context goes', () => {
+      const ε = eventize();
+      const ctxA = {};
+      const ctxB = {};
+      const listenerFunc = fake();
+
+      on(ε, 'foo', listenerFunc, ctxA);
+      on(ε, 'foo', listenerFunc, ctxB);
+      on(ε, 'foo', listenerFunc);
+      expect(getSubscriptionCount(ε)).toBe(3);
+
+      off(ε, listenerFunc, ctxA);
+
+      expect(getSubscriptionCount(ε)).toBe(2);
+      emit(ε, 'foo');
+      expect(listenerFunc.callCount).toBe(2);
+      expect(listenerFunc.thisValues).not.toContain(ctxA);
+      expect(listenerFunc.thisValues).toContain(ctxB);
+    });
+
+    // Same rule, object argument: the listener-object-with-a-context shape
+    // files the object in the identity slot and something else in the context
+    // slot, so up to v5.1.0 neither disjunct matched it and off(ε, obj) —
+    // "every subscription of that object" — walked past it.
+    it('detaches a listener object that was registered with a context', () => {
+      const ε = eventize();
+      const listenerObject = {foo: fake()};
+
+      on(ε, 'foo', listenerObject, {});
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      off(ε, listenerObject);
+
+      expect(getSubscriptionCount(ε)).toBe(0);
+      emit(ε, 'foo');
+      expect(listenerObject.foo.callCount).toBe(0);
+    });
+
+    // The association half is untouched by all of the above: off(ε, obj)
+    // still sweeps the three shapes that name the object and nothing else.
+    it('off(ε, listenerObject) keeps sweeping the shapes it always did', () => {
+      const ε = eventize();
+      const ctx = {foo: fake()};
+      const other = {foo: fake()};
+      const listenerFunc = fake();
+
+      on(ε, 'foo', ctx);
+      on(ε, 'foo', 'foo', ctx);
+      on(ε, 'foo', listenerFunc, ctx);
+      on(ε, 'foo', other);
+      expect(getSubscriptionCount(ε)).toBe(4);
+
+      off(ε, ctx);
+
+      expect(getSubscriptionCount(ε)).toBe(1);
+      emit(ε, 'foo');
+      expect(ctx.foo.callCount).toBe(0);
+      expect(listenerFunc.callCount).toBe(0);
+      expect(other.foo.callCount).toBe(1);
+    });
+  });
+
   describe('by eventName', () => {
     const ε = eventize();
 

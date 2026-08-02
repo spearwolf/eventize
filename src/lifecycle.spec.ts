@@ -70,18 +70,55 @@ describe('lifecycle', () => {
       const listener = fake();
       on(obj, 'foo', listener);
       on(obj, 'bar', listener);
+      // Under every context, too, since v6.0.0 — a registration drawn with
+      // one used to survive this call and keep both the function and the
+      // context object held.
+      on(obj, 'baz', listener, {});
 
       off(obj, listener);
 
       expect(getSubscriptionCount(obj)).toBe(0);
     });
 
-    it('off(ε, listenerObject) clears both subscription shapes', () => {
+    it('off(ε, listenerFunc, context) narrows to that one context', () => {
+      const obj = eventize();
+      const listener = fake();
+      const ctx = {};
+      on(obj, 'foo', listener, ctx);
+      on(obj, 'foo', listener, {});
+      on(obj, 'foo', listener);
+      expect(getSubscriptionCount(obj)).toBe(3);
+
+      off(obj, listener, ctx);
+
+      expect(getSubscriptionCount(obj)).toBe(2);
+    });
+
+    it('off(ε, listenerFunc, null) is the two-argument form, not a narrowing one', () => {
+      const obj = eventize();
+      const listener = fake();
+      on(obj, 'foo', listener, {});
+      on(obj, 'foo', listener);
+      expect(getSubscriptionCount(obj)).toBe(2);
+
+      // A nullish listener object is what "none given" looks like on the way
+      // in, so this is off(ε, listener) — there is no spelling that reaches
+      // only the registration made without a context. The handle is.
+      off(obj, listener, null);
+
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('off(ε, listenerObject) clears every shape naming that object', () => {
       const obj = eventize();
       const listenerObject = {foo: fake(), handler: fake()};
       on(obj, 'foo', listenerObject);
       on(obj, 'bar', 'handler', listenerObject);
-      expect(getSubscriptionCount(obj)).toBe(2);
+      on(obj, 'baz', fake(), listenerObject);
+      // The object in the identity slot *and* a context beside it — the one
+      // shape neither half of the match used to cover.
+      on(obj, 'plah', listenerObject, {});
+      expect(getSubscriptionCount(obj)).toBe(4);
 
       off(obj, listenerObject);
 

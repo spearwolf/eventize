@@ -3,8 +3,8 @@
 ## v5 → v6
 
 Against the last released version, `v5.1.0` — and `v6.0.0` is the only
-`6.x` there is, so this is the whole jump. Thirteen breaking changes.
-Seven are runtime changes on signatures that don't change shape, so grep
+`6.x` there is, so this is the whole jump. Fourteen breaking changes.
+Eight are runtime changes on signatures that don't change shape, so grep
 for the call patterns rather than relying on the type checker to find
 affected sites. Six are type-only and surface as compile errors
 instead.
@@ -15,6 +15,24 @@ instead.
   retained values and retain policies intact. All of them now wipe the
   keeper too. Targeted forms — `off(ε, eventName)`, `off(ε, [names])`,
   `off(ε, eventName, listenerObject)` — are unchanged.
+- **`off(ε, listenerFunc)` no longer cares which context the subscription
+  was drawn under.** It used to match only registrations whose stored
+  context was `null`, so `on(ε, 'evt', this.handler, this)` survived
+  `off(ε, this.handler)` in silence and left the emitter holding both the
+  function and the context object. It now detaches every registration of
+  that function. The break runs the other way for shared prototype methods:
+  `off(ε, MyClass.prototype.onData)` now also detaches other instances that
+  drew the same method under their own context. Grep for two-argument
+  `off()` calls whose listener is a `this.`-bound or `.prototype.` method
+  and narrow them to `off(ε, fn, ctx)`, which stays exact on both halves.
+  A nullish third argument does not count as one: `off(ε, fn, null)` takes
+  the same broad branch, so nothing addresses only the contextless
+  registration any more — use the handle `on()` returned for that.
+  `off(ε, listenerObject)` widened along the same seam, one shape's worth:
+  it now also detaches `on(ε, name, obj, ctx)`, an object listener carrying
+  a context, which was the one shape it walked past. What it already swept
+  — the object alone, the method-name form, `on(ε, name, fn, obj)` — is
+  unchanged.
 - **`on()` and `once()` aggregate by listener identity.** A listener object
   subscribed to the same event at the same priority is one registration,
   however many `on()` and `once()` calls produced it and in whatever order.
@@ -170,11 +188,11 @@ remedy. Check with `npm ls @spearwolf/eventize`, fix with `npm dedupe` or an
 `overrides` / `resolutions` entry pinning `^6.0.0`. At runtime,
 `getEventizeProtocol(obj)` says which copy owns an object without throwing.
 
-Two more runtime changes ride along, both filed as **fixes** rather than
+Three more runtime changes ride along, all filed as **fixes** rather than
 breaking changes — one stopped dispatching to code the subscriber never
-wrote, the other made a call do the one thing its arguments ask for — but a
-`v5.1.0` consumer meets both in the same upgrade and neither is visible to
-the type checker:
+wrote, one turned a silent no-op into a throw, one made a call do the one
+thing its arguments ask for — but a `v5.1.0` consumer meets all three in the
+same upgrade and none of them is visible to the type checker:
 
 - **An event name that only matches an inherited `Object.prototype` member
   dispatches to nothing.** `toString`, `toLocaleString`, `valueOf`,
@@ -197,6 +215,18 @@ the type checker:
   or define the method on the target: a target's own method under that name
   dispatches as normal, unless it is literally an alias of
   `Object.prototype`'s function.
+- **`on(ε, [], …)` and `once(ε, [], …)` throw instead of registering
+  nothing.** An empty array of event names used to reach the same map that
+  turns each name into a registration, so zero names meant zero
+  registrations, silently: the call handed back an unsubscribe handle for
+  nothing, and `onceAsync(ε, [])` returned a promise that never settled — no
+  resolve, no reject, a dangling `await` for the emitter's lifetime. All
+  three now throw `subscribeTo() called with insufficient arguments`
+  (`Error.cause: 'empty-names'`), atomically, before anything is registered.
+  The empty array is rarely a literal in working code, so the place to look
+  is a runtime-assembled name list that can come out empty — check `.length`
+  before subscribing, the same way a bulk `off([...])` needs guarding against
+  a nullish element.
 - **`off(ε, '*', listenerObject)` now detaches that object's wildcard
   subscriptions.** It used to remove nothing and report nothing: `off()`
   routes a name-plus-object pair into the named buckets, and a wildcard

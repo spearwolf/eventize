@@ -171,7 +171,16 @@ compile time) or an explicit `isEventized()` guard.
     position, tuples included, and a `NaN` inside `on(ε, ['a', ['b', NaN]], fn)`
     registers nothing at all. `Priority.Max` / `Priority.Min` (`±Infinity`) and `0`
     stay valid — the test is `Number.isNaN`.
-15. **The event name `'emit'` collides with the fallback method.** On a target with
+15. **`off(ε, fn)` ignores the context a subscription was drawn under** (since
+    v6.0.0). It detaches every registration of that function, `on(ε, name, fn,
+    ctx)` included — so a teardown calling `off(ε, MyClass.prototype.onData)`
+    also unsubscribes every other instance that drew the same prototype method
+    under its own context. `off(ε, fn, ctx)` stays exact and is the way to name
+    one of them; the handle `on()` returned is the way to name none of them. Up
+    to v5.1.0 the two-argument form matched only registrations whose context was
+    `null`, which failed the other way round — silently leaving the emitter
+    holding both the function and the context object.
+16. **The event name `'emit'` collides with the fallback method.** On a target with
     its own `.emit`, `emit(obj, 'emit', ...args)` calls `obj.emit(...args)`
     instead of `obj.emit('emit', ...args)` — the object's method matches in stage 1,
     so the fallback is never reached. The listener sees only the trailing args, not

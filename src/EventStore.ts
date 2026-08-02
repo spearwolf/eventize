@@ -667,6 +667,43 @@ export class EventStore {
    * `(listener, listenerObject)` pair, plus — for an object argument — the
    * nameless association, which reduces to `listenerObject` identity because
    * the event-name half of the association test can never fire without a name.
+   *
+   * How much of that pair has to match depends on how much of it the caller
+   * gave. `off(ε, fn, ctx)` names both halves and gets both compared. An
+   * `off()` with no listener object at all — `listenerObject` arrives
+   * `undefined` from `off()`, `null` from `remove()`'s array branch and from
+   * an explicit `off(ε, fn, null)` — asks about the listener alone, and since
+   * v6.0.0 that is what it is answered: the stored context is not part of a
+   * question the caller did not ask. There is therefore no spelling left that
+   * matches *only* a contextless registration; the handle `on()` returned is
+   * what addresses one registration and nothing else.
+   *
+   * Up to v5.1.0 the missing half was read as "registered with no context",
+   * so `on(ε, 'evt', this.handler, this)` survived `off(ε, this.handler)`
+   * without a word and kept both the function and the context object alive on
+   * an emitter the caller believed it had let go of. The narrow reading was
+   * deliberate, and the broad one is not free either: a teardown calling
+   * `off(ε, SomeClass.prototype.handler)` now detaches every *other* instance
+   * that drew the same prototype method under its own context. That price is
+   * accepted knowingly. An unsubscribe that silently removes nothing is the
+   * worse of the two failures — nothing about it is observable until someone
+   * measures what the emitter still holds — and `off(ε, fn, ctx)` is the way
+   * to name one registration, which is the whole point of keeping the
+   * three-argument form exact.
+   *
+   * An object argument reads the same way, and that is a decision rather than
+   * a side effect — an `&& !isObjectListener` on the test above would have
+   * held `off(ε, obj)` back, though only written `isEqual(listener,
+   * listenerObject ?? null)`: `isEqual()` lost its `null` default in the same
+   * change, so the exemption on its own would have asked the object-alone
+   * form about `undefined` and matched nothing at all. The rule is worth more
+   * than the exemption: the identity slot alone decides whenever the caller
+   * names no second argument, for a function and an object alike, so there is
+   * one sentence to know instead of two. What `off(ε, obj)` gains by it is the
+   * one shape it used to walk past, `on(ε, 'evt', obj, ctx)`, which files the
+   * object in the identity slot and something else in the context slot —
+   * "every subscription of that object" is what the call has always promised.
+   * The association disjunct below is untouched.
    */
   private detachByIdentity(
     eventName: EventName,
@@ -675,12 +712,15 @@ export class EventStore {
     listenerObject: unknown,
     isObjectListener: boolean,
   ): ListenerBucket {
+    const matchListenerOnly = listenerObject == null;
     let target = bucket;
     for (let i = bucket.length - 1; i >= 0; i--) {
       const current = bucket[i];
       if (
         current !== undefined &&
-        (current.isEqual(listener, listenerObject) ||
+        ((matchListenerOnly
+          ? current.listener === listener
+          : current.isEqual(listener, listenerObject)) ||
           (isObjectListener && current.listenerObject === listener))
       ) {
         if (target === bucket) {

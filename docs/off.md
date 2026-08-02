@@ -13,9 +13,9 @@
 | `off(emitter, '*')`                       | Same as above — all listeners (named and wildcard), all retained state. |
 | `off(emitter, eventName)`                 | Unsubscribes all listeners registered *for that name* (string or symbol), and unretains it. Wildcard listeners are not touched and keep seeing the event. |
 | `off(emitter, [eventName1, eventName2])`  | Same, for several events at once. A `'*'`, `null` or `undefined` anywhere in the array makes it the bulk form. |
-| `off(emitter, listenerFunc)`              | Unsubscribes a listener function that was registered **without** a context, from all events. |
-| `off(emitter, listenerFunc, context)`     | Unsubscribes a listener function registered with exactly that context. The context is part of the match key, not a filter on the row above — neither row matches the other's registrations. |
-| `off(emitter, listenerObject)`            | Unsubscribes every subscription associated with that object: the object-alone shape, the method-name shape, and the function-with-context shape `on(ε, name, fn, obj)`, whose context sits in the same slot. |
+| `off(emitter, listenerFunc)`              | Unsubscribes that listener function from all events — every registration of it, whatever context it was drawn under, `on(ε, name, fn, ctx)` included. |
+| `off(emitter, listenerFunc, context)`     | Unsubscribes that function only where it was registered with exactly that context. The narrowing form of the row above, and the one to reach for when the context matters. |
+| `off(emitter, listenerObject)`            | Unsubscribes every subscription associated with that object: the object-alone shape, the method-name shape, the function-with-context shape `on(ε, name, fn, obj)`, and — since v6.0.0 — the object-with-a-context shape `on(ε, name, obj, ctx)`. |
 | `off(emitter, eventName, listenerObject)` | Unsubscribes a listener object from a specific event only — but still unretains that event, whole, even if other listeners for it survive, and even if it detached nothing. |
 | `off(emitter, [eventName, …], listenerObject)` | **Nothing at all** — a complete no-op on listeners *and* retained state. Use `off(emitter, [names])` without the object, or `unretain(emitter, [names])`. |
 | `off(emitter, '*', listenerObject)`       | Unsubscribes a listener object from the **wildcard** bucket only. Named subscriptions of the same object stay, and retained state is untouched. |
@@ -122,6 +122,32 @@ off(ε, listener);       // removes it from ALL events
 emit(ε, 'foo'); // => "I will stay"
 emit(ε, 'bar'); // (nothing happens)
 ```
+
+Since v6.0.0 the context a subscription was drawn under is no part of this match. A function registered as `on(ε, 'foo', handler, ctx)` is removed by `off(ε, handler)` just like one registered without a context, and one function drawn under several contexts loses all of them at once:
+
+```javascript
+const ε = eventize();
+const handler = function () {
+  console.log('called on', this.name);
+};
+const a = {name: 'a'};
+const b = {name: 'b'};
+
+on(ε, 'foo', handler, a);
+on(ε, 'foo', handler, b);
+
+off(ε, handler); // both go
+```
+
+Up to v5.1.0 only the contextless registrations matched, so the two calls above survived an `off(ε, handler)` without a word — and the emitter went on holding the function and both context objects. Name the context to narrow the removal back to one subscription:
+
+```javascript
+off(ε, handler, a); // b's registration stays
+```
+
+That is the form to use in a teardown that shares a prototype method across instances: `off(ε, MyComponent.prototype.onData)` now detaches every instance's subscription, `off(ε, this.onData, this)` only its own.
+
+The context has to be a real value to narrow anything. `off(ε, handler, null)` and `off(ε, handler, undefined)` are the two-argument form spelled with a placeholder — a nullish third argument *is* "no listener object given" — so neither is a way to address only the registration made without a context. Nothing addresses that one on its own any more; keep the `unsubscribe` handle `on()` returned when a single registration has to be removed and no other, since it removes exactly what it created and asks no identity question at all.
 
 > [!NOTE]
 > There is no index from a listener back to the event names it is registered under, so `off(ε, listenerFunc)`, `off(ε, listenerFunc, context)` and `off(ε, listenerObject)` all scan every event name the emitter has ever seen to find where it sits — roughly 11 ns per registered event name, per call, regardless of how many of those names the listener actually holds a subscription for. Negligible for the usual handful of names; worth knowing if a hot teardown path calls one of these forms against an emitter carrying many distinct names. `unsubscribe()` handles and the event-name forms of `off()` don't pay this — they already know where to look.

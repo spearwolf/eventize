@@ -98,9 +98,9 @@ The same boundary applies to the duck-typed `emit()` path on non-eventized targe
 | `off(ε, '*')` | every listener, named and wildcard, **and** all retained state |
 | `off(ε, eventName)` | all listeners for that event, **and** its retain value + policy |
 | `off(ε, [name1, name2])` | as above for several events; strings and symbols alike. A `'*'`, `null` or `undefined` anywhere in the array makes it the bulk form — everything goes, listeners and retained state |
-| `off(ε, listenerFunc)` | that function, across all events |
-| `off(ε, listenerFunc, ctx)` | that function bound to that context |
-| `off(ε, listenerObject)` | every subscription of that object |
+| `off(ε, listenerFunc)` | that function, across all events and under every context it was registered with — `on(ε, name, fn, ctx)` included. Since v6.0.0; before that a context-bound registration survived |
+| `off(ε, listenerFunc, ctx)` | that function, only where it was registered with exactly that context — the narrowing form of the row above. A nullish `ctx` narrows nothing: it *is* the row above, so no spelling reaches only the contextless registration; the `on()` handle is what addresses a single one |
+| `off(ε, listenerObject)` | every subscription of that object — object alone, method name, `on(ε, name, fn, obj)`, and, since v6.0.0, `on(ε, name, obj, ctx)` |
 | `off(ε, [name, …], listenerObject)` | **nothing** — a complete no-op on listeners *and* retained state. Use `off(ε, [names])` without the object, or `unretain(ε, [names])` |
 | `off(ε, eventName, listenerObject)` | that object, on that event only — **and** the event's retain value + policy, even when sibling listeners for the name survive |
 | `off(ε, '*', listenerObject)` | that object's **wildcard** subscription only — named subscriptions of the same object survive, and retained state is untouched (`'*'` can never carry any). Since v6.0.0; before that it removed nothing at all |

@@ -9,12 +9,12 @@ to grep for and what to write instead.
 ## v5 → v6
 
 `v6.0.0` is the only `6.x` there is, so a `v5.1.0` consumer takes the whole jump
-at once. Thirteen breaking changes. Seven are runtime changes on signatures that
+at once. Fourteen breaking changes. Eight are runtime changes on signatures that
 do not change shape, so the type checker will not find the call sites for you —
 grep for the patterns below where one is given. Six are type-only and do surface
 as compile errors.
 
-Two further changes are filed as fixes rather than breaks, but a v5 consumer
+Three further changes are filed as fixes rather than breaks, but a v5 consumer
 meets them in the same install; they are at the end.
 
 ### Dedupe `@spearwolf/eventize` before you install v6
@@ -99,6 +99,56 @@ off(
 
 `off(ε, undefined)` was never a no-op — it has always taken the same branch as
 the bare `off(ε)`. What changed is that the branch now empties the keeper too.
+
+### `off(ε, listenerFunc)` no longer cares which context it was drawn under
+
+```js
+// v5 — the context-bound registration survived, silently
+on(ε, 'evt', this.handler, this);
+off(ε, this.handler);
+getSubscriptionCount(ε); // => 1, and this.handler kept firing
+
+// v6 — the function is the whole question
+on(ε, 'evt', this.handler, this);
+off(ε, this.handler);
+getSubscriptionCount(ε); // => 0
+```
+
+Up to v5.1.0 the two-argument form matched only registrations whose stored
+context was `null`, so an emitter went on holding both the function and the
+context object after a teardown that read as complete. It now matches the
+function alone, whatever context — if any — it was registered with.
+
+The direction of the break is the other way round: an `off()` that used to
+remove one subscription can now remove several. It bites where the same
+function reaches the emitter under several contexts, which in practice means a
+prototype method shared by several instances:
+
+```
+rg "off\([^,)]+,\s*[^,)]+\.prototype\." src/
+rg "off\(\s*\w+,\s*(this|self)\.[\w.]+\s*\)" src/
+```
+
+The replacement is the three-argument form, which stays exact on both halves —
+listener *and* context — and is now the only way to say "this one
+registration":
+
+```js
+off(ε, this.handler, this); // detaches this instance's subscription only
+```
+
+`off(ε, listenerObject)` widened along the same seam, one shape's worth: the
+identity slot alone decides there too, so it now also detaches
+`on(ε, name, obj, ctx)` — an object listener carrying a context, which was the
+one shape it used to walk past. Everything it already swept (the object alone,
+the method-name form, and `on(ε, name, fn, obj)`) is unchanged.
+
+There is no longer a spelling that removes *only* a registration made without a
+context: `off(ε, fn, null)` and `off(ε, fn, undefined)` both take the
+two-argument branch, since a nullish third argument is exactly what "no
+listener object given" means. Keep the handle `on()` returned when a single
+registration has to be addressed on its own — it never asks an identity
+question at all.
 
 ### Unsubscribe handles are single-shot
 
@@ -323,9 +373,9 @@ interface, which is the whole reason the base class stopped declaring its own.
   nothing instead of throwing. Only reachable by constructing the class
   yourself, which the package no longer exports in either namespace.
 
-### Two fixes that behave like breaks
+### Three fixes that behave like breaks
 
-Neither is visible to the type checker, and both change what runs.
+None of them is visible to the type checker, and all three change what runs.
 
 **Event names inherited from `Object.prototype` dispatch to nothing.**
 `toString`, `toLocaleString`, `valueOf`, `constructor`, `hasOwnProperty`,

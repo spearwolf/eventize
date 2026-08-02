@@ -259,7 +259,11 @@ export class EventListener {
    *
    * One shape: the `(listener, listenerObject)` pair a subscription was
    * registered with. The sole caller is `EventStore.removeByListener()`, the
-   * last fall-through in `EventStore.remove()`.
+   * last fall-through in `EventStore.remove()`, and since v6.0.0 it only asks
+   * when the caller actually named a listener object — `off(ε, fn)` compares
+   * the listener alone, at the call site. Hence no default for the second
+   * parameter any more: the one caller that used to lean on it was the one
+   * that no longer comes here.
    *
    * There used to be three more, all deleted for the same reason — no reachable
    * caller could ever take them. A match on the numeric `id` let
@@ -275,7 +279,7 @@ export class EventListener {
    * registration back through `EventStore.release()` instead, so an
    * `EventListener` instance never reaches `remove()` to begin with.
    */
-  isEqual(listener: unknown, listenerObject: unknown = null): boolean {
+  isEqual(listener: unknown, listenerObject: unknown): boolean {
     return this.listener === listener && this.listenerObject === listenerObject;
   }
 
