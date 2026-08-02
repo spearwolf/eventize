@@ -741,6 +741,26 @@ export function emit(
   }
 }
 
+const ignoreRejection = () => {
+  // deliberately empty: the point is owning the rejection, not reacting to it
+};
+
+// Claims the values an aborted emitAsync() dispatch left behind, so none of
+// them can be reported as an unhandled rejection. The array case is unwrapped
+// the same way the aggregation unwraps it, because a listener that returned an
+// array of promises hides its rejections one level down. Non-promise values
+// cost a throwaway wrapper each; this runs only on the error path, where the
+// aggregation is already lost.
+const markCollectedAsHandled = (values: any[]) => {
+  for (const val of values) {
+    if (Array.isArray(val)) {
+      for (const item of val) Promise.resolve(item).catch(ignoreRejection);
+    } else {
+      Promise.resolve(val).catch(ignoreRejection);
+    }
+  }
+};
+
 export function emitAsync<
   TEvents extends EventMap,
   K extends EventKeysOf<TEvents> | symbol,
@@ -772,10 +792,25 @@ export function emitAsync(
   const returnValue = (val: unknown) => {
     values.push(val);
   };
-  if (isEventized(target)) {
-    _emit(target, eventNames, args, returnValue);
-  } else if (isDuckTarget(target)) {
-    _duckEmit(target, eventNames, args, returnValue);
+  try {
+    if (isEventized(target)) {
+      _emit(target, eventNames, args, returnValue);
+    } else if (isDuckTarget(target)) {
+      _duckEmit(target, eventNames, args, returnValue);
+    }
+  } catch (err) {
+    // The dispatch aborted mid-walk: a later listener threw, or a '*' inside an
+    // event name array was rejected after the preceding names had already run.
+    // Whatever is in `values` at that point never reaches the aggregation
+    // below, and `values` is a local — nothing outside can attach a handler to
+    // a promise sitting in it. A rejected one would be reported as unhandled
+    // and, under Node's default --unhandled-rejections=throw, tear down the
+    // process even though the caller caught the synchronous throw correctly.
+    // Both dispatch paths feed the same collector, so both are covered here.
+    markCollectedAsHandled(values);
+    // Rethrown unchanged — same error, same stack, no wrapping and no cause.
+    // The throw belongs to the listener, not to emitAsync().
+    throw err;
   }
   // `Promise.resolve(undefined)`, not the argument-less `Promise.resolve()`:
   // the latter is `Promise<void>`, and the declared `Promise<any[] | undefined>`

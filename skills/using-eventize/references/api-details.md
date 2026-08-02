@@ -131,7 +131,7 @@ const values = await emitAsync(ε, 'load')
 
 A listener that throws synchronously aborts the dispatch in both functions. In `emitAsync` that throw leaves the call *synchronously* — the function is not `async`, and the dispatch runs before any promise is built — so it is not a rejected promise and `.catch()` on the result cannot see it. Wrap the call, not only the `await`. A listener returning a rejected promise only rejects the awaited result of `emitAsync` — by then every listener has already run, since invocation is synchronous.
 
-**Do not mix the two in one dispatch.** `emitAsync` builds its aggregation only after the dispatch returns, so a synchronous throw — from a listener, or from `'*'` inside a name array — leaves every promise already collected with no handler attached. Node's default `--unhandled-rejections=throw` terminates the process on that, even though the caller caught the synchronous error. The collected values are a local variable, so nothing outside can attach a handler: keep promise-returning and throwing listeners on separate events, or wrap the throwing one in `try/catch`.
+**Mixing the two in one dispatch costs the collected values.** `emitAsync` builds its aggregation only after the dispatch returns, so a synchronous throw — from a listener, or from `'*'` inside a name array — never reaches it. The caller gets the throw and nothing else: every value collected up to that point is dropped, and a rejection among them is claimed on the way out, so it is neither reported as unhandled nor observable. Wrap a throwing listener in `try/catch` if the values before it matter.
 
 ## The marker slot and its protocol
 

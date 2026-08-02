@@ -620,8 +620,8 @@ console.log(calls); // => ["first"]
 > [!NOTE]
 > `emitAsync()` aggregates listener return values into a single `Promise.all`. A listener returning a **rejected promise** rejects the awaited result, but the other listeners — being dispatched synchronously — have already run by then. A listener that throws synchronously still aborts dispatch in the same way as with `emit()`.
 
-> [!WARNING]
-> Do not mix the two in one dispatch. The aggregation is built *after* the dispatch returns, so a synchronous throw — from a listener, or from `'*'` inside a name array — leaves every promise already collected with no handler attached. Node's default `--unhandled-rejections=throw` then terminates the process even though the caller caught the synchronous error, and a browser fires `unhandledrejection`. There is no way to reach those promises from outside; keep promise-returning and throwing listeners on separate events, or wrap the throwing one in `try/catch`.
+> [!NOTE]
+> Mixing the two in one dispatch costs the collected values. The aggregation is built *after* the dispatch returns, so a synchronous throw — from a listener, or from `'*'` inside a name array — never reaches it: the caller gets the throw and nothing else. Every value collected up to that point is dropped, and any rejection among them is discarded along with it, so no `unhandledrejection` fires and Node's default `--unhandled-rejections=throw` has nothing to terminate on. What a listener already returned is unrecoverable, though — wrap a throwing listener in `try/catch` if the values before it matter.
 
 ---
 
