@@ -20,6 +20,19 @@ export function asEventized<T extends object>(obj: T): T & EventizedObject {
     return obj;
   }
 
+  if (obj === null || (typeof obj !== 'object' && typeof obj !== 'function')) {
+    // `Object.isExtensible()` below returns `false` for every primitive, so
+    // without this precondition `eventize(42)` fell into that branch and
+    // blamed freezing for a value that was never an object to begin with —
+    // advice that does not fit the caller's actual mistake. Checked after the
+    // `isEventized()` guard above (a foreign marker on a non-object is not
+    // reachable anyway) and before `Object.isExtensible()`, so that check
+    // keeps its one job: objects and functions that cannot be extended.
+    throw new TypeError(
+      `eventize() cannot attach to ${obj === null ? 'null' : `a value of type '${typeof obj}'`} — eventize needs an object or a function to attach to`,
+    );
+  }
+
   if (!Object.isExtensible(obj)) {
     // `Object.isExtensible()` covers `Object.freeze()`, `Object.seal()` and
     // `Object.preventExtensions()` alike — the native `TypeError` that
