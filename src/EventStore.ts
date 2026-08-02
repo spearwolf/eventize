@@ -139,6 +139,63 @@ const isSimilar = (
 };
 
 /**
+ * The callback a walk dispatches to, plus three context slots the walk carries
+ * from the caller through to the callback untouched.
+ *
+ * The slots exist so that callback can be a module-level function. An arrow
+ * built per emit captures what it needs and then escapes into the walk, where
+ * V8 cannot scalar-replace it, so every dispatch reaching at least one listener
+ * allocated a closure — two thirds of everything an `emit()` allocated.
+ *
+ * This is the *internal* shape of the hand-off, and `any` is what it costs.
+ * `unknown` is not available: a parameter type is checked contravariantly, so
+ * it would make every precisely typed callback unassignable. A generic
+ * `<A, B, C>` is — but only on the outside: inside the body the optional
+ * parameters read as `A | undefined` and no longer fit the callback's `A`, so a
+ * generic implementation buys its checking back with three casts. `forEach()`
+ * therefore declares the generic signature and implements it against this one:
+ * callers get the slots matched against the callback they passed (a swapped
+ * pair is rejected), while the walk itself carries values it never reads.
+ */
+type WalkCallback = (
+  listener: EventListener,
+  a?: any,
+  b?: any,
+  c?: any,
+) => void;
+
+/**
+ * Walks one bucket, for the dispatch that has only one. A module-level function
+ * for the same reason as `mergeWalk()` below — `forEach()` is close enough to
+ * TurboFan's inlining budget that neither loop belongs in its body.
+ *
+ * An index loop rather than `Array.prototype.forEach`, which hands its callback
+ * `(element, index, array)` and would land the index in the first context slot.
+ * The length is read once up front, which is safe for the same reason it is in
+ * `mergeWalk()`: the walk holds this array, so a mutation from inside `fn`
+ * clones the bucket and leaves this one alone. The `undefined` guard keeps the
+ * builtin's behaviour on a holey bucket — the hole is skipped in silence here,
+ * while `mergeWalk()` throws on one. It differs on one case the builtin would
+ * have visited, an element that really is `undefined`, which no bucket can hold:
+ * only `EventListener` instances ever go in.
+ */
+const walkBucket = (
+  listeners: Array<EventListener>,
+  fn: WalkCallback,
+  a?: any,
+  b?: any,
+  c?: any,
+): void => {
+  const len = listeners.length;
+  for (let i = 0; i < len; i++) {
+    const listener = listeners[i];
+    if (listener !== undefined) {
+      fn(listener, a, b, c);
+    }
+  }
+};
+
+/**
  * Interleaves a named bucket with the wildcard bucket by descending priority,
  * for the dispatch that has both. A module-level function rather than a branch
  * inside `forEach()`, and that placement is measured, not cosmetic: `forEach()`
@@ -162,7 +219,10 @@ const isSimilar = (
 const mergeWalk = (
   named: Array<EventListener>,
   wildcards: Array<EventListener>,
-  fn: (listener: EventListener) => void,
+  fn: WalkCallback,
+  a?: any,
+  b?: any,
+  c?: any,
 ): void => {
   const iLen = named.length;
   const jLen = wildcards.length;
@@ -177,12 +237,12 @@ const mergeWalk = (
       cur !== undefined &&
       (other === undefined || cur.priority >= other.priority)
     ) {
-      fn(cur);
+      fn(cur, a, b, c);
       ++i;
       continue;
     }
     if (other !== undefined) {
-      fn(other);
+      fn(other, a, b, c);
       ++j;
     } else {
       // cur/other read as undefined here for one of two reasons: the loop is
@@ -777,7 +837,30 @@ export class EventStore {
     }
   }
 
-  forEach(eventName: EventName, fn: (listener: EventListener) => void): void {
+  /**
+   * Walks the listeners for `eventName` in dispatch order and hands each one to
+   * `fn`, together with `a`, `b` and `c` unchanged — see `WalkCallback` for why
+   * the context travels as arguments rather than in a closure.
+   *
+   * The three slots are typed against the callback's own parameters, so passing
+   * them in the wrong order is a compile error rather than a listener called
+   * with its arguments shuffled. A callback that declares fewer parameters —
+   * every spec in this repo — leaves them unconstrained and may omit them.
+   */
+  forEach<A, B, C>(
+    eventName: EventName,
+    fn: (listener: EventListener, a: A, b: B, c: C) => void,
+    a?: A,
+    b?: B,
+    c?: C,
+  ): void;
+  forEach(
+    eventName: EventName,
+    fn: WalkCallback,
+    a?: any,
+    b?: any,
+    c?: any,
+  ): void {
     // The walk runs over the *live* buckets. Up to v5.1.0 it copied them
     // first, which protected it against a listener subscribing or
     // unsubscribing from inside its own callback — at the price of one
@@ -814,7 +897,7 @@ export class EventStore {
       // exit tell the store the outer one is over.
       wildcards[HELD_BY] += 1;
       try {
-        wildcards.forEach(fn);
+        walkBucket(wildcards, fn, a, b, c);
       } finally {
         // From a `finally`, because a listener that throws must not leave a
         // dead walk counted in — every later mutation of that bucket would
@@ -828,9 +911,9 @@ export class EventStore {
     if (wildcards !== undefined) wildcards[HELD_BY] += 1;
     try {
       if (wildcards === undefined) {
-        named.forEach(fn);
+        walkBucket(named, fn, a, b, c);
       } else {
-        mergeWalk(named, wildcards, fn);
+        mergeWalk(named, wildcards, fn, a, b, c);
       }
     } finally {
       named[HELD_BY] -= 1;

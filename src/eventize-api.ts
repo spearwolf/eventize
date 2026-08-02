@@ -121,6 +121,22 @@ const makeOnceUnsubscribe = (
   };
 };
 
+/**
+ * The dispatch callback, at module level and capturing nothing. Everything it
+ * needs arrives as an argument, because `store.forEach()` carries the context
+ * through the walk for exactly this purpose: an arrow built here per emit would
+ * escape into the walk and allocate a JSFunction plus context on every dispatch
+ * that reaches a listener.
+ */
+const applyListener = (
+  listener: EventListener,
+  eventName: EventName,
+  args: EventArgs,
+  returnValue?: (val: unknown) => void,
+) => {
+  listener.apply(eventName, args, returnValue);
+};
+
 const _emitOne = (
   eventizedObj: EventizedObject,
   eventName: EventName,
@@ -133,9 +149,7 @@ const _emitOne = (
     );
   }
   const {store, keeper} = internalsOf(eventizedObj);
-  store.forEach(eventName, (listener) =>
-    listener.apply(eventName, args, returnValue),
-  );
+  store.forEach(eventName, applyListener, eventName, args, returnValue);
   keeper.retain(eventName, args);
 };
 
