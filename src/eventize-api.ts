@@ -247,13 +247,20 @@ const isBulkRemoval = (listener: unknown): boolean =>
 // ---------------------------------------------------------------------------
 // on() — overloads ordered specific → generic.
 //
-// 1a/1b are the typed forms that bind when an explicit event-map generic
-// is in scope. The fallback overloads (1)–(4) carry a generic `T extends
-// object` whose `obj` parameter is `NonTypedEmitter<T>` — that conditional
-// resolves to `never` for typed emitters, forcing them through the typed
-// overloads (so wrong event names fail to compile) while still accepting
-// plain objects, arbitrary `object` references, and untyped emitters
-// (where the event map is the permissive default).
+// 1a/1b/1c, 2t and 4t are the typed forms that bind when an explicit
+// event-map generic is in scope. The fallback overloads (1)–(4) carry a
+// generic `T extends object` whose `obj` parameter is `NonTypedEmitter<T>` —
+// that conditional resolves to `never` for typed emitters, forcing them
+// through the typed overloads (so wrong event names fail to compile) while
+// still accepting plain objects, arbitrary `object` references, and untyped
+// emitters (where the event map is the permissive default).
+//
+// Because the guard sits on `obj` rather than on an event-name slot, closing
+// the loose set for a typed emitter closes *all* of it — including forms with
+// no event name in them, which have no typo to guard against. The 2t and 4t
+// groups are what puts those back, and they are mirrors of the same two groups
+// in `SubscribeFunc`: what one says the other says. Diverge here and the three
+// API surfaces start disagreeing at a new place.
 // ---------------------------------------------------------------------------
 
 // (1a) typed listener function for a known event key (or any symbol)
@@ -274,6 +281,25 @@ export function on<
   priority: number,
   listener: ListenerFor<TEvents, K>,
 ): UnsubscribeFunc;
+export function on<
+  TEvents extends EventMap,
+  K extends EventKeysOf<TEvents> | symbol,
+>(
+  obj: EventizedObject<TEvents>,
+  eventName: K,
+  listener: ListenerFor<TEvents, K>,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function on<
+  TEvents extends EventMap,
+  K extends EventKeysOf<TEvents> | symbol,
+>(
+  obj: EventizedObject<TEvents>,
+  eventName: K,
+  priority: number,
+  listener: ListenerFor<TEvents, K>,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
 // (1c) typed array of event names — common-listener form. Elements may carry
 // their own priority as a [name, priority] tuple, mixed freely with bare names.
 export function on<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
@@ -287,10 +313,71 @@ export function on<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
   priority: number,
   listener: (...args: MultiArgsFor<TEvents, K>) => void,
 ): UnsubscribeFunc;
+// (2t) the method-name and listener-object forms with a checked event name.
+export function on<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
+  obj: EventizedObject<TEvents>,
+  eventNames: K | K[],
+  methodName: EventName,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function on<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
+  obj: EventizedObject<TEvents>,
+  eventNames: K | K[],
+  priority: number,
+  methodName: EventName,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function on<TEvents extends EventMap, K extends EventKeysOf<TEvents>, L>(
+  obj: EventizedObject<TEvents>,
+  eventNames: K | K[],
+  listenerObject: ListenerObjectSlot<L>,
+  listenerContext?: ListenerObjectType,
+): UnsubscribeFunc;
+export function on<TEvents extends EventMap, K extends EventKeysOf<TEvents>, L>(
+  obj: EventizedObject<TEvents>,
+  eventNames: K | K[],
+  priority: number,
+  listenerObject: ListenerObjectSlot<L>,
+  listenerContext?: ListenerObjectType,
+): UnsubscribeFunc;
 // (1b) typed listener-object (method names = event names)
 export function on<TEvents extends EventMap>(
   obj: EventizedObject<TEvents>,
   listenerObject: EventListenerMethods<TEvents>,
+): UnsubscribeFunc;
+// (4t) the catch-all forms for a typed emitter — the mirror of the (4) group
+// in `SubscribeFunc`, which carries no guard because a call with no event name
+// has no typo to guard against. The one arm deliberately not mirrored is the
+// bare two-argument `on(ε, listenerObject)`: (1b) above owns it and checks the
+// method names against the map, which is the one place the standalone spelling
+// is stricter than `ε.on()` and stays that way.
+export function on<TEvents extends EventMap>(
+  obj: EventizedObject<TEvents>,
+  listener: ListenerFuncType,
+  listenerObject?: ListenerObjectType,
+): UnsubscribeFunc;
+export function on<TEvents extends EventMap>(
+  obj: EventizedObject<TEvents>,
+  priority: number,
+  listener: ListenerFuncType,
+  listenerObject?: ListenerObjectType,
+): UnsubscribeFunc;
+export function on<TEvents extends EventMap>(
+  obj: EventizedObject<TEvents>,
+  priority: number,
+  methodName: EventName,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function on<TEvents extends EventMap, L>(
+  obj: EventizedObject<TEvents>,
+  listenerObject: ListenerObjectSlot<L>,
+  listenerContext: ListenerObjectType,
+): UnsubscribeFunc;
+export function on<TEvents extends EventMap, L>(
+  obj: EventizedObject<TEvents>,
+  priority: number,
+  listenerObject: ListenerObjectSlot<L>,
+  listenerContext?: ListenerObjectType,
 ): UnsubscribeFunc;
 // (1) listener function with event name(s)
 export function on<T extends object>(
@@ -436,6 +523,25 @@ export function once<
   priority: number,
   listener: ListenerFor<TEvents, K>,
 ): UnsubscribeFunc;
+export function once<
+  TEvents extends EventMap,
+  K extends EventKeysOf<TEvents> | symbol,
+>(
+  obj: EventizedObject<TEvents>,
+  eventName: K,
+  listener: ListenerFor<TEvents, K>,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function once<
+  TEvents extends EventMap,
+  K extends EventKeysOf<TEvents> | symbol,
+>(
+  obj: EventizedObject<TEvents>,
+  eventName: K,
+  priority: number,
+  listener: ListenerFor<TEvents, K>,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
 // (1c) typed array of event names — common-listener form. Elements may carry
 // their own priority as a [name, priority] tuple, mixed freely with bare names.
 export function once<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
@@ -449,10 +555,75 @@ export function once<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
   priority: number,
   listener: (...args: MultiArgsFor<TEvents, K>) => void,
 ): UnsubscribeFunc;
+// (2t) the method-name and listener-object forms with a checked event name.
+export function once<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
+  obj: EventizedObject<TEvents>,
+  eventNames: K | K[],
+  methodName: EventName,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function once<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
+  obj: EventizedObject<TEvents>,
+  eventNames: K | K[],
+  priority: number,
+  methodName: EventName,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function once<
+  TEvents extends EventMap,
+  K extends EventKeysOf<TEvents>,
+  L,
+>(
+  obj: EventizedObject<TEvents>,
+  eventNames: K | K[],
+  listenerObject: ListenerObjectSlot<L>,
+  listenerContext?: ListenerObjectType,
+): UnsubscribeFunc;
+export function once<
+  TEvents extends EventMap,
+  K extends EventKeysOf<TEvents>,
+  L,
+>(
+  obj: EventizedObject<TEvents>,
+  eventNames: K | K[],
+  priority: number,
+  listenerObject: ListenerObjectSlot<L>,
+  listenerContext?: ListenerObjectType,
+): UnsubscribeFunc;
 // (1b) typed listener-object (method names = event names)
 export function once<TEvents extends EventMap>(
   obj: EventizedObject<TEvents>,
   listenerObject: EventListenerMethods<TEvents>,
+): UnsubscribeFunc;
+// (4t) the catch-all forms for a typed emitter — see the same group on `on()`
+// for why the bare two-argument listener-object form is not among them.
+export function once<TEvents extends EventMap>(
+  obj: EventizedObject<TEvents>,
+  listener: ListenerFuncType,
+  listenerObject?: ListenerObjectType,
+): UnsubscribeFunc;
+export function once<TEvents extends EventMap>(
+  obj: EventizedObject<TEvents>,
+  priority: number,
+  listener: ListenerFuncType,
+  listenerObject?: ListenerObjectType,
+): UnsubscribeFunc;
+export function once<TEvents extends EventMap>(
+  obj: EventizedObject<TEvents>,
+  priority: number,
+  methodName: EventName,
+  listenerObject: ListenerObjectType,
+): UnsubscribeFunc;
+export function once<TEvents extends EventMap, L>(
+  obj: EventizedObject<TEvents>,
+  listenerObject: ListenerObjectSlot<L>,
+  listenerContext: ListenerObjectType,
+): UnsubscribeFunc;
+export function once<TEvents extends EventMap, L>(
+  obj: EventizedObject<TEvents>,
+  priority: number,
+  listenerObject: ListenerObjectSlot<L>,
+  listenerContext?: ListenerObjectType,
 ): UnsubscribeFunc;
 // (1) listener function with event name(s)
 export function once<T extends object>(

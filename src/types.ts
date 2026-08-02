@@ -385,6 +385,22 @@ export interface SubscribeFunc<TEvents extends EventMap = DefaultEventMap> {
     priority: number,
     listener: ListenerFor<TEvents, K>,
   ): UnsubscribeFunc;
+  // The same two with the trailing context object. It is the fourth slot of
+  // the dedup tuple and the key `off(ε, fn, ctx)` removes by, so a typed map
+  // losing the spelling loses the narrow removal with it. The listener stays
+  // checked against the event; only the context is loose, the way the
+  // listener-object arms below leave everything after the name loose.
+  <K extends EventKeysOf<TEvents> | symbol>(
+    eventName: K,
+    listener: ListenerFor<TEvents, K>,
+    listenerObject: ListenerObjectType,
+  ): UnsubscribeFunc;
+  <K extends EventKeysOf<TEvents> | symbol>(
+    eventName: K,
+    priority: number,
+    listener: ListenerFor<TEvents, K>,
+    listenerObject: ListenerObjectType,
+  ): UnsubscribeFunc;
 
   // (1c) typed array of event names, per-event priorities allowed
   <K extends EventKeysOf<TEvents>>(

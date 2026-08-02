@@ -134,10 +134,12 @@ instead.
 
   Untyped emitters are unaffected: every duck-typing route stays open,
   including dynamic names, symbols, catch-all subscriptions and late-bound
-  method names. So does a call with no event name for the guard to close — a
-  catch-all, or a listener-object passed alone, is accepted on the method
-  surfaces even when its method names are not in the map, where the standalone
-  `on()` rejects the same literal.
+  method names. So does a call with no event name for the guard to close: a
+  catch-all is accepted on all three surfaces, and a listener-object passed
+  alone is accepted on the method surfaces even when its method names are not
+  in the map — the standalone two-argument `on(ε, obj)` is the one spelling
+  that still rejects the same literal, because it is typed as
+  `EventListenerMethods<TEvents>`.
 - **A subclass that narrows an override of one of those methods is a
   `TS2416`.** The override has to be assignable to the whole merged
   `EventizeApi` overload set now, and a name-narrowed

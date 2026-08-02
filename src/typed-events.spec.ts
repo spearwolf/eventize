@@ -3,6 +3,8 @@ import {
   emitAsync,
   Eventize,
   eventize,
+  getSubscriptionCount,
+  off,
   on,
   once,
   onceAsync,
@@ -281,9 +283,10 @@ describe('typed events — generic event-map support', () => {
       expect(true).toBe(true);
     });
 
-    // Not parity with the standalone functions: `NonTypedEmitter` closes every
-    // loose overload there, while the guard here sits on the event-name slot
-    // and leaves the forms that carry no name open. See `docs/backlog.md`.
+    // The guard here sits on the event-name slot, so the forms that carry no
+    // name stay open. The standalone functions close theirs on `obj`, which is
+    // why they need the mirrored arms pinned further down rather than the
+    // guard alone.
     it('rejects wrong event names and wrong tuples on the inject surface', () => {
       const ε = eventize.inject<MyEvents>({});
       // @ts-expect-error 'wrong' is not a key of MyEvents
@@ -359,10 +362,10 @@ describe('typed events — generic event-map support', () => {
       expect(fake).toHaveBeenCalledWith(1);
     });
 
-    // The divergence `docs/backlog.md` accepts rather than fixes: the guard on
-    // the method surfaces sits on the event-name slot, and a listener-object
-    // passed alone carries no name for it to close. The standalone rejection
-    // of the same literal is pinned above.
+    // The divergence `docs/typed-events.md` accepts rather than fixes: the
+    // guard on the method surfaces sits on the event-name slot, and a
+    // listener-object passed alone carries no name for it to close. The
+    // standalone rejection of the same literal is pinned above.
     it('accepts an undeclared listener-object method on the method surfaces', () => {
       const injectedBanana = jest.fn();
       const classBanana = jest.fn();
@@ -406,6 +409,200 @@ describe('typed events — generic event-map support', () => {
       ε.on(names, fake);
       ε.emit(names, 1);
       expect(fake).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  // The standalone guard sits on `obj`, so for a typed emitter it used to take
+  // the *whole* loose overload set with it — including forms that carry no
+  // event name and therefore no typo to guard against. What survived was
+  // `on(ε, name, fn)`, `on(ε, [names], fn)` and `on(ε, listenerObject)`; four
+  // shapes the runtime dispatches perfectly well had no compiling standalone
+  // spelling. Every case below is a compile assertion first — the runtime
+  // expectations are there to prove the shape still dispatches, and to keep
+  // jest from reporting an empty test.
+  describe('the standalone on() / once() on a typed emitter', () => {
+    it('takes a listener object under a checked event name', () => {
+      const ε = eventize<MyEvents>();
+      const seen: Array<[string, number]> = [];
+      const listenerObject = {
+        data(payload: string, code: number) {
+          seen.push([payload, code]);
+        },
+      };
+
+      on(ε, 'data', listenerObject);
+      emit(ε, 'data', 'x', 1);
+      expect(seen).toEqual([['x', 1]]);
+    });
+
+    // The name is checked, everything after it is not — this arm resolves the
+    // member at dispatch, so a listener object whose methods the map never
+    // declares is legal and simply dispatches to nothing under `data`. That
+    // asymmetry is what separates these arms from the function-plus-context
+    // one below, where the listener *is* checked against the event.
+    it('leaves the listener object method names unchecked', () => {
+      const ε = eventize<MyEvents>();
+      const undeclared = jest.fn();
+
+      on(ε, 'data', {anythingAtAll: undeclared});
+      on(ε, 'data', {anythingAtAll: undeclared}, {tag: 'ctx'});
+      emit(ε, 'data', 'x', 1);
+
+      expect(undeclared).not.toHaveBeenCalled();
+      expect(getSubscriptionCount(ε)).toBe(2);
+    });
+
+    it('takes a method name plus a listener object', () => {
+      const ε = eventize<MyEvents>();
+      const handler = jest.fn();
+
+      on(ε, 'data', 'handler', {handler});
+      emit(ε, 'data', 'x', 1);
+      expect(handler).toHaveBeenCalledWith('x', 1);
+
+      // Late binding: the method is resolved at dispatch and is not required
+      // to exist, so a nullish listener object stays legal here too.
+      on(ε, 'ready', 'suppliedLater', null);
+      expect(() => emit(ε, 'ready')).not.toThrow();
+    });
+
+    it('takes a listener function with a trailing context object', () => {
+      const ε = eventize<MyEvents>();
+      const listener = jest.fn();
+      const context = {tag: 'ctx'};
+
+      on(ε, 'data', listener, context);
+      emit(ε, 'data', 'x', 1);
+      expect(listener).toHaveBeenCalledWith('x', 1);
+
+      // The context is the fourth slot of the dedup tuple, which is what
+      // `off(ε, fn, ctx)` removes by — the reason this shape needs a spelling.
+      off(ε, listener, context);
+      emit(ε, 'data', 'y', 2);
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it('takes a catch-all listener function', () => {
+      const ε = eventize<MyEvents>();
+      const seen: string[] = [];
+
+      on(ε, (...args: unknown[]) => {
+        seen.push(String(args[0]));
+      });
+      emit(ε, 'data', 'x', 1);
+      emit(ε, 'shutdown', 'bye');
+      expect(seen).toEqual(['x', 'bye']);
+    });
+
+    it('takes the priority variants of the same four shapes', () => {
+      const ε = eventize<MyEvents>();
+      const order: string[] = [];
+      const context = {tag: 'ctx'};
+
+      on(ε, 'data', 10, {data: () => order.push('object')});
+      on(ε, 'data', 20, 'handler', {handler: () => order.push('method')});
+      on(ε, 'data', 30, () => order.push('func'), context);
+      on(ε, 40, () => order.push('catchAll'));
+      on(ε, 50, 'handler', {handler: () => order.push('catchAllMethod')});
+      on(ε, 60, {data: () => order.push('catchAllObject')});
+      on(ε, {data: () => order.push('typedObject')}, context);
+
+      emit(ε, 'data', 'x', 1);
+      // Highest priority first, then the priority-free (1b) form last — the
+      // mirrored arms take the priority slot exactly as the loose ones do.
+      expect(order).toEqual([
+        'catchAllObject',
+        'catchAllMethod',
+        'catchAll',
+        'func',
+        'method',
+        'object',
+        'typedObject',
+      ]);
+    });
+
+    it('gives once() the same four shapes', () => {
+      const ε = eventize<MyEvents>();
+      const handler = jest.fn();
+      const listener = jest.fn();
+      const catchAll = jest.fn();
+      const context = {tag: 'ctx'};
+
+      once(ε, 'data', {data: handler});
+      once(ε, 'data', 'handler', {handler});
+      once(ε, 'data', listener, context);
+      once(ε, catchAll);
+
+      emit(ε, 'data', 'x', 1);
+      emit(ε, 'data', 'y', 2);
+
+      expect(handler).toHaveBeenCalledTimes(2);
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(catchAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('still checks the event name in every mirrored form', () => {
+      const ε = eventize<MyEvents>();
+      const context = {tag: 'ctx'};
+
+      // @ts-expect-error 'nope' is not a key of MyEvents
+      on(ε, 'nope', {nope: () => {}});
+      // @ts-expect-error 'nope' is not a key of MyEvents
+      on(ε, 'nope', 'handler', {handler: () => {}});
+      // @ts-expect-error 'nope' is not a key of MyEvents
+      on(ε, 'nope', () => {}, context);
+      // @ts-expect-error 'nope' is not a key of MyEvents
+      once(ε, 'nope', 10, {nope: () => {}});
+      // @ts-expect-error data is [string, number], not [number]
+      on(ε, 'data', (code: number) => void code, context);
+
+      // The directives above are the assertions; `@ts-expect-error` suppresses
+      // the diagnostic, it does not stop the call, so these five did subscribe.
+      expect(getSubscriptionCount(ε)).toBe(5);
+    });
+
+    // The one loose shape that stays closed, and the reason the mirrored
+    // object arms all require an event name or a priority ahead of the
+    // listener object: two arguments alone still land on the typed
+    // `EventListenerMethods<TEvents>` arm, whose method names are checked.
+    // `ε.on({banana() {}})` remains the accepted divergence — closing it there
+    // would take the catch-all listener-object subscription away from typed
+    // maps entirely.
+    it('still rejects an undeclared method on a listener object passed alone', () => {
+      const ε = eventize<MyEvents>();
+      const banana = jest.fn();
+
+      // @ts-expect-error 'banana' is not a key of MyEvents
+      on(ε, {banana});
+
+      expect(banana).not.toHaveBeenCalled();
+    });
+
+    it('leaves every call form on an untyped emitter exactly as it was', () => {
+      const ε = eventize();
+      const seen: string[] = [];
+      const context = {tag: 'ctx'};
+      const dynamic: string = 'runtime';
+
+      on(ε, 'anything', () => seen.push('fn'));
+      on(ε, 'anything', () => seen.push('fnCtx'), context);
+      on(ε, 'anything', 'handler', {handler: () => seen.push('method')});
+      on(ε, 'anything', {anything: () => seen.push('object')});
+      on(ε, 'anything', {anything: () => seen.push('objectCtx')}, context);
+      on(ε, 'anything', 10, () => seen.push('prio'));
+      on(ε, 'anything', 10, 'handler', {
+        handler: () => seen.push('prioMethod'),
+      });
+      on(ε, 'anything', 10, {anything: () => seen.push('prioObject')});
+      on(ε, () => seen.push('catchAll'));
+      on(ε, 10, () => seen.push('catchAllPrio'));
+      on(ε, 10, 'handler', {handler: () => seen.push('catchAllMethod')});
+      on(ε, {anything: () => seen.push('catchAllObject')});
+      on(ε, {anything: () => seen.push('catchAllObjectCtx')}, context);
+      on(ε, dynamic, () => seen.push('dynamic'));
+
+      emit(ε, 'anything');
+      expect(seen).toHaveLength(13);
     });
   });
 
