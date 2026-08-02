@@ -69,6 +69,7 @@ Verified, deliberate, and each one looks like a bug. Don't "fix" any of them wit
 - **`retain(ε, [name, …])` rejects a wildcard atomically, `emit(ε, [name, …])` does not** — it dispatches the names preceding `'*'` and then throws. Unify them only with a CHANGELOG entry.
 - **The "equal priorities keep insertion order" guarantee holds only within a bucket.** The merge in `EventStore.forEach()` compares priority alone and never looks at `id`, so at equal priority the named listener always goes first, independent of registration order. Deliberate scope limit: `forEach()` is not to be changed to consult `id` across the bucket boundary.
 - **The `Object.prototype` boundary covers two of the three member lookups**, on purpose. The method-name branch `on(ε, 'evt', 'toString', obj)` spells the method out, so the inherited hit is the caller's choice.
+- **A holey bucket throws on one dispatch path and stays silent on the other.** `mergeWalk()` treats a hole as a corrupted array and throws; the named-only walk in `walkBucket()` skips it the way `Array.prototype.forEach` always has. The same corrupted emitter is loud or quiet depending only on whether a wildcard listener happens to be subscribed too. A hole cannot arise through `on()`/`off()`, so this is an internal-invariant asymmetry, not a path a consumer's own code can trigger — the guard exists for the case where something else has, and the two dispatch paths simply disagree on how to react. Same reason it alone has no entry in `docs/` or the skill.
 
 ## Conventions
 

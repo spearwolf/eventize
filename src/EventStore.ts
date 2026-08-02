@@ -504,6 +504,14 @@ export class EventStore {
    * `forEach()` never walks. The two methods answer `'*'` from different
    * arrays; see the doc comment there and `EventStore.spec.ts`'s
    * impostor-bucket case.
+   *
+   * Unreachable in the published types, not at runtime: `EventStore` is not
+   * exported from `src/index.ts` and the internals slot is opaque there —
+   * the boundary AGENTS.md draws under "The internals boundary". The slot
+   * itself is a documented, realm-wide symbol (`Symbol.for('eventize')`)
+   * that code can still reach into directly, which is exactly what
+   * `docs/retain.md` warns against doing. This method is not public API; it
+   * just isn't unreachable by construction.
    */
   peekListeners(eventName: EventName): ReadonlyArray<EventListener> {
     if (isCatchEmAll(eventName)) {
@@ -962,6 +970,16 @@ export class EventStore {
     }
   }
 
+  /**
+   * The identity-based half of `off()` — `off(ε, fn)`, `off(ε, fn, ctx)` and
+   * `off(ε, listenerObject)`. There is no reverse index from a listener back
+   * to the event names it sits under, so this walks every bucket in
+   * `namedListeners` plus the catch-em-all one and asks each "is this
+   * listener here?" Cost is O(registered event names) per call — roughly
+   * 11 ns per name on this emitter, independent of how many of those names
+   * the listener actually holds a subscription for. See `docs/off.md` for
+   * the consumer-facing version of this note.
+   */
   private removeByListener(listener: unknown, listenerObject: unknown): void {
     const isObjectListener = typeof listener === 'object';
 

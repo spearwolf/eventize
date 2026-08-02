@@ -123,6 +123,9 @@ emit(ε, 'foo'); // => "I will stay"
 emit(ε, 'bar'); // (nothing happens)
 ```
 
+> [!NOTE]
+> There is no index from a listener back to the event names it is registered under, so `off(ε, listenerFunc)`, `off(ε, listenerFunc, context)` and `off(ε, listenerObject)` all scan every event name the emitter has ever seen to find where it sits — roughly 11 ns per registered event name, per call, regardless of how many of those names the listener actually holds a subscription for. Negligible for the usual handful of names; worth knowing if a hot teardown path calls one of these forms against an emitter carrying many distinct names. `unsubscribe()` handles and the event-name forms of `off()` don't pay this — they already know where to look.
+
 ## Removing listener objects
 
 ```javascript
