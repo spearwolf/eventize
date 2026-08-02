@@ -26,7 +26,7 @@ import type {
   SubscribeArgs,
   UnsubscribeFunc,
 } from './types';
-import {dispatchableMember, isEventName} from './utils';
+import {dispatchableMember, isEventName, prependEventName} from './utils';
 
 // The handle is idempotent by construction: a second call is inert, not a
 // second release. Without the guard a shared registration was decremented
@@ -185,10 +185,10 @@ const _duckEmitOne = (
   }
   const emitFn = (target as {emit?: unknown}).emit;
   if (typeof emitFn === 'function') {
-    const retVal = (emitFn as (...a: any[]) => any).apply(obj, [
-      eventName,
-      ...args,
-    ]);
+    const retVal = (emitFn as (...a: any[]) => any).apply(
+      obj,
+      prependEventName(eventName, args),
+    );
     if (retVal != null) returnValue?.(retVal);
   }
 };

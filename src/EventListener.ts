@@ -5,7 +5,12 @@ import {
 } from './constants';
 
 import type {EventName, EventArgs, ListenerObjectType} from './types';
-import {dispatchableMember, isCatchEmAll, isEventName} from './utils';
+import {
+  dispatchableMember,
+  isCatchEmAll,
+  isEventName,
+  prependEventName,
+} from './utils';
 
 type EmitFnType = Function | undefined;
 // The watermark is the obligation sequence counter's value immediately before
@@ -79,8 +84,19 @@ const emit = (
   listener: ObjListener,
   args: EventArgs,
   returnValue?: ReturnValue,
-): boolean =>
-  apply(listener, listener.emit, [eventName].concat(args), returnValue);
+): boolean => {
+  // Checked here, ahead of building the forwarded argument list, rather than
+  // left to apply()'s own callability test: apply() already has the finished
+  // list as an argument by the time it runs, so it can't stop the allocation
+  // below from happening first. This is the common case for a catch-all
+  // listener object that only answers some of the names it receives — it
+  // reaches here, finds no emit() either, and now buys nothing for it.
+  const fn = listener.emit;
+  return (
+    typeof fn === 'function' &&
+    apply(listener, fn, prependEventName(eventName, args), returnValue)
+  );
+};
 
 /**
  * Returns the LISTENER_IS_* tag for a listener, or undefined for a type that
