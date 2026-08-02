@@ -320,7 +320,7 @@ describe('EventStore', () => {
   // priority the named listener always runs first — independent of
   // registration order. This is a documented scope limit, not something to
   // fix here: see AGENTS.md "Known asymmetries" and
-  // skills/using-eventize/references/api-details.md (BUG-004). Both
+  // skills/using-eventize/references/api-details.md, "`Priority` values". Both
   // registration directions are pinned below, but neither closes a gap: the
   // wildcard-first direction was already exercised implicitly by the
   // mixed-priority fixture above ('with named and catch-em-all listeners' —

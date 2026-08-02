@@ -460,7 +460,7 @@ describe('retain()', () => {
       expect(second.foo.callCount).toBe(1);
     });
 
-    // Behaviour pin, not a CORR-001 guard: each event name builds its own
+    // Behaviour pin, not a dedup guard: each event name builds its own
     // EventListener, so both registrations insert either way.
     it('replays each retained event once for a multi-event subscription', () => {
       const obj = eventize();
@@ -499,7 +499,7 @@ describe('retain()', () => {
       expect(getSubscriptionCount(obj)).toBe(1);
     });
 
-    // Behaviour pin, not a CORR-001 guard: off() splices the listener out, so
+    // Behaviour pin, not a dedup guard: off() splices the listener out, so
     // the second on() inserts either way. Guards against a future
     // "remember what was already replayed" implementation.
     it('replays again after the listener was removed and re-registered', () => {

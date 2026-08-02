@@ -110,7 +110,7 @@ export default defineConfig(
       ],
 
       // Type-only imports stay separate `import type` statements, matching
-      // the convention already used throughout src/ — CONS-001.
+      // the convention already used throughout src/.
       '@typescript-eslint/consistent-type-imports': [
         2,
         {
