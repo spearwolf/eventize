@@ -239,6 +239,141 @@ describe('the class surface is the same contract as the other two', () => {
   });
 });
 
+// eventize.inject() used to install its nine methods with Object.assign(),
+// as own enumerable properties — the class surface twelve lines away in
+// eventize.ts installs the same nine on the prototype with
+// Object.defineProperties() and {enumerable: false} instead, and its comment
+// names Object.assign() as the wrong choice for exactly this reason. This
+// suite pins the inject surface to the same descriptor, so a spread or an
+// Object.keys() over an injected object no longer carries a functioning,
+// closure-capturing emitter along with it.
+describe('the inject surface installs its methods non-enumerable, like the class surface', () => {
+  it('keeps its methods off Object.keys() and for…in', () => {
+    const obj = eventize.inject({});
+    const enumerated: string[] = [];
+    for (const key in obj) enumerated.push(key);
+
+    expect(enumerated).toEqual([]);
+    expect(Object.keys(obj)).toEqual([]);
+    expect(typeof obj.on).toBe('function');
+  });
+
+  it('does not carry a functioning emit() through a spread', () => {
+    const obj = eventize.inject({});
+    const listener = jest.fn();
+    obj.on('foo', listener);
+
+    const spread = {...obj};
+
+    expect((spread as any).emit).toBeUndefined();
+    expect((spread as any).on).toBeUndefined();
+
+    // the original is unaffected by taking the spread
+    obj.emit('foo', 1);
+    expect(listener).toHaveBeenCalledWith(1);
+  });
+
+  it('survives structuredClone() instead of throwing DataCloneError', () => {
+    const obj = eventize.inject({});
+    obj.on('foo', jest.fn());
+
+    expect(() => structuredClone(obj)).not.toThrow();
+  });
+
+  it('still destructures out working methods', () => {
+    const obj = eventize.inject({});
+    const listener = jest.fn();
+    const {on, emit} = obj;
+
+    on('foo', listener);
+    emit('foo', 42);
+
+    expect(listener).toHaveBeenCalledWith(42);
+  });
+
+  it('all nine descriptors match the class prototype shape', () => {
+    const obj = eventize.inject({});
+
+    for (const name of [
+      'on',
+      'once',
+      'onceAsync',
+      'off',
+      'emit',
+      'emitAsync',
+      'retain',
+      'retainClear',
+      'unretain',
+    ] as const) {
+      expect(Object.getOwnPropertyDescriptor(obj, name)).toMatchObject({
+        writable: true,
+        configurable: true,
+        enumerable: false,
+      });
+    }
+  });
+
+  // Object.assign() runs an assignment through whatever accessor or
+  // writability the existing property has; Object.defineProperty() never
+  // does — it replaces the descriptor outright. That difference reaches
+  // every member Object.assign() could not write through, not only a
+  // getter-only one, and it only flips the outcome when the member is also
+  // configurable: a non-configurable one is still rejected below, by
+  // defineProperty()'s own check instead of the assignment's.
+  it('overwrites a pre-existing getter-only member instead of throwing', () => {
+    const obj: {emit?: unknown} = {};
+    Object.defineProperty(obj, 'emit', {
+      get: () => 'not an emitter',
+      configurable: true,
+      enumerable: true,
+    });
+
+    expect(() => eventize.inject(obj)).not.toThrow();
+
+    const listener = jest.fn();
+    (obj as any).on('foo', listener);
+    (obj as any).emit('foo', 'bar');
+
+    expect(listener).toHaveBeenCalledWith('bar');
+  });
+
+  it('overwrites a pre-existing non-writable, configurable data property instead of throwing', () => {
+    const obj: {emit?: unknown} = {};
+    Object.defineProperty(obj, 'emit', {
+      value: 'not an emitter',
+      writable: false,
+      configurable: true,
+      enumerable: true,
+    });
+
+    expect(() => eventize.inject(obj)).not.toThrow();
+
+    const listener = jest.fn();
+    (obj as any).on('foo', listener);
+    (obj as any).emit('foo', 'bar');
+
+    expect(listener).toHaveBeenCalledWith('bar');
+  });
+
+  // The one shape that still fails, and for a different reason than before:
+  // defineProperty() refuses to redefine a non-configurable property at all,
+  // whether it is a getter or a plain data property, so inject() still
+  // throws here — now "Cannot redefine property", not the old assignment
+  // error, and thrown by the same defineProperty() call regardless of which
+  // of the two descriptor shapes made the property non-configurable.
+  it('still throws on a pre-existing non-configurable member, now from defineProperty()', () => {
+    const obj: {emit?: unknown} = {};
+    Object.defineProperty(obj, 'emit', {
+      value: 'not an emitter',
+      writable: false,
+      configurable: false,
+      enumerable: true,
+    });
+
+    expect(() => eventize.inject(obj)).toThrow(/Cannot redefine property/);
+  });
+});
+
 // `ConformityApi` above erases the real signatures to run one behaviour case
 // against three surfaces, so nothing in that suite makes `tsc` resolve a
 // `SubscribeFunc` arm. These two do, for the object-listener-with-context

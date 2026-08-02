@@ -188,11 +188,12 @@ remedy. Check with `npm ls @spearwolf/eventize`, fix with `npm dedupe` or an
 `overrides` / `resolutions` entry pinning `^6.0.0`. At runtime,
 `getEventizeProtocol(obj)` says which copy owns an object without throwing.
 
-Three more runtime changes ride along, all filed as **fixes** rather than
+Four more runtime changes ride along, all filed as **fixes** rather than
 breaking changes — one stopped dispatching to code the subscriber never
 wrote, one turned a silent no-op into a throw, one made a call do the one
-thing its arguments ask for — but a `v5.1.0` consumer meets all three in the
-same upgrade and none of them is visible to the type checker:
+thing its arguments ask for, one stopped an API surface from contradicting
+itself — but a `v5.1.0` consumer meets all four in the same upgrade and none
+of them is visible to the type checker:
 
 - **An event name that only matches an inherited `Object.prototype` member
   dispatches to nothing.** `toString`, `toLocaleString`, `valueOf`,
@@ -241,6 +242,27 @@ same upgrade and none of them is visible to the type checker:
   untouched — `'*'` can never carry any — and reference counting is not
   consulted, so one call releases a `refCount`-2 registration outright,
   exactly as `off(ε, 'foo', obj)` always has.
+- **`eventize.inject()`'s nine methods are no longer enumerable.** They used
+  to be installed with `Object.assign()`, as own enumerable properties;
+  `class extends Eventize` already installed the same nine on the prototype
+  non-enumerably and said why in a comment `eventize.inject()` did not
+  follow. `Object.keys(injected)` and `for…in` listed all nine, a spread
+  (`{...injected}`) carried a working, closure-capturing `emit`/`on`/etc.
+  that still drove the *original* object, and `structuredClone(injected)`
+  threw `DataCloneError` where `structuredClone(eventize({}))` did not. All
+  three close with the same `Object.defineProperties()` /
+  `{enumerable: false}` descriptor the class surface already used. Grep for
+  `eventize\.inject\(` and check for a spread, `Object.keys()`/`for…in`, or
+  `structuredClone()` over the result; reading a method by name
+  (`injected.on`) or destructuring it (`const {on, emit} = injected`) is
+  unaffected. Installing onto any pre-existing member `Object.assign()`
+  couldn't write through — a non-writable data property, or an accessor with
+  no setter — also changes, but only when that member is *configurable*:
+  assignment used to throw (`Cannot assign to read only property …` /
+  `Cannot set property … which has only a getter`); `Object.defineProperty()`
+  replaces the descriptor outright and now succeeds silently instead. A
+  non-configurable member still throws, now `Cannot redefine property:
+  <name>` in place of the assignment error.
 
 ## v4 → v5: `emit()` stopped throwing
 

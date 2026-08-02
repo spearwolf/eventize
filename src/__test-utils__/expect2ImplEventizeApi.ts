@@ -147,10 +147,10 @@ export const apiSurfaces: ApiSurface[] = [
   },
   {
     name: 'eventize.inject(obj) methods',
-    // The runtime methods Object.assign()-ed by inject() already accept the
-    // loose implementation-shape args (see eventize.ts) — only the exposed
-    // TS type is the tuned public one, so the cast is a type-level fix-up,
-    // not a runtime behavior change.
+    // The runtime methods inject() installs already accept the loose
+    // implementation-shape args (see eventize.ts) — only the exposed TS type
+    // is the tuned public one, so the cast is a type-level fix-up, not a
+    // runtime behavior change.
     create: (): ConformityApi =>
       eventize.inject({}) as unknown as ConformityApi,
   },

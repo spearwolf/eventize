@@ -81,35 +81,84 @@ export const eventize: EventizerFuncAPI = (() => {
   ): T & EventizeApi<TEvents> => {
     obj = asEventized(obj);
 
-    Object.assign(obj, {
-      on: (...args: SubscribeArgs): UnsubscribeFunc => on(obj, ...args),
+    // Object.defineProperties(), not Object.assign() — same descriptor, same
+    // reason, see the comment on the class surface below.
+    Object.defineProperties(obj, {
+      on: {
+        value: (...args: SubscribeArgs): UnsubscribeFunc => on(obj, ...args),
+        writable: true,
+        enumerable: false,
+        configurable: true,
+      },
 
-      once: (...args: SubscribeArgs): UnsubscribeFunc => once(obj, ...args),
+      once: {
+        value: (...args: SubscribeArgs): UnsubscribeFunc => once(obj, ...args),
+        writable: true,
+        enumerable: false,
+        configurable: true,
+      },
 
-      onceAsync: <ReturnType = void>(
-        eventNames: AnyEventNames,
-        options?: OnceAsyncOptions,
-      ): Promise<ReturnType> =>
-        onceAsyncLoose<ReturnType>(obj, eventNames, options),
+      onceAsync: {
+        value: <ReturnType = void>(
+          eventNames: AnyEventNames,
+          options?: OnceAsyncOptions,
+        ): Promise<ReturnType> =>
+          onceAsyncLoose<ReturnType>(obj, eventNames, options),
+        writable: true,
+        enumerable: false,
+        configurable: true,
+      },
 
-      off: (listener?: unknown, listenerObject?: unknown): void =>
-        offLoose(obj, listener, listenerObject),
+      off: {
+        value: (listener?: unknown, listenerObject?: unknown): void =>
+          offLoose(obj, listener, listenerObject),
+        writable: true,
+        enumerable: false,
+        configurable: true,
+      },
 
-      emit: (eventNames: AnyEventNames, ...args: EventArgs): void =>
-        emitLoose(obj, eventNames, ...args),
+      emit: {
+        value: (eventNames: AnyEventNames, ...args: EventArgs): void =>
+          emitLoose(obj, eventNames, ...args),
+        writable: true,
+        enumerable: false,
+        configurable: true,
+      },
 
-      emitAsync: (
-        eventNames: AnyEventNames,
-        ...args: EventArgs
-      ): Promise<any[] | undefined> => emitAsyncLoose(obj, eventNames, ...args),
+      emitAsync: {
+        value: (
+          eventNames: AnyEventNames,
+          ...args: EventArgs
+        ): Promise<any[] | undefined> =>
+          emitAsyncLoose(obj, eventNames, ...args),
+        writable: true,
+        enumerable: false,
+        configurable: true,
+      },
 
-      retain: (eventNames: AnyEventNames): void => retainLoose(obj, eventNames),
+      retain: {
+        value: (eventNames: AnyEventNames): void =>
+          retainLoose(obj, eventNames),
+        writable: true,
+        enumerable: false,
+        configurable: true,
+      },
 
-      retainClear: (eventNames: AnyEventNames): void =>
-        retainClearLoose(obj, eventNames),
+      retainClear: {
+        value: (eventNames: AnyEventNames): void =>
+          retainClearLoose(obj, eventNames),
+        writable: true,
+        enumerable: false,
+        configurable: true,
+      },
 
-      unretain: (eventNames: AnyEventNames): void =>
-        unretainLoose(obj, eventNames),
+      unretain: {
+        value: (eventNames: AnyEventNames): void =>
+          unretainLoose(obj, eventNames),
+        writable: true,
+        enumerable: false,
+        configurable: true,
+      },
     });
 
     return obj as T & EventizeApi<TEvents>;

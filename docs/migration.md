@@ -14,7 +14,7 @@ do not change shape, so the type checker will not find the call sites for you �
 grep for the patterns below where one is given. Six are type-only and do surface
 as compile errors.
 
-Three further changes are filed as fixes rather than breaks, but a v5 consumer
+Four further changes are filed as fixes rather than breaks, but a v5 consumer
 meets them in the same install; they are at the end.
 
 ### Dedupe `@spearwolf/eventize` before you install v6
@@ -373,9 +373,9 @@ interface, which is the whole reason the base class stopped declaring its own.
   nothing instead of throwing. Only reachable by constructing the class
   yourself, which the package no longer exports in either namespace.
 
-### Three fixes that behave like breaks
+### Four fixes that behave like breaks
 
-None of them is visible to the type checker, and all three change what runs.
+None of them is visible to the type checker, and all four change what runs.
 
 **Event names inherited from `Object.prototype` dispatch to nothing.**
 `toString`, `toLocaleString`, `valueOf`, `constructor`, `hasOwnProperty`,
@@ -430,6 +430,47 @@ object's *named* subscriptions) can now narrow to what it meant. Named
 subscriptions of the same object survive, retained state is untouched, and
 reference counting is not consulted — one call releases a `refCount`-2
 registration outright.
+
+**`eventize.inject()`'s nine methods no longer show up in `Object.keys()`, `for…in`, or a spread.**
+They used to be installed with `Object.assign()`, so they were own enumerable
+properties like anything else set that way — `class extends Eventize` already
+installed the same nine methods non-enumerably, and `eventize.inject()` now
+matches it:
+
+```js
+// v5 — the methods rode along with everything else
+const obj = eventize.inject({name: 'x'});
+Object.keys(obj); // => ['name', 'on', 'once', 'onceAsync', 'off', 'emit', ...]
+const copy = {...obj};
+copy.emit('foo'); // dispatched through the *original* obj — a working, if unwanted, emitter
+
+// v6 — only what you put there is enumerable
+const obj = eventize.inject({name: 'x'});
+Object.keys(obj); // => ['name']
+const copy = {...obj};
+copy.emit; // undefined
+```
+
+Grep for a spread, an `Object.keys()`/`Object.entries()`/`for…in`, or a
+`structuredClone()` over an injected object — the last one used to throw
+`DataCloneError` naming one of the closures and now succeeds:
+
+```
+rg "eventize\.inject\(" src/
+```
+
+Reading a method by name (`obj.on`, `obj.emit`, …) or destructuring it
+(`const {on, emit} = obj`) is unaffected — both read the property directly
+rather than enumerating it. Installing onto any pre-existing member
+`Object.assign()` could not write through — a non-writable data property, or
+an accessor with no setter — also changes, and only if that member is
+*configurable*: assignment used to throw (`Cannot assign to read only
+property …` / `Cannot set property … which has only a getter`);
+`Object.defineProperty()` replaces the descriptor outright instead, so the
+call now succeeds silently and leaves a working method in its place. A
+*non-configurable* member still throws, either way — now
+`TypeError: Cannot redefine property: <name>` instead of the assignment
+error above.
 
 ### Verifying the upgrade
 
