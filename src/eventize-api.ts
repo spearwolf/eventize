@@ -233,11 +233,12 @@ const hasWildcard = (eventNames: unknown): boolean =>
 // True for exactly the `off()` arguments that make EventStore.remove() empty
 // the whole registry. Mirrors that method's *effective* behaviour, not just
 // its condition: its array branch forwards every element back into itself with
-// a null listenerObject, so a `null`, `undefined` or `'*'` element lands in the
-// wipe-everything branch — an array is bulk if any single element would be.
-// Testing only for `'*'` here is what left `off(ε, [null])` emptying the store
-// while the keeper kept every retained value, and `off(ε, ['foo', null])`
-// dropping one name's retained state out of a total wipe.
+// a null listenerObject — recursively, so a nested array re-enters that same
+// branch — until a `null`, `undefined` or `'*'` at any depth lands in the
+// wipe-everything branch. An array is bulk if any (flattened) element would
+// be. Testing only the top level here is what left `off(ε, [[null]])`
+// emptying the store two levels down while the keeper never looked past the
+// first — expects an already-flattened array; see the call site in off().
 const isBulkRemoval = (listener: unknown): boolean =>
   Array.isArray(listener)
     ? listener.some((item) => item == null || item === EVENT_CATCH_EM_ALL)
@@ -667,17 +668,31 @@ export function off(
     (listenerType === 'string' || listenerType === 'symbol');
   store.remove(listener, listenerObject, forceRemove);
 
-  // off(ε), off(ε, '*') and any array whose elements make the store wipe
-  // itself — ['*', …], [null], ['foo', undefined] — clear the keeper too. This
-  // has to run before the array/name branches below, because isEventName('*')
-  // is true and '*' would otherwise take the name path, which clears nothing:
-  // retain() rejects '*' and it can never be an entry.
+  // Flattened once, ahead of both places below that read an array's
+  // elements. EventStore.remove()'s array branch recurses arbitrarily deep —
+  // every element goes back into remove() with a null listenerObject, so a
+  // nested array re-enters the same branch — and both isBulkRemoval() and the
+  // name filter have to see that same depth, or a marker or a name one level
+  // down from the top goes unseen on the keeper side while the store keeps
+  // following it. A non-array listener passes through unchanged.
+  const flatListener = Array.isArray(listener)
+    ? listener.flat(Infinity)
+    : listener;
+
+  // off(ε), off(ε, '*') and any (nested) array whose elements make the store
+  // wipe itself — ['*', …], [[null]], ['foo', undefined] — clear the keeper
+  // too. This has to run before the array/name branches below, because
+  // isEventName('*') is true and '*' would otherwise take the name path,
+  // which clears nothing: retain() rejects '*' and it can never be an entry.
   // isBulkRemoval() reproduces what EventStore.remove() does to the listeners,
   // and matches how unretain()/retainClear() already read a wildcard anywhere
   // in an array as "all retained events". Leaving retained payloads behind
   // after "remove everything" kept them strongly referenced and still replayed
   // them to later subscribers.
-  if (listener == null || (listenerObject == null && isBulkRemoval(listener))) {
+  if (
+    listener == null ||
+    (listenerObject == null && isBulkRemoval(flatListener))
+  ) {
     keeper.removeAll();
     return;
   }
@@ -691,7 +706,8 @@ export function off(
     // filter stays because the surviving caller hands in whatever the consumer
     // assembled: it keeps symbol event names — which the old
     // `typeof === 'string'` test silently dropped — and ignores anything that
-    // is not a name at all.
+    // is not a name at all, nested arrays included — flattened above, a name
+    // buried at any depth reads as a name too.
     //
     // The listenerObject == null guard mirrors EventStore.remove(): its array
     // branch requires the same condition, so off(ε, [names], listenerObject)
@@ -699,7 +715,7 @@ export function off(
     // listener identity and nothing is unsubscribed. Without this guard the
     // keeper cleared retained state for a call shape that detached no
     // listener at all.
-    keeper.remove(listener.filter(isEventName));
+    keeper.remove((flatListener as unknown[]).filter(isEventName));
   } else if (isEventName(listener)) {
     keeper.remove(listener);
   }

@@ -1279,6 +1279,54 @@ describe('off()', () => {
       expect(late.callCount).toBe(0);
     });
 
+    // EventStore.remove()'s array branch is recursive: it forwards every
+    // element back into itself with a null listenerObject, so a nested array
+    // re-enters that same branch. The keeper's isBulkRemoval() and its
+    // name-filter used to look only at the top level, so a name or a bulk
+    // marker one level deeper than that recursion went unseen on the keeper
+    // side while the store kept following it.
+    it("off(ε, [['a']]) clears the retained value the way off(ε, 'a') does", () => {
+      const obj = eventize();
+      retain(obj, 'a');
+      emit(obj, 'a', 'value');
+      on(obj, 'a', fake());
+
+      expect(getSubscriptionCount(obj)).toBe(1);
+      expect(getRetainedCount(obj)).toBe(1);
+
+      // remove(['a'], null) forwards 'a' back into remove('a', null), which
+      // is exactly off(ε, 'a') — the store's effective behaviour for this
+      // call is a plain named removal, one level deeper than the top-level
+      // array the caller wrote.
+      off(obj, [['a']]);
+
+      expect(getSubscriptionCount(obj)).toBe(0);
+      expect(getRetainedCount(obj)).toBe(0);
+    });
+
+    it.each([[[[null]]], [[[undefined]]]])(
+      'off(ε, %p) wipes the keeper too, matching the store wipe its recursive array branch performs',
+      (names) => {
+        const obj = eventize();
+        retain(obj, ['foo', 'bar']);
+        emit(obj, 'foo', 1);
+        emit(obj, 'bar', 2);
+        on(obj, 'foo', fake());
+        on(obj, 'bar', fake());
+
+        // remove([[null]], null) forwards [null] back into remove([null],
+        // null), which forwards null back into remove(null, null) — the
+        // wipe-everything branch, two levels down. isBulkRemoval() has to
+        // follow the same recursion or the store empties while the keeper
+        // keeps everything.
+        off(obj, names);
+
+        expect(getSubscriptionCount(obj)).toBe(0);
+        expect(getRetainedCount(obj)).toBe(0);
+        expect(getRetainedEventNames(obj)).toEqual([]);
+      },
+    );
+
     // The negative control for the three cases above: an array carrying no
     // bulk marker at all must take the name path, however many names are in
     // it. Written when the multi-event unsubscribe handle still passed
