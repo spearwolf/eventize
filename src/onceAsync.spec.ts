@@ -3,6 +3,7 @@ import {
   eventize,
   Eventize,
   getSubscriptionCount,
+  off,
   onceAsync,
   retain,
 } from './index';
@@ -156,6 +157,35 @@ describe('onceAsync()', () => {
 
       controller.abort();
       await Promise.resolve();
+    });
+
+    // MEM-002: off(ε) empties the store but has no path back into this
+    // closure — the abort listener lives on the signal, not on the emitter.
+    // The promise, and everything it closed over, stay alive until the
+    // signal itself fires. See docs/lifecycle.md ("onceAsync and off()").
+    it('off(ε) does not detach the abort handler — the pending promise outlives the emitter', async () => {
+      const obj = eventize();
+      const controller = new AbortController();
+      const addSpy = jest.spyOn(controller.signal, 'addEventListener');
+      const removeSpy = jest.spyOn(controller.signal, 'removeEventListener');
+
+      const promise = onceAsync(obj, 'foo', {signal: controller.signal});
+      expect(getSubscriptionCount(obj)).toBe(1);
+      expect(addSpy).toHaveBeenCalledTimes(1);
+
+      off(obj); // clears the store directly, bypassing onceAsync()'s own unsubscribe
+
+      expect(getSubscriptionCount(obj)).toBe(0); // the listener is gone from the store
+      expect(removeSpy).not.toHaveBeenCalled(); // off() never reaches the abort handler
+
+      // the promise stays pending until the signal itself is told to abort —
+      // off(ε) had no way to reach it
+      controller.abort();
+
+      await expect(promise).rejects.toMatchObject({name: 'AbortError'});
+      // the abort path never calls removeEventListener itself — {once: true}
+      // is what detaches the listener, and this spy cannot observe that
+      expect(removeSpy).not.toHaveBeenCalled();
     });
 
     it('works without options, as before', async () => {

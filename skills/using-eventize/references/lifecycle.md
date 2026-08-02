@@ -129,6 +129,25 @@ A throwing listener *was* called, but the auto-unsubscribe runs after the call
 returns and a throw never returns — so a one-shot that throws survives and fires
 again on the next matching `emit()`, until one invocation completes normally.
 
+**The same "settle only after return" rule lets a `once()` fire twice a
+different way: a callback that re-emits its own event before returning.** The
+listener is still fully subscribed at that point, so the nested `emit()`
+dispatches to it again. Not a separate defect — it is the deliberate absence
+of a recursion guard (`A → B → A` forwarding and same-event re-emission
+already overflow the stack by design) meeting the throwing-listener rule
+above; both are intended, and a `once()` firing twice under self re-emission
+is the two of them combined, not a new decision.
+
+```js
+let calls = 0;
+once(ε, 'ping', () => {
+  calls += 1;
+  if (calls === 1) emit(ε, 'ping'); // re-entrant — this once() hasn't settled yet
+});
+emit(ε, 'ping');
+calls; // => 2
+```
+
 ## `onceAsync` cancellation
 
 ```js
@@ -150,6 +169,26 @@ construction**: the listener, the `resolve` closure and the caller's whole
 `await` continuation stay attached for the emitter's lifetime, and there is no
 handle to release them. Pass a signal tied to the caller's own teardown whenever
 the event might legitimately never come.
+
+**A signal does not help against `off()` clearing the emitter from the other
+side.** `off(ε)` (or any form reaching the internal `once()`) empties the
+store, but the abort listener lives on the `AbortSignal`, not on the emitter —
+`off()` has no way to know the signal exists. The promise and everything its
+closure captured, emitter included, stay alive until the signal itself fires
+or is garbage collected:
+
+```js
+const promise = onceAsync(ε, 'foo', {signal: controller.signal});
+off(ε); // clears the store — the promise is still pending afterwards
+getSubscriptionCount(ε); // => 0
+controller.abort();
+await promise; // rejects only now
+```
+
+A signal shared across many emitters accumulates one such orphaned promise per
+emitter that got `off()`'d instead of aborted. Give a signal that might
+outlive its emitter its own `AbortController`, and call `abort()` from
+whatever code retires that emitter.
 
 ## Dynamically generated retain names
 

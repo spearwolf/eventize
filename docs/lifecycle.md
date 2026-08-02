@@ -315,6 +315,32 @@ obligation and — if nothing else is holding the listener — releases it.
 If such a name might never be answered, keep the handle and call it on teardown;
 `getSubscriptionCount(ε)` shows the difference.
 
+### A `once()` that re-emits its own event before returning fires twice
+
+The auto-unsubscribe above runs only after the callback returns. A callback
+that emits the same event again *before* returning is therefore dispatched
+from inside a dispatch its own one-shot has not been released from yet — the
+listener is still fully subscribed, so the nested `emit()` calls it a second
+time:
+
+```javascript
+let calls = 0;
+once(ε, 'ping', () => {
+  calls += 1;
+  if (calls === 1) emit(ε, 'ping'); // re-entrant: this once() hasn't settled yet
+});
+
+emit(ε, 'ping');
+calls; // => 2 — the "at most one call" promise breaks under self re-emission
+getSubscriptionCount(ε); // => 0 — settled once the nesting unwinds
+```
+
+This is not a separate defect: it is the same tension the throwing-listener
+case above resolves the same way, meeting [the deliberate absence of a
+recursion guard](../AGENTS.md#known-asymmetries) — `A → B → A` forwarding and
+same-event re-emission already overflow the stack by design, and a `once()`
+firing twice under the same conditions costs nothing extra to accept.
+
 ## `onceAsync` and cancellation
 
 `onceAsync(ε, eventName, {signal})` accepts an `AbortSignal`, close to the
@@ -339,6 +365,36 @@ unmount-before-event / cancelled-request shape — a component awaits
 `onceAsync()`, unmounts before the event arrives, and the promise plus everything
 it closed over is pinned until the emitter itself goes away. Pass a signal tied
 to the component's own teardown whenever the event might legitimately never come.
+
+### `onceAsync` and `off()`
+
+A signal fixes the case above only while the caller controls when the
+listener goes away. Clearing the emitter from the other side — `off(ε)`,
+`off(ε, eventName)`, any form that reaches the `once()` `onceAsync()` created
+internally — empties the store, but has no path back into the `onceAsync()`
+closure: the abort listener stays registered on the `AbortSignal`, not on the
+emitter, and `off()` has no way to know the signal exists. The promise, the
+pending obligation and everything the closure captured — including the
+emitter itself — stay alive until the signal fires or is garbage collected:
+
+```javascript
+const controller = new AbortController();
+const promise = onceAsync(ε, 'foo', {signal: controller.signal});
+
+off(ε); // clears the store — but not this
+getSubscriptionCount(ε); // => 0
+
+// the promise is still pending here, and stays pending until the signal
+// itself is told to abort — off(ε) had no way to reach it
+controller.abort();
+await promise; // rejects only now
+```
+
+A shared, long-lived `AbortSignal` handed to many `onceAsync()` calls
+accumulates one such orphaned promise per emitter that got `off()`'d instead
+of aborted. Give a signal that might outlive its emitter its own
+`AbortController`, and call `abort()` from whatever code retires that
+emitter — not just from whatever code the signal was originally built for.
 
 ## Verifying cleanup
 

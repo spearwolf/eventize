@@ -346,6 +346,15 @@ export class EventListener {
     // above it, regardless of where either one ends up sitting in the array.
     const watermark = nextObligationSequence;
 
+    // Settling only after the callback below returns is also why a once()
+    // whose own callback re-emits the same event before returning fires
+    // twice: `isRemoved` is still false and `callAfterApply` has not run yet,
+    // so the nested emit() dispatches to this same, still-live listener.
+    // Not a separate defect — it falls out of two decisions kept on purpose:
+    // no recursion guard (src/EventStore.ts), and a throwing listener keeps
+    // its one-shot rather than losing it to an exception mid-call. See
+    // docs/lifecycle.md for the consumer-facing writeup.
+
     // LISTENER_IS_FUNC
     if (typeof listener === 'function') {
       apply(listenerObject, listener, args, returnValue);

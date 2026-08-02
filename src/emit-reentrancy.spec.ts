@@ -398,6 +398,37 @@ describe('emit() re-entrancy (sub/unsub during dispatch)', () => {
     });
   });
 
+  describe('once() re-entrancy', () => {
+    // ASYNC-006: EventListener.apply() settles a once() obligation only
+    // after the callback returns (EventListener.ts, callAfterApply). A
+    // callback that re-emits its own event before returning is therefore
+    // dispatched to its own listener a second time, while that listener is
+    // still fully subscribed — the "at most one call" promise breaks under
+    // self re-emission. Deliberate: it falls out of two decisions kept on
+    // purpose elsewhere (no recursion guard, and a throwing listener keeps
+    // its one-shot) rather than a defect of its own. See docs/lifecycle.md.
+    it('fires twice when its own callback re-emits the same event before returning', () => {
+      const ε = eventize();
+      let calls = 0;
+
+      once(ε, 'ping', () => {
+        calls += 1;
+        if (calls === 1) {
+          emit(ε, 'ping'); // re-entrant: this once() has not settled yet
+        }
+      });
+
+      emit(ε, 'ping');
+
+      expect(calls).toBe(2);
+      // settled once the re-entrant call unwinds, not left dangling
+      expect(getSubscriptionCount(ε)).toBe(0);
+
+      emit(ε, 'ping');
+      expect(calls).toBe(2); // truly gone afterwards
+    });
+  });
+
   describe('retain order under nested emit()', () => {
     // _emitOne() (eventize-api.ts) calls keeper.retain() only *after*
     // store.forEach() returns — that ordering is what lets a throwing

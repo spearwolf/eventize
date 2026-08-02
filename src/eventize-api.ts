@@ -763,6 +763,15 @@ export function once(obj: object, ...args: SubscribeArgs): UnsubscribeFunc {
 // in the shape of fetch(). Without it, an event that never fires keeps the
 // listener and the caller's continuation alive for the emitter's whole
 // lifetime.
+//
+// off(ε) does not help here either, deliberately: it empties the store, but
+// the `onAbort` listener below is registered on the AbortSignal, not on the
+// emitter, and nothing in off() knows the signal exists to tell it. A signal
+// that outlives the emitter keeps this whole closure — promise, obligation,
+// emitter reference — alive until the signal itself fires or is collected.
+// See docs/lifecycle.md ("onceAsync and off()") for the consumer-facing
+// writeup; there is no fix that doesn't require off() to know about signals
+// or onceAsync() to know about off().
 // ---------------------------------------------------------------------------
 
 // `??`, not a `=== undefined` test: a signal aborted with an explicit null
