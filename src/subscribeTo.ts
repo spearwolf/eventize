@@ -85,11 +85,22 @@ const registerEventListener = (
  * position determined by the bucket size instead of by its priority. No error,
  * no warning, just the wrong call order.
  *
+ * `Number.isNaN` alone only catches the literal value NaN. The `[name,
+ * priority]` tuple's second slot reaches this function without a `typeof`
+ * gate at branch selection (branches A and B only enter here because
+ * `typeof args[…] === 'number'` already held) — so an untyped call site (a
+ * cast, or plain JS with no type checker) can hand a string, boolean or
+ * object into a tuple's priority slot, `Number.isNaN()` answers `false` for
+ * it just as it does for NaN, and it poisons the sort exactly the same way.
+ * The `typeof` check widens the guard to every such value while leaving the
+ * thrown message and cause untouched — this is a stricter test, not a new
+ * failure mode.
+ *
  * `Number.isNaN`, not `Number.isFinite`: `Priority.Max` and `Priority.Min` are
  * `±Infinity`, which sorts perfectly well and is documented API.
  */
 const assertPriorityIsUsable = (priority: number, args: EventArgs): void => {
-  if (Number.isNaN(priority)) {
+  if (typeof priority !== 'number' || Number.isNaN(priority)) {
     // No `hasConsole` guard: `warn` is already the no-op arrow when there is no
     // console. The guard that used to sit here (and at the listener check
     // below) could never be false in any environment a test can construct, so
@@ -198,6 +209,20 @@ const _subscribeTo = (
     );
 
   if (Array.isArray(eventName)) {
+    if (eventName.length === 0) {
+      // The map below registers one listener per name, so an empty array used
+      // to register nothing at all: on(ε, [], h) and once(ε, [], h) returned a
+      // handle for zero subscriptions with no warning and no throw, and
+      // onceAsync(ε, []) resolved a promise that never settles. Rejected here,
+      // atomically and before anything is registered — the same treatment a
+      // NaN in one tuple gets below. Same message and cause vocabulary as the
+      // listener check above: one more way "insufficient arguments" is
+      // insufficient.
+      warn('called with an empty array of event names!', args);
+      throw new Error('subscribeTo() called with insufficient arguments', {
+        cause: 'empty-names',
+      });
+    }
     // Resolve every per-event priority before registering anything, so a NaN in
     // one tuple rejects the whole call instead of leaving the names in front of
     // it subscribed — the same atomicity `retain(ε, [name, …])` has for '*'.

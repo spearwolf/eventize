@@ -350,6 +350,26 @@ dispatches as normal, unless it is literally an alias of `Object.prototype`'s
 function (`{toString: Object.prototype.toString}` is skipped along with the
 inherited one).
 
+**`on(ε, [], …)` and `once(ε, [], …)` now throw instead of registering
+nothing.** An empty array of event names used to reach the same map that turns
+each name into a registration — zero names meant zero registrations, silently.
+`on(ε, [], h)` and `once(ε, [], h)` returned a handle for nothing, with no
+warning and no throw, and `onceAsync(ε, [])` returned a promise that never
+settles: no resolve, no reject, just a dangling `await` for the emitter's
+lifetime. All three now throw
+`subscribeTo() called with insufficient arguments` (`Error.cause:
+'empty-names'`), atomically, before anything is registered — the empty array
+is rarely a literal in working code, so grep for a runtime-assembled name list
+that can end up empty:
+
+```
+rg "\b(on|once|onceAsync)\(\s*\S+,\s*(\[\]|\w+)\s*[,)]" src/
+```
+
+Guard the call the same way a bulk `off([...])` needs guarding against a
+nullish element — check `.length` before subscribing, or drop the call when
+there is nothing to name.
+
 **`off(ε, '*', listenerObject)` now detaches something.** It used to remove
 nothing and report nothing, for every shape that puts an object on the wildcard
 — `on(ε, '*', obj)`, the bare catch-all `on(ε, obj)`, `on(ε, '*', fn, ctx)` and

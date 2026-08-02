@@ -964,6 +964,83 @@ describe('on()', () => {
   });
 
   // ---------------------------------------------------------------------------------------------
+  // Number.isNaN() answers false for every non-number value, not just for the
+  // literal NaN it was written to catch — so a string, boolean or object
+  // arriving in the priority slot poisoned sortByPriorityAndId() exactly like
+  // NaN did, without tripping the guard. The [name, priority] tuple's second
+  // slot is the one spot that reaches assertPriorityIsUsable() without a
+  // typeof gate at branch selection, so that is where an untyped call site
+  // (a cast, or plain JS with no type checker at all) can smuggle one in.
+  describe('a non-number priority', () => {
+    it('rejects a non-number value inside a [name, priority] tuple', () => {
+      const obj = eventize();
+      expect(() =>
+        on(obj, [['foo', 'high' as unknown as number]], () => {}),
+      ).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects a boolean inside a [name, priority] tuple', () => {
+      const obj = eventize();
+      expect(() =>
+        on(obj, [['foo', true as unknown as number]], () => {}),
+      ).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('registers nothing when one tuple in a longer list carries a non-number priority', () => {
+      const obj = eventize();
+      expect(() =>
+        on(obj, ['a', ['b', {} as unknown as number], 'c'], () => {}),
+      ).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('keeps ±Infinity valid inside a tuple', () => {
+      const obj = eventize();
+      const calls: string[] = [];
+      on(obj, [['foo', Priority.Max]], () => calls.push('max'));
+      expect(getSubscriptionCount(obj)).toBe(1);
+      emit(obj, 'foo');
+      expect(calls).toEqual(['max']);
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // The array branch maps over the event names and registers one listener per
+  // name — an empty array registers nothing, so on(ε, [], h) and
+  // once(ε, [], h) used to return a handle for zero subscriptions with no
+  // warning and no throw, and onceAsync(ε, []) resolved a promise that never
+  // settles. Rejected atomically, before anything is registered, the same way
+  // a NaN in one tuple rejects the whole call.
+  describe('an empty array of event names', () => {
+    it('rejects on() with an empty array instead of registering nothing', () => {
+      const obj = eventize();
+      expect(() => on(obj, [], () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects once() with an empty array instead of registering nothing', () => {
+      const obj = eventize();
+      expect(() => once(obj, [], () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('carries the "empty-names" cause on Error.cause', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        on(obj, [], () => {});
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).message).toMatch(/insufficient arguments/);
+      expect((caught as Error).cause).toBe('empty-names');
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
   describe('an object listener with a trailing context object', () => {
     it('registers, dispatches, and is removable by the context', () => {
       const ε = eventize();

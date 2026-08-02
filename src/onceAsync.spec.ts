@@ -38,6 +38,17 @@ describe('onceAsync()', () => {
     expect(await onceAsync<number>(e, ['bar', 'foo'])).toBe(1001);
   });
 
+  // ---------------------------------------------------------------------------------------------
+  // once() throws synchronously for an empty array of event names — and
+  // because that call sits inside the Promise executor here, the throw turns
+  // into a rejection instead of propagating out of onceAsync() itself. Before
+  // the fix, once(ε, []) subscribed nothing and the returned promise never
+  // settled: no resolve, no reject, just a dangling await forever.
+  it('rejects instead of hanging on an empty array of event names', async () => {
+    const e = eventize();
+    await expect(onceAsync(e, [])).rejects.toThrow(/insufficient arguments/);
+  });
+
   describe('AbortSignal support', () => {
     it('unsubscribes and rejects when the signal aborts', async () => {
       const obj = eventize();
