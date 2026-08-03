@@ -1,7 +1,28 @@
+// `warn` is bound to `console.warn` at module load, so a `jest.spyOn(console,
+// 'warn')` installed from a spec never sees the call. Replacing the export
+// itself is the only way to observe it; everything else stays the real module.
+jest.mock('./utils', () => ({
+  // Spreading a module namespace drops the non-enumerable `__esModule` flag,
+  // and a default or namespace import of the mocked module would then be sent
+  // through the CJS interop wrapper. Nothing under src/ imports it that way
+  // today; restating the flag keeps this file from becoming the reason the day
+  // one does.
+  __esModule: true,
+  ...jest.requireActual('./utils'),
+  warn: jest.fn(),
+}));
+
 import {EventKeeper} from './EventKeeper';
 import type {EventName} from './types';
+import {warn} from './utils';
+
+const warnMock = warn as unknown as jest.Mock;
 
 const bar = Symbol('bar');
+
+beforeEach(() => {
+  warnMock.mockClear();
+});
 
 describe('EventKeeper', () => {
   it('is instanceable', () => {
@@ -221,7 +242,7 @@ describe('EventKeeper', () => {
     keeper.add('foo');
     keeper.retain('foo', ['data']);
 
-    const existingEvents = [{order: 0, replay: jest.fn()}];
+    const existingEvents = [{order: 0, eventName: 'seed', replay: jest.fn()}];
     const emitter = {apply: jest.fn()};
 
     const result = keeper.replayTo('foo', emitter, existingEvents);
@@ -428,6 +449,89 @@ describe('EventKeeper', () => {
 
       expect(keeper.events).toBe(fresh.events);
       expect(keeper.eventNames).toBe(fresh.eventNames);
+    });
+  });
+
+  // A replay runs consumer code that the on() caller never asked to run at
+  // this moment, so publish() catches instead of unwinding the registration
+  // it is the tail of. These cases watch the batch itself; retain.spec.ts
+  // watches what an on() caller sees.
+  describe('publish() isolates a throwing replay', () => {
+    it('runs the rest of the batch, in order, and warns for the one that threw', () => {
+      const keeper = new EventKeeper();
+      keeper.add(['first', 'second', 'third']);
+      keeper.retain('first', ['1']);
+      keeper.retain('second', ['2']);
+      keeper.retain('third', ['3']);
+
+      const seen: EventName[] = [];
+      const boom = new Error('boom');
+      const emitter = {
+        apply: (eventName: EventName) => {
+          seen.push(eventName);
+          if (eventName === 'first') throw boom;
+        },
+      };
+
+      expect(() =>
+        EventKeeper.publish(keeper.replayTo('*', emitter)),
+      ).not.toThrow();
+
+      // sorting happens before the first replay runs, so a throw in the
+      // middle of the batch cannot reshuffle what is left of it
+      expect(seen).toEqual(['first', 'second', 'third']);
+
+      expect(warnMock).toHaveBeenCalledTimes(1);
+      expect(warnMock.mock.calls[0]).toEqual([
+        expect.stringContaining('retained replay'),
+        'first',
+        boom,
+      ]);
+    });
+
+    it('warns once per throwing replay, not once per batch', () => {
+      const keeper = new EventKeeper();
+      keeper.add(['a', 'b']);
+      keeper.retain('a', ['1']);
+      keeper.retain('b', ['2']);
+
+      const emitter = {
+        apply: (eventName: EventName) => {
+          throw new Error(`boom-${String(eventName)}`);
+        },
+      };
+
+      EventKeeper.publish(keeper.replayTo('*', emitter));
+
+      expect(warnMock).toHaveBeenCalledTimes(2);
+      expect(warnMock.mock.calls.map((c) => c[1])).toEqual(['a', 'b']);
+    });
+
+    it('isolates a batch of exactly one replay too', () => {
+      const keeper = new EventKeeper();
+      keeper.add('foo');
+      keeper.retain('foo', ['payload']);
+
+      const emitter = {
+        apply: () => {
+          throw new Error('boom');
+        },
+      };
+
+      expect(() =>
+        EventKeeper.publish(keeper.replayTo('foo', emitter)),
+      ).not.toThrow();
+      expect(warnMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('says nothing when no replay throws', () => {
+      const keeper = new EventKeeper();
+      keeper.add('foo');
+      keeper.retain('foo', ['payload']);
+
+      EventKeeper.publish(keeper.replayTo('foo', {apply: jest.fn()}));
+
+      expect(warnMock).not.toHaveBeenCalled();
     });
   });
 

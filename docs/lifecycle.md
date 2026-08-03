@@ -313,6 +313,12 @@ one-shot without a kept handle can turn into a repeat-shot the moment it throws.
 Once some later invocation completes normally, the store finally settles the
 obligation and — if nothing else is holding the listener — releases it.
 
+A retained replay is where that becomes visible without a second `emit()` at
+all, and it is the third way a `once()` fires twice. The replays queued by one
+`on()`/`once()` call run as an isolated batch, so a replay that throws settles
+nothing and the next replay of the same batch calls the same handler again —
+see [a listener that throws on a replay](./retain.md#a-listener-that-throws-on-a-replay).
+
 If such a name might never be answered, keep the handle and call it on teardown;
 `getSubscriptionCount(ε)` shows the difference.
 

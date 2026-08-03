@@ -1,5 +1,20 @@
+// `warn` is bound to `console.warn` at module load, so a `jest.spyOn(console,
+// 'warn')` installed from a spec never sees the call. Replacing the export
+// itself is the only way to observe it; everything else stays the real module.
+jest.mock('./utils', () => ({
+  // Spreading a module namespace drops the non-enumerable `__esModule` flag,
+  // and a default or namespace import of the mocked module would then be sent
+  // through the CJS interop wrapper. Nothing under src/ imports it that way
+  // today; restating the flag keeps this file from becoming the reason the day
+  // one does.
+  __esModule: true,
+  ...jest.requireActual('./utils'),
+  warn: jest.fn(),
+}));
+
 import {fake, replace} from 'sinon';
 
+import {warn} from './utils';
 import {
   Eventize,
   eventize,
@@ -624,5 +639,144 @@ describe('retain()', () => {
       expect(subscriber.calledWith('payload')).toBeTruthy();
       expect(subscriber.callCount).toBe(1);
     });
+  });
+});
+
+// A retained replay runs consumer code at a moment the on() caller did not
+// ask for: the value was produced by whoever emitted it, possibly long ago,
+// and the subscription is already in the store by the time the replay runs.
+// So a throw here is reported and stepped over, where the same throw during
+// emit() unwinds into the caller that caused the event (pinned in
+// emit-throwing-listener.spec.ts).
+describe('a throwing retained replay', () => {
+  const warnMock = warn as unknown as jest.Mock;
+
+  beforeEach(() => {
+    warnMock.mockClear();
+  });
+
+  it('does not stop the rest of its batch, and keeps the batch order', () => {
+    const obj = eventize({});
+    const seen: string[] = [];
+    const boom = new Error('boom');
+
+    retain(obj, ['a', 'b', 'c']);
+    emit(obj, 'a', 'A');
+    emit(obj, 'b', 'B');
+    emit(obj, 'c', 'C');
+
+    const unsubscribe = on(obj, ['a', 'b', 'c'], (value: string) => {
+      seen.push(value);
+      if (value === 'A') throw boom;
+    });
+
+    expect(seen).toEqual(['A', 'B', 'C']);
+
+    // the handle exists, covers every name, and still works
+    expect(getSubscriptionCount(obj)).toBe(3);
+    unsubscribe();
+    expect(getSubscriptionCount(obj)).toBe(0);
+
+    emit(obj, 'b', 'AFTERWARDS');
+    expect(seen).toEqual(['A', 'B', 'C']);
+
+    expect(warnMock).toHaveBeenCalledTimes(1);
+    expect(warnMock.mock.calls[0][1]).toBe('a');
+    expect(warnMock.mock.calls[0][2]).toBe(boom);
+  });
+
+  it('leaves a single-replay subscription registered and unsubscribable', () => {
+    const obj = eventize({});
+    let calls = 0;
+
+    retain(obj, 'foo');
+    emit(obj, 'foo', 'RETAINED');
+
+    const unsubscribe = on(obj, 'foo', () => {
+      calls += 1;
+      throw new Error('boom');
+    });
+
+    expect(calls).toBe(1);
+    expect(warnMock).toHaveBeenCalledTimes(1);
+    expect(getSubscriptionCount(obj)).toBe(1);
+
+    unsubscribe();
+    expect(getSubscriptionCount(obj)).toBe(0);
+  });
+
+  // The catch is as wide as the replay: everything the replayed listener sets
+  // off synchronously is inside it, so a throw from a listener on a different
+  // event is caught too — and reported under the name that was being replayed,
+  // which is what makes the logged error the only thing that says where it came
+  // from.
+  it('also catches a throw from an emit() the replayed listener made itself', () => {
+    const obj = eventize({});
+
+    on(obj, 'other', () => {
+      throw new Error('boom');
+    });
+
+    retain(obj, 'a');
+    emit(obj, 'a', 'A');
+
+    expect(() =>
+      on(obj, 'a', () => {
+        emit(obj, 'other');
+      }),
+    ).not.toThrow();
+
+    expect(warnMock).toHaveBeenCalledTimes(1);
+    // the replayed name, not the one whose listener actually threw
+    expect(warnMock.mock.calls[0][1]).toBe('a');
+    expect((warnMock.mock.calls[0][2] as Error).message).toBe('boom');
+  });
+
+  // A once() spends its one shot in `callAfterApply`, which apply() runs only
+  // *after* the listener returned — so a throwing replay settles nothing, and
+  // the next replay of the same batch finds the obligation still open. Two
+  // intended decisions meet here: a throwing listener keeps its one-shot, and
+  // the replays of one batch no longer stop at the first throw. The result is
+  // a once() that fires twice for one subscription, which no non-throwing
+  // path can produce.
+  it('leaves a once() obligation open, so the next replay of the batch fires it again', () => {
+    const obj = eventize({});
+    const seen: string[] = [];
+
+    retain(obj, ['a', 'b']);
+    emit(obj, 'a', 'A');
+    emit(obj, 'b', 'B');
+
+    once(obj, ['a', 'b'], (value: string) => {
+      seen.push(value);
+      if (value === 'A') throw new Error('boom');
+    });
+
+    expect(seen).toEqual(['A', 'B']);
+    // the second replay returned normally, so it settled the obligation
+    expect(getSubscriptionCount(obj)).toBe(0);
+
+    emit(obj, 'a', 'AFTERWARDS');
+    expect(seen).toEqual(['A', 'B']);
+  });
+
+  // The counterpart: nothing in the batch returned normally, so the one shot
+  // is still owed and the subscription stays.
+  it('keeps a once() armed when every replay of the batch throws', () => {
+    const obj = eventize({});
+    const seen: string[] = [];
+
+    retain(obj, ['a', 'b']);
+    emit(obj, 'a', 'A');
+    emit(obj, 'b', 'B');
+
+    once(obj, ['a', 'b'], (value: string) => {
+      seen.push(value);
+      throw new Error('boom');
+    });
+
+    expect(seen).toEqual(['A', 'B']);
+    expect(warnMock).toHaveBeenCalledTimes(2);
+    expect(getSubscriptionCount(obj)).toBe(2);
   });
 });

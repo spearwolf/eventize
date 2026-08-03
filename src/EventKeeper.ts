@@ -1,5 +1,5 @@
 import type {AnyEventNames, EventArgs, EventName} from './types';
-import {isCatchEmAll} from './utils';
+import {isCatchEmAll, warn} from './utils';
 
 type KeeperEventItem = {
   order: number;
@@ -8,6 +8,8 @@ type KeeperEventItem = {
 
 export type KeeperEvent = {
   order: number;
+  /** The name being replayed — carried for the warning in `publish()`. */
+  eventName: EventName;
   replay: () => void;
 };
 
@@ -67,9 +69,59 @@ const EMPTY_EVENT_NAMES: Set<EventName> = Object.freeze(
 );
 
 export class EventKeeper {
+  /**
+   * Runs a batch of queued replays, oldest retained value first, and lets no
+   * single one of them end the batch.
+   *
+   * This is the tail of a `subscribeTo()` call, which is why a throw is
+   * swallowed here and nowhere else in the library — `emitAsync()`'s catch
+   * claims its collected promises and rethrows, this one does not rethrow: at
+   * an `emit()` a throwing listener unwinds into the caller that *caused* the
+   * event, and that caller is the right place for it. The caller of a replay is whoever just called `on()` or
+   * `once()`; they did not produce the value, they may not know the emitter
+   * retains anything at all, and by the time a replay runs their listeners are
+   * already in the store. Letting the throw out would hand them a half-served
+   * batch — the names after the throwing one never replayed — plus no
+   * unsubscribe handle for the subscriptions the call had already made, which
+   * left `off()` as the only way back out. So every replay gets its own
+   * `try`/`catch`, and `on()` / `once()` return normally.
+   *
+   * Nothing disappears: a caught throw goes to `warn()` with the event name it
+   * came from, one line per throwing replay. Sorting happens once, before the
+   * first replay runs, so a throw in the middle of a batch cannot reorder what
+   * is left of it.
+   *
+   * The catch is as wide as the replay, not as wide as the replayed listener:
+   * a replay whose handler emits something else synchronously carries that
+   * whole dispatch inside the `try`, so a throw from a listener two events away
+   * is caught here too and reported under the replayed name. Narrowing it is
+   * not possible from here — everything a replay reaches is one synchronous
+   * call — and it is the right end of the trade anyway, since the alternative
+   * is the same half-served batch by a longer route. It does mean the warning
+   * names where the replay started, not necessarily where the throw came from;
+   * the error object it logs alongside carries that.
+   *
+   * A `once()` is the one thing that notices which replay threw.
+   * `EventListener.apply()` settles its obligation *after* the dispatch, so a
+   * replay that throws settles nothing, and the next replay of the same batch
+   * finds the one shot still owed and fires the listener again. That follows
+   * from a decision kept on purpose — a throwing listener keeps its one-shot —
+   * and `docs/retain.md` states it for consumers.
+   */
   static publish(events: KeeperEvent[]): void {
     if (events.length === 0) return;
-    events.sort(byOrder).forEach((event) => event.replay());
+    events.sort(byOrder);
+    for (const event of events) {
+      try {
+        event.replay();
+      } catch (error) {
+        warn(
+          'a retained replay threw; the batch continues. event:',
+          event.eventName,
+          error,
+        );
+      }
+    }
   }
 
   events: Map<EventName, KeeperEventItem> = EMPTY_EVENTS;
@@ -177,6 +229,7 @@ export class EventKeeper {
         const {order, args} = event;
         sortedEvents.push({
           order,
+          eventName,
           replay: () => eventListener.apply(eventName, args),
         });
       }

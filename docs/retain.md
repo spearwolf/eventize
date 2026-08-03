@@ -10,7 +10,7 @@ Key behaviors:
 
 - Calling `retain()` on a non-eventized object automatically eventizes it.
 - Only the **last** emission is retained; later ones overwrite it.
-- Retained events are delivered to new subscribers synchronously, during `on()` — but only once the whole call is registered. The replays are queued while subscribing and flushed as a batch afterwards, so every name of an `on(ε, ['a', 'b'], fn)` is already live when the first replay runs. Two consequences: a replay that emits another retained name reaches the listener live *and* still gets that name's queued replay afterwards, and a listener that throws on a replay throws out of `on()` while its subscription stays registered — the caller never receives the handle for it.
+- Retained events are delivered to new subscribers synchronously, during `on()` — but only once the whole call is registered. The replays are queued while subscribing and flushed as a batch afterwards, so every name of an `on(ε, ['a', 'b'], fn)` is already live when the first replay runs. Two consequences: a replay that emits another retained name reaches the listener live *and* still gets that name's queued replay afterwards, and a listener that throws on a replay does not take the rest of the batch with it — see [A listener that throws on a replay](#a-listener-that-throws-on-a-replay).
 - With several retained events, a new subscriber receives them in completion order — the order in which each event's `emit()` call returned, not the order in which the calls started. The two coincide only when no `emit()` call is nested inside another. Nesting is not a corner case: any listener that itself calls `emit()` before returning — most commonly a forwarding listener, `on(upstream, downstream)`, relaying one event onto another — reverses completion order relative to start order for the events involved. See below.
 - String and symbol event names both work.
 
@@ -88,6 +88,56 @@ once(ε, 'initialized', (data) => console.log('Initialized:', data));
 const result = await onceAsync(ε, 'initialized');
 console.log(result); // => { ready: true }
 ```
+
+### A listener that throws on a replay
+
+Since v6.0.0 every queued replay runs in its own `try`/`catch`. A listener that
+throws while a retained value is being replayed to it does not end the batch:
+
+- the remaining replays still run, in the same order they were sorted into
+  before the first one started;
+- the throw is reported through `console.warn`, prefixed `[eventize]`, with the
+  event name and the error object — it is not rethrown, and there is no other
+  hook for it;
+- `on()` and `once()` return their handle as usual, for the complete
+  registration the call made.
+
+```javascript
+retain(ε, ['a', 'b']);
+emit(ε, 'a', 'A');
+emit(ε, 'b', 'B');
+
+const unsubscribe = on(ε, ['a', 'b'], (value) => {
+  if (value === 'A') throw new Error('boom');
+  console.log(value);
+});
+// => [eventize] a retained replay threw; the batch continues. event: a Error: boom
+// => "B"
+// `unsubscribe` covers both names and works
+```
+
+This is the one place where a throwing listener is swallowed. During an `emit()`
+it propagates to the caller that *caused* the event, which is where the
+decision about it belongs. A replay has no such caller: whoever called `on()`
+did not produce the value, may not know the emitter retains anything, and their
+listeners are already registered by the time a replay runs — so letting the
+throw out handed them a half-served batch and no handle for subscriptions that
+existed either way. Up to v5.1.0 that is exactly what happened, and `off()` was
+the only way back out.
+
+One consequence for `once()`: the one shot is spent *after* the listener
+returns, so a replay that throws settles nothing. The next replay of the same
+batch finds the obligation still open and calls the listener again — a `once()`
+that fires twice for one subscription. If every replay of the batch throws, the
+`once()` stays armed for the next real `emit()`. Same rule as [a throwing
+`once()` during `emit()`](./lifecycle.md#a-once-is-only-spent-when-something-was-actually-called),
+seen through a batch instead of a single dispatch.
+
+One thing to know before reading a warning as a diagnosis: the catch covers
+everything a replay sets off synchronously, not just the replayed listener. If
+that listener emits another event and *its* handler throws, the throw is caught
+here as well and reported under the name that was being replayed. The logged
+error object is what says where it actually came from.
 
 ### Notes
 

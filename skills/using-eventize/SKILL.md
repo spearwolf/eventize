@@ -120,6 +120,14 @@ compile time) or an explicit `isEventized()` guard.
    a defect on its own: this one is that rule meeting the absent recursion guard
    of pitfall 4. If a `once()` body may re-enter its own event, unsubscribe
    through the returned handle before emitting.
+   **A retained replay is the one dispatch this does not describe.** Since
+   v6.0.0 each replay queued by an `on()`/`once()` call runs in its own
+   `try`/`catch`: the throw is reported through `console.warn` with the event
+   name, the remaining replays of that batch still run, and the call returns its
+   handle. Up to v5.1.0 it threw out of `on()`, leaving registered
+   subscriptions the caller had no handle for. A `once()` sees the third way to
+   fire twice here — a replay that throws settles nothing, so the next replay of
+   the same batch calls it again.
 6. **Nested `emit()` retains out of order.** The same after-dispatch write means
    **any** `emit()` nested inside another — not only self-recursion — writes its
    retained state first, innermost call to outermost. The common way in is

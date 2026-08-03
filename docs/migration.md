@@ -437,9 +437,9 @@ interface, which is the whole reason the base class stopped declaring its own.
   nothing instead of throwing. Only reachable by constructing the class
   yourself, which the package no longer exports in either namespace.
 
-### Five fixes that behave like breaks
+### Six fixes that behave like breaks
 
-None of them is visible to the type checker, and all five change what runs.
+None of them is visible to the type checker, and all six change what runs.
 
 **Event names inherited from `Object.prototype` dispatch to nothing.**
 `toString`, `toLocaleString`, `valueOf`, `constructor`, `hasOwnProperty`,
@@ -579,6 +579,42 @@ call now succeeds silently and leaves a working method in its place. A
 *non-configurable* member still throws, either way — now
 `TypeError: Cannot redefine property: <name>` instead of the assignment
 error above.
+
+**A listener that throws on a retained replay no longer throws out of `on()`.**
+Up to v5.1.0 the throw propagated to whoever subscribed: the later names of a
+multi-name call never got their replay, and the subscriptions the call had
+already made came back without a handle, removable only through `off()`. Since
+v6.0.0 each replay of a batch is isolated — the throw goes to `console.warn`
+with the event name, the rest of the batch runs, and the handle comes back:
+
+```js
+// v5 — the replay's throw arrived here
+try {
+  on(ε, 'config', applyConfig);
+} catch (err) {
+  reportBadConfig(err); // the only place it could be caught
+}
+
+// v6 — nothing arrives here any more; catch it where it happens
+on(ε, 'config', (cfg) => {
+  try {
+    applyConfig(cfg);
+  } catch (err) {
+    reportBadConfig(err);
+  }
+});
+```
+
+Only an emitter that retains something can replay at all, so start the grep
+there and check what the subscriptions on those names do with a bad value:
+
+```
+rg "\bretain\(" src/
+```
+
+A `once()` on a retained name is the one shape that changes twice over: a
+replay that throws settles nothing, so the next replay of the same batch calls
+the listener again — where v5 stopped at the first throw.
 
 ### Verifying the upgrade
 

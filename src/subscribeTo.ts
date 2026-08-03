@@ -45,7 +45,16 @@ const registerEventListener = (
   // every replay queued by this call in sequence before returning. Whichever
   // one runs first can settle that obligation — through the real dispatch it
   // triggers, same as any other emit — and a once() promises at most one
-  // invocation in total, retained replay included. `isRemoved` cannot be what
+  // invocation in total, retained replay included.
+  //
+  // That last promise holds for as long as no replay throws. Settling happens
+  // after the dispatch returns, so a replay that throws settles nothing, the
+  // guard below still reads `settled === false`, and the next replay of the
+  // same batch reaches this very handler again — a batch is no longer stopped
+  // by one throwing replay. See the doc comment at `EventKeeper.publish()`,
+  // which is where that isolation lives and why.
+  //
+  // `isRemoved` cannot be what
   // stops a later replay in the same batch: a member kept alive by an on()
   // registration is never removed at all, so its queued replay would call the
   // listener a second time with nothing left to guard it. The obligation
