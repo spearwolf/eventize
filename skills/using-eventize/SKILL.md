@@ -81,7 +81,7 @@ common source of surprise:
 | Functions | On a non-eventized target |
 | --- | --- |
 | `on`, `once`, `onceAsync`, `retain` | **auto-eventize** it, then proceed |
-| `emit`, `emitAsync` | **duck-type**: `obj[eventName](…args)`, else `obj.emit(eventName, …args)`, else no-op — an inherited `Object.prototype` member is not a match (pitfall 11) |
+| `emit`, `emitAsync` | **duck-type**: `obj[eventName](…args)`, else `obj.emit(eventName, …args)`, else no-op — a function or class target too (v6.0.0), and an inherited `Object.prototype` / `Function.prototype` member is not a match (pitfall 11) |
 | `off`, `getSubscriptionCount`, `getRetainedCount`, `getRetainedEventNames` | **permissive**: silent no-op / `0` / `[]`, even for `null` |
 | `retainClear`, `unretain` | **throw** `"object is not eventized"` |
 
@@ -157,7 +157,18 @@ compile time) or an explicit `isEventized()` guard.
     own property still skipped is an alias of that very function
     (`{toString: Object.prototype.toString}`). A skipped name falls through to the
     `.emit()` fallback. The method-name form `on(ε, 'evt', 'toString', obj)` is
-    exempt — it names what it wants.
+    exempt — it names what it wants. Since v6.0.0 the same identity test runs one
+    prototype level further out, against `Function.prototype`, which matters for
+    the function targets that arrived with it: `call`, `apply`, `bind`,
+    `toString` and `Symbol.hasInstance` are not handlers on a function. `name`
+    and `length` are own properties of a function, so the test is not what
+    decides them — they are a string and a number, not callable, and fall
+    through anyway. `arguments` and `caller` are the one place a name is not merely
+    unanswered: reading either off a strict-mode function throws, and the
+    dispatch reads before it subtracts, so those two surface a `TypeError`.
+    `__proto__` is carved out unconditionally like `constructor`, because no
+    level can subtract it and on a function it resolves to something callable —
+    `Function.prototype`, or the superclass of a subclass.
 12. **Two majors of eventize in one tree throw at the boundary.** The marker is
     keyed by `Symbol.for('eventize')`, which is realm-wide, so a `^5` and a `^6`
     installed side by side share one slot per object. Since v6.0.0 the marker

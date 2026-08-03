@@ -203,12 +203,12 @@ remedy. Check with `npm ls @spearwolf/eventize`, fix with `npm dedupe` or an
 `overrides` / `resolutions` entry pinning `^6.0.0`. At runtime,
 `getEventizeProtocol(obj)` says which copy owns an object without throwing.
 
-Four more runtime changes ride along, all filed as **fixes** rather than
+Five more runtime changes ride along, all filed as **fixes** rather than
 breaking changes — one stopped dispatching to code the subscriber never
-wrote, one turned a silent no-op into a throw, one made a call do the one
-thing its arguments ask for, one stopped an API surface from contradicting
-itself — but a `v5.1.0` consumer meets all four in the same upgrade and none
-of them is visible to the type checker:
+wrote, one widened what a target may be, one turned a silent no-op into a
+throw, one made a call do the one thing its arguments ask for, one stopped an
+API surface from contradicting itself — but a `v5.1.0` consumer meets all five
+in the same upgrade and none of them is visible to the type checker:
 
 - **An event name that only matches an inherited `Object.prototype` member
   dispatches to nothing.** `toString`, `toLocaleString`, `valueOf`,
@@ -230,7 +230,21 @@ of them is visible to the type checker:
   form (`on(ε, 'toString', 'toString', obj)`), which is deliberately exempt,
   or define the method on the target: a target's own method under that name
   dispatches as normal, unless it is literally an alias of
-  `Object.prototype`'s function.
+  `Object.prototype`'s function. The same test covers `Function.prototype` as
+  well since v6.0.0, which is what makes the next item safe.
+- **`emit()` on a non-eventized function or class dispatches instead of doing
+  nothing.** `emit(Registry, 'reset', 'shutdown')` calls
+  `Registry.reset('shutdown')`; up to v5.1.0 the duck-target test demanded
+  `typeof === 'object'`, so the call was a silent no-op — while the same
+  function dispatched normally after `eventize()`. Where the no-op was the
+  guard, write the guard: `if (isEventized(target)) emit(target, name, …args)`.
+  Two names on a function target are worse than unanswered: `arguments` and
+  `caller` are poisoned accessors on a strict-mode function, and a dispatch
+  reads the member before it subtracts anything, so both throw a `TypeError`
+  where they used to no-op — rename the event. (A sloppy-mode function answers
+  `null` and reaches the `.emit()` fallback.) Nothing else on a function is a
+  handler: `call`, `apply`, `bind`, `toString`, `Symbol.hasInstance` and
+  `__proto__` are all skipped.
 - **`on(ε, [], …)` and `once(ε, [], …)` throw instead of registering
   nothing.** An empty array of event names used to reach the same map that
   turns each name into a registration, so zero names meant zero
@@ -285,11 +299,13 @@ of them is visible to the type checker:
 
 1. `obj[eventName]` is a function the object itself provides → call it with
    `this === obj`. Since v6.0.0 a member inherited from `Object.prototype`
-   doesn't count (see the v5 → v6 note above).
+   doesn't count (see the v5 → v6 note above), nor one inherited from
+   `Function.prototype`.
 2. Else `obj.emit` is a function → call `obj.emit(eventName, …args)`.
 3. Else silent no-op.
 
-`null`, `undefined`, and non-objects no-op. `'*'` still throws. Return values flow through the same aggregation as eventized dispatch, so `emitAsync()` behaves uniformly across both paths.
+`null`, `undefined` and primitives no-op; since v6.0.0 a function or a class is a
+target like any object. `'*'` still throws. Return values flow through the same aggregation as eventized dispatch, so `emitAsync()` behaves uniformly across both paths.
 
 If you relied on the throw as a typo net, either guard with `isEventized()` or move to a typed emitter — `eventize<TEvents>()` still rejects unknown event names at compile time. `retainClear()` and `unretain()` are unchanged and still throw.
 

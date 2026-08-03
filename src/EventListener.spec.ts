@@ -277,6 +277,25 @@ describe('EventListener', () => {
       expect(callAfterApply).toHaveBeenCalledTimes(1);
     });
 
+    // The boundary's second level (`Function.prototype`, added with function
+    // dispatch targets in v6.0.0) runs on this path too, because both paths
+    // resolve through the same `dispatchableMember()`. A listener *object* can
+    // never be a function — `isObjListener()` requires `typeof === 'object'` —
+    // so the only shape on which the second level is observable here is the
+    // aliasing edge, which is exactly the shape the duck path pins as well
+    // ("skips an own property aliasing a Function.prototype function" in
+    // emit-ducktyping.spec.ts). Up to v5.1.0 this threw "Bind must be called on
+    // a function" from inside the dispatch.
+    it('skips an own property that is Function.prototype’s own function', () => {
+      const obj = {bind: Function.prototype.bind, emit: jest.fn()};
+      const listener = new EventListener('bind', 0, obj);
+      const returnValue = jest.fn();
+
+      expect(() => listener.apply('bind', [], returnValue)).not.toThrow();
+      expect(returnValue).not.toHaveBeenCalled();
+      expect(obj.emit.mock.calls[0]).toEqual(['bind']);
+    });
+
     it('keeps a null-prototype listener object working', () => {
       const listenerObject = Object.create(null) as Record<string, unknown>;
       const foo = jest.fn();
@@ -326,6 +345,38 @@ describe('EventListener', () => {
       const returnValue = jest.fn();
       listener.apply('evt', [], returnValue);
       expect(returnValue).toHaveBeenCalledWith('[object Object]');
+    });
+
+    // `constructor` and `__proto__` are the same deliberate exception as
+    // `toString` above, just unconditional rather than snapshot-gated (see
+    // dispatchableMember() in src/utils.ts): the method-name form always
+    // reads the property the caller named. What that property resolves to
+    // still depends on the listener object it is read from. On a plain
+    // object, `__proto__` is `Object.prototype` itself — not callable — so
+    // the dispatch quietly finds nothing to invoke and a once() in this
+    // shape survives.
+    it('reads __proto__ on a plain object but finds nothing callable', () => {
+      const listener = new EventListener('evt', 0, '__proto__', {});
+      const returnValue = jest.fn();
+      const callAfterApply = jest.fn();
+      listener.callAfterApply = callAfterApply;
+      expect(() => listener.apply('evt', [], returnValue)).not.toThrow();
+      expect(returnValue).not.toHaveBeenCalled();
+      expect(callAfterApply).not.toHaveBeenCalled();
+    });
+
+    // On a function, the same property instead reads `Function.prototype` —
+    // which is itself a callable, no-op function — so the dispatch does find
+    // something to call, the call happens, and a once() in this shape is
+    // consumed.
+    it('reads __proto__ on a function and finds Function.prototype, which is callable', () => {
+      const listener = new EventListener('evt', 0, '__proto__', function () {});
+      const returnValue = jest.fn();
+      const callAfterApply = jest.fn();
+      listener.callAfterApply = callAfterApply;
+      expect(() => listener.apply('evt', [], returnValue)).not.toThrow();
+      expect(returnValue).not.toHaveBeenCalled();
+      expect(callAfterApply).toHaveBeenCalled();
     });
   });
 

@@ -17,21 +17,25 @@ import {emit, emitAsync, eventize, on, once} from './index';
  * comparison cannot see the failure it needs to see — each says so where it
  * appears.
  *
- * Function targets are deliberately not among the forms below, and not
- * merely because they haven't been added yet. `on(ε, fn)` tags `fn` as
- * `LISTENER_IS_FUNC` (`detectListenerType()`), and `EventListener.apply()`'s
- * first branch calls `fn` itself — there is no listener-object form that
- * resolves a member *on* a function the way the object forms below resolve
- * one on a plain object. `isObjListener()` requires `typeof === 'object'`
- * for exactly this reason. The duck path, meanwhile, silently no-ops on a
- * bare function today (`isDuckTarget()` requires `typeof === 'object'` too) —
- * a gap to be closed separately. Once it is, the two paths still permanently
- * disagree at this one spot: a function handed to the listener side is a
- * function *listener*, never a listener *object* to resolve members on. The
- * one shape that does read a member off a function listener object is the
- * method-name form `on(ε, 'evt', 'method', fn)`, through `canReadMembers()`
- * — a different branch entirely, called out here so it isn't mistaken for
- * the object-dispatch form this file compares.
+ * Function targets are deliberately not among the forms below, and the reason
+ * is structural rather than a gap waiting to be filled. The duck path does
+ * resolve members on a function since v6.0.0 (`isDuckTarget()` accepts
+ * `typeof === 'function'`); the listener path never will. `on(ε, fn)` tags
+ * `fn` as `LISTENER_IS_FUNC` (`detectListenerType()`), and
+ * `EventListener.apply()`'s first branch calls `fn` itself — a function handed
+ * to the listener side is a function *listener*, never a listener *object* to
+ * resolve members on, and `isObjListener()` requires `typeof === 'object'` for
+ * exactly that reason. So the function shape has no second side to compare
+ * against: it is pinned as absolute cases of the duck path in
+ * `emit-ducktyping.spec.ts`, the `Function.prototype` level of the member
+ * boundary included. The one part of that level both paths can reach is the
+ * aliasing edge `{bind: Function.prototype.bind}` on an *object*, pinned on
+ * each side separately — in `emit-ducktyping.spec.ts` and in
+ * `EventListener.spec.ts`. The one shape that does read a member off a
+ * function listener object is the method-name form
+ * `on(ε, 'evt', 'method', fn)`, through `canReadMembers()` — a different
+ * branch entirely, called out here so it isn't mistaken for the
+ * object-dispatch form this file compares.
  *
  * The duck path is exercised as `emit(target, ...)` / `emitAsync(target, ...)`
  * on a plain, non-eventized object. The listener path is exercised as

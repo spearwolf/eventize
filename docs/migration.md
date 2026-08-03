@@ -437,9 +437,9 @@ interface, which is the whole reason the base class stopped declaring its own.
   nothing instead of throwing. Only reachable by constructing the class
   yourself, which the package no longer exports in either namespace.
 
-### Four fixes that behave like breaks
+### Five fixes that behave like breaks
 
-None of them is visible to the type checker, and all four change what runs.
+None of them is visible to the type checker, and all five change what runs.
 
 **Event names inherited from `Object.prototype` dispatch to nothing.**
 `toString`, `toLocaleString`, `valueOf`, `constructor`, `hasOwnProperty`,
@@ -463,6 +463,41 @@ or define the method on the target. A target's own method under that name
 dispatches as normal, unless it is literally an alias of `Object.prototype`'s
 function (`{toString: Object.prototype.toString}` is skipped along with the
 inherited one).
+
+The same identity test covers `Function.prototype` as well now, which is what
+makes the next item safe.
+
+**`emit()` on a non-eventized function or class dispatches instead of doing
+nothing.** `emit(Registry, 'reset', 'shutdown')` calls `Registry.reset('shutdown')`;
+up to v5.1.0 the duck-target test demanded `typeof === 'object'`, so the call was
+a silent no-op — while the very same function dispatched normally after
+`eventize()`. Code that relied on the no-op as a guard has to say so:
+
+```js
+if (isEventized(target)) emit(target, name, ...args); // only eventized targets
+```
+
+Two event names on a function target are worse than unanswered. `arguments` and
+`caller` are poisoned accessors on a strict-mode function, and a dispatch reads
+the member before it subtracts anything, so both throw a `TypeError` where they
+used to be a silent no-op — rename the event, or keep the target's own method
+under a different name. A sloppy-mode function answers `null` and reaches the
+`.emit()` fallback instead. Nothing else on a function is a handler: `call`,
+`apply`, `bind`, `toString`, `Symbol.hasInstance` and `__proto__` are all
+skipped.
+
+The greppable part is the target, not the name:
+
+```
+rg "\b(emit|emitAsync)\(\s*[A-Z][A-Za-z0-9_]*\s*," src/
+```
+
+That finds the class-shaped targets — a starting point, not a complete find:
+`\b` also matches after a `.`, so it fires just as readily on a method call
+like `obj.emit(Foo, 'bar', 666)`, where `Foo` is the event name argument, not
+the dispatch target. The one that bites is an event name out of external data
+on a target that can be a function, and no pattern sees that — grep the
+assembly of the name instead, the way the empty-array item below does.
 
 **`on(ε, [], …)` and `once(ε, [], …)` now throw instead of registering
 nothing.** An empty array of event names used to reach the same map that turns
@@ -569,13 +604,14 @@ non-eventized target. They duck-type instead:
 
 1. `obj[eventName]` is a function the object actually provides → call it with
    `this === obj`. Since v6.0.0 a member inherited from `Object.prototype` does
-   not count.
+   not count, nor one inherited from `Function.prototype`.
 2. Otherwise `obj.emit` is a function → call `obj.emit(eventName, …args)`.
 3. Otherwise a silent no-op.
 
-`null`, `undefined` and non-objects no-op. `'*'` still throws. Return values flow
-through the same aggregation as eventized dispatch, so `emitAsync()` behaves
-uniformly across both paths.
+`null`, `undefined` and primitives no-op; since v6.0.0 a function or a class is a
+target like any object. `'*'` still throws. Return values flow through the same
+aggregation as eventized dispatch, so `emitAsync()` behaves uniformly across both
+paths.
 
 If you relied on the throw as a typo net, guard with `isEventized()` or move to a
 typed emitter — `eventize<TEvents>()` still rejects unknown event names at

@@ -274,6 +274,298 @@ describe('emit() duck-typing on non-eventized targets (v5+)', () => {
     });
   });
 
+  // A function is a dispatch target like any other object since v6.0.0: a
+  // class with static handlers, a factory function carrying methods, a plain
+  // function used as a method bag. Its own block rather than rows among the
+  // object cases above, for two reasons. The member boundary has a second
+  // level here — every function inherits `call`, `apply`, `bind` and
+  // `toString` from `Function.prototype`, none of which is a handler — and
+  // there is no eventized listener-object counterpart to compare against:
+  // `on(ε, fn)` subscribes `fn` itself as a function listener, so no member is
+  // ever resolved *on* a function on the listener side (see the header comment
+  // of dispatch-parity.spec.ts).
+  describe('function targets', () => {
+    it('calls fn[eventName] with the args', () => {
+      const foo = fake();
+      const target = Object.assign(function () {}, {foo});
+
+      emit(target, 'foo', 'a', 1, {x: 2});
+
+      expect(foo.calledOnce).toBe(true);
+      expect(foo.calledWith('a', 1, {x: 2})).toBe(true);
+    });
+
+    it('invokes the method with `this` === the function target', () => {
+      const seenThis: unknown[] = [];
+      const target = Object.assign(function () {}, {
+        foo(this: unknown) {
+          seenThis.push(this);
+        },
+      });
+
+      emit(target, 'foo');
+
+      expect(seenThis).toEqual([target]);
+    });
+
+    it('dispatches to a static method of a class', () => {
+      const seen: unknown[][] = [];
+      class Registry {
+        static reset(...args: unknown[]) {
+          seen.push(args);
+        }
+      }
+
+      emit(Registry, 'reset', 7);
+
+      expect(seen).toEqual([[7]]);
+    });
+
+    it('falls back to fn.emit(eventName, ...args)', () => {
+      const emitFn = fake();
+      const target = Object.assign(function () {}, {emit: emitFn});
+
+      emit(target, 'foo', 1, 'two');
+
+      expect(emitFn.calledOnceWith('foo', 1, 'two')).toBe(true);
+    });
+
+    it('lets a named method win over .emit()', () => {
+      const foo = fake();
+      const emitFn = fake();
+      const target = Object.assign(function () {}, {foo, emit: emitFn});
+
+      emit(target, 'foo', 'X');
+
+      expect(foo.calledOnceWith('X')).toBe(true);
+      expect(emitFn.called).toBe(false);
+    });
+
+    it('is a silent no-op with neither a named method nor .emit()', () => {
+      const target = function () {};
+
+      expect(() => emit(target, 'foo', 1)).not.toThrow();
+    });
+
+    it('never calls the function target itself', () => {
+      const target = fake();
+
+      emit(target, 'foo', 1);
+
+      expect(target.called).toBe(false);
+    });
+
+    it("throws on '*' like every other target", () => {
+      const target = Object.assign(function () {}, {emit: fake()});
+
+      expect(() => emit(target, '*', 'data')).toThrow(/concrete event name/);
+    });
+
+    // Same reasoning as the Object.prototype block above, one prototype level
+    // further: an event name out of external data hits `Function.prototype` on
+    // *every* function target, and `call`/`apply`/`bind` are callable, so
+    // without the boundary a function target answers all of them — with the
+    // caller's args reinterpreted as a `this` value.
+    describe('event names colliding with Function.prototype', () => {
+      const inheritedMethodNames = Object.getOwnPropertyNames(
+        Function.prototype,
+      ).filter((name) => {
+        // `arguments` and `caller` are poisoned accessors — reading either one
+        // throws, on `Function.prototype` and on any strict-mode function
+        // alike, so neither can ever resolve to a member. Pinned separately
+        // below.
+        try {
+          return (
+            typeof (Function.prototype as unknown as Record<string, unknown>)[
+              name
+            ] === 'function'
+          );
+        } catch {
+          return false;
+        }
+      });
+
+      it.each(inheritedMethodNames)(
+        'does not dispatch to the inherited %s',
+        (eventName) => {
+          const emitFn = fake();
+          const target = Object.assign(function () {}, {emit: emitFn});
+
+          expect(() => emit(target, eventName)).not.toThrow();
+          // The name found nothing, so the fallback chain continues.
+          expect(emitFn.calledOnceWith(eventName)).toBe(true);
+        },
+      );
+
+      it('does not dispatch to the inherited Symbol.hasInstance', () => {
+        const emitFn = fake();
+        const target = Object.assign(function () {}, {emit: emitFn});
+
+        emit(target, Symbol.hasInstance);
+
+        expect(emitFn.calledOnceWith(Symbol.hasInstance)).toBe(true);
+      });
+
+      it('is a silent no-op without an emit() fallback', () => {
+        const target = function () {};
+
+        expect(() => emit(target, 'call', 'a')).not.toThrow();
+        expect(() => emit(target, 'bind')).not.toThrow();
+      });
+
+      it('still calls an own override of an inherited member', () => {
+        const call = fake();
+        const emitFn = fake();
+        const target = Object.assign(function () {}, {call, emit: emitFn});
+
+        emit(target, 'call', 'X');
+
+        expect(call.calledOnceWith('X')).toBe(true);
+        expect(emitFn.called).toBe(false);
+      });
+
+      it('skips an own property aliasing the inherited function', () => {
+        const emitFn = fake();
+        const target = Object.assign(function () {}, {
+          call: Function.prototype.call,
+          emit: emitFn,
+        });
+
+        emit(target, 'call');
+
+        expect(emitFn.calledOnceWith('call')).toBe(true);
+      });
+
+      it('applies the Object.prototype level to a function target too', () => {
+        const emitFn = fake();
+        const target = Object.assign(function () {}, {emit: emitFn});
+
+        emit(target, 'valueOf');
+
+        expect(emitFn.calledOnceWith('valueOf')).toBe(true);
+      });
+
+      // `name` and `length` are *own* properties of every function, so the
+      // identity test against `Function.prototype` does not cover them — and
+      // it does not have to: both hold a string / a number, never a function,
+      // so they fail the callability test one step later and reach the
+      // fallback like any unanswered name. Pinned because the boundary's
+      // reasoning stops one step short of them.
+      it.each(['name', 'length'])(
+        'reaches the .emit() fallback for the own function property %s',
+        (eventName) => {
+          const emitFn = fake();
+          const target = Object.assign(function namedFn() {}, {emit: emitFn});
+
+          expect(() => emit(target, eventName)).not.toThrow();
+          expect(emitFn.calledOnceWith(eventName)).toBe(true);
+        },
+      );
+
+      // The one sharp edge of allowing function targets, pinned as measured
+      // rather than as wanted: `fn.arguments` and `fn.caller` throw for a
+      // strict-mode function, and the member read happens before any boundary
+      // can subtract anything. So these two names surface a TypeError from
+      // inside dispatch instead of reaching the fallback. Loud, and the same
+      // TypeError the equivalent hand-written property read would produce.
+      it.each(['arguments', 'caller'])(
+        'lets the poisoned accessor %s throw out of the dispatch',
+        (eventName) => {
+          const emitFn = fake();
+          const target = Object.assign(function () {}, {emit: emitFn});
+
+          expect(() => emit(target, eventName)).toThrow(TypeError);
+          expect(emitFn.called).toBe(false);
+        },
+      );
+    });
+
+    // `__proto__` is the one name neither prototype level can subtract, and on
+    // a function target it is the only inherited name that resolves to
+    // something callable: `fn.__proto__` *is* `Function.prototype`. Neither
+    // level sees it — `Object.prototype.__proto__` is `null`, and
+    // `Reflect.ownKeys(Function.prototype)` does not list the accessor at all,
+    // because it lives on `Object.prototype`. So it is carved out
+    // unconditionally, the way `constructor` is, and for the same reason: no
+    // handler under that name is legitimate (in an object literal `__proto__:`
+    // sets the prototype instead of defining a property), and identity cannot
+    // answer it. On an object target the name was always harmless —
+    // `Object.prototype` is not callable — which is why this whole edge
+    // arrived with function targets.
+    describe('the event name "__proto__"', () => {
+      it('does not call Function.prototype, and reaches the .emit() fallback', () => {
+        const emitFn = fake();
+        const target = Object.assign(function () {}, {emit: emitFn});
+
+        expect(() => emit(target, '__proto__', 1)).not.toThrow();
+        expect(emitFn.calledOnceWith('__proto__', 1)).toBe(true);
+      });
+
+      it('does not call the superclass of a subclass target', () => {
+        const seen: unknown[][] = [];
+        class Base {}
+        class Sub extends Base {
+          static emit(...args: unknown[]) {
+            seen.push(args);
+          }
+        }
+
+        expect(() => emit(Sub, '__proto__')).not.toThrow();
+        expect(seen).toEqual([['__proto__']]);
+      });
+
+      it('aggregates nothing from it through emitAsync()', async () => {
+        class Base {}
+        class Sub extends Base {}
+
+        await expect(emitAsync(Sub, '__proto__')).resolves.toBeUndefined();
+      });
+
+      it('is skipped on an object target whose prototype is a function', () => {
+        const emitFn = fake();
+        const target = Object.create(function () {}) as {emit: unknown};
+        target.emit = emitFn;
+
+        expect(() => emit(target, '__proto__')).not.toThrow();
+        expect(emitFn.calledOnceWith('__proto__')).toBe(true);
+      });
+    });
+
+    // The second boundary level is keyed by name for every target, not just
+    // for functions — which is what makes these two cases about plain objects
+    // part of this feature. `arguments` in particular is a legal handler name
+    // on an object and must stay one: a boundary that read the live
+    // `Function.prototype.arguments` to compare against would throw here.
+    describe('an object target under the second boundary level', () => {
+      it('still dispatches to an own method named after a poisoned accessor', () => {
+        const handler = fake();
+        const target = {arguments: handler, caller: handler};
+
+        emit(target, 'arguments', 1);
+        emit(target, 'caller', 2);
+
+        expect(handler.callCount).toBe(2);
+      });
+
+      it('still dispatches to an own method named after a Function.prototype member', () => {
+        const call = fake();
+
+        emit({call}, 'call', 'X');
+
+        expect(call.calledOnceWith('X')).toBe(true);
+      });
+
+      it('skips an own property aliasing a Function.prototype function', () => {
+        const emitFn = fake();
+        const target = {bind: Function.prototype.bind, emit: emitFn};
+
+        emit(target, 'bind');
+
+        expect(emitFn.calledOnceWith('bind')).toBe(true);
+      });
+    });
+  });
+
   describe('non-object targets', () => {
     it('silently no-ops on null', () => {
       expect(() => emit(null as unknown as object, 'foo')).not.toThrow();
@@ -281,6 +573,10 @@ describe('emit() duck-typing on non-eventized targets (v5+)', () => {
 
     it('silently no-ops on undefined', () => {
       expect(() => emit(undefined as unknown as object, 'foo')).not.toThrow();
+    });
+
+    it('silently no-ops on a primitive', () => {
+      expect(() => emit(42 as unknown as object, 'toFixed')).not.toThrow();
     });
   });
 
@@ -398,6 +694,30 @@ describe('emitAsync() duck-typing on non-eventized targets (v5+)', () => {
     const result = await emitAsync(target, ['a', 'b']);
 
     expect(result).toEqual(['A', 'B']);
+  });
+
+  it('aggregates the return value of a method on a function target', async () => {
+    const target = Object.assign(function () {}, {
+      load() {
+        return Promise.resolve(42);
+      },
+    });
+
+    await expect(emitAsync(target, 'load')).resolves.toEqual([42]);
+  });
+
+  it('aggregates the .emit() fallback of a function target', async () => {
+    const target = Object.assign(function () {}, {
+      emit(_eventName: string, n: number) {
+        return n * 2;
+      },
+    });
+
+    await expect(emitAsync(target, 'whatever', 21)).resolves.toEqual([42]);
+  });
+
+  it('aggregates nothing from an inherited Function.prototype member', async () => {
+    await expect(emitAsync(function () {}, 'bind')).resolves.toBeUndefined();
   });
 
   it('aggregates nothing from an inherited Object.prototype member', async () => {

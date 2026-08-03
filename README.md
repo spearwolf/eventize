@@ -244,7 +244,7 @@ Eventize splits its API into four families by how each function treats a target 
 | Function                                    | On a non-eventized object                    |
 | ------------------------------------------- | -------------------------------------------- |
 | `on()`, `once()`, `onceAsync()`, `retain()` | Auto-eventizes the object                    |
-| `emit()`, `emitAsync()` (v5+)               | Duck-types: calls `obj[eventName](...args)`  |
+| `emit()`, `emitAsync()` (v5+)               | Duck-types: calls `obj[eventName](...args)` — a function target too (v6.0.0) |
 | `off()`, `getSubscriptionCount()`, `getRetainedCount()`, `getRetainedEventNames()` | Silently does nothing / returns `0` / `[]` |
 | `retainClear()`, `unretain()`               | Throws `"object is not eventized"`           |
 
@@ -260,9 +260,11 @@ Eventize splits its API into four families by how each function treats a target 
 
 Step 1 ignores a member that is identical to `Object.prototype`'s member of the same name, so an event called `toString`, `valueOf`, `constructor`, `hasOwnProperty`, `isPrototypeOf`, `propertyIsEnumerable` or `toLocaleString` does not dispatch to the function every object inherits — it moves on to step 2. The list is not a list: the test is identity against `Object.prototype`, so it covers every member that object carries, V8's `__defineGetter__` / `__lookupSetter__` family included. Define your own `toString` — on the object or on its class — and it is called as normal, because the check compares the resolved member against `Object.prototype`'s function by identity rather than going by the name. The one own property that is still skipped is an alias of that same function, `{toString: Object.prototype.toString}`. The same boundary applies to listener-object dispatch on an eventized target.
 
+Since v6.0.0 the target may be a **function** — a class with static handlers, a factory carrying methods — and the same three steps apply, with the boundary extended one prototype level: a member identical to `Function.prototype`'s member of the same name is ignored too, so `call`, `apply`, `bind`, `toString` and `Symbol.hasInstance` are not handlers on a function target and move on to step 2. `name` and `length` are own properties of every function rather than inherited ones, so the boundary is not what decides them — they hold a string and a number, are therefore not callable, and reach step 2 all the same. Two names are the exception to "an unanswered name is harmless": `arguments` and `caller` throw a `TypeError` for a strict-mode function on the read itself, before any boundary can subtract them, so an event under either name surfaces that error out of the dispatch. `__proto__` is skipped unconditionally, the way `constructor` is: no identity test can subtract it, and on a function it resolves to `Function.prototype` — or, on a subclass, to the superclass — which the dispatch would otherwise call.
+
 One collision: on a target with its own `.emit`, `emit(obj, 'emit', ...args)` hits step 1 and calls `obj.emit(...args)` without the event name — it never reaches step 2. A target with no `.emit` is unaffected (both steps fail, silent no-op). This is the protocol applied literally; the collision occurs when the event name matches the fallback method itself.
 
-That lets you point `emit()` at adapters, mocks, or plain method-bags without ceremony. `null` / `undefined` / non-object targets silently no-op. **`'*'` still throws** — it remains subscribe-only.
+That lets you point `emit()` at adapters, mocks, or plain method-bags without ceremony. `null`, `undefined` and primitives silently no-op. **`'*'` still throws** — it remains subscribe-only.
 
 Inside an array it throws *late*: `emit(ε, ['a', '*', 'b'])` dispatches `'a'`, then throws, and never dispatches `'b'` — a half-completed emit. `retain(ε, [names])` is the opposite and rejects atomically: a `'*'` anywhere in the array retains nothing at all.
 
@@ -284,6 +286,15 @@ const sink = {
 };
 emit(sink, 'foo', 'hello'); // => "foo: hello"
 emit(sink, 'missing'); // no-op (no method, no .emit fallback)
+
+// ✅ Duck-typing (v6.0.0): a function or a class is a target too
+class Registry {
+  static reset(reason) {
+    console.log('reset:', reason);
+  }
+}
+emit(Registry, 'reset', 'shutdown'); // => "reset: shutdown"
+emit(Registry, 'bind', globalThis); // no-op — inherited from Function.prototype
 
 // ✅ off() is permissive — safe in cleanup paths
 off({}); // no-op, no throw

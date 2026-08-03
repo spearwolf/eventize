@@ -222,8 +222,14 @@ const _duckEmit = (
   }
 };
 
+// Since v6.0.0 a function is a duck target too — a class with static handlers,
+// a factory carrying methods. This is the same set `asEventized()` accepts and
+// the same set `EventStore` treats as a listener object, so `emit(fn, 'foo')`
+// no longer means something different before and after `eventize(fn)`. The
+// member boundary in `dispatchableMember()` is what makes it safe: without it
+// every function target answers `call`, `apply` and `bind`.
 const isDuckTarget = (obj: unknown): obj is object =>
-  obj != null && typeof obj === 'object';
+  obj != null && (typeof obj === 'object' || typeof obj === 'function');
 
 const hasWildcard = (eventNames: unknown): boolean =>
   Array.isArray(eventNames)
