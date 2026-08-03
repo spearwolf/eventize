@@ -806,31 +806,59 @@ export function onceAsync<ReturnType = void>(
   options?: OnceAsyncOptions,
 ): Promise<ReturnType> {
   const signal = options?.signal;
-  return new Promise<ReturnType>((resolve, reject) => {
-    if (signal?.aborted) {
-      reject(abortReason(signal));
-      return;
-    }
-    // Declared before once() on purpose: the listener closure reads onAbort,
-    // which can only be created once `unsubscribe` exists.
-    let onAbort: (() => void) | undefined;
-    // A retained event fires inside once(), before there is anything to attach.
-    let resolved = false;
-    const unsubscribe = once(obj, eventNames, ((...args: EventArgs) => {
-      resolved = true;
-      if (signal != null && onAbort != null) {
-        signal.removeEventListener('abort', onAbort);
-      }
-      resolve(args[0] as ReturnType);
-    }) as ListenerFuncType);
-    if (signal != null && !resolved) {
-      onAbort = () => {
-        unsubscribe();
-        reject(abortReason(signal));
-      };
-      signal.addEventListener('abort', onAbort, {once: true});
-    }
+  // A manual deferred, not `new Promise((resolve, reject) => { ... once() ... })`:
+  // an argument error (empty name array, NaN priority, ...) is a programmer
+  // mistake, and every other throw site in this library fails synchronously
+  // at the call site rather than through a rejection. Calling once() inside a
+  // Promise executor would catch that throw and hand it back as a rejection
+  // instead — invisible to a fire-and-forget call with no `await`/`catch`,
+  // and an unhandled rejection under Node's default
+  // `--unhandled-rejections=throw`. Capturing `resolve`/`reject` here and
+  // calling once() afterwards, outside the executor, lets such a throw
+  // propagate straight out of onceAsync() to its caller.
+  let resolve!: (value: ReturnType | PromiseLike<ReturnType>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<ReturnType>((res, rej) => {
+    resolve = res;
+    reject = rej;
   });
+
+  // Deliberately ahead of once(), and therefore ahead of the argument
+  // validation once() carries out: if the signal already fired there is no
+  // reason to touch the emitter at all. One consequence follows from that
+  // ordering and is accepted rather than fixed — onceAsync(ε, [], {signal:
+  // alreadyAborted}) rejects with the abort reason instead of throwing the
+  // "insufficient arguments" error a bare onceAsync(ε, []) throws. Running
+  // once() first to validate before this check would register a real
+  // subscription, and a retained value can resolve that subscription
+  // synchronously from inside once() itself — settling the promise with a
+  // stale value the caller already told this call to abandon. Swallowing one
+  // rare argument error is the cheaper mistake of the two.
+  if (signal?.aborted) {
+    reject(abortReason(signal));
+    return promise;
+  }
+  // Declared before once() on purpose: the listener closure reads onAbort,
+  // which can only be created once `unsubscribe` exists.
+  let onAbort: (() => void) | undefined;
+  // A retained event fires inside once(), before there is anything to attach.
+  let resolved = false;
+  const unsubscribe = once(obj, eventNames, ((...args: EventArgs) => {
+    resolved = true;
+    if (signal != null && onAbort != null) {
+      signal.removeEventListener('abort', onAbort);
+    }
+    resolve(args[0] as ReturnType);
+  }) as ListenerFuncType);
+  if (signal != null && !resolved) {
+    onAbort = () => {
+      unsubscribe();
+      reject(abortReason(signal));
+    };
+    signal.addEventListener('abort', onAbort, {once: true});
+  }
+
+  return promise;
 }
 
 // ---------------------------------------------------------------------------

@@ -363,7 +363,18 @@ calls; // => 1
 `onceAsync(ε, eventName, {signal})` accepts an `AbortSignal`, close to the
 `fetch()` shape. Aborting unsubscribes the internal `once()` listener and rejects
 the promise — with the signal's `reason` if it has one, otherwise with a
-synthesized `AbortError` `DOMException`.
+synthesized `AbortError` `DOMException`. An already-aborted signal rejects the
+same way, immediately — that is the `fetch()` shape too, not an argument
+error.
+
+An argument error — an empty array of event names, a `NaN` priority — throws
+synchronously out of `onceAsync()` itself, at the call site, the same as every
+other programmer-error throw in this library. It does not reach the returned
+promise as a rejection, so a fire-and-forget call with no `await`/`catch`
+fails where the mistake is, instead of becoming an unhandled rejection —
+except when the signal is already aborted at the time of the call, in which
+case that takes precedence and the argument error is never checked: the call
+rejects with the abort reason instead of throwing.
 
 ```javascript
 const controller = new AbortController();

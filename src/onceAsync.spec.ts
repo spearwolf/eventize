@@ -30,6 +30,28 @@ describe('onceAsync()', () => {
     expect(await onceAsync(e, 'foo')).toBe(666);
   });
 
+  // A retained value replays into the listener synchronously, from inside
+  // once() itself, before onceAsync() has returned a promise to anyone. If the
+  // registration ever moves outside the Promise executor, `resolve` still has
+  // to be assigned and reachable at that exact point — pin that here instead
+  // of trusting it by inspection: `settled` must already be true after a
+  // single microtask, with no emit() call in between to resolve it late.
+  it('resolves synchronously during once() on a retained replay, not only eventually', async () => {
+    const e = eventize();
+    retain(e, 'foo');
+    emit(e, 'foo', 'immediate');
+
+    let settled = false;
+    const promise = onceAsync(e, 'foo').then((value) => {
+      settled = true;
+      return value;
+    });
+
+    await Promise.resolve();
+    expect(settled).toBe(true);
+    await expect(promise).resolves.toBe('immediate');
+  });
+
   it('with multiple event names', async () => {
     const e = eventize();
 
@@ -40,14 +62,46 @@ describe('onceAsync()', () => {
   });
 
   // ---------------------------------------------------------------------------------------------
-  // once() throws synchronously for an empty array of event names — and
-  // because that call sits inside the Promise executor here, the throw turns
-  // into a rejection instead of propagating out of onceAsync() itself. Before
-  // the fix, once(ε, []) subscribed nothing and the returned promise never
-  // settled: no resolve, no reject, just a dangling await forever.
-  it('rejects instead of hanging on an empty array of event names', async () => {
+  // once() throws synchronously for an argument error (empty array of event
+  // names, NaN priority, ...). onceAsync() must let that throw reach the
+  // caller synchronously too, at the call site — not swallow it into a Promise
+  // executor and hand back a rejection instead. A fire-and-forget
+  // `onceAsync(ε, [])` with no `await`/`catch` would otherwise become an
+  // unhandled rejection under Node's default `--unhandled-rejections=throw`,
+  // rather than failing at the line that has the bug.
+  it('throws synchronously instead of rejecting on an empty array of event names', () => {
     const e = eventize();
-    await expect(onceAsync(e, [])).rejects.toThrow(/insufficient arguments/);
+    expect(() => onceAsync(e, [])).toThrow(/insufficient arguments/);
+  });
+
+  it('throws synchronously instead of rejecting on a NaN priority', () => {
+    const e = eventize();
+    expect(() => onceAsync(e, [['foo', NaN]] as unknown as string[])).toThrow(
+      /NaN priority/,
+    );
+  });
+
+  // The signal.aborted pre-check runs before once() is ever called, so an
+  // already-aborted signal short-circuits before the argument validation
+  // gets a chance to run at all. An empty array of event names — normally a
+  // synchronous throw, per the two cases above — is swallowed here: the
+  // call rejects with the abort reason instead. See the doc comment beside
+  // onceAsync() for why this stays in that order rather than being "fixed".
+  it('an already-aborted signal wins over an argument error: rejects with the abort reason, does not throw', async () => {
+    const e = eventize();
+    const controller = new AbortController();
+    controller.abort();
+
+    let thrown = false;
+    let promise: Promise<unknown> | undefined;
+    try {
+      promise = onceAsync(e, [], {signal: controller.signal});
+    } catch {
+      thrown = true;
+    }
+
+    expect(thrown).toBe(false);
+    await expect(promise).rejects.toMatchObject({name: 'AbortError'});
   });
 
   describe('AbortSignal support', () => {

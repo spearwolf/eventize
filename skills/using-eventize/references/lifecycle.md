@@ -180,6 +180,15 @@ Aborting unsubscribes and rejects with the signal's `reason`, or with an
 `fetch()` would hand back the bare `null`). An already-aborted signal rejects
 without subscribing.
 
+An argument error — an empty array of event names, a `NaN` priority — throws
+synchronously out of `onceAsync()` at the call site rather than rejecting,
+so a fire-and-forget call with no `await`/`catch` fails at the mistake
+instead of becoming an unhandled rejection. That throw never happens,
+though, when the signal is already aborted: the abort check runs before
+`once()`'s own validation ever gets a chance to, so
+`onceAsync(ε, [], {signal: alreadyAborted})` rejects with the abort reason
+instead of throwing — the two checks race in a fixed order, and abort wins.
+
 **Without a signal, an `onceAsync()` on an event that never fires is a leak by
 construction**: the listener, the `resolve` closure and the caller's whole
 `await` continuation stay attached for the emitter's lifetime, and there is no
