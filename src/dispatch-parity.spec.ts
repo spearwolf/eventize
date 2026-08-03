@@ -8,13 +8,14 @@ import {emit, emitAsync, eventize, on, once} from './index';
  * the member through `dispatchableMember()`, fall back to `.emit()` built by
  * `prependEventName()`, and feed a return value through the same
  * `returnValue` callback so `emitAsync()` aggregates identically either way.
- * Nothing shared enforces that today — the chain is written out twice, once
- * per path (see AGENTS.md, "Three API surfaces, one implementation"). A red
- * test below means the two paths have diverged, not that one of them is
- * "wrong": most assertions here compare path against path rather than a
- * hand-pinned absolute value, because the divergence is what this spec
- * exists to catch. A handful are absolute anchors instead, where a pure
- * comparison cannot see the failure it needs to see — each says so where it
+ * Since v6.0.0 the chain is shared in `dispatchToTarget()` in
+ * `src/utils.ts`, called by both paths. The spec's reach has narrowed: any
+ * divergence must now come from what is not shared — like the `'*'` rejection
+ * each path makes itself. A red test below means the two paths have diverged,
+ * not that one of them is "wrong": most assertions here compare path against
+ * path rather than a hand-pinned absolute value, because the divergence is what
+ * this spec exists to catch. A handful are absolute anchors instead, where a
+ * pure comparison cannot see the failure it needs to see — each says so where it
  * appears.
  *
  * Function targets are deliberately not among the forms below, and the reason

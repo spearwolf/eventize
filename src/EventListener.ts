@@ -5,14 +5,14 @@ import {
 } from './constants';
 
 import type {EventName, EventArgs, ListenerObjectType} from './types';
+import type {DispatchTarget} from './utils';
 import {
-  dispatchableMember,
+  dispatchToTarget,
+  invokeListener,
   isCatchEmAll,
   isEventName,
-  prependEventName,
 } from './utils';
 
-type EmitFnType = Function | undefined;
 // The watermark is the obligation sequence counter's value immediately before
 // this dispatch invoked the listener — read there, not inside this callback,
 // because a handler that re-subscribes itself with once() aggregates onto the
@@ -29,14 +29,6 @@ type CallAfterApplyFnType = ((watermark: number) => void) | undefined;
 type ReturnValue = (retVal: unknown) => void;
 
 /**
- * A dispatch target seen from the inside: event-named members that may or may
- * not be functions, plus the optional `emit()` fallback spelled out so that
- * `noPropertyAccessFromIndexSignature` allows `.emit`. Nothing trusts a member
- * to be callable — `apply()` checks before it invokes.
- */
-type ObjListener = Record<EventName, unknown> & {emit?: EmitFnType};
-
-/**
  * Narrows a *listener object* — the thing a method-name subscription reads its
  * method off. Non-nullish is the entire runtime precondition for property
  * access, so the predicate asserts nothing the check doesn't establish; what
@@ -44,7 +36,7 @@ type ObjListener = Record<EventName, unknown> & {emit?: EmitFnType};
  * function qualifies on purpose: `on(ε, 'foo', 'reset', SomeClass)` is a
  * supported shape.
  */
-const canReadMembers = (obj: unknown): obj is ObjListener => obj != null;
+const canReadMembers = (obj: unknown): obj is DispatchTarget => obj != null;
 
 /**
  * Narrows a *listener* that is itself the dispatch target. Stricter than
@@ -54,49 +46,8 @@ const canReadMembers = (obj: unknown): obj is ObjListener => obj != null;
  * feed the result into the `emitAsync()` aggregation and consume a `once()`.
  * This is the same test `detectListenerType()` makes for LISTENER_IS_OBJ.
  */
-const isObjListener = (obj: unknown): obj is ObjListener =>
+const isObjListener = (obj: unknown): obj is DispatchTarget =>
   obj != null && typeof obj === 'object';
-
-/**
- * Returns true when `func` was actually callable and got invoked. Takes
- * `unknown` rather than a function type: every call site feeds it a member
- * read off a listener object, and the callability test below is the only
- * thing that may decide the question.
- */
-const apply = (
-  context: unknown,
-  func: unknown,
-  args: EventArgs,
-  returnValue?: ReturnValue,
-): boolean => {
-  if (typeof func === 'function') {
-    const retVal = func.apply(context, args);
-    if (retVal != null) {
-      returnValue?.(retVal);
-    }
-    return true;
-  }
-  return false;
-};
-
-const emit = (
-  eventName: EventName,
-  listener: ObjListener,
-  args: EventArgs,
-  returnValue?: ReturnValue,
-): boolean => {
-  // Checked here, ahead of building the forwarded argument list, rather than
-  // left to apply()'s own callability test: apply() already has the finished
-  // list as an argument by the time it runs, so it can't stop the allocation
-  // below from happening first. This is the common case for a catch-all
-  // listener object that only answers some of the names it receives — it
-  // reaches here, finds no emit() either, and now buys nothing for it.
-  const fn = listener.emit;
-  return (
-    typeof fn === 'function' &&
-    apply(listener, fn, prependEventName(eventName, args), returnValue)
-  );
-};
 
 /**
  * Returns the LISTENER_IS_* tag for a listener, or undefined for a type that
@@ -357,7 +308,7 @@ export class EventListener {
 
     // LISTENER_IS_FUNC
     if (typeof listener === 'function') {
-      apply(listenerObject, listener, args, returnValue);
+      invokeListener(listenerObject, listener, args, returnValue);
       // Unconditional: a function listener is callable by construction, so the
       // dispatch above always invoked it. Nothing to survive here.
       if (this.callAfterApply) this.callAfterApply(watermark);
@@ -368,7 +319,12 @@ export class EventListener {
     if (isEventName(listener)) {
       const didCall =
         canReadMembers(listenerObject) &&
-        apply(listenerObject, listenerObject[listener], args, returnValue);
+        invokeListener(
+          listenerObject,
+          listenerObject[listener],
+          args,
+          returnValue,
+        );
       // A once() must survive a dispatch that found no method — late-bound
       // listener objects are a normal pattern, and so is a listener object
       // that is not there at all.
@@ -380,17 +336,10 @@ export class EventListener {
     if (!isObjListener(listener)) return;
 
     if (this.isCatchEmAll || this.eventName === eventName) {
-      // dispatchableMember, not a raw `listener[eventName]`: a name colliding
-      // with an Object.prototype member found the inherited function on any
-      // object at all. Skipping it leaves the `emit()` fallback below as the
-      // next link in the chain, which is what an unanswered name should reach.
-      const didCall =
-        apply(
-          listener,
-          dispatchableMember(listener, eventName),
-          args,
-          returnValue,
-        ) || emit(eventName, listener, args, returnValue);
+      // The member-then-emit() chain lives in dispatchToTarget(), shared with
+      // the duck-typed path — including the boolean this reads: a once() is
+      // spent only by a dispatch that actually invoked something.
+      const didCall = dispatchToTarget(listener, eventName, args, returnValue);
       if (didCall && this.callAfterApply) this.callAfterApply(watermark);
     }
   }

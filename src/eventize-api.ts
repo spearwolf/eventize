@@ -26,7 +26,8 @@ import type {
   SubscribeArgs,
   UnsubscribeFunc,
 } from './types';
-import {dispatchableMember, isEventName, prependEventName} from './utils';
+import type {DispatchTarget} from './utils';
+import {dispatchToTarget, isEventName} from './utils';
 
 // The handle is idempotent by construction: a second call is inert, not a
 // second release. Without the guard a shared registration was decremented
@@ -168,12 +169,16 @@ const _emit = (
   }
 };
 
-// Duck-typing dispatch for non-eventized targets (v5+). Mirrors the
-// listener-object fallback in EventListener.ts: try obj[eventName](...args)
-// first; if no method is found, fall back to obj.emit(eventName, ...args);
-// otherwise silently no-op. Return values are surfaced via the same
-// `returnValue` callback used for eventized dispatch, so emitAsync can
-// aggregate them uniformly across both paths.
+// Duck-typing dispatch for non-eventized targets (v5+). The resolution itself
+// is `dispatchToTarget()`, the same function the listener-object path in
+// EventListener.ts runs — try obj[eventName](...args), else fall back to
+// obj.emit(eventName, ...args), else silently no-op — so the two paths cannot
+// disagree about what counts as a match and emitAsync() aggregates the same
+// way either way. What stays here is the `'*'` rejection: a name array has to
+// dispatch the names ahead of the wildcard before it throws, which is a
+// property of the loop below, not of a single dispatch.
+//
+// The duck path ignores the boolean, having no once() to spend on it.
 const _duckEmitOne = (
   obj: object,
   eventName: EventName,
@@ -185,26 +190,7 @@ const _duckEmitOne = (
       "emit() must be called with a concrete event name — '*' is reserved for subscribing to all events and cannot be emitted",
     );
   }
-  const target = obj as Record<EventName, unknown>;
-  // Same prototype boundary as the listener-object path in EventListener.ts —
-  // the two dispatch paths have to agree on what counts as a match, or the
-  // emitAsync() aggregation diverges between them. An event name out of
-  // external data (a JSON key, a message type) collides with
-  // Object.prototype on every plain object.
-  const fn = dispatchableMember(target, eventName);
-  if (typeof fn === 'function') {
-    const retVal = (fn as (...a: any[]) => any).apply(obj, args);
-    if (retVal != null) returnValue?.(retVal);
-    return;
-  }
-  const emitFn = (target as {emit?: unknown}).emit;
-  if (typeof emitFn === 'function') {
-    const retVal = (emitFn as (...a: any[]) => any).apply(
-      obj,
-      prependEventName(eventName, args),
-    );
-    if (retVal != null) returnValue?.(retVal);
-  }
+  dispatchToTarget(obj as DispatchTarget, eventName, args, returnValue);
 };
 
 const _duckEmit = (

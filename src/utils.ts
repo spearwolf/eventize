@@ -200,6 +200,149 @@ export const prependEventName = (
   return out;
 };
 
+/**
+ * A dispatch target seen from the inside: event-named members that may or may
+ * not be functions, plus the optional `emit()` fallback spelled out so that
+ * `noPropertyAccessFromIndexSignature` allows `.emit`. Both dispatch paths
+ * reduce their target to this shape — a listener object on the eventized path,
+ * a duck-typed target on the other — and nothing here trusts a member to be
+ * callable: `dispatchToTarget()` tests before it invokes.
+ */
+export type DispatchTarget = Record<EventName, unknown> & {emit?: unknown};
+
+/**
+ * Invokes `func` with `context` as its `this` if — and only if — it is callable,
+ * and returns whether it was. Takes `unknown` rather than a function type:
+ * every call site feeds it a member read off a listener object or a dispatch
+ * target, and the callability test below is the only thing that may decide the
+ * question.
+ *
+ * The return value is load-bearing all the way up: `EventListener.apply()`
+ * spends a `once()` on a dispatch that answers `true` and on no other, so
+ * "callable" and "was invoked" have to stay the same answer.
+ */
+export const invokeListener = (
+  context: unknown,
+  func: unknown,
+  args: EventArgs,
+  returnValue?: (retVal: unknown) => void,
+): boolean => {
+  if (typeof func === 'function') {
+    const retVal = func.apply(context, args);
+    if (retVal != null) {
+      returnValue?.(retVal);
+    }
+    return true;
+  }
+  return false;
+};
+
+/**
+ * The `.emit()` half of the chain below: forward the event name plus the
+ * original arguments to the target's own `emit()`, if it has a callable one.
+ *
+ * Callability is tested here, ahead of `prependEventName()`, rather than left
+ * to `invokeListener()`'s own test: that function already has the finished
+ * argument list by the time it runs, so it cannot stop the allocation from
+ * happening first. This is the common case for a catch-all listener object
+ * answering only some of the names it receives — it arrives here, finds no
+ * `emit` either, and now buys nothing for it.
+ */
+const emitFallback = (
+  target: DispatchTarget,
+  eventName: EventName,
+  args: EventArgs,
+  returnValue?: (retVal: unknown) => void,
+): boolean => {
+  const emitFn = target.emit;
+  return (
+    typeof emitFn === 'function' &&
+    invokeListener(
+      target,
+      emitFn,
+      prependEventName(eventName, args),
+      returnValue,
+    )
+  );
+};
+
+/**
+ * The resolution both dispatch paths share, in one place: resolve the
+ * event-named member through `dispatchableMember()` and call it, else fall back
+ * to `.emit()` with the event name prepended, else do nothing. Called by
+ * `EventListener.apply()`'s `LISTENER_IS_OBJ` branch and by `_duckEmitOne()`;
+ * up to v5.1.0 each wrote the chain out for itself, which is how the two came
+ * to disagree about function targets. AGENTS.md ("The two dispatch paths in
+ * `emit` move in lockstep") states the rule — this is the part of it that no
+ * longer depends on anyone remembering.
+ *
+ * `dispatchableMember()`, not a raw `target[eventName]`: a name colliding with
+ * an `Object.prototype` or `Function.prototype` member finds an inherited
+ * function on any target at all. Skipping it leaves the `.emit()` fallback as
+ * the next link in the chain, which is what an unanswered name should reach.
+ *
+ * **The return value is load-bearing**: `true` means something was actually
+ * invoked, and `EventListener.apply()` spends a `once()` on nothing else. A
+ * dispatch that resolved no member and found no `.emit()` must answer `false`,
+ * or a one-shot subscription is consumed by an event it never handled — the
+ * failure mode `dispatch-parity.spec.ts` keeps an absolute anchor for, because
+ * comparing the two paths against each other cannot see it (the duck path has
+ * no `once()` to diverge from).
+ *
+ * Deliberately outside: the `'*'` rejection (it stays in `_emitOne()` and
+ * `_duckEmitOne()`, because a name array must keep dispatching the names ahead
+ * of the wildcard before it throws — see AGENTS.md, "Known asymmetries"), the
+ * `isObjListener()` and `isCatchEmAll || eventName` tests in `apply()`, and the
+ * obligation watermark that has to be read before any of this runs.
+ *
+ * Three flat module-level functions taking positional arguments, rather than one
+ * body or anything that builds a closure: `EventStore.ts` explains the mechanism
+ * at `mergeWalk()` — on this path the size of a function decides whether its
+ * caller inlines it — and a closure factory or an options object would put an
+ * allocation on every dispatch on top of that. The split is not a device
+ * invented here either: `invokeListener()` and `emitFallback()` are the same two
+ * functions `EventListener.apply()` already called before this extraction. A
+ * call frame was added to the listener path, but does not show in the three
+ * listener-workload measurements.
+ *
+ * What the extraction does cost is on the other side, and it is two numbers: the
+ * duck path used to hold this chain inline in `_duckEmitOne()` and now pays the
+ * same two call frames the listener path always paid. Measured over the
+ * extraction, one variant per process, 1e7 dispatches per process, 25 processes
+ * per cell, the two variants interleaved and then re-run in the opposite order —
+ * a duck-typed `.emit()` fallback went from 11.5-12.0 ns to 11.7-12.3 ns, about
+ * 0.2 ns; a duck-typed dispatch that answers nothing regressed from 6.51-6.76 ns
+ * to 6.89-7.15 ns, about 0.38 ns (roughly 6% relative, strongest excursion in
+ * the field, but ranges are fully disjoint). Everything else stayed inside the
+ * baseline's own spread: a duck-typed method hit 9.9-10.4 against 10.0-10.6, and
+ * on the listener path a method hit 24.2-25.2 against 24.2-25.1, an `.emit()`
+ * fallback 30.5-32.3 against 30.5-33.3, and a dispatch that answers nothing
+ * 16.7-17.4 against 16.7-17.4.
+ * The trade: 0.2 ns on the compatibility path for non-eventized targets buys
+ * the end of the duplication that had already let the two paths disagree once,
+ * over function targets, which cost a `v6.0.0` behaviour change to repair.
+ *
+ * Two traps if this is ever re-measured, both paid for here. Sequential runs —
+ * every "before" process, then every "after" — put a machine drift squarely
+ * inside the comparison: that ordering reported a 10% duck-path regression that
+ * interleaving showed to be the box getting slower between the two halves, and
+ * the same absolute numbers moved by 15% across sessions with no code change at
+ * all. And single cells wander: quote ranges over many processes, never one
+ * value, which is the same warning `mergeWalk()` gives.
+ */
+export const dispatchToTarget = (
+  target: DispatchTarget,
+  eventName: EventName,
+  args: EventArgs,
+  returnValue?: (retVal: unknown) => void,
+): boolean =>
+  invokeListener(
+    target,
+    dispatchableMember(target, eventName),
+    args,
+    returnValue,
+  ) || emitFallback(target, eventName, args, returnValue);
+
 export const hasConsole = typeof console !== 'undefined';
 
 // `console.warn` is non-optional in lib.dom, so a truthiness test on it reads
