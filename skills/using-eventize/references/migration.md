@@ -307,6 +307,14 @@ in the same upgrade and none of them is visible to the type checker:
   replaces the descriptor outright and now succeeds silently instead. A
   non-configurable member still throws, now `Cannot redefine property:
   <name>` in place of the assignment error.
+- **`retainClear()` and `unretain()` throw a `TypeError` instead of a plain
+  `Error`, on a non-eventized target.** The message changed too: the old text
+  was `'object is not eventized'`; the new one names the function and the
+  remedy — `retainClear() cannot operate on a non-eventized object —
+  eventize(obj) first, or guard the call with isEventized(obj)` (`unretain()`
+  reads the same way). Code that matched the error class or the exact
+  message breaks. Catch `TypeError`, or match
+  `/cannot operate on a non-eventized object/` instead.
 
 ## v4 → v5: `emit()` stopped throwing
 

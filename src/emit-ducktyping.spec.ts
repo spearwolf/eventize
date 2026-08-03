@@ -581,12 +581,18 @@ describe('emit() duck-typing on non-eventized targets (v5+)', () => {
   });
 
   describe('retainClear / unretain remain strict', () => {
-    it('retainClear() still throws on non-eventized objects', () => {
-      expect(() => retainClear({}, 'foo')).toThrow('object is not eventized');
+    it('retainClear() still throws a TypeError on non-eventized objects', () => {
+      expect(() => retainClear({}, 'foo')).toThrow(TypeError);
+      expect(() => retainClear({}, 'foo')).toThrow(
+        'retainClear() cannot operate on a non-eventized object',
+      );
     });
 
-    it('unretain() still throws on non-eventized objects', () => {
-      expect(() => unretain({}, 'foo')).toThrow('object is not eventized');
+    it('unretain() still throws a TypeError on non-eventized objects', () => {
+      expect(() => unretain({}, 'foo')).toThrow(TypeError);
+      expect(() => unretain({}, 'foo')).toThrow(
+        'unretain() cannot operate on a non-eventized object',
+      );
     });
   });
 });

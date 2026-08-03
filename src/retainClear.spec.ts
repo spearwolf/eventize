@@ -45,12 +45,15 @@ describe('retainClear()', () => {
     expect(sub3.calledWith('plah')).toBeTruthy();
   });
 
-  it('throws error when called on non-eventized object', () => {
+  it('throws a TypeError when called on non-eventized object', () => {
     const obj = {};
 
     expect(() => {
       retainClear(obj, 'foo');
-    }).toThrow('object is not eventized');
+    }).toThrow(TypeError);
+    expect(() => {
+      retainClear(obj, 'foo');
+    }).toThrow('retainClear() cannot operate on a non-eventized object');
   });
 
   it('works with symbol event names', () => {

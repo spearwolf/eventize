@@ -9,7 +9,7 @@ to grep for and what to write instead.
 ## v5 → v6
 
 `v6.0.0` is the only `6.x` there is, so a `v5.1.0` consumer takes the whole jump
-at once. Fourteen breaking changes. Eight are runtime changes on signatures that
+at once. Fifteen breaking changes. Nine are runtime changes on signatures that
 do not change shape, so the type checker will not find the call sites for you —
 grep for the patterns below where one is given. Six are type-only and do surface
 as compile errors.
@@ -436,6 +436,14 @@ interface, which is the whole reason the base class stopped declaring its own.
 - **An `EventListener` built directly with a `null` listener** dispatches to
   nothing instead of throwing. Only reachable by constructing the class
   yourself, which the package no longer exports in either namespace.
+- **`retainClear()` and `unretain()` throw a `TypeError` instead of a plain
+  `Error`, on a non-eventized target.** The message changed with it: the old
+  text was `'object is not eventized'`; the new one names the function and the
+  remedy, e.g. `retainClear() cannot operate on a non-eventized object —
+  eventize(obj) first, or guard the call with isEventized(obj)` (`unretain()`
+  reads the same way). Code that matched the error class or the exact message
+  breaks. Grep for the old string: `rg "object is not eventized"`. _Migration:_
+  catch `TypeError`, or match `/cannot operate on a non-eventized object/`.
 
 ### Six fixes that behave like breaks
 

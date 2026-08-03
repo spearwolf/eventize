@@ -312,7 +312,8 @@ const plainObj = {};
 try {
   retainClear(plainObj, 'foo');
 } catch (e) {
-  console.error(e.message); // => "object is not eventized"
+  console.error(e instanceof TypeError); // => true
+  console.error(e.message); // => "retainClear() cannot operate on a non-eventized object — eventize(obj) first, or guard the call with isEventized(obj)"
 }
 
 const ε = eventize(plainObj);
@@ -368,4 +369,4 @@ on(ε, 'bar', console.log); // (nothing — retain is off)
 
 ### Inspecting what's retained
 
-`getRetainedCount(ε)` and `getRetainedEventNames(ε)` (see [README → Inspecting emitter state](../README.md#inspecting-emitter-state)) let you check retained state from the outside instead of reaching into `ε[Symbol.for('eventize')].keeper`. The two report different things on purpose — a name can carry a retain policy without ever having fired — so `getRetainedEventNames(ε).length >= getRetainedCount(ε)` always holds. Both return `0` / `[]` for a non-eventized object rather than throwing, unlike `retainClear()` and `unretain()`, which throw `"object is not eventized"`. `retain()` throws for neither reason — it eventizes the object instead, as the first bullet at the top of this page says; its only throw is the wildcard rejection.
+`getRetainedCount(ε)` and `getRetainedEventNames(ε)` (see [README → Inspecting emitter state](../README.md#inspecting-emitter-state)) let you check retained state from the outside instead of reaching into `ε[Symbol.for('eventize')].keeper`. The two report different things on purpose — a name can carry a retain policy without ever having fired — so `getRetainedEventNames(ε).length >= getRetainedCount(ε)` always holds. Both return `0` / `[]` for a non-eventized object rather than throwing, unlike `retainClear()` and `unretain()`, which throw a `TypeError` naming the function and the remedy (`eventize(obj)` first, or guard the call with `isEventized(obj)`). `retain()` throws for neither reason — it eventizes the object instead, as the first bullet at the top of this page says; its only throw is the wildcard rejection.

@@ -246,7 +246,7 @@ Eventize splits its API into four families by how each function treats a target 
 | `on()`, `once()`, `onceAsync()`, `retain()` | Auto-eventizes the object                    |
 | `emit()`, `emitAsync()` (v5+)               | Duck-types: calls `obj[eventName](...args)` — a function target too (v6.0.0) |
 | `off()`, `getSubscriptionCount()`, `getRetainedCount()`, `getRetainedEventNames()` | Silently does nothing / returns `0` / `[]` |
-| `retainClear()`, `unretain()`               | Throws `"object is not eventized"`           |
+| `retainClear()`, `unretain()`               | Throws `TypeError`                           |
 
 **Why the split?**
 
@@ -300,8 +300,8 @@ emit(Registry, 'bind', globalThis); // no-op — inherited from Function.prototy
 off({}); // no-op, no throw
 
 // ❌ Strict: retain-state mutators still surface typos
-retainClear({}, 'foo'); // throws: "object is not eventized"
-unretain({}, 'foo'); // throws: "object is not eventized"
+retainClear({}, 'foo'); // throws TypeError: retainClear() cannot operate on a non-eventized object — ...
+unretain({}, 'foo'); // throws TypeError: unretain() cannot operate on a non-eventized object — ...
 ```
 
 The type guard `isEventized(obj)` (see _Utilities_) lets you check defensively when you need to.

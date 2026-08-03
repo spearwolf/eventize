@@ -136,12 +136,15 @@ describe('unretain()', () => {
     expect(sub.called).toBeFalsy();
   });
 
-  it('throws error when called on non-eventized object', () => {
+  it('throws a TypeError when called on non-eventized object', () => {
     const obj = {};
 
     expect(() => {
       unretain(obj, 'foo');
-    }).toThrow('object is not eventized');
+    }).toThrow(TypeError);
+    expect(() => {
+      unretain(obj, 'foo');
+    }).toThrow('unretain() cannot operate on a non-eventized object');
   });
 
   it('works with functional API', () => {

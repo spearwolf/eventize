@@ -83,7 +83,7 @@ common source of surprise:
 | `on`, `once`, `onceAsync`, `retain` | **auto-eventize** it, then proceed |
 | `emit`, `emitAsync` | **duck-type**: `obj[eventName](…args)`, else `obj.emit(eventName, …args)`, else no-op — a function or class target too (v6.0.0), and an inherited `Object.prototype` / `Function.prototype` member is not a match (pitfall 11) |
 | `off`, `getSubscriptionCount`, `getRetainedCount`, `getRetainedEventNames` | **permissive**: silent no-op / `0` / `[]`, even for `null` |
-| `retainClear`, `unretain` | **throw** `"object is not eventized"` |
+| `retainClear`, `unretain` | **throw** a `TypeError` naming the function and the remedy |
 
 `on`-family functions install behavior, so auto-eventizing is a meaningful
 reading of the intent. Retain-state mutators have no duck-typed equivalent, so

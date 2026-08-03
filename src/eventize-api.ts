@@ -1121,7 +1121,9 @@ export function retainClear(
   eventNames: AnyEventNames,
 ): void {
   if (!isEventized(eventizedObj)) {
-    throw new Error('object is not eventized');
+    throw new TypeError(
+      'retainClear() cannot operate on a non-eventized object — eventize(obj) first, or guard the call with isEventized(obj)',
+    );
   }
   const {keeper} = internalsOf(eventizedObj);
   if (hasWildcard(eventNames)) {
@@ -1145,7 +1147,9 @@ export function unretain(
   eventNames: AnyEventNames,
 ): void {
   if (!isEventized(eventizedObj)) {
-    throw new Error('object is not eventized');
+    throw new TypeError(
+      'unretain() cannot operate on a non-eventized object — eventize(obj) first, or guard the call with isEventized(obj)',
+    );
   }
   const {keeper} = internalsOf(eventizedObj);
   if (hasWildcard(eventNames)) {
