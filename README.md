@@ -678,6 +678,8 @@ Only the **last** emission is kept, events emitted _before_ the `retain()` call 
 
 A type guard returning `true` if an object has been processed by `eventize()`. Also available as `eventize.is(obj)`. On a typed emitter it preserves the event map it narrows, so a wrong event name stays a compile error *inside* the `if` — up to v5.1.0 the narrowing widened the map back to the permissive default and silently reopened every loose overload.
 
+The marker it probes for is a property, so it is inherited like any other: `eventize(SomeClass.prototype)` makes every instance answer `true` and share that one prototype's emitter — `on()` on one instance is reachable from `emit()` on another. Useful for a single emitter shared by a whole class, surprising when each instance was expected to keep independent subscriptions.
+
 ```javascript
 import {eventize, isEventized} from '@spearwolf/eventize';
 

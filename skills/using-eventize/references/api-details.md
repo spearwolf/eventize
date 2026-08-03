@@ -207,7 +207,13 @@ Two functions deliberately stay quiet:
 
 - `isEventized(obj)` is a type guard and probes the slot only. It answers `true`
   for a foreign marker, because the object *is* eventized — just not by this
-  copy.
+  copy. The probe is a property read, so it also answers `true` for an
+  *inherited* marker: `eventize(SomeClass.prototype)` makes every instance
+  report eventized and share that prototype's store and keeper — one emitter
+  for the whole class, `on()` on one instance reachable from `emit()` on
+  another. Deliberate, not a defect — useful when one shared channel for a
+  whole class is the point, surprising when each instance was expected to
+  keep independent subscriptions.
 - `getEventizeProtocol(obj)` returns the number, or `undefined` for anything
   without one, and never throws. It is the tool for diagnosing the situation
   before something else does. `undefined` together with

@@ -3,6 +3,7 @@ import {
   asEventized,
   emit,
   eventize,
+  getEventizeProtocol,
   getSubscriptionCount,
   isEventized,
   off,
@@ -154,5 +155,96 @@ describe('the marker slot cannot be deleted', () => {
       enumerable: false,
       writable: false,
     });
+  });
+});
+
+// The marker is a property, not a registry entry, so it is inherited exactly
+// the way every other property is. Eventizing a prototype therefore does not
+// give each instance its own emitter: every instance reads the same
+// inherited slot and so shares one `EventStore` and one `EventKeeper`. This
+// is intended and stays intended — see the doc comment beside `isEventized()`
+// in `src/isEventized.ts`. What follows pins the consequences a reader meets
+// one step past "it's inherited": `on()` and `emit()` on different instances
+// reach the same listeners, `getSubscriptionCount()` cannot tell the
+// instances apart, `off()` on one instance detaches for all of them, and
+// re-`eventize()`-ing an instance whose prototype already carries the slot
+// does not fork off an own one.
+describe('an eventized prototype shares one emitter across its instances', () => {
+  const makeSharedPrototype = () => {
+    class Instance {}
+    eventize(Instance.prototype);
+    return Instance;
+  };
+
+  it('reports every instance as eventized, at the same protocol as the prototype', () => {
+    const Instance = makeSharedPrototype();
+    const a = new Instance();
+    const b = new Instance();
+
+    expect(isEventized(Instance.prototype)).toBe(true);
+    expect(isEventized(a)).toBe(true);
+    expect(isEventized(b)).toBe(true);
+
+    expect(getEventizeProtocol(a)).toBe(
+      getEventizeProtocol(Instance.prototype),
+    );
+    expect(getEventizeProtocol(b)).toBe(
+      getEventizeProtocol(Instance.prototype),
+    );
+  });
+
+  it('lets on() on one instance fire for emit() on another', () => {
+    const Instance = makeSharedPrototype();
+    const a = new Instance();
+    const b = new Instance();
+    const handler = jest.fn();
+
+    on(a, 'foo', handler);
+    emit(b, 'foo', 42);
+
+    expect(handler).toHaveBeenCalledWith(42);
+  });
+
+  it('reports the same getSubscriptionCount() for every instance', () => {
+    const Instance = makeSharedPrototype();
+    const a = new Instance();
+    const b = new Instance();
+
+    on(a, 'foo', () => {});
+
+    expect(getSubscriptionCount(a)).toBe(1);
+    expect(getSubscriptionCount(b)).toBe(1);
+    expect(getSubscriptionCount(Instance.prototype)).toBe(1);
+  });
+
+  it('lets off() on one instance detach the subscription for all of them', () => {
+    const Instance = makeSharedPrototype();
+    const a = new Instance();
+    const b = new Instance();
+    const handler = jest.fn();
+
+    on(a, 'foo', handler);
+    off(b, 'foo');
+
+    expect(getSubscriptionCount(a)).toBe(0);
+    expect(getSubscriptionCount(b)).toBe(0);
+
+    emit(a, 'foo', 1);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('does not give an instance its own slot when eventize() runs on it again', () => {
+    const Instance = makeSharedPrototype();
+    const a = new Instance();
+
+    // asEventized() sees the inherited slot via isEventized() and returns the
+    // object unchanged — no own NAMESPACE property is defined on `a`.
+    const result = eventize(a);
+
+    expect(result).toBe(a);
+    expect(Object.getOwnPropertySymbols(a)).not.toContain(NAMESPACE);
+    expect(Object.getOwnPropertySymbols(Instance.prototype)).toContain(
+      NAMESPACE,
+    );
   });
 });

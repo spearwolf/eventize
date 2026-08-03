@@ -13,6 +13,19 @@ import type {EventizeGuard, EventizedObject} from './types';
  * The follow-up question — whose slot is it — belongs to the public
  * `getEventizeProtocol()`, which also never throws; enforcing the answer is
  * `internalsOf()`'s job alone.
+ *
+ * The read is a plain property lookup, so it walks the prototype chain like
+ * any other: `obj[NAMESPACE]` finds an inherited slot exactly as readily as
+ * an own one, because the marker is a property, not an entry in some
+ * separate registry keyed by identity. Eventize a prototype and every
+ * instance answers `true` here, `asEventized()` hands each one back
+ * unchanged, and all of them read the same `EventStore` and `EventKeeper` —
+ * one emitter shared by the whole class, `on()` on one instance reachable
+ * from `emit()` on another. Useful when that sharing is the point (a class
+ * of objects that really is one broadcast channel); surprising when each
+ * instance was expected to keep its own independent subscriptions and
+ * nothing separated them — see `marker-integrity.spec.ts` for the pinned
+ * behaviour.
  */
 export const isEventized: EventizeGuard = (
   obj: unknown,
