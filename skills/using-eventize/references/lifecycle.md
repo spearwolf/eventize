@@ -34,9 +34,10 @@ payload.
 | `off(ε, [null, …])` / `off(ε, [undefined, …])` | all | every value and every policy |
 | `off(ε, eventName)` | every listener for that name | value **and** policy for that name |
 | `off(ε, [eventName, …])` — no `'*'` | every listener for each listed name | value and policy per listed name |
-| `off(ε, listenerFunc)` | that function, from every event and under every context (since v6.0.0) | untouched |
+| `off(ε, listenerFunc)` | that function, from every event and under every context, plus the registrations that draw it as some *other* listener's context, `on(ε, name, other, fn)` (both since v6.0.0) | untouched |
 | `off(ε, listenerFunc, context)` | that function, only where it was registered with exactly that context | untouched |
 | `off(ε, listenerObject)` | every subscription of that object — object alone, method name, and either shape carrying it as a context, `on(ε, name, fn, obj)` and `on(ε, name, obj, ctx)` | untouched |
+| `off(ε, listenerObject, context)` | that object, only where it was registered with exactly that context — the narrowing form of the row above | untouched |
 | `off(ε, eventName, listenerObject)` | only that object, on that one event | value **and** policy for that name — even when a sibling listener survives |
 | `off(ε, '*', listenerObject)` | only that object's wildcard subscription | untouched |
 | `off(ε, [eventName, …], listenerObject)` | **nothing** | untouched — a complete no-op |

@@ -13,9 +13,9 @@
 | `off(emitter, '*')`                       | Same as above — all listeners (named and wildcard), all retained state. |
 | `off(emitter, eventName)`                 | Unsubscribes all listeners registered *for that name* (string or symbol), and unretains it. Wildcard listeners are not touched and keep seeing the event. |
 | `off(emitter, [eventName1, eventName2])`  | Same, for several events at once. A `'*'`, `null` or `undefined` anywhere in the array makes it the bulk form. |
-| `off(emitter, listenerFunc)`              | Unsubscribes that listener function from all events — every registration of it, whatever context it was drawn under, `on(ε, name, fn, ctx)` included. |
-| `off(emitter, listenerFunc, context)`     | Unsubscribes that function only where it was registered with exactly that context. The narrowing form of the row above, and the one to reach for when the context matters. |
-| `off(emitter, listenerObject)`            | Unsubscribes every subscription associated with that object: the object-alone shape, the method-name shape, the function-with-context shape `on(ε, name, fn, obj)`, and — since v6.0.0 — the object-with-a-context shape `on(ε, name, obj, ctx)`. |
+| `off(emitter, listenerFunc)`              | Unsubscribes that listener function from all events — every registration of it, whatever context it was drawn under, `on(ε, name, fn, ctx)` included. Since v6.0.0 it also reaches the registrations that drew the function as some *other* listener's context, `on(ε, name, other, fn)`, because a function is a listener object like any other. |
+| `off(emitter, listenerFunc, context)`     | Unsubscribes that function only where it was registered with exactly that context. The narrowing form of the row above, and the one to reach for when the context matters. A listener *object* in the first slot reads the same way — `off(ε, obj, ctx)` is that one pair and nothing else, since v6.0.0. |
+| `off(emitter, listenerObject)`            | Unsubscribes every subscription associated with that object: the object-alone shape, the method-name shape, the function-with-context shape `on(ε, name, fn, obj)`, and — since v6.0.0 — the object-with-a-context shape `on(ε, name, obj, ctx)`. The listener object may be a function or a class; up to v5.1.0 those two were silently skipped here. |
 | `off(emitter, eventName, listenerObject)` | Unsubscribes a listener object from a specific event only — but still unretains that event, whole, even if other listeners for it survive, and even if it detached nothing. |
 | `off(emitter, [eventName, …], listenerObject)` | **Nothing at all** — a complete no-op on listeners *and* retained state. Use `off(emitter, [names])` without the object, or `unretain(emitter, [names])`. |
 | `off(emitter, '*', listenerObject)`       | Unsubscribes a listener object from the **wildcard** bucket only. Named subscriptions of the same object stay, and retained state is untouched. |
@@ -173,6 +173,21 @@ off(ε, service); // removes every subscription of 'service'
 emit(ε, 'foo'); // (nothing happens)
 emit(ε, 'bar'); // (nothing happens)
 ```
+
+A listener object does not have to be a plain object — a function or a class is one too, on this side as well as on the dispatch side:
+
+```javascript
+class Registry {
+  static reset() {
+    console.log('reset');
+  }
+}
+
+on(ε, 'shutdown', 'reset', Registry);
+off(ε, Registry); // detaches it
+```
+
+Up to v5.1.0 that `off()` removed nothing and reported nothing: the sweep asked `typeof === 'object'`, so a function or a class in the listener-object slot fell through the test and went on firing, with the class and everything it closed over still held by the emitter. The targeted `off(ε, 'shutdown', Registry)` never asks that question and is untouched by the widening — but it did not reach this subscription against v5.1.0 either, for a separate reason: with an event name given it compared `Registry` against the slot holding the *method name* instead of the one holding the listener object, so the method-name shape slipped past it too. Both halves land in v6.0.0. Against v5.1.0 nothing addressed this subscription by identity at all — only `off(ε, 'shutdown')`, a bulk `off()`, or the handle `on()` returned.
 
 Restricted to one event:
 

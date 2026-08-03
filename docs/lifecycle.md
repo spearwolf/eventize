@@ -69,9 +69,10 @@ on the form.
 | `off(ε, [null, …])` / `off(ε, [undefined, …])` | all | every value and every policy; the other names add nothing |
 | `off(ε, eventName)` | every listener for that name | value **and** policy for that name — same as `unretain(ε, eventName)` |
 | `off(ε, [eventName, …])` — no `'*'` in the array | every listener for each listed name | value and policy for each listed name, strings and symbols alike |
-| `off(ε, listenerFunc)` | that function, from every event and under every context — `on(ε, name, fn, ctx)` included (since v6.0.0; up to v5.1.0 it survived) | **untouched** |
+| `off(ε, listenerFunc)` | that function, from every event and under every context — `on(ε, name, fn, ctx)` included (since v6.0.0; up to v5.1.0 it survived) — and, also since v6.0.0, the registrations that merely draw it as some *other* listener's context, `on(ε, name, other, fn)` | **untouched** |
 | `off(ε, listenerFunc, context)` | that function, from every event, only where it was registered with exactly that context — the narrowing form of the row above | **untouched** |
 | `off(ε, listenerObject)` | every subscription of that object — the object-alone shape, the method-name shape, the function-with-context shape `on(ε, name, fn, obj)`, and, since v6.0.0, the object-with-a-context shape `on(ε, name, obj, ctx)` | **untouched** |
+| `off(ε, listenerObject, context)` | that object, only where it was registered with exactly that context — the narrowing form of the row above | **untouched** |
 | `off(ε, eventName, listenerObject)` | only that object's subscription to that one event | value **and** policy for that name — even when a sibling listener for it survives |
 | `off(ε, '*', listenerObject)` | only that object's wildcard subscription; named ones survive | **untouched** — `'*'` can never carry retained state |
 | `off(ε, [eventName, …], listenerObject)` | **nothing** | **untouched** — a complete no-op |

@@ -143,12 +143,76 @@ identity slot alone decides there too, so it now also detaches
 one shape it used to walk past. Everything it already swept (the object alone,
 the method-name form, and `on(ε, name, fn, obj)`) is unchanged.
 
+The same seam, one type wider: a **function or a class** in the listener-object
+slot is swept as well, where up to v5.1.0 the sweep asked `typeof === 'object'`
+and skipped it in silence. `off(ε, Registry)` after
+`on(ε, 'evt', 'reset', Registry)` used to leave the class subscribed and firing;
+it detaches now. The direction of the break is again "removes more": a function
+that is some *other* listener's context goes too.
+
+The first pattern casts wide on purpose: any single-line `on()` or `once()` with
+four or more comma-separated arguments, which is where a trailing listener object
+ends up — the array event-name form `on(ε, ['a', 'b'], 'reset', Registry)` and
+the five-argument form with a priority included. It over-matches, and a
+three-argument call whose event names are an array looks the same to it, so read
+each hit and check what the trailing value actually is. What it does *not* find
+is a call split across lines; add `-U` or scan those by hand. The second pattern
+finds the removals most likely to have been silent no-ops.
+
+```
+rg "\b(on|once)\((?:\s*(?:\[[^\]]*\]|[^,)]+),){3,}" src/
+rg "off\(\s*\w+,\s*[A-Z]\w*\s*\)" src/
+```
+
+Name the listener as well, and only that pair goes:
+
+```js
+off(ε, otherHandler, fn); // detaches that one registration, nothing else of fn's
+```
+
 There is no longer a spelling that removes *only* a registration made without a
 context: `off(ε, fn, null)` and `off(ε, fn, undefined)` both take the
 two-argument branch, since a nullish third argument is exactly what "no
 listener object given" means. Keep the handle `on()` returned when a single
 registration has to be addressed on its own — it never asks an identity
 question at all.
+
+### `off(ε, listenerObject, ctx)` narrows to exactly that pair
+
+```js
+on(ε, 'foo', other, obj); // obj is *other*'s context here
+on(ε, 'bar', obj, someCtx); // and its own listener here
+
+off(ε, obj, someCtx);
+
+// v5 — and up to the widening above: both went
+getSubscriptionCount(ε); // => 0
+
+// v6 — only the pair the call named
+getSubscriptionCount(ε); // => 1
+```
+
+The association match — "this object appears *somewhere* in that subscription" —
+now runs only for the two-argument forms, which are the half of `off()` that
+means "everywhere". Name a context and the call answers the question it was
+asked and nothing more, for an object and a function alike. A function argument
+was already exact up to v5.1.0, for the accidental reason that it was not
+matched at all; the fix above would have taken that exactness away.
+
+This one removes *less* than before, so it bites wherever the three-argument
+form was doing the sweeping:
+
+```
+rg "off\(\s*\w+,\s*[\w.]+,\s*[\w.]+\s*\)" src/
+```
+
+The pattern matches `off(ε, variable, obj)` with a variable event name as well as `off(ε, this.handler, this)`, but not string-literal event names like `off(ε, 'foo', obj)` — the quote character falls outside `[\w.]`.
+
+The replacement is the two-argument form, unchanged in reach:
+
+```js
+off(ε, obj); // every subscription obj takes part in, in either slot
+```
 
 ### Unsubscribe handles are single-shot
 

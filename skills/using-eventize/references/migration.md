@@ -32,7 +32,20 @@ instead.
   it now also detaches `on(ε, name, obj, ctx)`, an object listener carrying
   a context, which was the one shape it walked past. What it already swept
   — the object alone, the method-name form, `on(ε, name, fn, obj)` — is
-  unchanged.
+  unchanged. One type wider along the same seam: a function or a class in
+  the listener-object slot is swept too, where the old `typeof === 'object'`
+  test skipped it in silence, so `off(ε, Registry)` after
+  `on(ε, 'evt', 'reset', Registry)` detaches instead of leaving the class
+  subscribed and firing. Again "removes more": a function that is another
+  listener's context goes as well — `off(ε, otherHandler, fn)` narrows it.
+- **`off(ε, listenerObject, ctx)` narrows to exactly that pair**, where up to
+  `v5.1.0` it also swept every subscription that merely carried the object as
+  its context. The association match runs for the two-argument forms only
+  now, which are the half of `off()` that means "everywhere"; naming a
+  context gets the named pair and nothing else, for an object and a function
+  alike. This one removes *less* than before — grep three-argument `off()`
+  calls that were relied on to sweep, and use the two-argument
+  `off(ε, listenerObject)` there.
 - **`on()` and `once()` aggregate by listener identity.** A listener object
   subscribed to the same event at the same priority is one registration,
   however many `on()` and `once()` calls produced it and in whatever order.

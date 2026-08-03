@@ -703,7 +703,23 @@ export class EventStore {
    * one shape it used to walk past, `on(ε, 'evt', obj, ctx)`, which files the
    * object in the identity slot and something else in the context slot —
    * "every subscription of that object" is what the call has always promised.
-   * The association disjunct below is untouched.
+   *
+   * What the association disjunct needed instead is `&& matchListenerOnly`: it
+   * answers the *nameless* association, so it has no business running once the
+   * caller has named a context. Without the gate the three-argument form was
+   * not narrowing at all — `off(ε, fn, ctx)` swept every other listener that
+   * merely drew `fn` as its own context, and the whole point of keeping that
+   * form exact is that there be one spelling for one registration. The gate
+   * moves two things relative to v5.1.0, in opposite directions, and both are
+   * intended: the two-argument forms remove *more* (the paragraph above, and
+   * `off(ε, fn)` also reaching a function that sits in someone else's context
+   * slot), while `off(ε, obj, ctx)` removes *less* — v5.1.0 and the untethered
+   * v6 disjunct both took the foreign-context registrations along, and now
+   * only the named pair goes. `off(ε, obj)` is the form for the broad sweep.
+   * Note that `!isObjectListener` and `matchListenerOnly` are not two spellings
+   * of one idea: the first asks what kind of thing the caller passed, the
+   * second how much of the pair they named. Only the second is a question about
+   * the call.
    */
   private detachByIdentity(
     eventName: EventName,
@@ -721,7 +737,9 @@ export class EventStore {
         ((matchListenerOnly
           ? current.listener === listener
           : current.isEqual(listener, listenerObject)) ||
-          (isObjectListener && current.listenerObject === listener))
+          (matchListenerOnly &&
+            isObjectListener &&
+            current.listenerObject === listener))
       ) {
         if (target === bucket) {
           target = this.bucketForMutation(eventName, bucket);
@@ -1021,7 +1039,19 @@ export class EventStore {
    * the consumer-facing version of this note.
    */
   private removeByListener(listener: unknown, listenerObject: unknown): void {
-    const isObjectListener = typeof listener === 'object';
+    // Both `typeof` values, because both are listener objects: the set is
+    // `ListenerObjectType` in `types.ts` — `object | null | undefined`, which
+    // in `typeof` terms is exactly these two. Not `canReadMembers()`, which is
+    // a laxer test on the dispatch side and takes any non-nullish value,
+    // primitives included: `on(ε, 'foo', 'toFixed', 42)` registers and
+    // dispatches, and nothing here or in `off()` will ever remove it by
+    // identity. `'object'` alone made `off(ε, Registry)` after
+    // `on(ε, 'foo', 'reset', Registry)` the failure this file's other comments
+    // call the worse one: nothing removed, nothing reported, the class still
+    // held and still firing. `null` cannot arrive here — `remove()` routes a
+    // nullish listener to `removeAllListeners()` long before this line.
+    const isObjectListener =
+      typeof listener === 'object' || typeof listener === 'function';
 
     this.namedListeners.forEach((bucket, name) => {
       // Replacing the value of a key the Map is currently iterating is

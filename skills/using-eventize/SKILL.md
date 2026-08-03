@@ -192,7 +192,10 @@ compile time) or an explicit `isEventized()` guard.
     v6.0.0). It detaches every registration of that function, `on(ε, name, fn,
     ctx)` included — so a teardown calling `off(ε, MyClass.prototype.onData)`
     also unsubscribes every other instance that drew the same prototype method
-    under its own context. `off(ε, fn, ctx)` stays exact and is the way to name
+    under its own context. It reaches one step further still: a registration
+    that draws `fn` as some *other* listener's context, `on(ε, name, other, fn)`,
+    goes with it too, because a function is a listener object like any other.
+    `off(ε, fn, ctx)` stays exact and is the way to name
     one of them; the handle `on()` returned is the way to name none of them. Up
     to v5.1.0 the two-argument form matched only registrations whose context was
     `null`, which failed the other way round — silently leaving the emitter

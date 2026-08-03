@@ -238,6 +238,154 @@ describe('off()', () => {
     });
   });
 
+  // A listener object does not have to be a plain object. The dispatch side has
+  // always accepted a function or a class in that slot; the sweeping removal
+  // used to test `typeof === 'object'` and walked straight past both, so the
+  // call reported nothing and left the class, its statics and every closure
+  // hanging on the emitter — still firing.
+  describe('by function-valued listener object', () => {
+    it('detaches a method-name subscription whose listener object is a class', () => {
+      const ε = eventize();
+      const reset = fake();
+      class Registry {
+        static reset = reset;
+      }
+
+      on(ε, 'foo', 'reset', Registry);
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      off(ε, Registry);
+
+      expect(getSubscriptionCount(ε)).toBe(0);
+      emit(ε, 'foo');
+      expect(reset.callCount).toBe(0);
+    });
+
+    it('detaches a function-with-context subscription whose context is a function', () => {
+      const ε = eventize();
+      const listenerFunc = fake();
+      const ctx = () => {};
+
+      on(ε, 'foo', listenerFunc, ctx);
+      expect(getSubscriptionCount(ε)).toBe(1);
+
+      off(ε, ctx);
+
+      expect(getSubscriptionCount(ε)).toBe(0);
+      emit(ε, 'foo');
+      expect(listenerFunc.callCount).toBe(0);
+    });
+
+    // The accepted price, symmetric to the object case: the identity slot is
+    // not the only place the argument is looked for, so one function serving as
+    // its own listener *and* as another listener's context loses both roles in
+    // one call. `off(ε, other, fn)` is what names a single registration.
+    it('off(ε, fn) also takes subscriptions where fn is only another listener’s context', () => {
+      const ε = eventize();
+      const handler = fake();
+      const other = fake();
+
+      on(ε, 'foo', handler);
+      on(ε, 'bar', other, handler);
+      on(ε, 'bar', other);
+      expect(getSubscriptionCount(ε)).toBe(3);
+
+      off(ε, handler);
+
+      expect(getSubscriptionCount(ε)).toBe(1);
+      emit(ε, 'foo');
+      emit(ε, 'bar');
+      expect(handler.callCount).toBe(0);
+      expect(other.callCount).toBe(1);
+    });
+  });
+
+  // Where the two-argument forms are deliberately broad, the three-argument
+  // form is the way to name one registration — so the association disjunct is
+  // off whenever a context was given. Without that gate, widening the identity
+  // gate to functions would have made `off(ε, fn, ctx)` sweep every other
+  // listener that merely drew `fn` as its context, and the object spelling did
+  // exactly that already in v5.1.0, as did the untethered v6 disjunct; what is
+  // new to v6 is that the three-argument form now does not. The four cases
+  // below pin both halves: the three-argument form is exact for either role, the
+  // two-argument form is not.
+  describe('by listener and context', () => {
+    it('off(ε, fn, ctx) leaves the registration where fn is another listener’s context', () => {
+      const ε = eventize();
+      const other = fake();
+      const fn = fake();
+      const someCtx = {};
+
+      on(ε, 'foo', other, fn);
+      on(ε, 'bar', fn, someCtx);
+      expect(getSubscriptionCount(ε)).toBe(2);
+
+      off(ε, fn, someCtx);
+
+      expect(getSubscriptionCount(ε)).toBe(1);
+      emit(ε, 'foo');
+      emit(ε, 'bar');
+      expect(fn.callCount).toBe(0);
+      expect(other.callCount).toBe(1);
+    });
+
+    it('off(ε, obj, ctx) leaves the registration where obj is another listener’s context', () => {
+      const ε = eventize();
+      const other = fake();
+      const listenerObject = {bar: fake()};
+      const someCtx = {};
+
+      on(ε, 'foo', other, listenerObject);
+      on(ε, 'bar', listenerObject, someCtx);
+      expect(getSubscriptionCount(ε)).toBe(2);
+
+      off(ε, listenerObject, someCtx);
+
+      expect(getSubscriptionCount(ε)).toBe(1);
+      emit(ε, 'foo');
+      emit(ε, 'bar');
+      expect(listenerObject.bar.callCount).toBe(0);
+      expect(other.callCount).toBe(1);
+    });
+
+    // The other side of the same boundary: drop the context and both roles go.
+    it('off(ε, fn) still takes the foreign-context registration with it', () => {
+      const ε = eventize();
+      const other = fake();
+      const fn = fake();
+
+      on(ε, 'foo', other, fn);
+      on(ε, 'bar', fn, {});
+      expect(getSubscriptionCount(ε)).toBe(2);
+
+      off(ε, fn);
+
+      expect(getSubscriptionCount(ε)).toBe(0);
+      emit(ε, 'foo');
+      emit(ε, 'bar');
+      expect(fn.callCount).toBe(0);
+      expect(other.callCount).toBe(0);
+    });
+
+    it('off(ε, obj) still takes the foreign-context registration with it', () => {
+      const ε = eventize();
+      const other = fake();
+      const listenerObject = {bar: fake()};
+
+      on(ε, 'foo', other, listenerObject);
+      on(ε, 'bar', listenerObject, {});
+      expect(getSubscriptionCount(ε)).toBe(2);
+
+      off(ε, listenerObject);
+
+      expect(getSubscriptionCount(ε)).toBe(0);
+      emit(ε, 'foo');
+      emit(ε, 'bar');
+      expect(listenerObject.bar.callCount).toBe(0);
+      expect(other.callCount).toBe(0);
+    });
+  });
+
   describe('by eventName', () => {
     const ε = eventize();
 
