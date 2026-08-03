@@ -257,6 +257,21 @@ in the same upgrade and none of them is visible to the type checker:
   is a runtime-assembled name list that can come out empty — check `.length`
   before subscribing, the same way a bulk `off([...])` needs guarding against
   a nullish element.
+- **`on(ε, [...with a hole...], …)`, `once()` and `onceAsync()` throw instead
+  of registering a subset.** A hole — `new Array(2)`, or an array grown by
+  setting `.length` past its last write — used to be silently skipped the
+  same way the empty array above was: `on(ε, ['a', , 'b'], h)` registered
+  `'a'` and `'b'` and said nothing about the gap, and an all-holes array
+  registered nothing at all, so `once(ε, new Array(2), h)` handed back a
+  handle for zero subscriptions and `onceAsync(ε, new Array(2))` a promise
+  that never settles. All three now throw the same
+  `subscribeTo() called with insufficient arguments`
+  (`Error.cause: 'sparse-names'`), atomically, before anything is registered.
+  An element explicitly set to `undefined` is a value, not a hole, and is
+  unaffected. A hole is not greppable by shape unless it is the `new Array()`
+  spelling — check with an indexed loop (`for (let i = 0; i < a.length; i++)
+  if (!(i in a)) …`), not `.some()`/`.map()`, both of which skip a hole
+  instead of visiting it.
 - **`off(ε, '*', listenerObject)` now detaches that object's wildcard
   subscriptions.** It used to remove nothing and report nothing: `off()`
   routes a name-plus-object pair into the named buckets, and a wildcard

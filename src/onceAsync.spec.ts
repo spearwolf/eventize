@@ -81,6 +81,30 @@ describe('onceAsync()', () => {
     );
   });
 
+  // Same treatment as the empty array above, and for the same reason: a
+  // sparse array of event names is an argument error, not something to
+  // resolve around, so onceAsync() must throw synchronously here too rather
+  // than hand back a promise that never settles.
+  it('throws synchronously instead of rejecting on a sparse array of event names', () => {
+    const e = eventize();
+    expect(() =>
+      onceAsync(
+        e,
+        Object.assign(new Array(3), {
+          0: 'foo',
+          2: 'bar',
+        }) as unknown as string[],
+      ),
+    ).toThrow(/insufficient arguments/);
+  });
+
+  it('throws synchronously instead of rejecting on an array of nothing but holes', () => {
+    const e = eventize();
+    expect(() => onceAsync(e, new Array(2) as unknown as string[])).toThrow(
+      /insufficient arguments/,
+    );
+  });
+
   // The signal.aborted pre-check runs before once() is ever called, so an
   // already-aborted signal short-circuits before the argument validation
   // gets a chance to run at all. An empty array of event names — normally a

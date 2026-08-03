@@ -8,6 +8,20 @@ import {EVENT_CATCH_EM_ALL} from './constants';
 import type {EventArgs, EventName, ListenerObjectType} from './types';
 import {warn} from './utils';
 
+/**
+ * Holds the batch of queued replays for one `subscribeTo()` call, lazily.
+ *
+ * Most emitters never call `retain()`, so `hasRetainedFor()` below is false for
+ * every name a call registers and `events` is never touched — no array is
+ * built, matching the premise `EventKeeper`'s own shared stand-ins and
+ * `hasRetainedFor()` already rely on. The field materializes the moment the
+ * first replay is queued (`EventKeeper.replayTo()`'s own default-parameter
+ * idiom does the allocating), and every further call in the same batch reuses
+ * that array instead of starting a new one — the same box travels through
+ * `_subscribeTo()` and every `registerEventListener()` call it makes.
+ */
+type ReplayQueue = {events?: KeeperEvent[]};
+
 const registerEventListener = (
   store: EventStore,
   keeper: EventKeeper,
@@ -15,7 +29,7 @@ const registerEventListener = (
   priority: number,
   listener: unknown,
   listenerObject: ListenerObjectType,
-  retainedEvents: KeeperEvent[],
+  replayQueue: ReplayQueue,
   obligation: OnceObligation | null,
 ): EventListener => {
   const newListener = new EventListener(
@@ -80,7 +94,11 @@ const registerEventListener = (
               if (!obligation.settled) el.apply(name, args);
             },
           };
-    keeper.replayTo(eventName, replayTarget, retainedEvents);
+    replayQueue.events = keeper.replayTo(
+      eventName,
+      replayTarget,
+      replayQueue.events,
+    );
   }
 
   return el;
@@ -123,7 +141,7 @@ const _subscribeTo = (
   store: EventStore,
   keeper: EventKeeper,
   args: EventArgs,
-  retainedEvents: KeeperEvent[],
+  replayQueue: ReplayQueue,
   obligation: OnceObligation | null,
 ): EventListener | Array<EventListener> => {
   const len = args.length;
@@ -205,7 +223,12 @@ const _subscribeTo = (
 
   assertPriorityIsUsable(priority, args);
 
-  const register = (prio: number) => (event: EventName) =>
+  // One flat function taking both varying arguments, not a curried pair — the
+  // array branch below used to call `register(prio)` once per name only to
+  // discard the outer closure after a single use; `registerOne(prio, event)`
+  // is the same shape `applyListener()` uses on the emit path for the same
+  // reason.
+  const registerOne = (prio: number, event: EventName): EventListener =>
     registerEventListener(
       store,
       keeper,
@@ -213,7 +236,7 @@ const _subscribeTo = (
       prio,
       listener,
       listenerObject,
-      retainedEvents,
+      replayQueue,
       obligation,
     );
 
@@ -232,9 +255,36 @@ const _subscribeTo = (
         cause: 'empty-names',
       });
     }
-    // Resolve every per-event priority before registering anything, so a NaN in
-    // one tuple rejects the whole call instead of leaving the names in front of
-    // it subscribed — the same atomicity `retain(ε, [name, …])` has for '*'.
+    // A hole is a missing element, not a value — `!(i in eventName)` is what
+    // tells the two apart; `entry === undefined` would not, since an element
+    // explicitly set to `undefined` reads back the same way but is a value.
+    // Rejected here, atomically and before any resolution, same as the
+    // empty-array case just above: the per-name `map()`s below both skip
+    // holes (that is what `Array.prototype.map()` does), so without this
+    // guard a hole silently registers a subset of the names instead of
+    // throwing, and an all-holes array — `new Array(n)` — registers nothing
+    // and hands back a live-looking handle, or for onceAsync() a promise that
+    // never settles. Exactly the empty-array failure, reachable through a
+    // length that isn't 0.
+    for (let i = 0; i < eventName.length; i++) {
+      if (!(i in eventName)) {
+        warn('called with a sparse array of event names!', args);
+        throw new Error('subscribeTo() called with insufficient arguments', {
+          cause: 'sparse-names',
+        });
+      }
+    }
+    // Resolve every per-event priority before registering anything, so a NaN
+    // in one tuple rejects the whole call instead of leaving the names in
+    // front of it subscribed — the same atomicity `retain(ε, [name, …])` has
+    // for '*'. One pass builds and validates each entry; a second, separate
+    // pass registers — folding those two together would let entry N register
+    // while a later entry could still fail its check, and a registration
+    // cannot be undone once `store.add()` has run. Two passes, not three: the
+    // old third pass (a `for` loop doing only the validation) is gone because
+    // `assertPriorityIsUsable()` now runs inside the first `map()`, where a
+    // throw stops that `map()` before it produces a complete `entries` array
+    // — so the registering `map()` after it never starts either.
     //
     // A tuple without a priority only reaches here from untyped call sites —
     // `EventNameWithPriority` is a fixed 2-tuple, so the typed API rejects it.
@@ -242,16 +292,17 @@ const _subscribeTo = (
     // and it keeps `undefined` out of the arithmetic in sortByPriorityAndId,
     // where it would become NaN. `??` rather than `||` — 0 is Priority.Normal,
     // not "absent" — which is also why `??` lets an explicit NaN through to the
-    // assertion below rather than swallowing it.
-    const entries: Array<[EventName, number]> = eventName.map((name) =>
-      Array.isArray(name) ? [name[0], name[1] ?? priority] : [name, priority],
-    );
-    for (const entry of entries) {
+    // assertion rather than swallowing it.
+    const entries: Array<[EventName, number]> = eventName.map((name) => {
+      const entry: [EventName, number] = Array.isArray(name)
+        ? [name[0], name[1] ?? priority]
+        : [name, priority];
       assertPriorityIsUsable(entry[1], args);
-    }
-    return entries.map((entry) => register(entry[1])(entry[0]));
+      return entry;
+    });
+    return entries.map((entry) => registerOne(entry[1], entry[0]));
   }
-  return register(priority)(eventName);
+  return registerOne(priority, eventName);
 };
 
 export const subscribeTo = (
@@ -260,14 +311,12 @@ export const subscribeTo = (
   args: EventArgs,
   obligation: OnceObligation | null = null,
 ): EventListener | Array<EventListener> => {
-  const retainedEvents: KeeperEvent[] = [];
-  const listeners = _subscribeTo(
-    store,
-    keeper,
-    args,
-    retainedEvents,
-    obligation,
-  );
-  EventKeeper.publish(retainedEvents);
+  // No array here — see the ReplayQueue doc comment above. Most calls never
+  // populate `.events`, and then `EventKeeper.publish()` is never even called.
+  const replayQueue: ReplayQueue = {};
+  const listeners = _subscribeTo(store, keeper, args, replayQueue, obligation);
+  if (replayQueue.events !== undefined) {
+    EventKeeper.publish(replayQueue.events);
+  }
   return listeners;
 };

@@ -744,13 +744,14 @@ describe('on()', () => {
 
   // ---------------------------------------------------------------------------------------------
   // One thrown message, `subscribeTo() called with insufficient arguments`,
-  // covers four distinct causes — a missing listener, a value that cannot be
-  // dispatched at all, an empty method name, and an empty array of event
-  // names. The wording is frozen (it predates v4 and is documented), but the
-  // cause that produced it now rides along on Error.cause so a bug report
-  // doesn't have to guess from a string that is wrong three times out of four.
-  // The three argument-shaped ones are below; 'empty-names' is pinned with the
-  // rest of the empty-array behaviour further down this file.
+  // covers five distinct causes — a missing listener, a value that cannot be
+  // dispatched at all, an empty method name, an empty array of event names,
+  // and a sparse array of event names. The wording is frozen (it predates v4
+  // and is documented), but the cause that produced it now rides along on
+  // Error.cause so a bug report doesn't have to guess from a string that is
+  // wrong four times out of five. The three argument-shaped ones are below;
+  // 'empty-names' and 'sparse-names' are pinned with the rest of the
+  // empty-array / sparse-array behaviour further down this file.
   describe('Error.cause distinguishes the argument-shape causes', () => {
     it('is "missing-listener" when the listener argument is absent', () => {
       const obj = eventize();
@@ -1039,6 +1040,85 @@ describe('on()', () => {
       expect(caught).toBeInstanceOf(Error);
       expect((caught as Error).message).toMatch(/insufficient arguments/);
       expect((caught as Error).cause).toBe('empty-names');
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // A hole is a missing element, not a value — an untyped call site can still
+  // hand one to on()/once()/onceAsync() (`new Array(2)`, or an array grown by
+  // setting `.length` past its last write). ESLint's `no-sparse-arrays`
+  // forbids the `['a', , 'b']` literal spelling, so the cases below build one
+  // with `Object.assign(new Array(n), {...})` instead — same hole, no lint
+  // exemption needed. Rejected atomically, the same
+  // treatment as an empty array and for the same reason: letting per-name
+  // resolution silently skip the hole would register a subset of the names
+  // instead of throwing, and a once()/onceAsync() over an all-holes array
+  // would register nothing at all and hand back a handle — or a promise —
+  // that never does anything, exactly the failure the empty-names guard
+  // exists to prevent for `[]`.
+  describe('a sparse array of event names', () => {
+    it('rejects on() with a hole in the middle instead of registering only the other names', () => {
+      const obj = eventize();
+      expect(() =>
+        on(
+          obj,
+          Object.assign(new Array(3), {0: 'a', 2: 'b'}) as unknown as string[],
+          () => {},
+        ),
+      ).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects on() with an array of nothing but holes', () => {
+      const obj = eventize();
+      expect(() => on(obj, new Array(2), () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects once() with a hole in the middle instead of registering only the other names', () => {
+      const obj = eventize();
+      expect(() =>
+        once(
+          obj,
+          Object.assign(new Array(3), {0: 'a', 2: 'b'}) as unknown as string[],
+          () => {},
+        ),
+      ).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects once() with an array of nothing but holes', () => {
+      const obj = eventize();
+      expect(() => once(obj, new Array(2), () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('carries the "sparse-names" cause on Error.cause', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        on(
+          obj,
+          Object.assign(new Array(3), {0: 'a', 2: 'b'}) as unknown as string[],
+          () => {},
+        );
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).message).toMatch(/insufficient arguments/);
+      expect((caught as Error).cause).toBe('sparse-names');
+    });
+
+    // An element explicitly set to `undefined` is a value, not a hole — this
+    // guard must not reject it. What (if anything) happens to that value
+    // downstream is a separate, pre-existing question this package does not
+    // touch.
+    it('does not treat an explicit undefined element as a hole', () => {
+      const obj = eventize();
+      expect(() =>
+        on(obj, ['a', undefined, 'b'] as any, () => {}),
+      ).not.toThrow();
     });
   });
 

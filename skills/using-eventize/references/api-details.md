@@ -27,7 +27,7 @@ Parsing is positional: a leading `number` means "wildcard with priority"; a `num
 
 ### Why a subscription was rejected
 
-`"subscribeTo() called with insufficient arguments"` covers four distinct mistakes, and the message has been that one string since v4. Since v6.0.0 the specific one rides on `Error.cause`, so a catch block can tell them apart without parsing text or reading the console:
+`"subscribeTo() called with insufficient arguments"` covers five distinct mistakes, and the message has been that one string since v4. Since v6.0.0 the specific one rides on `Error.cause`, so a catch block can tell them apart without parsing text or reading the console:
 
 | `Error.cause` | What was wrong | Example |
 | --- | --- | --- |
@@ -35,6 +35,7 @@ Parsing is positional: a leading `number` means "wildcard with priority"; a `num
 | `'not-dispatchable'` | A value that is not a function, string, symbol or non-null object | `on(ε, 'foo', 5)` |
 | `'empty-method-name'` | A method name of `''` | `on(ε, 'foo', '', obj)` |
 | `'empty-names'` | An empty array of event names — zero registrations, so nothing to hand back | `on(ε, [], fn)` |
+| `'sparse-names'` | An array of event names with a hole — the map underneath a name list skips a hole rather than erroring on it, so left unguarded this would register a subset of the names, or none at all for an all-holes array | `on(ε, new Array(2), fn)` |
 
 The NaN-priority rejection is the one throw that is *not* in this family: different message, and no `cause`.
 
@@ -71,7 +72,7 @@ controller.abort();
 
 Aborting unsubscribes the internal `once()` and rejects with `signal.reason`, falling back to an `AbortError` `DOMException` whenever the reason is nullish — `abort(null)` lands on the `DOMException` too, where `fetch()` would reject with the bare `null`. An already-aborted signal rejects without subscribing at all; a retained event that resolves synchronously inside `once()` never attaches an abort handler. The option type is exported as `OnceAsyncOptions`, and the option works identically on all three surfaces: `onceAsync(ε, …)`, `ε.onceAsync(…)` after `eventize.inject()`, and `this.onceAsync(…)` in a `class extends Eventize`.
 
-An argument error — an empty array of event names, a `NaN` priority — throws synchronously out of `onceAsync()` at the call site, not as a rejection: `once()`'s own validation runs outside the promise machinery, so a fire-and-forget call with no `await`/`catch` fails where the mistake is instead of becoming an unhandled rejection. The one exception is an already-aborted signal: that check runs *before* `once()` is ever called, so `onceAsync(ε, [], {signal: alreadyAborted})` rejects with the abort reason rather than throwing — the argument is never validated in that combination.
+An argument error — an empty or sparse array of event names, a `NaN` priority — throws synchronously out of `onceAsync()` at the call site, not as a rejection: `once()`'s own validation runs outside the promise machinery, so a fire-and-forget call with no `await`/`catch` fails where the mistake is instead of becoming an unhandled rejection. The one exception is an already-aborted signal: that check runs *before* `once()` is ever called, so `onceAsync(ε, [], {signal: alreadyAborted})` rejects with the abort reason rather than throwing — the argument is never validated in that combination.
 
 `once()` is only consumed when a listener actually ran. For the object forms — `once(ε, 'foo', obj)` and `once(ε, 'foo', 'methodName', obj)` — a dispatch that finds neither the method nor the `.emit()` fallback leaves the subscription in place, so a late-initialised listener object still gets its one call. The `.emit()` fallback counts as a call and does consume the `once()`. Function listeners are always callable, so they are always consumed. Until v6.0.0 the miss silently burned the subscription.
 

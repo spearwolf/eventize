@@ -336,7 +336,7 @@ The full set of call shapes — including the method-name form `on(ε, 'foo', 'm
 
 The listener slot takes only what can be dispatched to: a function, a method name (string or symbol), or a listener object. Anything else throws — `on(ε, 'foo', 5)` fails instead of registering a subscription no `emit()` could ever reach. Since v6.0.0; up to v5.1.0 the slot was tested for truthiness alone, so that call registered a dead entry while `on(ε, 'foo', 0)` threw.
 
-That rejection shares one message, `subscribeTo() called with insufficient arguments`, with three other mistakes. Since v6.0.0 `Error.cause` says which one it was: `'missing-listener'` (the slot came out `null`/`undefined`), `'not-dispatchable'` (the case above), `'empty-method-name'` (a method name of `''`), and `'empty-names'` (an empty array of event names). All four reject atomically — nothing is registered before the check.
+That rejection shares one message, `subscribeTo() called with insufficient arguments`, with four other mistakes. Since v6.0.0 `Error.cause` says which one it was: `'missing-listener'` (the slot came out `null`/`undefined`), `'not-dispatchable'` (the case above), `'empty-method-name'` (a method name of `''`), `'empty-names'` (an empty array of event names), and `'sparse-names'` (an array of event names with a hole, e.g. `new Array(2)` or `['a', , 'b']`). All five reject atomically — nothing is registered before the check.
 
 ##### Multiple Event Names
 

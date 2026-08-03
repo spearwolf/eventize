@@ -373,7 +373,7 @@ synthesized `AbortError` `DOMException`. An already-aborted signal rejects the
 same way, immediately — that is the `fetch()` shape too, not an argument
 error.
 
-An argument error — an empty array of event names, a `NaN` priority — throws
+An argument error — an empty or sparse array of event names, a `NaN` priority — throws
 synchronously out of `onceAsync()` itself, at the call site, the same as every
 other programmer-error throw in this library. It does not reach the returned
 promise as a rejection, so a fire-and-forget call with no `await`/`catch`

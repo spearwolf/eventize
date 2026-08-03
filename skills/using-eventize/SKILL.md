@@ -195,10 +195,15 @@ compile time) or an explicit `isEventized()` guard.
     not truthiness-checked: a function, a string, a symbol or a non-null object
     passes, anything else throws. An empty array of event names throws too —
     `on(ε, [], fn)` used to hand back a handle for zero subscriptions and
-    `onceAsync(ε, [])` a promise that never settled. Four mistakes share the one
+    `onceAsync(ε, [])` a promise that never settled — and so does a *sparse*
+    one: `on(ε, new Array(2), fn)` used to register nothing and hand back the
+    same kind of dangling handle, and a hole anywhere else in the array (`['a',
+    , 'b']`) used to register only the names around it, silently. An element
+    explicitly set to `undefined` is a value, not a hole, and is unaffected —
+    it still registers under the name `undefined`. Five mistakes share the one
     message `subscribeTo() called with insufficient arguments`, and `Error.cause`
     names which: `'missing-listener'`, `'not-dispatchable'`, `'empty-method-name'`,
-    `'empty-names'`. An unusable priority is the exception — its own message
+    `'empty-names'`, `'sparse-names'`. An unusable priority is the exception — its own message
     (`subscribeTo() called with a NaN priority`), no cause. It throws in every
     position, tuples included, and one bad value inside
     `on(ε, ['a', ['b', NaN]], fn)` registers none of the names. The guard is
