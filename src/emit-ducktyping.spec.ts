@@ -1,5 +1,6 @@
 import {fake} from 'sinon';
 
+import {unhandledRejectionsDuring} from './__test-utils__/unhandledRejections';
 import {emit, emitAsync, retainClear, unretain} from './index';
 
 describe('emit() duck-typing on non-eventized targets (v5+)', () => {
@@ -411,5 +412,47 @@ describe('emitAsync() duck-typing on non-eventized targets (v5+)', () => {
     const target = {emit: fake()};
 
     expect(() => emitAsync(target, '*')).toThrow(/concrete event name/);
+  });
+
+  // The eventized half of this promise is pinned in emitAsync.spec.ts. Both
+  // dispatch paths feed one collector inside a single try, so the claim that
+  // both are covered is a structural one — these two cases are what turns it
+  // into a measured one. Only the array form can reach the failure here: a
+  // duck dispatch of a single name collects at most one value, and there is no
+  // later listener left to throw after it.
+  describe('when a duck-typed dispatch throws', () => {
+    it('leaves no unhandled rejection behind when a later duck method throws', async () => {
+      const target = {
+        first: () => Promise.reject(new Error('rejected')),
+        second: () => [Promise.reject(new Error('rejected in an array'))],
+        third: () => {
+          throw new Error('duck exploded');
+        },
+      };
+
+      const reported = await unhandledRejectionsDuring(() => {
+        expect(() => emitAsync(target, ['first', 'second', 'third'])).toThrow(
+          'duck exploded',
+        );
+      });
+
+      expect(reported).toEqual([]);
+    });
+
+    it("leaves no unhandled rejection behind when '*' aborts a name array", async () => {
+      const target = {
+        first: () => Promise.reject(new Error('rejected')),
+        second: fake(),
+      };
+
+      const reported = await unhandledRejectionsDuring(() => {
+        expect(() => emitAsync(target, ['first', '*', 'second'])).toThrow(
+          /concrete event name/,
+        );
+      });
+
+      expect(reported).toEqual([]);
+      expect(target.second.called).toBe(false);
+    });
   });
 });

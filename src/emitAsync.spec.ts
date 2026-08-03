@@ -1,3 +1,4 @@
+import {unhandledRejectionsDuring} from './__test-utils__/unhandledRejections';
 import {emitAsync, eventize, on, Priority} from './index';
 
 describe('emitAsync()', () => {
@@ -43,33 +44,6 @@ describe('emitAsync()', () => {
   });
 
   describe('when the synchronous dispatch throws', () => {
-    // The values emitAsync() collects live in a local array, so nothing outside
-    // can attach a handler to them once the dispatch aborts. What these cases
-    // watch for is the process-level report: run the throwing emit, let Node
-    // reach the turn in which it decides a rejection is unowned, and collect
-    // whatever it announces. The listener is removed again in `finally` —
-    // a process-global handler left behind would swallow the reports of every
-    // suite that runs after this one.
-    const unhandledRejectionsDuring = async (
-      run: () => void,
-    ): Promise<unknown[]> => {
-      const reported: unknown[] = [];
-      const collect = (reason: unknown) => {
-        reported.push(reason);
-      };
-      process.on('unhandledRejection', collect);
-      try {
-        run();
-        // Two turns: the first drains the microtask queue the rejection sits
-        // in, the second is the one Node reports from.
-        await new Promise((resolve) => setImmediate(resolve));
-        await new Promise((resolve) => setImmediate(resolve));
-      } finally {
-        process.off('unhandledRejection', collect);
-      }
-      return reported;
-    };
-
     it('leaves no unhandled rejection behind when a later listener throws', async () => {
       const o = eventize();
 

@@ -855,9 +855,16 @@ export function off(
   // name filter have to see that same depth, or a marker or a name one level
   // down from the top goes unseen on the keeper side while the store keeps
   // following it. A non-array listener passes through unchanged.
-  const flatListener = Array.isArray(listener)
-    ? listener.flat(Infinity)
-    : listener;
+  //
+  // The listenerObject == null gate is not a second condition to keep in sync
+  // with the two readers below: it is the one both of them already carry. With
+  // a listener object named, off(ε, [name, …], listenerObject) unsubscribes
+  // nothing and clears nothing, and the flattened copy was allocated for a
+  // path that never looks at it.
+  const flatListener =
+    listenerObject == null && Array.isArray(listener)
+      ? listener.flat(Infinity)
+      : listener;
 
   // off(ε), off(ε, '*') and any (nested) array whose elements make the store
   // wipe itself — ['*', …], [[null]], ['foo', undefined] — clear the keeper

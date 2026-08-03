@@ -341,6 +341,22 @@ recursion guard](../AGENTS.md#known-asymmetries) — `A → B → A` forwarding 
 same-event re-emission already overflow the stack by design, and a `once()`
 firing twice under the same conditions costs nothing extra to accept.
 
+A callback that knows it re-enters has the way out in its own hand: the handle
+`once()` returned detaches the listener immediately, so releasing it ahead of
+the nested `emit()` leaves nothing for that emit to call.
+
+```javascript
+let calls = 0;
+const unsubscribe = once(ε, 'ping', () => {
+  calls += 1;
+  unsubscribe(); // settle the one-shot now, not after the return
+  if (calls === 1) emit(ε, 'ping');
+});
+
+emit(ε, 'ping');
+calls; // => 1
+```
+
 ## `onceAsync` and cancellation
 
 `onceAsync(ε, eventName, {signal})` accepts an `AbortSignal`, close to the

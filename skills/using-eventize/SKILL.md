@@ -113,6 +113,13 @@ compile time) or an explicit `isEventized()` guard.
    throwing `once()` therefore fires again — and `retain()` is not updated for
    that emit, because the write happens after all listeners. Wrap risky bodies
    yourself; there is no global error handler by design.
+   **A throw is not the only way a `once()` fires twice.** The one-shot is
+   settled after the callback *returns*, so a callback that re-emits its own
+   event before returning is dispatched to its own listener again, still fully
+   subscribed. Both routes are the same rule seen from two sides, and neither is
+   a defect on its own: this one is that rule meeting the absent recursion guard
+   of pitfall 4. If a `once()` body may re-enter its own event, unsubscribe
+   through the returned handle before emitting.
 6. **Nested `emit()` retains out of order.** The same after-dispatch write means
    **any** `emit()` nested inside another — not only self-recursion — writes its
    retained state first, innermost call to outermost. The common way in is
@@ -167,10 +174,20 @@ compile time) or an explicit `isEventized()` guard.
     could reach any more.
 14. **`on()` rejects what it cannot dispatch.** The listener slot is type-checked,
     not truthiness-checked: a function, a string, a symbol or a non-null object
-    passes, anything else throws. A `NaN` priority throws as well, in every
-    position, tuples included, and a `NaN` inside `on(ε, ['a', ['b', NaN]], fn)`
-    registers nothing at all. `Priority.Max` / `Priority.Min` (`±Infinity`) and `0`
-    stay valid — the test is `Number.isNaN`.
+    passes, anything else throws. An empty array of event names throws too —
+    `on(ε, [], fn)` used to hand back a handle for zero subscriptions and
+    `onceAsync(ε, [])` a promise that never settled. Four mistakes share the one
+    message `subscribeTo() called with insufficient arguments`, and `Error.cause`
+    names which: `'missing-listener'`, `'not-dispatchable'`, `'empty-method-name'`,
+    `'empty-names'`. An unusable priority is the exception — its own message
+    (`subscribeTo() called with a NaN priority`), no cause. It throws in every
+    position, tuples included, and one bad value inside
+    `on(ε, ['a', ['b', NaN]], fn)` registers none of the names. The guard is
+    `typeof priority !== 'number' || Number.isNaN(priority)`, so a non-number cast
+    into a tuple's priority slot is rejected as well; `Priority.Max` /
+    `Priority.Min` (`±Infinity`) and `0` stay valid — it is not a finiteness test.
+    Every one of these rejections is atomic: nothing is registered before the
+    check.
 15. **`off(ε, fn)` ignores the context a subscription was drawn under** (since
     v6.0.0). It detaches every registration of that function, `on(ε, name, fn,
     ctx)` included — so a teardown calling `off(ε, MyClass.prototype.onData)`

@@ -148,6 +148,21 @@ emit(ε, 'ping');
 calls; // => 2
 ```
 
+A callback that knows it re-enters settles itself: the handle `once()` returned
+detaches the listener straight away, so releasing it ahead of the nested
+`emit()` leaves nothing for that emit to reach.
+
+```js
+let calls = 0;
+const unsubscribe = once(ε, 'ping', () => {
+  calls += 1;
+  unsubscribe(); // now, rather than after the return
+  if (calls === 1) emit(ε, 'ping');
+});
+emit(ε, 'ping');
+calls; // => 1
+```
+
 ## `onceAsync` cancellation
 
 ```js

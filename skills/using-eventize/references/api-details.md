@@ -23,7 +23,32 @@ on(ε, 10, listenerObj, ctx)             // the same, catch-all with a priority
 on(ε, 10, 'methodName', obj)            // catch-all method name, with a priority
 ```
 
-Parsing is positional: a leading `number` means "wildcard with priority"; a `number` in second position means "named event with priority"; a leading `string`/`symbol`/array means a named subscription; anything else is treated as a wildcard listener. Calling `on()` without a resolvable listener throws `"subscribeTo() called with insufficient arguments"` — and "resolvable" is a type test, not a truthiness test: only a function, a string, a symbol or a non-null object gets through, so `on(ε, 'foo', 5)` throws (since v6.0.0) where it used to register a subscription that could never dispatch. A `NaN` priority throws too, from the same release on (`"subscribeTo() called with a NaN priority"`), in every position a priority can occupy, including inside a `[name, priority]` tuple, where a single `NaN` rejects the whole call without registering any of the names. `Priority.Max` and `Priority.Min` are `±Infinity` and stay valid — the check is `Number.isNaN`, not `Number.isFinite`.
+Parsing is positional: a leading `number` means "wildcard with priority"; a `number` in second position means "named event with priority"; a leading `string`/`symbol`/array means a named subscription; anything else is treated as a wildcard listener. Calling `on()` without a resolvable listener throws `"subscribeTo() called with insufficient arguments"` — and "resolvable" is a type test, not a truthiness test: only a function, a string, a symbol or a non-null object gets through, so `on(ε, 'foo', 5)` throws (since v6.0.0) where it used to register a subscription that could never dispatch. An unusable priority throws too, from the same release on (`"subscribeTo() called with a NaN priority"`), in every position a priority can occupy, including inside a `[name, priority]` tuple, where a single bad value rejects the whole call without registering any of the names. The guard is `typeof priority !== 'number' || Number.isNaN(priority)` — it catches `NaN` and, in the tuple slot an untyped call site can reach past the positional `typeof` gate, every other non-number that would poison the sort the same way. `Priority.Max` and `Priority.Min` are `±Infinity` and stay valid: the test is not a finiteness test.
+
+### Why a subscription was rejected
+
+`"subscribeTo() called with insufficient arguments"` covers four distinct mistakes, and the message has been that one string since v4. Since v6.0.0 the specific one rides on `Error.cause`, so a catch block can tell them apart without parsing text or reading the console:
+
+| `Error.cause` | What was wrong | Example |
+| --- | --- | --- |
+| `'missing-listener'` | The listener slot came out `null` / `undefined` — usually one argument short | `on(ε, 'foo')` |
+| `'not-dispatchable'` | A value that is not a function, string, symbol or non-null object | `on(ε, 'foo', 5)` |
+| `'empty-method-name'` | A method name of `''` | `on(ε, 'foo', '', obj)` |
+| `'empty-names'` | An empty array of event names — zero registrations, so nothing to hand back | `on(ε, [], fn)` |
+
+The NaN-priority rejection is the one throw that is *not* in this family: different message, and no `cause`.
+
+```js
+try {
+  on(ε, names, handler);
+} catch (err) {
+  if (err.cause === 'empty-names') {
+    // nothing to subscribe to — the name list came out empty
+  } else throw err;
+}
+```
+
+All four are atomic. Nothing is registered before the check, so a rejected call leaves the emitter exactly as it found it — the same guarantee a `NaN` inside one tuple gives for the whole name list.
 
 Forwarding `on()` / `once()` through a wrapper needs `const rawOn = on as SubscribeImpl` — TypeScript refuses to spread a union of tuples into a fixed-arity call, so the public overloads cannot accept `on(target, ...args)` for `args: SubscribeArgs`. `SubscribeImpl` and the eleven named `SubscribeArgs` arms are exported for exactly this.
 

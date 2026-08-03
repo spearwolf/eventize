@@ -159,8 +159,8 @@ describe('onceAsync()', () => {
       await Promise.resolve();
     });
 
-    // MEM-002: off(ε) empties the store but has no path back into this
-    // closure — the abort listener lives on the signal, not on the emitter.
+    // off(ε) empties the store but has no path back into this closure — the
+    // abort listener lives on the signal, not on the emitter.
     // The promise, and everything it closed over, stay alive until the
     // signal itself fires. See docs/lifecycle.md ("onceAsync and off()").
     it('off(ε) does not detach the abort handler — the pending promise outlives the emitter', async () => {

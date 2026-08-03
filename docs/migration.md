@@ -408,15 +408,24 @@ warning and no throw, and `onceAsync(ε, [])` returned a promise that never
 settles: no resolve, no reject, just a dangling `await` for the emitter's
 lifetime. All three now throw
 `subscribeTo() called with insufficient arguments` (`Error.cause:
-'empty-names'`), atomically, before anything is registered — the empty array
-is rarely a literal in working code, so grep for a runtime-assembled name list
-that can end up empty:
+'empty-names'`), atomically, before anything is registered.
+
+The literal is the only shape a pattern can name outright:
 
 ```
-rg "\b(on|once|onceAsync)\(\s*\S+,\s*(\[\]|\w+)\s*[,)]" src/
+rg "\b(on|once|onceAsync)\([^,]+,\s*\[\s*\]" src/
 ```
 
-Guard the call the same way a bulk `off([...])` needs guarding against a
+The case that actually bites is a name list assembled at runtime, and that one
+is not greppable by call shape — a variable holding `[]` looks like a variable
+holding three names. Grep the assembly instead, wherever a list is derived from
+data rather than written out:
+
+```
+rg "\b(on|once|onceAsync)\([^,]+,\s*[^,)]*\.(filter|map|flat|concat|split)\(" src/
+```
+
+Then guard at the call the way a bulk `off([...])` needs guarding against a
 nullish element — check `.length` before subscribing, or drop the call when
 there is nothing to name.
 

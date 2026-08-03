@@ -1,2 +1,7 @@
 build
 node_modules
+
+# Markdown is not format-checked in this repo. The globs in package.json
+# already exclude it; this line makes the exclusion hold for a direct
+# `npx prettier` call on a path too.
+*.md

@@ -399,8 +399,8 @@ describe('emit() re-entrancy (sub/unsub during dispatch)', () => {
   });
 
   describe('once() re-entrancy', () => {
-    // ASYNC-006: EventListener.apply() settles a once() obligation only
-    // after the callback returns (EventListener.ts, callAfterApply). A
+    // EventListener.apply() settles a once() obligation only after the
+    // callback returns (EventListener.ts, callAfterApply). A
     // callback that re-emits its own event before returning is therefore
     // dispatched to its own listener a second time, while that listener is
     // still fully subscribed — the "at most one call" promise breaks under
@@ -426,6 +426,29 @@ describe('emit() re-entrancy (sub/unsub during dispatch)', () => {
 
       emit(ε, 'ping');
       expect(calls).toBe(2); // truly gone afterwards
+    });
+
+    // The way out, and the reason the case above is documented rather than
+    // guarded: the caller already holds something that settles the one-shot
+    // early. Releasing the handle detaches the listener from the store before
+    // the nested walk starts, so the re-entrant emit finds nothing to call —
+    // no recursion guard needed for a callback that knows it re-enters.
+    it('does not fire twice when the callback releases its handle before re-emitting', () => {
+      const ε = eventize();
+      let calls = 0;
+
+      const unsubscribe = once(ε, 'ping', () => {
+        calls += 1;
+        unsubscribe();
+        if (calls === 1) {
+          emit(ε, 'ping');
+        }
+      });
+
+      emit(ε, 'ping');
+
+      expect(calls).toBe(1);
+      expect(getSubscriptionCount(ε)).toBe(0);
     });
   });
 

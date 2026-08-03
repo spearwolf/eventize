@@ -744,12 +744,14 @@ describe('on()', () => {
 
   // ---------------------------------------------------------------------------------------------
   // One thrown message, `subscribeTo() called with insufficient arguments`,
-  // covers three distinct causes — a missing listener, a value that cannot be
-  // dispatched at all, and an empty method name. The wording is frozen (it
-  // predates v4 and is documented), but the cause that produced it now rides
-  // along on Error.cause so a bug report doesn't have to guess from a string
-  // that is wrong two times out of three.
-  describe('Error.cause distinguishes the three causes', () => {
+  // covers four distinct causes — a missing listener, a value that cannot be
+  // dispatched at all, an empty method name, and an empty array of event
+  // names. The wording is frozen (it predates v4 and is documented), but the
+  // cause that produced it now rides along on Error.cause so a bug report
+  // doesn't have to guess from a string that is wrong three times out of four.
+  // The three argument-shaped ones are below; 'empty-names' is pinned with the
+  // rest of the empty-array behaviour further down this file.
+  describe('Error.cause distinguishes the argument-shape causes', () => {
     it('is "missing-listener" when the listener argument is absent', () => {
       const obj = eventize();
       let caught: unknown;
