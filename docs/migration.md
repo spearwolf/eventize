@@ -9,12 +9,12 @@ to grep for and what to write instead.
 ## v5 → v6
 
 `v6.0.0` is the only `6.x` there is, so a `v5.1.0` consumer takes the whole jump
-at once. Fifteen breaking changes. Nine are runtime changes on signatures that
+at once. Seventeen breaking changes. Eleven are runtime changes on signatures that
 do not change shape, so the type checker will not find the call sites for you —
 grep for the patterns below where one is given. Six are type-only and do surface
 as compile errors.
 
-Four further changes are filed as fixes rather than breaks, but a v5 consumer
+Six further changes are filed as fixes rather than breaks, but a v5 consumer
 meets them in the same install; they are at the end.
 
 ### Dedupe `@spearwolf/eventize` before you install v6
@@ -319,6 +319,41 @@ call, and a call-level `NaN` throws even when every tuple carries its own
 priority. `Priority.Max` and `Priority.Min` are `±Infinity` and stay valid — the
 test is `Number.isNaN`, not a finiteness test.
 
+### `on()` / `once()` / `onceAsync()` throw on a sparse array of event names
+
+A hole — `new Array(2)`, or an array grown by setting `.length` past its last
+write — used to be silently skipped by the per-name registration:
+`on(ε, ['a', , 'b'], h)` registered `'a'` and `'b'` and said nothing about the
+missing middle name, and an array of nothing but holes registered nothing at
+all, reached through a length that isn't `0`. `once(ε, new Array(2), h)`
+returned a handle for zero subscriptions; `onceAsync(ε, new Array(2))`
+returned a promise that never settles. All three now throw
+`subscribeTo() called with insufficient arguments` (`Error.cause:
+'sparse-names'`), atomically, before anything is registered. An element
+explicitly set to `undefined` is a value, not a hole, and is unaffected — it
+still registers under the name `undefined`, exactly as before; that is a
+separate, pre-existing question this change does not touch.
+
+```
+rg "\b(on|once|onceAsync)\([^,]+,\s*new Array\(" src/
+```
+
+That finds the constructor spelling only. A hole introduced by growing an
+array past its last index (`names[5] = 'x'` on a shorter array) or by an
+elision in a literal (`['a', , 'b']`) is not greppable by shape — check with
+an indexed loop instead, the same way a nullish element needs checking before
+a bulk `off([...])`. `Array.prototype.some()` is not that loop: it skips a
+hole exactly like the per-name `map()` this change replaces, so it never
+calls back for the index that needs catching.
+
+```js
+for (let i = 0; i < names.length; i++) {
+  if (!(i in names)) {
+    /* a hole at i — rejected before v6 too, just silently */
+  }
+}
+```
+
 ### The listener slot is type-checked
 
 Grep for a possibly-missing value forwarded into the listener position. Both
@@ -535,42 +570,6 @@ rg "\b(on|once|onceAsync)\([^,]+,\s*[^,)]*\.(filter|map|flat|concat|split)\(" sr
 Then guard at the call the way a bulk `off([...])` needs guarding against a
 nullish element — check `.length` before subscribing, or drop the call when
 there is nothing to name.
-
-**`on(ε, [...names with a hole...], …)`, `once()` and `onceAsync()` now throw
-instead of registering a subset.** A hole — `new Array(2)`, or an array
-grown by setting `.length` past its last write — used to be silently skipped
-by the per-name registration: `on(ε, ['a', , 'b'], h)` registered `'a'` and
-`'b'` and said nothing about the missing middle name, and an array of
-nothing but holes registered nothing at all, the same failure the
-empty-array item above describes, reached through a length that isn't `0`.
-`once(ε, new Array(2), h)` returned a handle for zero subscriptions;
-`onceAsync(ε, new Array(2))` returned a promise that never settles. All
-three now throw `subscribeTo() called with insufficient arguments`
-(`Error.cause: 'sparse-names'`), atomically, before anything is registered.
-An element explicitly set to `undefined` is a value, not a hole, and is
-unaffected — it still registers under the name `undefined`, exactly as
-before; that is a separate, pre-existing question this change does not
-touch.
-
-```
-rg "\b(on|once|onceAsync)\([^,]+,\s*new Array\(" src/
-```
-
-That finds the constructor spelling only. A hole introduced by growing an
-array past its last index (`names[5] = 'x'` on a shorter array) or by an
-elision in a literal (`['a', , 'b']`) is not greppable by shape — check with
-an indexed loop instead, the same way a nullish element needs checking before
-a bulk `off([...])`. `Array.prototype.some()` is not that loop: it skips a
-hole exactly like the `map()`s this fix replaces, so it never calls back for
-the index that needs catching.
-
-```js
-for (let i = 0; i < names.length; i++) {
-  if (!(i in names)) {
-    /* a hole at i — rejected before v6 too, just silently */
-  }
-}
-```
 
 **`off(ε, '*', listenerObject)` now detaches something.** It used to remove
 nothing and report nothing, for every shape that puts an object on the wildcard

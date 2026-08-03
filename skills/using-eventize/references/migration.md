@@ -3,8 +3,8 @@
 ## v5 → v6
 
 Against the last released version, `v5.1.0` — and `v6.0.0` is the only
-`6.x` there is, so this is the whole jump. Fourteen breaking changes.
-Eight are runtime changes on signatures that don't change shape, so grep
+`6.x` there is, so this is the whole jump. Seventeen breaking changes.
+Eleven are runtime changes on signatures that don't change shape, so grep
 for the call patterns rather than relying on the type checker to find
 affected sites. Six are type-only and surface as compile errors
 instead.
@@ -69,6 +69,14 @@ instead.
   used to detach it outright, skipping the reference count every documented
   path honours. Use `unsub()`; with the handle reduced to `() => void`
   there is no supported way to obtain such an id anyway.
+- **`retainClear()` and `unretain()` throw a `TypeError` instead of a plain
+  `Error`, on a non-eventized target.** The message changed too: the old text
+  was `'object is not eventized'`; the new one names the function and the
+  remedy — `retainClear() cannot operate on a non-eventized object —
+  eventize(obj) first, or guard the call with isEventized(obj)` (`unretain()`
+  reads the same way). Code that matched the error class or the exact
+  message breaks. Catch `TypeError`, or match
+  `/cannot operate on a non-eventized object/` instead.
 - **`UnsubscribeFunc.listener` / `.listeners` are gone, and so is the
   `EventListener` type export.** The handle is `() => void`. The union
   that declared the two fields made either access a `TS2339` at every call
@@ -123,6 +131,20 @@ instead.
   — so validate before the call: `Number.isNaN(p) ? Priority.Normal : p`, and
   apply the same guard inside a tuple, which the call-level value does not
   cover.
+- **`on()` / `once()` / `onceAsync()` throw on a sparse array of event
+  names.** A hole — `new Array(2)`, or an array grown by setting `.length`
+  past its last write — used to be silently skipped by the per-name
+  registration: `on(ε, ['a', , 'b'], h)` registered `'a'` and `'b'` and said
+  nothing about the gap, and an all-holes array registered nothing at all,
+  so `once(ε, new Array(2), h)` handed back a handle for zero subscriptions
+  and `onceAsync(ε, new Array(2))` a promise that never settles. All three
+  now throw `subscribeTo() called with insufficient arguments`
+  (`Error.cause: 'sparse-names'`), atomically, before anything is
+  registered. An element explicitly set to `undefined` is a value, not a
+  hole, and is unaffected. A hole is not greppable by shape unless it is the
+  `new Array()` spelling — check with an indexed loop
+  (`for (let i = 0; i < a.length; i++) if (!(i in a)) …`), not
+  `.some()`/`.map()`, both of which skip a hole instead of visiting it.
 - **A typed event map now narrows on `eventize.inject()` and on
   `class Eventize`.** Both surfaces used to accept every wrong event name and
   every wrong argument tuple, and on the class surface the listener parameters
@@ -203,12 +225,14 @@ remedy. Check with `npm ls @spearwolf/eventize`, fix with `npm dedupe` or an
 `overrides` / `resolutions` entry pinning `^6.0.0`. At runtime,
 `getEventizeProtocol(obj)` says which copy owns an object without throwing.
 
-Five more runtime changes ride along, all filed as **fixes** rather than
+Six more runtime changes ride along, all filed as **fixes** rather than
 breaking changes — one stopped dispatching to code the subscriber never
 wrote, one widened what a target may be, one turned a silent no-op into a
 throw, one made a call do the one thing its arguments ask for, one stopped an
-API surface from contradicting itself — but a `v5.1.0` consumer meets all five
-in the same upgrade and none of them is visible to the type checker:
+API surface from contradicting itself, one kept a throwing retained replay
+from taking the rest of its batch down with it — but a `v5.1.0` consumer
+meets all six in the same upgrade and none of them is visible to the type
+checker:
 
 - **An event name that only matches an inherited `Object.prototype` member
   dispatches to nothing.** `toString`, `toLocaleString`, `valueOf`,
@@ -257,21 +281,6 @@ in the same upgrade and none of them is visible to the type checker:
   is a runtime-assembled name list that can come out empty — check `.length`
   before subscribing, the same way a bulk `off([...])` needs guarding against
   a nullish element.
-- **`on(ε, [...with a hole...], …)`, `once()` and `onceAsync()` throw instead
-  of registering a subset.** A hole — `new Array(2)`, or an array grown by
-  setting `.length` past its last write — used to be silently skipped the
-  same way the empty array above was: `on(ε, ['a', , 'b'], h)` registered
-  `'a'` and `'b'` and said nothing about the gap, and an all-holes array
-  registered nothing at all, so `once(ε, new Array(2), h)` handed back a
-  handle for zero subscriptions and `onceAsync(ε, new Array(2))` a promise
-  that never settles. All three now throw the same
-  `subscribeTo() called with insufficient arguments`
-  (`Error.cause: 'sparse-names'`), atomically, before anything is registered.
-  An element explicitly set to `undefined` is a value, not a hole, and is
-  unaffected. A hole is not greppable by shape unless it is the `new Array()`
-  spelling — check with an indexed loop (`for (let i = 0; i < a.length; i++)
-  if (!(i in a)) …`), not `.some()`/`.map()`, both of which skip a hole
-  instead of visiting it.
 - **`off(ε, '*', listenerObject)` now detaches that object's wildcard
   subscriptions.** It used to remove nothing and report nothing: `off()`
   routes a name-plus-object pair into the named buckets, and a wildcard
@@ -307,14 +316,18 @@ in the same upgrade and none of them is visible to the type checker:
   replaces the descriptor outright and now succeeds silently instead. A
   non-configurable member still throws, now `Cannot redefine property:
   <name>` in place of the assignment error.
-- **`retainClear()` and `unretain()` throw a `TypeError` instead of a plain
-  `Error`, on a non-eventized target.** The message changed too: the old text
-  was `'object is not eventized'`; the new one names the function and the
-  remedy — `retainClear() cannot operate on a non-eventized object —
-  eventize(obj) first, or guard the call with isEventized(obj)` (`unretain()`
-  reads the same way). Code that matched the error class or the exact
-  message breaks. Catch `TypeError`, or match
-  `/cannot operate on a non-eventized object/` instead.
+- **A listener that throws on a retained replay no longer throws out of
+  `on()`.** Up to v5.1.0 the throw propagated to whoever subscribed: the
+  later names of a multi-name call never got their replay, and the
+  subscriptions the call had already made came back without a handle,
+  removable only through `off()`. Each replay of a batch is isolated now —
+  the throw goes to `console.warn` with the event name, the rest of the
+  batch still replays, and `on()` / `once()` return the handle for the
+  registration they completed. Grep for `retain(` and check what the
+  subscriptions on those names do with a bad value. A `once()` on a retained
+  name changes twice over: a replay that throws settles nothing, so the next
+  replay of the same batch calls the listener again — where v5 stopped at
+  the first throw.
 
 ## v4 → v5: `emit()` stopped throwing
 
