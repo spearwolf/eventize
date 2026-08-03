@@ -35,6 +35,38 @@ describe('a marker written by another copy of eventize', () => {
     expect(() => emit(obj, 'foo', 1, 2)).toThrow(MISMATCH);
   });
 
+  // PERF-001 moved the internals resolution in the array branch of `_emit()`
+  // so a run of concrete names pays `internalsOf()` once instead of once per
+  // name — see the comment beside `_emitOne()` in eventize-api.ts. The one way
+  // that change could regress this boundary is by resolving the marker before
+  // the `'*'` rejection runs. It must not: '*' is checked first, unconditionally,
+  // both for the scalar form and for every element of an array — a foreign
+  // marker given '*' must still get the wildcard message, never the mismatch.
+  it("rejects '*' before it ever reads a foreign marker's protocol (scalar form)", () => {
+    const obj = markAsForeign({}, legacyMarker());
+    expect(() => emit(obj, '*', 'data')).toThrow(/concrete event name/);
+    expect(() => emit(obj, '*', 'data')).not.toThrow(MISMATCH);
+  });
+
+  it("rejects '*' before it ever reads a foreign marker's protocol (array form, '*' first)", () => {
+    const obj = markAsForeign({}, legacyMarker());
+    expect(() => emit(obj, ['*', 'foo'], 'data')).toThrow(
+      /concrete event name/,
+    );
+    expect(() => emit(obj, ['*', 'foo'], 'data')).not.toThrow(MISMATCH);
+  });
+
+  // The protocol check is a security boundary, not a cache — it must still run
+  // on every emit() that actually dispatches something. What it must NOT do is
+  // run for a call that dispatches nothing at all: an empty event-name array
+  // never reaches `_emitOne()`, so `internalsOf()` is never called for it, and
+  // that stays true whether the marker is genuine or foreign. This is the
+  // baseline this package's optimization had to preserve, not a new relaxation.
+  it('does not run the boundary check for an empty event-name array — nothing to dispatch, nothing to check', () => {
+    const obj = markAsForeign({}, legacyMarker());
+    expect(() => emit(obj, [], 'data')).not.toThrow();
+  });
+
   it('makes off() fail at the boundary', () => {
     const obj = markAsForeign({}, legacyMarker());
     expect(() => off(obj, 'foo')).toThrow(MISMATCH);

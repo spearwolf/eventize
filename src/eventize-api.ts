@@ -2,6 +2,7 @@ import {asEventized} from './asEventized';
 import {EVENT_CATCH_EM_ALL} from './constants';
 import {createOnceObligation} from './EventListener';
 import type {EventListener, OnceObligation} from './EventListener';
+import type {EventizeInternals} from './internals';
 import {internalsOf} from './internals';
 import {isEventized} from './isEventized';
 import {subscribeTo} from './subscribeTo';
@@ -138,20 +139,38 @@ const applyListener = (
   listener.apply(eventName, args, returnValue);
 };
 
+// `internals` is an accumulator, not a cache: `_emit()`'s array branch passes
+// back whatever the previous call resolved, so a run of concrete names pays
+// `internalsOf()` once instead of once per name (PERF-001). The `'*'` check
+// stays the first thing this function does, unconditionally, so the resolve
+// never moves ahead of it — a name array with `'*'` after concrete names must
+// keep throwing the wildcard message, not a stale-internals side effect, and
+// a foreign-marker emitter asked for `'*'` must keep getting that same
+// message instead of a protocol mismatch. Called with no fourth argument (the
+// scalar path, and the first element of every array), it resolves internals
+// itself exactly as before.
 const _emitOne = (
   eventizedObj: EventizedObject,
   eventName: EventName,
   args: EventArgs,
   returnValue?: (val: unknown) => void,
-) => {
+  internals?: EventizeInternals,
+): EventizeInternals => {
   if (eventName === EVENT_CATCH_EM_ALL) {
     throw new Error(
       "emit() must be called with a concrete event name — '*' is reserved for subscribing to all events and cannot be emitted",
     );
   }
-  const {store, keeper} = internalsOf(eventizedObj);
-  store.forEach(eventName, applyListener, eventName, args, returnValue);
-  keeper.retain(eventName, args);
+  const resolved = internals ?? internalsOf(eventizedObj);
+  resolved.store.forEach(
+    eventName,
+    applyListener,
+    eventName,
+    args,
+    returnValue,
+  );
+  resolved.keeper.retain(eventName, args);
+  return resolved;
 };
 
 const _emit = (
@@ -161,9 +180,20 @@ const _emit = (
   returnValue?: (val: unknown) => void,
 ) => {
   if (Array.isArray(eventNames)) {
-    eventNames.forEach((event: EventName) =>
-      _emitOne(eventizedObj, event, args, returnValue),
-    );
+    // `.forEach()`, not a `for...of`: the array form has to keep skipping
+    // holes the way `_duckEmit()`'s `.forEach()` below already does, and a
+    // `for...of` does not — it reads a hole as `undefined` and dispatches (and
+    // retains) an event by that name, which neither this path used to do nor
+    // the duck path does today. AGENTS.md ("The two dispatch paths in `emit`
+    // move in lockstep") is the reason this loop shape is not a style choice.
+    //
+    // An empty array never calls `_emitOne()`, so `internalsOf()` never runs
+    // for it — same as before this change. The protocol check is not skipped
+    // *for any dispatch*; there is simply no dispatch to check it for.
+    let internals: EventizeInternals | undefined;
+    eventNames.forEach((event: EventName) => {
+      internals = _emitOne(eventizedObj, event, args, returnValue, internals);
+    });
   } else {
     _emitOne(eventizedObj, eventNames, args, returnValue);
   }
