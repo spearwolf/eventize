@@ -1,8 +1,9 @@
 import {LOG_NAMESPACE, EVENT_CATCH_EM_ALL} from './constants';
 import type {EventArgs, EventName} from './types';
 
-export const isCatchEmAll = (eventName: unknown): eventName is string =>
-  eventName === EVENT_CATCH_EM_ALL;
+export const isCatchEmAll = (
+  eventName: unknown,
+): eventName is typeof EVENT_CATCH_EM_ALL => eventName === EVENT_CATCH_EM_ALL;
 
 export const isEventName = (eventName: unknown): eventName is EventName => {
   switch (typeof eventName) {

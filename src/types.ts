@@ -273,7 +273,7 @@ export type ListenerFor<TEvents, K> = ListenerTaking<ArgsFor<TEvents, K>>;
 export type EventListenerMethods<TEvents extends EventMap = DefaultEventMap> = {
   [K in EventKeysOf<TEvents>]?: ListenerFor<TEvents, K>;
 } & {
-  emit?: (eventName: EventKeysOf<TEvents>, ...args: any[]) => void;
+  emit?: (eventName: EventKeysOf<TEvents>, ...args: unknown[]) => void;
 };
 
 /**

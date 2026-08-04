@@ -49,6 +49,14 @@ const canReadMembers = (obj: unknown): obj is DispatchTarget => obj != null;
 const isObjListener = (obj: unknown): obj is DispatchTarget =>
   obj != null && typeof obj === 'object';
 
+// The domain of the LISTENER_IS_* tags, spelled out as literals rather than
+// mirrored with `typeof LISTENER_IS_OBJ` and friends: a `typeof` alias tracks
+// whatever the constant happens to hold, so a typo'd constant (`= 5` instead
+// of `= 4`) would recompute the union around the mistake and hide it. The
+// hardcoded `1 | 2 | 4` is what makes that same typo a `TS2322` where
+// `LISTENER_IS_OBJ` is returned as this type.
+type ListenerTypeTag = 1 | 2 | 4;
+
 /**
  * Returns the LISTENER_IS_* tag for a listener, or undefined for a type that
  * cannot be one. This is also the filter `_subscribeTo()` applies: a value with
@@ -63,7 +71,9 @@ const isObjListener = (obj: unknown): obj is DispatchTarget =>
  * The tag is what `EventStore.isSimilar()` compares. It is deliberately *not*
  * what `apply()` dispatches on — see the note there.
  */
-export const detectListenerType = (listener: unknown): number | undefined => {
+export const detectListenerType = (
+  listener: unknown,
+): ListenerTypeTag | undefined => {
   switch (typeof listener) {
     case 'function':
       return LISTENER_IS_FUNC;
@@ -167,7 +177,7 @@ export class EventListener {
   listenerObject: ListenerObjectType;
   // Read by EventStore.isSimilar(), which needs a value it can compare with
   // `===`. Never read by apply() — see the note there.
-  readonly listenerType: number | undefined;
+  readonly listenerType: ListenerTypeTag | undefined;
   // Runs after a dispatch that actually invoked the listener. It means "settle
   // the pending one-shot obligations", not "release a handle" — one listener
   // can carry several once() registrations, and a single closure per handle

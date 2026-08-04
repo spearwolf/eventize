@@ -3,10 +3,10 @@
 ## v5 → v6
 
 Against the last released version, `v5.1.0` — and `v6.0.0` is the only
-`6.x` there is, so this is the whole jump. Twenty-one breaking changes.
+`6.x` there is, so this is the whole jump. Twenty-two breaking changes.
 Thirteen are runtime changes on signatures that don't change shape, so grep
 for the call patterns rather than relying on the type checker to find
-affected sites. Eight are type-only and surface as compile errors
+affected sites. Nine are type-only and surface as compile errors
 instead.
 
 - **Bulk `off()` now clears retained state.** `off(ε)`, `off(ε, '*')`, and
@@ -130,6 +130,15 @@ instead.
   that case. Add a guard: `(await emitAsync(ε, 'x'))?.map(…)`, or `?? []`.
 - **`export type ListenerType` is gone** — an alias for `unknown` nothing
   referenced. Replace an import with `unknown` directly.
+- **`EventListenerMethods`' `emit` catch-all takes `unknown[]` instead of
+  `any[]`.** A listener object's own `emit(eventName, ...args)` handler had
+  every argument typed `any`, so nothing inside its body was checked — a call
+  like `args[0].toUpperCase()` on a payload that turned out to be a number
+  compiled and threw at dispatch. It is a compile error now until the value
+  is narrowed. Grep for a listener object's own catch-all method:
+  `rg "emit\(\s*\w+\s*,\s*\.\.\.\w+\s*\)" src/`. Narrow before use —
+  `if (typeof args[0] === 'string') args[0].toUpperCase();` — or an `as`
+  where the shape is already known.
 - **`on()` / `once()` throw on a listener they cannot dispatch to.** The
   slot used to be checked for truthiness only, so `on(ε, 'foo', 5)`
   registered a listener no `emit()` could ever reach — it counted towards

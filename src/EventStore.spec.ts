@@ -418,6 +418,26 @@ describe('EventStore', () => {
       expect(store.getSubscriptionCount()).toBe(1);
     });
 
+    // `removeSimilar` is set to true only by off()'s own forceRemove, which
+    // requires the listener argument to already be a string or symbol (see
+    // eventize-api.ts) — the public API can never reach this branch with a
+    // listener that fails isEventName(). EventStore.remove() is a store
+    // method the specs call directly, though, and that direct call is
+    // exactly where the invariant would otherwise go unchecked: without the
+    // isEventName() guard, a non-name listener would be forced into a Map
+    // lookup that can never hit, leaving the registration untouched instead
+    // of falling through to identity removal.
+    it('removeSimilar with a non-event-name listener falls through to identity removal', () => {
+      const store = new EventStore();
+      const listenerObject = {};
+      store.add('foo', 0, listenerObject);
+
+      store.remove(listenerObject, null, true);
+
+      expect(store.namedListeners.has('foo')).toBe(false);
+      expect(store.getSubscriptionCount()).toBe(0);
+    });
+
     it('aggregates a once() obligation onto a similar listener', () => {
       const store = new EventStore();
       const listenerObject = {};

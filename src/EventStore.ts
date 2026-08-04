@@ -1217,11 +1217,8 @@ export class EventStore {
     }
 
     // off('foo', obj) / off(Symbol('foo'), obj)
-    if (removeSimilar) {
-      this.removeByEventNameAndListenerObject(
-        listener as EventName,
-        listenerObject,
-      );
+    if (removeSimilar && isEventName(listener)) {
+      this.removeByEventNameAndListenerObject(listener, listenerObject);
       return;
     }
 

@@ -9,9 +9,9 @@ to grep for and what to write instead.
 ## v5 → v6
 
 `v6.0.0` is the only `6.x` there is, so a `v5.1.0` consumer takes the whole jump
-at once. Twenty-one breaking changes. Thirteen are runtime changes on signatures that
+at once. Twenty-two breaking changes. Thirteen are runtime changes on signatures that
 do not change shape, so the type checker will not find the call sites for you —
-grep for the patterns below where one is given. Eight are type-only and do surface
+grep for the patterns below where one is given. Nine are type-only and do surface
 as compile errors.
 
 Seven further changes are filed as fixes rather than breaks, but a v5 consumer
@@ -651,6 +651,14 @@ interface, which is the whole reason the base class stopped declaring its own.
   structurally is affected.
 - **`export type ListenerType` is gone.** It was an alias for `unknown`. Write
   `unknown`.
+- **`EventListenerMethods`' `emit` catch-all takes `unknown[]` instead of
+  `any[]`.** A listener object's own `emit(eventName, ...args)` handler had
+  every argument typed `any`, so nothing inside its body was checked; a call
+  like `args[0].toUpperCase()` on a numeric payload compiled and threw at
+  dispatch. Grep for a listener object's own catch-all method:
+  `rg "emit\(\s*\w+\s*,\s*\.\.\.\w+\s*\)" src/`. _Migration:_ narrow before
+  use — `if (typeof args[0] === 'string') args[0].toUpperCase();`, or an `as`
+  where the shape is already known.
 - **An `EventListener` built directly with a `null` listener** dispatches to
   nothing instead of throwing. Only reachable by constructing the class
   yourself, which the package no longer exports in either namespace.
