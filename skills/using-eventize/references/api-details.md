@@ -27,17 +27,19 @@ Parsing is positional: a leading `number` means "wildcard with priority"; a `num
 
 ### Why a subscription was rejected
 
-`"subscribeTo() called with insufficient arguments"` covers five distinct mistakes, and the message has been that one string since v4. Since v6.0.0 the specific one rides on `Error.cause`, so a catch block can tell them apart without parsing text or reading the console:
+`"subscribeTo() called with insufficient arguments"` covers seven distinct mistakes, and the message has been that one string since v4. Since v6.0.0 the specific one rides on `Error.cause`, so a catch block can tell them apart without parsing text or reading the console:
 
 | `Error.cause` | What was wrong | Example |
 | --- | --- | --- |
 | `'missing-listener'` | The listener slot came out `null` / `undefined` — usually one argument short | `on(ε, 'foo')` |
 | `'not-dispatchable'` | A value that is not a function, string, symbol or non-null object | `on(ε, 'foo', 5)` |
 | `'empty-method-name'` | A method name of `''` | `on(ε, 'foo', '', obj)` |
+| `'missing-listener-object'` | A method name with nothing to read it off. Late binding covers the *method*, which may appear later; the object slot is never written after registration, so a nullish one is dead for good | `on(ε, 'foo', 'handler', null)` |
 | `'empty-names'` | An empty array of event names — zero registrations, so nothing to hand back | `on(ε, [], fn)` |
 | `'sparse-names'` | An array of event names with a hole — the map underneath a name list skips a hole rather than erroring on it, so left unguarded this would register a subset of the names, or none at all for an all-holes array | `on(ε, new Array(2), fn)` |
+| `'invalid-name'` | An event name that is not a string or a symbol — an array entry, or a single name in a form that puts a priority after it. It used to register under that value, where no `emit()` could reach it and, for a number, no `off(ε, 123)` could remove it either | `on(ε, [123], fn)`, `on(ε, {}, 10, fn)` |
 
-The NaN-priority rejection is the one throw that is *not* in this family: different message, and no `cause`.
+The priority rejection is the one throw that is *not* in this family: its own message, `"subscribeTo() called with a NaN priority"`, and `Error.cause: 'invalid-priority'` — since v6.0.0, so a catch block keyed on `cause` covers it too.
 
 ```js
 try {
@@ -49,7 +51,7 @@ try {
 }
 ```
 
-All four are atomic. Nothing is registered before the check, so a rejected call leaves the emitter exactly as it found it — the same guarantee a `NaN` inside one tuple gives for the whole name list.
+All seven are atomic, and so is the priority rejection. Nothing is registered before the check, so a rejected call leaves the emitter exactly as it found it — `getSubscriptionCount(ε)` after the throw is what it was before it.
 
 Forwarding `on()` / `once()` through a wrapper needs `const rawOn = on as SubscribeImpl` — TypeScript refuses to spread a union of tuples into a fixed-arity call, so the public overloads cannot accept `on(target, ...args)` for `args: SubscribeArgs`. `SubscribeImpl` and the eleven named `SubscribeArgs` arms are exported for exactly this.
 

@@ -9,9 +9,9 @@ to grep for and what to write instead.
 ## v5 → v6
 
 `v6.0.0` is the only `6.x` there is, so a `v5.1.0` consumer takes the whole jump
-at once. Seventeen breaking changes. Eleven are runtime changes on signatures that
+at once. Nineteen breaking changes. Twelve are runtime changes on signatures that
 do not change shape, so the type checker will not find the call sites for you —
-grep for the patterns below where one is given. Six are type-only and do surface
+grep for the patterns below where one is given. Seven are type-only and do surface
 as compile errors.
 
 Six further changes are filed as fixes rather than breaks, but a v5 consumer
@@ -330,9 +330,10 @@ returned a handle for zero subscriptions; `onceAsync(ε, new Array(2))`
 returned a promise that never settles. All three now throw
 `subscribeTo() called with insufficient arguments` (`Error.cause:
 'sparse-names'`), atomically, before anything is registered. An element
-explicitly set to `undefined` is a value, not a hole, and is unaffected — it
-still registers under the name `undefined`, exactly as before; that is a
-separate, pre-existing question this change does not touch.
+explicitly set to `undefined` is a value, not a hole, and this guard leaves it
+alone — the entry check in the next section rejects it instead, with
+`Error.cause: 'invalid-name'`. Up to `v5.1.0` it registered under the name
+`undefined`.
 
 ```
 rg "\b(on|once|onceAsync)\([^,]+,\s*new Array\(" src/
@@ -352,6 +353,83 @@ for (let i = 0; i < names.length; i++) {
     /* a hole at i — rejected before v6 too, just silently */
   }
 }
+```
+
+### `on()` / `once()` / `onceAsync()` reject an event name that is not a string or a symbol
+
+The array branch used to check the array and never its elements, so any value
+at all could become an event name: `on(ε, [123], fn)`, `on(ε, [null], fn)`,
+`on(ε, [[]], fn)` and `on(ε, ['a', undefined, 'b'], fn)` filed a bucket under
+that value and counted it in `getSubscriptionCount(ε)`. Nothing could dispatch
+to it, and a number could not even be removed: `isEventName(123)` is false, so
+`off(ε, 123)` falls through to identity matching and finds nothing — only
+`off(ε, fn)` reached it. All of them now throw
+`subscribeTo() called with insufficient arguments` (`Error.cause:
+'invalid-name'`), atomically. A `[name, priority]` tuple's first slot is
+checked the same way.
+
+The single-name forms had the same hole, and it is closed with the same cause.
+Wherever a priority follows the name, the decoding used to take the name slot
+unread — `on(ε, {}, 10, fn)`, `on(ε, null, 10, fn)` and the four-argument
+`on(ε, 5, 10, fn, ctx)` all registered under a non-name.
+
+What is *not* affected: the catch-all spellings, which fill the name slot with
+`'*'` themselves, and `on(ε, 123, fn)`, where `123` is decoded as a priority
+and always was.
+
+```
+rg "\b(on|once|onceAsync)\(\s*[^,]+,\s*\[" src/
+rg "\b(on|once)\(\s*[^,]+,\s*[a-zA-Z_$][\w.$]*\s*,\s*-?\d" src/
+```
+
+The first finds every array-shaped name list; the second finds a variable in
+the name slot followed by a numeric priority, which is the single-name shape
+this closes. Either way what needs checking is where the name comes from.
+Where a list is assembled at runtime, filter it:
+
+```js
+const names = raw.filter(
+  (n) => typeof n === 'string' || typeof n === 'symbol',
+);
+if (names.length > 0) on(ε, names, handler);
+```
+
+The `length` guard is not optional — an empty array throws too
+(`Error.cause: 'empty-names'`), which is the older half of the same rule.
+
+### A method name needs a listener object
+
+`on(ε, 'foo', 'handler', null)` — with `undefined`, or with the fourth argument
+left off — registered a subscription that could never dispatch: the method is
+read off the listener object at dispatch time, and nothing writes that slot
+after registration. Up to `v5.1.0` the entry sat there counting in
+`getSubscriptionCount(ε)` and threw
+`TypeError: Cannot read properties of null` on the first `emit()`. It now
+throws `subscribeTo() called with insufficient arguments` (`Error.cause:
+'missing-listener-object'`) at the `on()` call, and the compiler rejects it
+first: the slot is `object` in the method-name forms.
+
+A `once()` in that shape was the worse half — its obligation could never
+settle, so the handle went on holding the emitter, its store, its keeper and
+every retained payload for as long as the handle was kept.
+
+Late binding is unchanged, because late binding is about the *method*:
+
+```js
+const target = {}; // no `handler` yet
+on(ε, 'foo', 'handler', target); // fine, dispatches to nothing
+target.handler = () => {}; // from here on it fires
+```
+
+```
+rg "\b(on|once)\([^)]*,\s*['\"][^'\"]+['\"]\s*,\s*(null|undefined)\s*\)" src/
+```
+
+Replace with a guard where the object is a lookup that may miss:
+
+```js
+const target = registry[name];
+if (target) on(ε, 'foo', 'handler', target);
 ```
 
 ### The listener slot is type-checked
@@ -382,9 +460,9 @@ An array, `null` or `undefined` in the listener position is now a compile
 error the same way: `on(ε, ['a', 'b'])`, `on(ε, null)` and
 `on(ε, undefined)` used to compile and throw
 `subscribeTo() called with insufficient arguments` at runtime. The *trailing*
-listener-object slot — `on(ε, 'foo', 'handler', null)` — is unchanged and
-still accepts `null` / `undefined`; that is the documented late-bound shape,
-not a lookup that missed.
+slot still accepts `null` / `undefined` wherever it carries a `this` context —
+`on(ε, 'foo', fn, null)`. Behind a method name it does not, for the reason two
+sections up.
 
 ### Typed maps now narrow on `eventize.inject()` and `class Eventize`
 
@@ -444,12 +522,6 @@ interface, which is the whole reason the base class stopped declaring its own.
 
 ### The smaller ones
 
-- **`on(ε, 'foo', 'handler', null)` no longer throws.** A method-name
-  subscription with a missing or `null` listener object used to throw
-  `TypeError` the moment the event fired; it now dispatches to nothing until a
-  real listener object is supplied, and a `once()` in this shape is not
-  consumed. Code that caught the `TypeError` as a signal should check
-  `getSubscriptionCount(ε)` instead.
 - **`off(ε, <numeric listener id>)` removes nothing.** Undocumented and
   untested; it detached the listener outright, skipping the reference count.
   Use `unsub()`.

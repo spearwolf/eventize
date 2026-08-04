@@ -165,6 +165,39 @@ describe('once()', () => {
     });
   });
 
+  // A once() whose listener object is missing was the one registration that
+  // could never discharge: apply() needs an object to read the method off, so
+  // the obligation stayed pending for the emitter's lifetime and the handle
+  // kept both the emitter and the obligation reachable — the leak the
+  // single-slot handle design exists to prevent, reached through the one path
+  // that never gets to the settle hook. Rejected before registration now.
+  describe('a method-name once() without a listener object', () => {
+    it('throws instead of arming an obligation that can never settle', () => {
+      const obj = eventize();
+      expect(() =>
+        once(obj, 'foo', 'handler', null as unknown as object),
+      ).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+
+      // Nothing was registered, so nothing dispatches and nothing is left to
+      // settle: the emitter is exactly what it was before the call.
+      emit(obj, 'foo');
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('names the cause on Error.cause', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        once(obj, 'foo', 'handler', undefined as unknown as object);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).cause).toBe('missing-listener-object');
+    });
+  });
+
   describe('UnsubscribeFunc contract', () => {
     // The handle used to expose the internal EventListener as
     // `.listener` (single-name forms) or `.listeners` (array form). Both are

@@ -3,10 +3,10 @@
 ## v5 → v6
 
 Against the last released version, `v5.1.0` — and `v6.0.0` is the only
-`6.x` there is, so this is the whole jump. Seventeen breaking changes.
-Eleven are runtime changes on signatures that don't change shape, so grep
+`6.x` there is, so this is the whole jump. Nineteen breaking changes.
+Twelve are runtime changes on signatures that don't change shape, so grep
 for the call patterns rather than relying on the type checker to find
-affected sites. Six are type-only and surface as compile errors
+affected sites. Seven are type-only and surface as compile errors
 instead.
 
 - **Bulk `off()` now clears retained state.** `off(ε)`, `off(ε, '*')`, and
@@ -60,10 +60,33 @@ instead.
 - **Unsubscribe handles are single-shot.** Calling one a second time used to
   decrement a shared reference count again, releasing a *sibling* handle's
   registration out from under it. A second call is now inert.
-- **A method-name subscription with a missing listener object no-ops
-  instead of throwing.** `on(ε, 'foo', 'handler', null)` used to throw the
-  moment the event fired; it now silently does nothing until a real
-  listener object is supplied.
+- **A method-name subscription without a listener object throws at the
+  `on()` call.** `on(ε, 'foo', 'handler', null)` — with `undefined`, or with
+  the argument left off — used to register and then throw a `TypeError` the
+  moment the event fired. It now throws
+  `subscribeTo() called with insufficient arguments`
+  (`Error.cause: 'missing-listener-object'`), atomically, and the compiler
+  rejects the call first. Nothing writes that slot after registration, so
+  the subscription could never have dispatched; a `once()` in this shape
+  never settled and its handle held the emitter for as long as it was kept.
+  Late binding is untouched — it is the *method* that may appear later, and
+  an object without it still subscribes: `on(ε, 'foo', 'handler', target)`
+  starts firing the moment `target.handler` exists.
+- **An event name that is not a string or a symbol throws.**
+  `on(ε, [123], fn)`, `[null]`, `[[]]` and an element explicitly set to
+  `undefined` used to file a bucket under that value: unreachable by
+  `emit()`, and for a number unreachable by `off(ε, 123)` too, since
+  `isEventName(123)` is false and the removal falls through to identity
+  matching. The single-name forms had the same hole wherever a priority
+  follows the name — `on(ε, {}, 10, fn)`, `on(ε, null, 10, fn)`, and the
+  four-argument `on(ε, 5, 10, fn, ctx)`. All of them now throw
+  `subscribeTo() called with insufficient arguments`
+  (`Error.cause: 'invalid-name'`), atomically, and so does the first slot of
+  a `[name, priority]` tuple. The catch-all spellings fill the name slot
+  with `'*'` themselves and are unaffected, as is `on(ε, 123, fn)`, where
+  `123` is decoded as a priority. Filter a runtime-assembled name list to
+  strings and symbols — and keep the `.length` check, because an empty
+  result throws too.
 - **`off(ε, <numeric listener id>)` no longer removes anything.** This was
   undocumented and untested — passing the internal listener's numeric id
   used to detach it outright, skipping the reference count every documented
@@ -109,14 +132,21 @@ instead.
   `on(ε, ['a', 'b'])` looked dispatchable to the runtime test and threw
   `subscribeTo() called with insufficient arguments` anyway. That call, and
   `on(ε, null)` / `on(ε, undefined)`, are compile errors now. The *trailing*
-  listener-object slot is unchanged and still nullish —
-  `on(ε, 'foo', 'handler', null)` is the documented late-bound shape, not a
-  lookup that missed. Guard the lookup, or keep the handle `on()` returned:
+  slot is unchanged and still nullish wherever it carries a `this` context —
+  `on(ε, 'foo', fn, null)`. Guard the lookup, or keep the handle `on()`
+  returned:
 
   ```ts
   const handler = handlers[name];
   if (handler) on(ε, 'foo', handler);
   ```
+- **The listener-object slot of the method-name forms is `object`.** The type
+  half of the runtime rejection above: `on(ε, 'foo', 'handler', null)` and
+  the same call with `undefined` compiled up to `v5.1.0` and are compile
+  errors now, on all three API surfaces and in the `NamedMethodArgs`,
+  `NamedPriorityMethodArgs` and `CatchAllPriorityMethodArgs` arms of
+  `SubscribeArgs`. The method is resolved late; the object it lives on is
+  not. Guard the lookup before the call.
 - **`on()` / `once()` throw on a `NaN` priority.** `NaN` is a `number`, so it
   passed as a priority and then made every comparison in the insertion sort
   false — the listener landed wherever the bucket size put it, silently. The
@@ -141,7 +171,8 @@ instead.
   now throw `subscribeTo() called with insufficient arguments`
   (`Error.cause: 'sparse-names'`), atomically, before anything is
   registered. An element explicitly set to `undefined` is a value, not a
-  hole, and is unaffected. A hole is not greppable by shape unless it is the
+  hole — this guard leaves it alone and the entry check rejects it with
+  `'invalid-name'` instead. A hole is not greppable by shape unless it is the
   `new Array()` spelling — check with an indexed loop
   (`for (let i = 0; i < a.length; i++) if (!(i in a)) …`), not
   `.some()`/`.map()`, both of which skip a hole instead of visiting it.

@@ -105,6 +105,23 @@ describe('onceAsync()', () => {
     );
   });
 
+  // The third member of the same family, and the one with a promise's worth of
+  // consequence: a name that is not a name registers a bucket nothing can ever
+  // emit to, so the promise would never settle either.
+  it('throws synchronously instead of rejecting on an entry that is not an event name', () => {
+    const e = eventize();
+    let caught: unknown;
+    try {
+      onceAsync(e, [123] as unknown as string[]);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toMatch(/insufficient arguments/);
+    expect((caught as Error).cause).toBe('invalid-name');
+    expect(getSubscriptionCount(e)).toBe(0);
+  });
+
   // The signal.aborted pre-check runs before once() is ever called, so an
   // already-aborted signal short-circuits before the argument validation
   // gets a chance to run at all. An empty array of event names — normally a

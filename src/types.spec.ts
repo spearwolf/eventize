@@ -108,14 +108,31 @@ describe('the listener slot rejects what the runtime rejects', () => {
     );
   });
 
-  it('still accepts a nullish listener *object* in the trailing slot', () => {
+  it('refuses a nullish listener *object* behind a method name', () => {
     const target = eventize();
-    // Late-bound listener objects are a documented shape: the method name is
-    // resolved at dispatch, and a missing object dispatches to nothing.
-    const unsubscribe = on(target, 'foo', 'handler', null);
+    // Late binding is about the *method*, which is resolved at dispatch and
+    // may appear later. The object it is read off has no such second chance,
+    // so the slot is `object` and both spellings are compile errors on top of
+    // the runtime throw.
+    // @ts-expect-error null cannot carry a method
+    expect(() => on(target, 'foo', 'handler', null)).toThrow(
+      'subscribeTo() called with insufficient arguments',
+    );
+    // @ts-expect-error undefined cannot carry a method either
+    expect(() => on(target, 'foo', 'handler', undefined)).toThrow(
+      'subscribeTo() called with insufficient arguments',
+    );
     // `target` is `EventizedObject`, not `EventizeApi` — eventize() doesn't
     // inject `.emit`. Dispatch through the standalone function, matching the
     // rest of this file.
+    expect(() => emit(target, 'foo')).not.toThrow();
+  });
+
+  it('still accepts a nullish *context* in the trailing slot', () => {
+    const target = eventize();
+    // The same position after a function listener means something else — a
+    // `this` context — and having none stays the normal case.
+    const unsubscribe = on(target, 'foo', () => {}, null);
     expect(() => emit(target, 'foo')).not.toThrow();
     unsubscribe();
   });

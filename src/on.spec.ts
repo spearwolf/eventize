@@ -744,14 +744,15 @@ describe('on()', () => {
 
   // ---------------------------------------------------------------------------------------------
   // One thrown message, `subscribeTo() called with insufficient arguments`,
-  // covers five distinct causes — a missing listener, a value that cannot be
-  // dispatched at all, an empty method name, an empty array of event names,
-  // and a sparse array of event names. The wording is frozen (it predates v4
-  // and is documented), but the cause that produced it now rides along on
-  // Error.cause so a bug report doesn't have to guess from a string that is
-  // wrong four times out of five. The three argument-shaped ones are below;
-  // 'empty-names' and 'sparse-names' are pinned with the rest of the
-  // empty-array / sparse-array behaviour further down this file.
+  // covers seven distinct causes — a missing listener, a value that cannot be
+  // dispatched at all, an empty method name, a method name with no listener
+  // object to read it from, an empty array of event names, a sparse array of
+  // event names, and an array entry that is not an event name. The wording is
+  // frozen (it predates v4 and is documented), but the cause that produced it
+  // now rides along on Error.cause so a bug report doesn't have to guess from
+  // a string that is wrong six times out of seven. The argument-shaped ones
+  // are below; 'empty-names', 'sparse-names' and 'invalid-name' are pinned
+  // with the rest of the array behaviour further down this file.
   describe('Error.cause distinguishes the argument-shape causes', () => {
     it('is "missing-listener" when the listener argument is absent', () => {
       const obj = eventize();
@@ -791,6 +792,103 @@ describe('on()', () => {
       expect(caught).toBeInstanceOf(Error);
       expect((caught as Error).message).toMatch(/insufficient arguments/);
       expect((caught as Error).cause).toBe('empty-method-name');
+    });
+
+    it('is "missing-listener-object" for a method name with nothing to read it from', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        on(obj, 'foo', 'handler', null as unknown as object);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).message).toMatch(/insufficient arguments/);
+      expect((caught as Error).cause).toBe('missing-listener-object');
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // A method-name listener resolves its method off the listener object at
+  // dispatch time, so the object may acquire the method later — that is late
+  // binding, and it stays supported. What can never grow is the object slot
+  // itself: nothing writes it after registration except detach(), so a
+  // method-name subscription registered without one is dead for good. It used
+  // to register anyway, count towards getSubscriptionCount(), dispatch to
+  // nothing, and — for once() — hold the emitter through an obligation that
+  // could never settle. Rejected before registration now, atomically, so the
+  // counter is the assertion that matters here.
+  describe('a method-name subscription without a listener object', () => {
+    it('rejects a null listener object instead of registering a dead subscription', () => {
+      const obj = eventize();
+      expect(() =>
+        on(obj, 'foo', 'handler', null as unknown as object),
+      ).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects an undefined listener object', () => {
+      const obj = eventize();
+      expect(() =>
+        on(obj, 'foo', 'handler', undefined as unknown as object),
+      ).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects a symbol method name without a listener object', () => {
+      const obj = eventize();
+      expect(() =>
+        on(obj, 'foo', Symbol('handler'), null as unknown as object),
+      ).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    // This spelling is decoded by the leading-number branch, so the cause is
+    // the assertion that matters: a shift in the positional decoding would
+    // land the method name in the listener slot of some other branch and this
+    // case would stay green as 'not-dispatchable'.
+    it('rejects the catch-all spelling with a priority', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        on(obj, Priority.High, 'handler', null as unknown as object);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).cause).toBe('missing-listener-object');
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects it for an array of event names, registering none of them', () => {
+      const obj = eventize();
+      expect(() =>
+        on(obj, ['foo', 'bar'], 'handler', null as unknown as object),
+      ).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects it in once() as well', () => {
+      const obj = eventize();
+      expect(() =>
+        once(obj, 'foo', 'handler', null as unknown as object),
+      ).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    // The counter-example: an object that has no such method *yet* is the
+    // documented late-bound shape and must keep registering.
+    it('keeps a listener object without the method registered', () => {
+      const obj = eventize();
+      const listenerObject: Record<string, unknown> = {};
+      expect(() => on(obj, 'foo', 'handler', listenerObject)).not.toThrow();
+      expect(getSubscriptionCount(obj)).toBe(1);
+
+      const calls: string[] = [];
+      emit(obj, 'foo', 1);
+      listenerObject['handler'] = (val: number) => calls.push(`late:${val}`);
+      emit(obj, 'foo', 2);
+      expect(calls).toEqual(['late:2']);
     });
   });
 
@@ -923,6 +1021,33 @@ describe('on()', () => {
       const obj = eventize();
       expect(() => once(obj, 'foo', NaN, () => {})).toThrow(Error);
       expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    // The one rejection with its own message — so a catch block built around
+    // the documented cause vocabulary needs it to carry a cause too, or this
+    // single case is the one that falls back to matching text.
+    it('carries the "invalid-priority" cause on Error.cause', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        on(obj, 'foo', NaN, () => {});
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).message).toMatch(/NaN priority/);
+      expect((caught as Error).cause).toBe('invalid-priority');
+    });
+
+    it('carries the same cause for a non-number in a tuple', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        on(obj, [['foo', 'high' as unknown as number]], () => {});
+      } catch (error) {
+        caught = error;
+      }
+      expect((caught as Error).cause).toBe('invalid-priority');
     });
 
     // Priority.Max and Priority.Min are ±Infinity. Infinity is order-capable,
@@ -1110,15 +1235,166 @@ describe('on()', () => {
       expect((caught as Error).cause).toBe('sparse-names');
     });
 
-    // An element explicitly set to `undefined` is a value, not a hole — this
-    // guard must not reject it. What (if anything) happens to that value
-    // downstream is a separate, pre-existing question this package does not
-    // touch.
+    // An element explicitly set to `undefined` is a value, not a hole, and
+    // this guard must not be the one that catches it. It is rejected all the
+    // same — `undefined` is no more an event name than `null` is — but by the
+    // entry check below, which is what the cause has to say. Reading it off
+    // the message alone would not tell the two apart: they share one.
     it('does not treat an explicit undefined element as a hole', () => {
       const obj = eventize();
-      expect(() =>
-        on(obj, ['a', undefined, 'b'] as any, () => {}),
-      ).not.toThrow();
+      let caught: unknown;
+      try {
+        on(obj, ['a', undefined, 'b'] as any, () => {});
+      } catch (error) {
+        caught = error;
+      }
+      expect((caught as Error).cause).toBe('invalid-name');
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // The array branch used to check the array — empty, holey — but never its
+  // elements, so anything at all could become an event name. A number is the
+  // worst of them: `on(ε, [123], fn)` registered a bucket under `123` and
+  // counted, but `off(ε, 123)` could not address it, because isEventName(123)
+  // is false and the removal falls through to identity matching instead.
+  // `on()` accepted a name the name-based half of `off()` does not know.
+  // Rejected atomically now, like the two array guards it stands next to.
+  describe('an array entry that is not an event name', () => {
+    it('rejects a number', () => {
+      const obj = eventize();
+      expect(() => on(obj, [123] as any, () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects null', () => {
+      const obj = eventize();
+      expect(() => on(obj, [null] as any, () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects an empty array as an entry', () => {
+      const obj = eventize();
+      expect(() => on(obj, [[]] as any, () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects a non-name in the first slot of a [name, priority] tuple', () => {
+      const obj = eventize();
+      expect(() => on(obj, [[123, Priority.High]] as any, () => {})).toThrow(
+        Error,
+      );
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('registers nothing when one entry in a longer list is not a name', () => {
+      const obj = eventize();
+      expect(() => on(obj, ['a', 123, 'c'] as any, () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects it in once() as well', () => {
+      const obj = eventize();
+      expect(() => once(obj, [123] as any, () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('carries the "invalid-name" cause on Error.cause', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        on(obj, [123] as any, () => {});
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).message).toMatch(/insufficient arguments/);
+      expect((caught as Error).cause).toBe('invalid-name');
+    });
+
+    // Symbols are event names, and an array of them has to stay one.
+    it('keeps a symbol entry valid', () => {
+      const obj = eventize();
+      const name = Symbol('foo');
+      expect(() => on(obj, [name], () => {})).not.toThrow();
+      expect(getSubscriptionCount(obj)).toBe(1);
+    });
+  });
+
+  // ---------------------------------------------------------------------------------------------
+  // The array is not the only way in. The branch that decodes
+  // `on(ε, name, priority, listener)` selects on `typeof args[1] === 'number'`
+  // alone and then takes args[0] as the event name without ever asking what it
+  // is — so the same class of dead registration the array-entry check above
+  // rejects was reachable one branch over, from the same kind of untyped call
+  // site, and with the same consequence: a bucket under a value `emit()`
+  // cannot reach and the name-based half of `off()` cannot address.
+  describe('a single event name that is not an event name', () => {
+    it('rejects an object in the name slot ahead of a priority', () => {
+      const obj = eventize();
+      expect(() => on(obj, {} as any, 10, () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects null in the name slot ahead of a priority', () => {
+      const obj = eventize();
+      expect(() => on(obj, null as any, 10, () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    // Four arguments, so the leading number is decoded as a name rather than
+    // as a catch-all priority — the one spelling that puts a number in the
+    // name slot of this branch.
+    it('rejects a number in the name slot ahead of a priority', () => {
+      const obj = eventize();
+      expect(() => on(obj, 5 as any, 10, () => {}, {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('rejects it in once() as well', () => {
+      const obj = eventize();
+      expect(() => once(obj, null as any, 10, () => {})).toThrow(Error);
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    it('carries the "invalid-name" cause on Error.cause', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        on(obj, {} as any, 10, () => {});
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).message).toMatch(/insufficient arguments/);
+      expect((caught as Error).cause).toBe('invalid-name');
+    });
+
+    // The name gate reports before the priority gate, on this branch exactly
+    // as inside an array entry: a call that is wrong about where the listener
+    // is filed is answered for that before it is answered for the order it is
+    // filed in.
+    it('reports the name before the priority when both are wrong', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        on(obj, {} as any, NaN, () => {});
+      } catch (error) {
+        caught = error;
+      }
+      expect((caught as Error).cause).toBe('invalid-name');
+      expect(getSubscriptionCount(obj)).toBe(0);
+    });
+
+    // The catch-all forms reach the same gate with '*' filled in by the
+    // decoding, and a symbol name reaches it as itself — neither may trip it.
+    it('leaves the catch-all and symbol spellings alone', () => {
+      const obj = eventize();
+      expect(() => on(obj, 10, () => {})).not.toThrow();
+      expect(() => on(obj, Symbol('foo'), 10, () => {})).not.toThrow();
+      expect(() => on(obj, () => {})).not.toThrow();
+      expect(getSubscriptionCount(obj)).toBe(3);
     });
   });
 

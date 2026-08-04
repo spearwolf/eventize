@@ -336,7 +336,9 @@ The full set of call shapes — including the method-name form `on(ε, 'foo', 'm
 
 The listener slot takes only what can be dispatched to: a function, a method name (string or symbol), or a listener object. Anything else throws — `on(ε, 'foo', 5)` fails instead of registering a subscription no `emit()` could ever reach. Since v6.0.0; up to v5.1.0 the slot was tested for truthiness alone, so that call registered a dead entry while `on(ε, 'foo', 0)` threw.
 
-That rejection shares one message, `subscribeTo() called with insufficient arguments`, with four other mistakes. Since v6.0.0 `Error.cause` says which one it was: `'missing-listener'` (the slot came out `null`/`undefined`), `'not-dispatchable'` (the case above), `'empty-method-name'` (a method name of `''`), `'empty-names'` (an empty array of event names), and `'sparse-names'` (an array of event names with a hole, e.g. `new Array(2)` or `['a', , 'b']`). All five reject atomically — nothing is registered before the check.
+That rejection shares one message, `subscribeTo() called with insufficient arguments`, with six other mistakes. Since v6.0.0 `Error.cause` says which one it was: `'missing-listener'` (the slot came out `null`/`undefined`), `'not-dispatchable'` (the case above), `'empty-method-name'` (a method name of `''`), `'missing-listener-object'` (a method name with no object to read it off, `on(ε, 'foo', 'handler', null)`), `'empty-names'` (an empty array of event names), `'sparse-names'` (an array of event names with a hole, e.g. `new Array(2)` or `['a', , 'b']`), and `'invalid-name'` (an event name that is not a string or a symbol — an array entry such as `[123]`, or a single name followed by a priority, `on(ε, {}, 10, fn)`). All seven reject atomically — nothing is registered before the check. An unusable priority is the eighth cause, `'invalid-priority'`, and the only one with a message of its own (`subscribeTo() called with a NaN priority`).
+
+A method name is resolved off its listener object at dispatch time, so the method may appear later — that is late binding, and it still works. The object cannot: nothing fills that slot after registration, so `on(ε, 'foo', 'handler', null)` throws instead of registering something no `emit()` could ever reach. Since v6.0.0; up to v5.1.0 it registered and then threw a `TypeError` on the first emit.
 
 ##### Multiple Event Names
 
@@ -348,6 +350,8 @@ emit(ε, 'bar', 2); // => 2
 ```
 
 An **empty** array throws (since v6.0.0). Up to v5.1.0 it registered nothing at all and said nothing about it: `on(ε, [], listener)` handed back an unsubscribe function for zero subscriptions, and `onceAsync(ε, [])` returned a promise that never settled — no resolve, no reject, a dangling `await` for the emitter's lifetime. Where the name list is assembled at runtime, check its `.length` before subscribing.
+
+Every **entry** has to be an event name — a string or a symbol (since v6.0.0). `on(ε, [123], listener)` used to file a bucket under `123` that no `emit()` could reach and no `off(ε, 123)` could remove; the same for `null`, `undefined` and a nested array. Filter a runtime-assembled list, or check the first slot of each `[name, priority]` tuple. A single name is checked the same way wherever a priority follows it — `on(ε, {}, 10, listener)` throws too.
 
 ##### Wildcards (`*`)
 

@@ -314,9 +314,11 @@ describe('typed events — generic event-map support', () => {
       ε.on(() => seen.push('catchAll'));
       ε.on(dynamic, () => seen.push('dynamic'));
       ε.on(SECRET, () => seen.push('symbol'));
-      // Late-bound: the listener object may be supplied later, so this one
-      // dispatches to nothing rather than throwing. Compiling is the assertion.
-      ε.on('anything', 'suppliedLater', null);
+      // Late binding covers the method, not the object it lives on: an object
+      // that does not carry `suppliedLater` yet is fine, a missing object is
+      // not — on an untyped surface just as much as on a typed one.
+      const lateBound: Record<string, unknown> = {};
+      ε.on('anything', 'suppliedLater', lateBound);
 
       ε.emit('anything');
       ε.emit(dynamic);
@@ -461,9 +463,15 @@ describe('typed events — generic event-map support', () => {
       expect(handler).toHaveBeenCalledWith('x', 1);
 
       // Late binding: the method is resolved at dispatch and is not required
-      // to exist, so a nullish listener object stays legal here too.
-      on(ε, 'ready', 'suppliedLater', null);
+      // to exist — an empty object subscribes fine and dispatches to nothing
+      // until it grows the method. The object itself is required, on the typed
+      // surface exactly as on the loose one.
+      on(ε, 'ready', 'suppliedLater', {});
       expect(() => emit(ε, 'ready')).not.toThrow();
+      // @ts-expect-error a method name needs something to read the method off
+      expect(() => on(ε, 'ready', 'suppliedLater', null)).toThrow(
+        'subscribeTo() called with insufficient arguments',
+      );
     });
 
     it('takes a listener function with a trailing context object', () => {

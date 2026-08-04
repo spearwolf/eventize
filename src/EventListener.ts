@@ -325,9 +325,14 @@ export class EventListener {
           args,
           returnValue,
         );
-      // A once() must survive a dispatch that found no method — late-bound
-      // listener objects are a normal pattern, and so is a listener object
-      // that is not there at all.
+      // A once() must survive a dispatch that found no method: late-bound
+      // listener objects are a normal pattern, and the object may grow the
+      // method between two emits. The `canReadMembers()` half is no longer
+      // reachable through `on()` / `once()` — `_subscribeTo()` rejects a method
+      // name without a listener object, and `detach()` only nulls the slot of a
+      // listener that is already removed — so it guards what remains: a
+      // directly constructed `EventListener`, which honours no such
+      // precondition.
       if (didCall && this.callAfterApply) this.callAfterApply(watermark);
       return;
     }

@@ -4,9 +4,9 @@ import {detectListenerType, EventListener} from './EventListener';
 import type {OnceObligation} from './EventListener';
 import type {EventStore} from './EventStore';
 import {Priority} from './Priority';
-import {EVENT_CATCH_EM_ALL} from './constants';
+import {EVENT_CATCH_EM_ALL, LISTENER_IS_NAMED_FUNC} from './constants';
 import type {EventArgs, EventName, ListenerObjectType} from './types';
-import {warn} from './utils';
+import {isEventName, warn} from './utils';
 
 /**
  * Holds the batch of queued replays for one `subscribeTo()` call, lazily.
@@ -133,7 +133,40 @@ const assertPriorityIsUsable = (priority: number, args: EventArgs): void => {
     // below) could never be false in any environment a test can construct, so
     // it only ever showed up as an uncovered branch.
     warn('called with a NaN priority!', args);
-    throw new Error('subscribeTo() called with a NaN priority');
+    // The message is the one thing here that predates the cause vocabulary and
+    // stays untouched — it is the only rejection in this file that does not
+    // read "insufficient arguments", so a catch block keying on `cause` used to
+    // have to fall back to matching text for this single case.
+    throw new Error('subscribeTo() called with a NaN priority', {
+      cause: 'invalid-priority',
+    });
+  }
+};
+
+/**
+ * Rejects a value in the event-name slot that no dispatch can ever carry. The
+ * array branch checked the array — empty, holey — and never its
+ * elements, so `on(ε, [123], fn)` registered a bucket under `123`; it counted
+ * towards `getSubscriptionCount()` and no `emit()` could reach it. The numeric
+ * case is the one with teeth: `off(ε, 123)` cannot address it either, because
+ * `isEventName(123)` is false and `EventStore.remove()` therefore forwards it
+ * to identity matching, where nothing matches — leaving a registration only
+ * `off(ε, listener)` can reach.
+ *
+ * The same gap sits one branch over. Branch B selects on
+ * `typeof args[1] === 'number'` alone and then takes `args[0]` as the name
+ * unread, so `on(ε, {}, 10, fn)`, `on(ε, null, 10, fn)` and the four-argument
+ * `on(ε, 5, 10, fn, ctx)` filed a bucket under a non-name exactly as `[123]`
+ * did. Branches A and C fill the name slot themselves — with `'*'`, or from an
+ * `args[0]` a `typeof` test has already established — so the single-name gate
+ * below costs them one `typeof` switch and rejects nothing they can produce.
+ */
+const assertEventNameIsUsable = (name: unknown, args: EventArgs): void => {
+  if (!isEventName(name)) {
+    warn('called with a value that cannot be an event name!', args);
+    throw new Error('subscribeTo() called with insufficient arguments', {
+      cause: 'invalid-name',
+    });
   }
 };
 
@@ -221,6 +254,39 @@ const _subscribeTo = (
     });
   }
 
+  // A method name is resolved off the listener object at dispatch time, which
+  // is what makes late binding work: the method may appear after the
+  // subscription. The object slot itself has no such second chance — nothing
+  // writes it after registration except `detach()`, which nulls it — so a
+  // method-name subscription that arrives without one is dead the moment it is
+  // made. It used to be made anyway: `apply()` finds no object to read from and
+  // returns, the entry counts towards `getSubscriptionCount()`, and a `once()`
+  // in this shape never reaches the settle hook, so its obligation pins the
+  // emitter through the handle for as long as the handle is kept.
+  //
+  // Only `null` / `undefined` are rejected. Any other value is a thing property
+  // access works on, and whether it carries the method is the late-binding
+  // question, not this one.
+  if (
+    detectListenerType(listener) === LISTENER_IS_NAMED_FUNC &&
+    listenerObject == null
+  ) {
+    warn('called with a method name but no listener object!', args);
+    throw new Error('subscribeTo() called with insufficient arguments', {
+      cause: 'missing-listener-object',
+    });
+  }
+
+  // The single-name gate. An array is checked entry by entry further down,
+  // where the `[name, priority]` tuples are resolved; everything else is a name
+  // in its own right and is checked here, before the priority and before any
+  // registration. Name before priority, the same order the array entries take:
+  // a call that is wrong about where its listener is filed is answered for that
+  // first.
+  if (!Array.isArray(eventName)) {
+    assertEventNameIsUsable(eventName, args);
+  }
+
   assertPriorityIsUsable(priority, args);
 
   // One flat function taking both varying arguments, not a curried pair — the
@@ -297,6 +363,10 @@ const _subscribeTo = (
       const entry: [EventName, number] = Array.isArray(name)
         ? [name[0], name[1] ?? priority]
         : [name, priority];
+      // Name before priority: a `[123, NaN]` entry is wrong about the thing
+      // that decides where it is filed before it is wrong about the order it
+      // is filed in.
+      assertEventNameIsUsable(entry[0], args);
       assertPriorityIsUsable(entry[1], args);
       return entry;
     });

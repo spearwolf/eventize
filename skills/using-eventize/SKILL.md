@@ -198,13 +198,24 @@ compile time) or an explicit `isEventized()` guard.
     `onceAsync(ε, [])` a promise that never settled — and so does a *sparse*
     one: `on(ε, new Array(2), fn)` used to register nothing and hand back the
     same kind of dangling handle, and a hole anywhere else in the array (`['a',
-    , 'b']`) used to register only the names around it, silently. An element
-    explicitly set to `undefined` is a value, not a hole, and is unaffected —
-    it still registers under the name `undefined`. Five mistakes share the one
+    , 'b']`) used to register only the names around it, silently. Every event
+    name has to be a string or a symbol as well: `on(ε, [123], fn)`, `[null]`,
+    `[[]]`, an element explicitly set to `undefined`, and — wherever a priority
+    follows the name — the single-name spellings `on(ε, {}, 10, fn)` and
+    `on(ε, null, 10, fn)` used to file a bucket under that value, unreachable by
+    `emit()` and, for a number, unreachable by `off(ε, 123)` too. The catch-all
+    forms fill the name slot with `'*'` themselves and are unaffected, as is
+    `on(ε, 123, fn)`, where `123` is a priority. And a method name needs an
+    object to be read off:
+    `on(ε, 'foo', 'handler', null)` used to register a subscription nothing could
+    ever fill, because late binding covers the method, not the object it lives
+    on. Seven mistakes share the one
     message `subscribeTo() called with insufficient arguments`, and `Error.cause`
     names which: `'missing-listener'`, `'not-dispatchable'`, `'empty-method-name'`,
-    `'empty-names'`, `'sparse-names'`. An unusable priority is the exception — its own message
-    (`subscribeTo() called with a NaN priority`), no cause. It throws in every
+    `'missing-listener-object'`, `'empty-names'`, `'sparse-names'`, `'invalid-name'`.
+    An unusable priority is the exception — its own message
+    (`subscribeTo() called with a NaN priority`), with `'invalid-priority'` on
+    `Error.cause`. It throws in every
     position, tuples included, and one bad value inside
     `on(ε, ['a', ['b', NaN]], fn)` registers none of the names. The guard is
     `typeof priority !== 'number' || Number.isNaN(priority)`, so a non-number cast

@@ -269,10 +269,16 @@ export type NamedFuncArgs = [
   listener: ListenerFuncType,
   listenerObject?: ListenerObjectType,
 ];
+// The listener-object slot of a *method-name* arm is `object`, not
+// `ListenerObjectType`: the method is read off that object at dispatch time, so
+// a nullish one is not a late binding waiting to happen but a subscription that
+// can never dispatch, and `_subscribeTo()` rejects it (`Error.cause:
+// 'missing-listener-object'`). Every other trailing slot in this file stays
+// nullish — there it is a *context*, and having none is the normal case.
 export type NamedMethodArgs = [
   eventNames: OnEventNames,
   methodName: EventName,
-  listenerObject: ListenerObjectType,
+  listenerObject: object,
 ];
 export type NamedObjectArgs = [
   eventNames: OnEventNames,
@@ -291,7 +297,7 @@ export type NamedPriorityMethodArgs = [
   eventNames: OnEventNames,
   priority: number,
   methodName: EventName,
-  listenerObject: ListenerObjectType,
+  listenerObject: object,
 ];
 export type NamedPriorityObjectArgs = [
   eventNames: OnEventNames,
@@ -319,7 +325,7 @@ export type CatchAllPriorityFuncArgs = [
 export type CatchAllPriorityMethodArgs = [
   priority: number,
   methodName: EventName,
-  listenerObject: ListenerObjectType,
+  listenerObject: object,
 ];
 export type CatchAllPriorityObjectArgs = [
   priority: number,
@@ -415,17 +421,19 @@ export interface SubscribeFunc<TEvents extends EventMap = DefaultEventMap> {
 
   // (2t) the method-name and object forms keep the *name* checked and leave
   //      everything after it loose — the method is resolved at dispatch and is
-  //      not required to exist, which is what late binding means.
+  //      not required to exist, which is what late binding means. The object it
+  //      is read off is required, and that is the difference: a method that is
+  //      missing can appear later, a listener object that is missing cannot.
   <K extends EventKeysOf<TEvents>>(
     eventNames: K | K[],
     methodName: EventName,
-    listenerObject: ListenerObjectType,
+    listenerObject: object,
   ): UnsubscribeFunc;
   <K extends EventKeysOf<TEvents>>(
     eventNames: K | K[],
     priority: number,
     methodName: EventName,
-    listenerObject: ListenerObjectType,
+    listenerObject: object,
   ): UnsubscribeFunc;
   <K extends EventKeysOf<TEvents>, L>(
     eventNames: K | K[],
@@ -457,13 +465,13 @@ export interface SubscribeFunc<TEvents extends EventMap = DefaultEventMap> {
   (
     eventNames: LooseNames<TEvents>,
     methodName: EventName,
-    listenerObject: ListenerObjectType,
+    listenerObject: object,
   ): UnsubscribeFunc;
   (
     eventNames: LooseNames<TEvents>,
     priority: number,
     methodName: EventName,
-    listenerObject: ListenerObjectType,
+    listenerObject: object,
   ): UnsubscribeFunc;
   <L>(
     eventNames: LooseNames<TEvents>,
@@ -491,7 +499,7 @@ export interface SubscribeFunc<TEvents extends EventMap = DefaultEventMap> {
   (
     priority: number,
     methodName: EventName,
-    listenerObject: ListenerObjectType,
+    listenerObject: object,
   ): UnsubscribeFunc;
   <L>(
     listenerObject: ListenerObjectSlot<L>,
@@ -582,14 +590,14 @@ export interface StandaloneSubscribeFunc {
     obj: EventizedObject<TEvents>,
     eventNames: K | K[],
     methodName: EventName,
-    listenerObject: ListenerObjectType,
+    listenerObject: object,
   ): UnsubscribeFunc;
   <TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
     obj: EventizedObject<TEvents>,
     eventNames: K | K[],
     priority: number,
     methodName: EventName,
-    listenerObject: ListenerObjectType,
+    listenerObject: object,
   ): UnsubscribeFunc;
   <TEvents extends EventMap, K extends EventKeysOf<TEvents>, L>(
     obj: EventizedObject<TEvents>,
@@ -630,7 +638,7 @@ export interface StandaloneSubscribeFunc {
     obj: EventizedObject<TEvents>,
     priority: number,
     methodName: EventName,
-    listenerObject: ListenerObjectType,
+    listenerObject: object,
   ): UnsubscribeFunc;
   <TEvents extends EventMap, L>(
     obj: EventizedObject<TEvents>,
@@ -673,14 +681,14 @@ export interface StandaloneSubscribeFunc {
     obj: NonTypedEmitter<T>,
     eventNames: OnEventNames,
     methodName: EventName,
-    listenerObject: ListenerObjectType,
+    listenerObject: object,
   ): UnsubscribeFunc;
   <T extends object>(
     obj: NonTypedEmitter<T>,
     eventNames: OnEventNames,
     priority: number,
     methodName: EventName,
-    listenerObject: ListenerObjectType,
+    listenerObject: object,
   ): UnsubscribeFunc;
   // The catch-all sibling of the method-name form. Reachable at runtime only
   // with a leading priority — without one, `on(ε, 'handler', obj)` reads the
@@ -690,7 +698,7 @@ export interface StandaloneSubscribeFunc {
     obj: NonTypedEmitter<T>,
     priority: number,
     methodName: EventName,
-    listenerObject: ListenerObjectType,
+    listenerObject: object,
   ): UnsubscribeFunc;
   // (3) listener object alone
   <T extends object, L>(
