@@ -14,7 +14,7 @@ do not change shape, so the type checker will not find the call sites for you �
 grep for the patterns below where one is given. Seven are type-only and do surface
 as compile errors.
 
-Six further changes are filed as fixes rather than breaks, but a v5 consumer
+Seven further changes are filed as fixes rather than breaks, but a v5 consumer
 meets them in the same install; they are at the end.
 
 ### Dedupe `@spearwolf/eventize` before you install v6
@@ -599,9 +599,9 @@ interface, which is the whole reason the base class stopped declaring its own.
   breaks. Grep for the old string: `rg "object is not eventized"`. _Migration:_
   catch `TypeError`, or match `/cannot operate on a non-eventized object/`.
 
-### Six fixes that behave like breaks
+### Seven fixes that behave like breaks
 
-None of them is visible to the type checker, and all six change what runs.
+None of them is visible to the type checker, and all seven change what runs.
 
 **Event names inherited from `Object.prototype` dispatch to nothing.**
 `toString`, `toLocaleString`, `valueOf`, `constructor`, `hasOwnProperty`,
@@ -777,6 +777,50 @@ rg "\bretain\(" src/
 A `once()` on a retained name is the one shape that changes twice over: a
 replay that throws settles nothing, so the next replay of the same batch calls
 the listener again — where v5 stopped at the first throw.
+
+**A replay batch now hears what its own handlers do to retained state.** Up to
+v5.1.0 the batch a subscription triggers was materialized whole — names *and*
+values — before the first replay ran, so nothing a handler did could reach the
+replays still ahead of it. `unretain()` and `retainClear()` from inside a replay
+were no-ops for that batch, and a name re-emitted from there replayed the value
+the batch had been built with. `off(ε)` from the same place *did* stop the rest,
+because it detaches the listeners. Since v6.0.0 every replay looks its name up
+when it runs, so both spellings agree and the value is always the current one:
+
+```js
+retain(ε, ['config', 'user']);
+emit(ε, 'config', cfg);
+emit(ε, 'user', user);
+
+on(ε, ['config', 'user'], (value) => {
+  handle(value);
+  if (isConfig(value)) unretain(ε, 'user'); // decided while 'config' replays
+});
+
+// v5 — 'user' was replayed anyway, after the policy was already gone
+// v6 — 'user' is not replayed
+```
+
+If that second delivery was doing real work, drop the policy after the batch
+instead of during it — the whole batch is synchronous, so a microtask is late
+enough:
+
+```js
+if (isConfig(value)) queueMicrotask(() => unretain(ε, 'user'));
+```
+
+The greppable half is the write, not the handler around it:
+
+```
+rg "\b(unretain|retainClear)\(" src/
+```
+
+Only the call sites reachable from a listener body matter, and of those only
+the ones on an emitter that retains something — cross-check against
+`rg "\bretain\("`, the same starting point the previous item uses. A handler
+that re-emits a retained name is affected too and greps the same way, through
+`retain(` rather than through the `emit()`, since the shape that changes is
+"emit a name this emitter retains, from inside a replay of another one".
 
 ### Verifying the upgrade
 

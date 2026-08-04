@@ -10,7 +10,7 @@ Key behaviors:
 
 - Calling `retain()` on a non-eventized object automatically eventizes it.
 - Only the **last** emission is retained; later ones overwrite it.
-- Retained events are delivered to new subscribers synchronously, during `on()` — but only once the whole call is registered. The replays are queued while subscribing and flushed as a batch afterwards, so every name of an `on(ε, ['a', 'b'], fn)` is already live when the first replay runs. Two consequences: a replay that emits another retained name reaches the listener live *and* still gets that name's queued replay afterwards, and a listener that throws on a replay does not take the rest of the batch with it — see [A listener that throws on a replay](#a-listener-that-throws-on-a-replay).
+- Retained events are delivered to new subscribers synchronously, during `on()` — but only once the whole call is registered. The replays are queued while subscribing and flushed as a batch afterwards, so every name of an `on(ε, ['a', 'b'], fn)` is already live when the first replay runs. Two consequences: a replay that emits another retained name reaches the listener live *and* still gets that name's queued replay afterwards — carrying the value that emit just wrote, since v6.0.0 — and a listener that throws on a replay does not take the rest of the batch with it — see [A listener that throws on a replay](#a-listener-that-throws-on-a-replay). What the batch fixes up front is *which* names take part and in *what order*; what each replay delivers is looked up when it runs — see [A handler that changes retained state mid-batch](#a-handler-that-changes-retained-state-mid-batch).
 - With several retained events, a new subscriber receives them in completion order — the order in which each event's `emit()` call returned, not the order in which the calls started. The two coincide only when no `emit()` call is nested inside another. Nesting is not a corner case: any listener that itself calls `emit()` before returning — most commonly a forwarding listener, `on(upstream, downstream)`, relaying one event onto another — reverses completion order relative to start order for the events involved. See below.
 - String and symbol event names both work.
 - Since v6.0.0, `eventNames` is validated atomically before anything changes: a value that is not a string or a symbol, an empty array, or an array with a hole all throw an `Error` with `Error.cause` set to `'invalid-name'`, `'empty-names'` or `'sparse-names'` respectively — the same three causes `on()` / `once()` use for the equivalent shapes. **`retain(ε, [])` used to be a silent no-op; it now throws** (`Error.cause: 'empty-names'`), which is the behavior change worth knowing about if code ever called `retain()` with an empty, possibly-empty, or otherwise unchecked array. `retain(ε, 42)` used to file a policy under `42` that no `emit()` could ever fill — `getRetainedEventNames(ε)` reported it forever after — and now throws instead. See [`docs/migration.md` → `retain()` / `unretain()` / `retainClear()` reject a non-name, an empty array or a sparse array of event names](./migration.md#retain--unretain--retainclear-reject-a-non-name-an-empty-array-or-a-sparse-array-of-event-names) for the grep pattern.
@@ -139,6 +139,52 @@ everything a replay sets off synchronously, not just the replayed listener. If
 that listener emits another event and *its* handler throws, the throw is caught
 here as well and reported under the name that was being replayed. The logged
 error object is what says where it actually came from.
+
+### A handler that changes retained state mid-batch
+
+Since v6.0.0 every queued replay asks the emitter what it holds at the moment
+that replay runs. A handler that unretains something while an earlier name of
+the same batch is being replayed to it is therefore heard immediately:
+
+```javascript
+retain(ε, ['a', 'b']);
+emit(ε, 'a', 'A');
+emit(ε, 'b', 'B');
+
+on(ε, ['a', 'b'], (value) => {
+  console.log(value);
+  if (value === 'A') unretain(ε, 'b'); // or retainClear(ε, '*'), or off(ε)
+});
+// => "A"
+// 'b' is never delivered
+```
+
+Up to v5.1.0 the batch was a full snapshot, so `'B'` still arrived — while
+`off(ε)` in the same place did stop it, because that detaches the listeners.
+Two spellings of "stop delivering this to me", opposite directions. They now
+agree.
+
+The same rule decides the payload: a name re-emitted from inside a replay
+replays the *new* value, not the one the batch was built with.
+
+```javascript
+retain(ε, ['a', 'b']);
+emit(ε, 'a', 'A');
+emit(ε, 'b', 'B1');
+
+on(ε, ['a', 'b'], (value) => {
+  console.log(value);
+  if (value === 'A') emit(ε, 'b', 'B2');
+});
+// => "A"
+// => "B2"   ← live, both names are already registered
+// => "B2"   ← 'b's own queued replay, up to date (was "B1" until v6.0.0)
+```
+
+Only the values follow along. Which names take part is decided when the batch
+is built — a name retained for the first time from inside a replay does not
+join it — and the order is fixed before the first replay runs, so a value
+rewritten mid-batch keeps its place instead of moving to the end.
 
 ### Notes
 

@@ -27,6 +27,8 @@ import {
   once,
   emit,
   retain,
+  retainClear,
+  unretain,
 } from './index';
 import {keeperOf} from './__test-utils__/listeners';
 
@@ -901,5 +903,127 @@ describe('a throwing retained replay', () => {
     expect(seen).toEqual(['A', 'B']);
     expect(warnMock).toHaveBeenCalledTimes(2);
     expect(getSubscriptionCount(obj)).toBe(2);
+  });
+});
+
+// A replay batch is ordered up front and then run; since v6.0.0 each replay
+// asks the keeper what it holds at the moment that replay runs. Everything a
+// handler does to the retained state therefore reaches the replays still ahead
+// of it — the direction `off(ε)` was already taking through listener detach,
+// now taken by the retain-side spellings too.
+describe('a write during a retained replay batch', () => {
+  const warnMock = warn as unknown as jest.Mock;
+
+  beforeEach(() => {
+    warnMock.mockClear();
+  });
+
+  it('does not deliver a name the running replay unretained', () => {
+    const obj = eventize({});
+    const seen: string[] = [];
+
+    retain(obj, ['a', 'b']);
+    emit(obj, 'a', 'A');
+    emit(obj, 'b', 'B');
+
+    on(obj, ['a', 'b'], (value: string) => {
+      seen.push(value);
+      if (value === 'A') unretain(obj, 'b');
+    });
+
+    expect(seen).toEqual(['A']);
+    expect(getRetainedEventNames(obj)).toEqual(['a']);
+  });
+
+  it('does not deliver the rest of the batch after retainClear(ε, "*")', () => {
+    const obj = eventize({});
+    const seen: string[] = [];
+
+    retain(obj, ['a', 'b']);
+    emit(obj, 'a', 'A');
+    emit(obj, 'b', 'B');
+
+    on(obj, ['a', 'b'], (value: string) => {
+      seen.push(value);
+      if (value === 'A') retainClear(obj, '*');
+    });
+
+    expect(seen).toEqual(['A']);
+    // retainClear drops the values and keeps the policies
+    expect(getRetainedEventNames(obj).sort()).toEqual(['a', 'b']);
+    expect(getRetainedCount(obj)).toBe(0);
+  });
+
+  // The control. `off(ε)` has taken this direction since v6.0.0 by a different
+  // route: it detaches the listeners and `EventListener.apply()` bails on
+  // `isRemoved`, so the queued replay finds nothing to call. Both spellings of
+  // "stop delivering this to me" now agree.
+  it('does not deliver the rest of the batch after off(ε)', () => {
+    const obj = eventize({});
+    const seen: string[] = [];
+
+    retain(obj, ['a', 'b']);
+    emit(obj, 'a', 'A');
+    emit(obj, 'b', 'B');
+
+    on(obj, ['a', 'b'], (value: string) => {
+      seen.push(value);
+      if (value === 'A') off(obj);
+    });
+
+    expect(seen).toEqual(['A']);
+    expect(getSubscriptionCount(obj)).toBe(0);
+    expect(getRetainedEventNames(obj)).toEqual([]);
+  });
+
+  // The stale-args window: a queued replay used to close over the value read
+  // when it was queued, so a name re-emitted mid-batch replayed the value it
+  // had *before*. It now replays what the keeper holds when it runs — the same
+  // value a subscriber arriving one moment later would get.
+  it('replays the value a mid-batch emit wrote, not the one held at queue time', () => {
+    const obj = eventize({});
+    const seen: string[] = [];
+
+    retain(obj, ['a', 'b']);
+    emit(obj, 'a', 'A');
+    emit(obj, 'b', 'B1');
+
+    on(obj, ['a', 'b'], (value: string) => {
+      seen.push(value);
+      if (value === 'A') emit(obj, 'b', 'B2');
+    });
+
+    // 'B2' twice: once live, because every name of the call is registered
+    // before the first replay runs, and once from 'b's own queued replay —
+    // which now carries the value that emit left behind.
+    expect(seen).toEqual(['A', 'B2', 'B2']);
+  });
+
+  // Where the new re-check meets the one throw the library swallows: the
+  // isolation is unchanged, and so is what the throwing handler managed to do
+  // before it threw. The unthrown half of the pair — a throwing replay leaving
+  // its once() armed for the next replay of the same batch — is pinned above.
+  it('isolates the throw of a replay that unretained the rest of its batch', () => {
+    const obj = eventize({});
+    const seen: string[] = [];
+
+    retain(obj, ['a', 'b']);
+    emit(obj, 'a', 'A');
+    emit(obj, 'b', 'B');
+
+    const unsubscribe = once(obj, ['a', 'b'], (value: string) => {
+      seen.push(value);
+      unretain(obj, 'b');
+      throw new Error('boom');
+    });
+
+    expect(seen).toEqual(['A']);
+    expect(warnMock).toHaveBeenCalledTimes(1);
+    // the throwing replay settled nothing and the suppressed one never ran, so
+    // the once() is still owed its one shot on both names
+    expect(getSubscriptionCount(obj)).toBe(2);
+
+    unsubscribe();
+    expect(getSubscriptionCount(obj)).toBe(0);
   });
 });

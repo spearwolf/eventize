@@ -127,7 +127,11 @@ compile time) or an explicit `isEventized()` guard.
    handle. Up to v5.1.0 it threw out of `on()`, leaving registered
    subscriptions the caller had no handle for. A `once()` sees the third way to
    fire twice here — a replay that throws settles nothing, so the next replay of
-   the same batch calls it again.
+   the same batch calls it again. What such a handler *can* do is stop the rest
+   of the batch: since v6.0.0 each replay reads the emitter when it runs, so an
+   `unretain()`, a `retainClear()` or an `off()` from inside one takes effect for
+   the names still ahead of it, and a name re-emitted there replays the new
+   value. Up to v5.1.0 only the `off()` route worked.
 6. **Nested `emit()` retains out of order.** The same after-dispatch write means
    **any** `emit()` nested inside another — not only self-recursion — writes its
    retained state first, innermost call to outermost. The common way in is

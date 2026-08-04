@@ -268,13 +268,14 @@ remedy. Check with `npm ls @spearwolf/eventize`, fix with `npm dedupe` or an
 `overrides` / `resolutions` entry pinning `^6.0.0`. At runtime,
 `getEventizeProtocol(obj)` says which copy owns an object without throwing.
 
-Six more runtime changes ride along, all filed as **fixes** rather than
+Seven more runtime changes ride along, all filed as **fixes** rather than
 breaking changes — one stopped dispatching to code the subscriber never
 wrote, one widened what a target may be, one turned a silent no-op into a
 throw, one made a call do the one thing its arguments ask for, one stopped an
 API surface from contradicting itself, one kept a throwing retained replay
-from taking the rest of its batch down with it — but a `v5.1.0` consumer
-meets all six in the same upgrade and none of them is visible to the type
+from taking the rest of its batch down with it, one let a replay batch hear
+what its own handlers do to retained state — but a `v5.1.0` consumer
+meets all seven in the same upgrade and none of them is visible to the type
 checker:
 
 - **An event name that only matches an inherited `Object.prototype` member
@@ -371,6 +372,36 @@ checker:
   name changes twice over: a replay that throws settles nothing, so the next
   replay of the same batch calls the listener again — where v5 stopped at
   the first throw.
+- **A replay batch hears what its own handlers do to retained state.** Up to
+  v5.1.0 the batch a subscription triggers was materialized whole — names
+  *and* values — before the first replay ran, so `unretain()` and
+  `retainClear()` called from inside a replay were no-ops for that batch, and
+  a name re-emitted from there replayed the value the batch had been built
+  with. `off(ε)` from the same place did stop the rest, because it detaches
+  the listeners. Every replay now looks its name up when it runs, so both
+  spellings agree and the value is the current one:
+
+  ```js
+  retain(ε, ['config', 'user']);
+  emit(ε, 'config', cfg);
+  emit(ε, 'user', user);
+
+  on(ε, ['config', 'user'], (value) => {
+    handle(value);
+    if (isConfig(value)) unretain(ε, 'user');
+  });
+  // v5 — 'user' was replayed anyway; v6 — it is not
+  ```
+
+  If that second delivery was doing real work, drop the policy after the
+  batch rather than during it — the batch is synchronous, so
+  `queueMicrotask(() => unretain(ε, 'user'))` is late enough. Grep for
+  `\b(unretain|retainClear)\(` and keep the call sites reachable from a
+  listener body on an emitter that retains something — cross-check against
+  `retain(`, which is also where a handler that re-emits a retained name
+  shows up. Only the values follow the emitter: membership in a batch is
+  still decided when it is built, and the order is still fixed before the
+  first replay runs.
 
 ## v4 → v5: `emit()` stopped throwing
 

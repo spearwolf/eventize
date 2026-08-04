@@ -13,7 +13,7 @@ jest.mock('./utils', () => ({
 }));
 
 import {EventKeeper, publishReplays} from './EventKeeper';
-import type {EventName} from './types';
+import type {EventArgs, EventName} from './types';
 import {warn} from './utils';
 
 const warnMock = warn as unknown as jest.Mock;
@@ -530,6 +530,117 @@ describe('EventKeeper', () => {
       publishReplays(keeper.replayTo('foo', {apply: jest.fn()}));
 
       expect(warnMock).not.toHaveBeenCalled();
+    });
+  });
+
+  // The batch is materialized and sorted before the first replay runs, but the
+  // values are not: each replay looks the name up when it runs, so a write that
+  // happens mid-batch reaches every replay still ahead of it. retain.spec.ts
+  // watches the same rule through unretain() / retainClear() / off().
+  describe('a queued replay consults the keeper when it runs', () => {
+    it('skips a name the running replay removed', () => {
+      const keeper = new EventKeeper();
+      keeper.add(['a', 'b']);
+      keeper.retain('a', ['A']);
+      keeper.retain('b', ['B']);
+
+      const seen: EventName[] = [];
+      const emitter = {
+        apply: (eventName: EventName) => {
+          seen.push(eventName);
+          if (eventName === 'a') keeper.remove('b');
+        },
+      };
+
+      publishReplays(keeper.replayTo('*', emitter));
+
+      expect(seen).toEqual(['a']);
+    });
+
+    it('skips the rest of the batch after clearAll()', () => {
+      const keeper = new EventKeeper();
+      keeper.add(['a', 'b', 'c']);
+      keeper.retain('a', ['A']);
+      keeper.retain('b', ['B']);
+      keeper.retain('c', ['C']);
+
+      const seen: EventName[] = [];
+      const emitter = {
+        apply: (eventName: EventName) => {
+          seen.push(eventName);
+          if (eventName === 'a') keeper.clearAll();
+        },
+      };
+
+      publishReplays(keeper.replayTo('*', emitter));
+
+      expect(seen).toEqual(['a']);
+    });
+
+    it('replays the value held when it runs, not the one held when queued', () => {
+      const keeper = new EventKeeper();
+      keeper.add(['a', 'b']);
+      keeper.retain('a', ['A']);
+      keeper.retain('b', ['B1']);
+
+      const seen: [EventName, EventArgs | undefined][] = [];
+      const emitter = {
+        apply: (eventName: EventName, args?: EventArgs) => {
+          seen.push([eventName, args]);
+          if (eventName === 'a') keeper.retain('b', ['B2']);
+        },
+      };
+
+      publishReplays(keeper.replayTo('*', emitter));
+
+      expect(seen).toEqual([
+        ['a', ['A']],
+        ['b', ['B2']],
+      ]);
+    });
+
+    // The other half of the same rule: membership is decided at queue time.
+    // A name that had nothing to replay when the batch was built does not join
+    // it, however much a running replay retains for it.
+    it('does not add a name a running replay gave a value to', () => {
+      const keeper = new EventKeeper();
+      keeper.add(['a', 'b']);
+      keeper.retain('a', ['A']);
+
+      const seen: EventName[] = [];
+      const emitter = {
+        apply: (eventName: EventName) => {
+          seen.push(eventName);
+          if (eventName === 'a') keeper.retain('b', ['B']);
+        },
+      };
+
+      publishReplays(keeper.replayTo('*', emitter));
+
+      expect(seen).toEqual(['a']);
+    });
+
+    // Only the values follow the keeper. The order is fixed when the batch is
+    // sorted, so a value rewritten mid-batch — which takes a fresh, higher
+    // order id — keeps the slot it was queued in instead of moving to the end.
+    it('keeps the batch order fixed at queue time when a value is replaced', () => {
+      const keeper = new EventKeeper();
+      keeper.add(['a', 'b', 'c']);
+      keeper.retain('a', ['A']);
+      keeper.retain('b', ['B1']);
+      keeper.retain('c', ['C']);
+
+      const seen: EventName[] = [];
+      const emitter = {
+        apply: (eventName: EventName) => {
+          seen.push(eventName);
+          if (eventName === 'a') keeper.retain('b', ['B2']);
+        },
+      };
+
+      publishReplays(keeper.replayTo('*', emitter));
+
+      expect(seen).toEqual(['a', 'b', 'c']);
     });
   });
 

@@ -221,6 +221,28 @@ export class EventKeeper {
       : this.events.has(eventName);
   }
 
+  /**
+   * Queues one replay per name that has something to replay, for
+   * `publishReplays()` to run once the whole `subscribeTo()` call is
+   * registered.
+   *
+   * Which names take part is decided here, at queue time; *what* each of them
+   * delivers is not. Every queued replay looks its name up again when it runs
+   * and does nothing if the keeper no longer holds it — so a handler that
+   * unretains a name, calls `retainClear()`, or re-emits a retained value
+   * mid-batch reaches every replay still ahead of it, and a replay never hands
+   * out a value the keeper has already dropped or replaced. Up to v5.1.0 the
+   * batch closed over the values read while it was being built, which made
+   * `unretain(ε, 'b')` from inside a replay a no-op for the batch it was in
+   * while `off(ε)` from the same place stopped it — the latter by detaching
+   * the listeners, so `EventListener.apply()` bailed on `isRemoved`. Two
+   * spellings of "stop delivering this to me", opposite directions.
+   *
+   * Only the values follow the keeper. The order is fixed when
+   * `publishReplays()` sorts, and a value rewritten mid-batch takes a fresh,
+   * higher order id without moving out of the slot it was queued in — the same
+   * reason a throw cannot reshuffle the rest of a batch.
+   */
   replayTo(
     eventName: EventName,
     eventListener: {apply: (eventName: EventName, args?: EventArgs) => void},
@@ -229,11 +251,17 @@ export class EventKeeper {
     if (!isCatchEmAll(eventName)) {
       const event = this.events.get(eventName);
       if (event != null) {
-        const {order, args} = event;
         sortedEvents.push({
-          order,
+          order: event.order,
           eventName,
-          replay: () => eventListener.apply(eventName, args),
+          // `this.events` is read through the field on purpose: `removeAll()`
+          // and `clearAll()` release the container instead of emptying it, so
+          // a captured Map would be the one the emitter no longer uses.
+          replay: () => {
+            const current = this.events.get(eventName);
+            if (current === undefined) return;
+            eventListener.apply(eventName, current.args);
+          },
         });
       }
     } else {
