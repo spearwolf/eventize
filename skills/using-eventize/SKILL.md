@@ -6,8 +6,12 @@ description: Use when code imports `@spearwolf/eventize`, mentions `eventize`/`E
 # @spearwolf/eventize
 
 A zero-dependency **synchronous** event emitter for any JS/TS object. ESM + CJS,
-opt-in generic event maps. Ships unminified (~48 kB ESM); around 5 kB once a
-bundler minifies it and the transport gzips it.
+opt-in generic event maps. Ships unminified (74.8 kB ESM); around 6.5 kB gzip
+once a bundler minifies it — regardless of what you import. The package is one
+bundled ESM file, and `sideEffects: false` only lets a bundler drop that whole
+file when nothing from it is used — it cannot prune statements inside a file
+that _is_ used, so the bundle is practically indivisible at the file
+granularity, not tree-shakable.
 
 Deeper material — load only when the task needs it:
 
@@ -26,7 +30,7 @@ sharing one implementation:
 
 | Style | Create | Call |
 | --- | --- | --- |
-| Functional (recommended, tree-shakable) | `const ε = eventize(obj?)` | `on(ε, …)`, `emit(ε, …)` |
+| Functional (recommended) | `const ε = eventize(obj?)` | `on(ε, …)`, `emit(ε, …)` |
 | Injected methods | `eventize.inject(obj)` | `obj.on(…)`, `obj.emit(…)` |
 | Class inheritance | `class X extends Eventize {}` | `this.on(…)`, `this.emit(…)` |
 

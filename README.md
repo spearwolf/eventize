@@ -12,16 +12,24 @@ A tiny, clever, and dependency-free library for synchronous event-driven program
 
 Written entirely in TypeScript and targeting modern `ES2022`, it offers a type-safe developer experience without sacrificing performance or adding bloat.
 
-Zero runtime dependencies, `sideEffects: false`, tree-shakeable. The package
-ships unminified — the ESM build is about 48 kB — which comes to roughly
-5 kB once a bundler minifies it and the transport gzips it.
+Zero runtime dependencies, `sideEffects: false`. Not meaningfully
+tree-shakeable, though: the package ships as one bundled ESM file, and
+`sideEffects: false` only lets a bundler drop that file entirely when
+nothing from it is imported — it cannot prune individual statements inside
+a file that _is_ used, so any import pulls in the whole thing regardless of
+which top-level side effect it happens to trigger. A bundle that imports
+only `on` measures about the same as one that imports everything — 18.4 kB
+minified / 6.5 kB gzip against 19.2 kB / 6.8 kB for `import * as`, roughly
+96 % of the size for one function. The package ships unminified — the ESM
+build is 74.8 kB — down to roughly 6.5 kB once a bundler minifies it and
+the transport gzips it.
 
 ### Features
 
 - 🚀 **Developer-Focused API**: Clean, modern, and functional.
 - ✨ **Wildcards & Priorities**: Subscribe to all events and control listener execution order.
 - 🔷 **Full TypeScript Support**: Optional generic event maps narrow `emit`, `on`, retained-event names and listener arguments — without losing first-class duck-typing for code that doesn't opt in.
-- 📦 **Zero Runtime Dependencies**: Lightweight with a minimal footprint (~5 kB minified + gzipped).
+- 📦 **Zero Runtime Dependencies**: Lightweight with a minimal footprint (~6.5 kB gzipped, practically indivisible — see above).
 - ESM & CommonJS Support.
 - Apache 2.0 Licensed.
 
