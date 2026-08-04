@@ -38,17 +38,6 @@ instead.
   `on(ε, 'evt', 'reset', Registry)` detaches instead of leaving the class
   subscribed and firing. Again "removes more": a function that is another
   listener's context goes as well — `off(ε, otherHandler, fn)` narrows it.
-- **`off(ε, eventName, listenerObject)` widened too — it now also detaches
-  the method-name form** `on(ε, eventName, methodName, listenerObject)` and
-  `on(ε, eventName, fn, context)`. Up to `v5.1.0` the association test
-  compared `listenerObject` only against the slot a plain object listener is
-  stored in; a method-name or context registration parks it in a different
-  slot, so the targeted `off()` matched nothing there and reported nothing.
-  Cleanup code calling `off(ε, eventName, listenerObject)` after registering
-  with `on(ε, eventName, 'method', listenerObject)` believed it had detached
-  the subscription while the emitter went on holding it. Grep targeted
-  three-argument `off()` calls paired with a method-name `on()` — they now
-  detach where they used to no-op.
 - **`off(ε, listenerObject, ctx)` narrows to exactly that pair**, where up to
   `v5.1.0` it also swept every subscription that merely carried the object as
   its context. The association match runs for the two-argument forms only
@@ -319,15 +308,16 @@ remedy. Check with `npm ls @spearwolf/eventize`, fix with `npm dedupe` or an
 `overrides` / `resolutions` entry pinning `^6.0.0`. At runtime,
 `getEventizeProtocol(obj)` says which copy owns an object without throwing.
 
-Seven more runtime changes ride along, all filed as **fixes** rather than
+Eight more runtime changes ride along, all filed as **fixes** rather than
 breaking changes — one stopped dispatching to code the subscriber never
 wrote, one widened what a target may be, one turned a silent no-op into a
-throw, one made a call do the one thing its arguments ask for, one stopped an
-API surface from contradicting itself, one kept a throwing retained replay
-from taking the rest of its batch down with it, one let a replay batch hear
-what its own handlers do to retained state — but a `v5.1.0` consumer
-meets all seven in the same upgrade and none of them is visible to the type
-checker:
+throw, one made a call do the one thing its arguments ask for, one made a
+targeted `off()` reach a registration it had always claimed to remove, one
+stopped an API surface from contradicting itself, one kept a throwing
+retained replay from taking the rest of its batch down with it, one let a
+replay batch hear what its own handlers do to retained state — but a
+`v5.1.0` consumer meets all eight in the same upgrade and none of them is
+visible to the type checker:
 
 - **An event name that only matches an inherited `Object.prototype` member
   dispatches to nothing.** `toString`, `toLocaleString`, `valueOf`,
@@ -390,6 +380,17 @@ checker:
   untouched — `'*'` can never carry any — and reference counting is not
   consulted, so one call releases a `refCount`-2 registration outright,
   exactly as `off(ε, 'foo', obj)` always has.
+- **`off(ε, eventName, listenerObject)` widened too — it now also detaches
+  the method-name form** `on(ε, eventName, methodName, listenerObject)` and
+  `on(ε, eventName, fn, context)`. Up to `v5.1.0` the association test
+  compared `listenerObject` only against the slot a plain object listener is
+  stored in; a method-name or context registration parks it in a different
+  slot, so the targeted `off()` matched nothing there and reported nothing.
+  Cleanup code calling `off(ε, eventName, listenerObject)` after registering
+  with `on(ε, eventName, 'method', listenerObject)` believed it had detached
+  the subscription while the emitter went on holding it. Grep targeted
+  three-argument `off()` calls paired with a method-name `on()` — they now
+  detach where they used to no-op.
 - **`eventize.inject()`'s nine methods are no longer enumerable.** They used
   to be installed with `Object.assign()`, as own enumerable properties;
   `class extends Eventize` already installed the same nine on the prototype

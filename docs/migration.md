@@ -14,7 +14,7 @@ do not change shape, so the type checker will not find the call sites for you �
 grep for the patterns below where one is given. Nine are type-only and do surface
 as compile errors.
 
-Seven further changes are filed as fixes rather than breaks, but a v5 consumer
+Eight further changes are filed as fixes rather than breaks, but a v5 consumer
 meets them in the same install; they are at the end.
 
 ### Dedupe `@spearwolf/eventize` before you install v6
@@ -454,7 +454,8 @@ after registration. Up to `v5.1.0` the entry sat there counting in
 `TypeError: Cannot read properties of null` on the first `emit()`. It now
 throws `subscribeTo() called with insufficient arguments` (`Error.cause:
 'missing-listener-object'`) at the `on()` call, and the compiler rejects it
-first: the slot is `object` in the method-name forms.
+first — see "The smaller ones" below for the compile-time half of this
+rejection.
 
 A `once()` in that shape was the worse half — its obligation could never
 settle, so the handle went on holding the emitter, its store, its keeper and
@@ -622,14 +623,8 @@ only type source. Untyped emitters are unaffected — every duck-typing route
 stays open, including dynamic names, symbols, catch-all subscriptions and
 late-bound method names.
 
-A subclass that _overrides_ one of those methods feels it too. The override has
-to be assignable to the merged overload set, so it carries the loose
-implementation signature — `emit(eventNames: AnyEventNames, ...args: EventArgs)`
-and `super.emit(eventNames as never, ...args)`, not a narrowed
-`emit(eventName: 'data', …)`, which compiled up to `v5.1.0` and is a `TS2416`
-now. And for as long as it is declared, that one member is loose again for
-callers of that subclass: a member in a class body wins over the merged
-interface, which is the whole reason the base class stopped declaring its own.
+A subclass that overrides one of those methods feels it too — see "The smaller
+ones" below for the `TS2416` this produces.
 
 ### The smaller ones
 
@@ -645,10 +640,13 @@ interface, which is the whole reason the base class stopped declaring its own.
   resolved to `undefined` when no listener returned a non-null value; the old
   `any` hid that. Guard the result: `(await emitAsync(ε, 'x'))?.map(…)`, or
   `?? []`.
-- **The marker slot on `EventizedObject` is opaque.** `EventStore`,
-  `EventKeeper` and `EventListener` no longer appear in `lib/index.d.ts`.
-  Nothing that calls the API breaks; only code that annotated the slot
-  structurally is affected.
+- **The listener-object slot of the method-name forms is `object`.** The type
+  half of the runtime rejection in "A method name needs a listener object"
+  above: `on(ε, 'foo', 'handler', null)` and the same call with `undefined`
+  compiled up to `v5.1.0` and are compile errors now, on all three API
+  surfaces and in the `NamedMethodArgs`, `NamedPriorityMethodArgs` and
+  `CatchAllPriorityMethodArgs` arms of `SubscribeArgs`. The method is resolved
+  late; the object it lives on is not. Guard the lookup before the call.
 - **`export type ListenerType` is gone.** It was an alias for `unknown`. Write
   `unknown`.
 - **`EventListenerMethods`' `emit` catch-all takes `unknown[]` instead of
@@ -659,9 +657,6 @@ interface, which is the whole reason the base class stopped declaring its own.
   `rg "emit\(\s*\w+\s*,\s*\.\.\.\w+\s*\)" src/`. _Migration:_ narrow before
   use — `if (typeof args[0] === 'string') args[0].toUpperCase();`, or an `as`
   where the shape is already known.
-- **An `EventListener` built directly with a `null` listener** dispatches to
-  nothing instead of throwing. Only reachable by constructing the class
-  yourself, which the package no longer exports in either namespace.
 - **`retainClear()` and `unretain()` throw a `TypeError` instead of a plain
   `Error`, on a non-eventized target.** The message changed with it: the old
   text was `'object is not eventized'`; the new one names the function and the
@@ -670,10 +665,38 @@ interface, which is the whole reason the base class stopped declaring its own.
   reads the same way). Code that matched the error class or the exact message
   breaks. Grep for the old string: `rg "object is not eventized"`. _Migration:_
   catch `TypeError`, or match `/cannot operate on a non-eventized object/`.
+- **A subclass that narrows an override of `on()`, `once()`, `emit()`,
+  `emitAsync()`, `retain()`, `retainClear()` or `unretain()` is a `TS2416`.**
+  The override has to be assignable to the whole merged `EventizeApi` overload
+  set now, so it carries the loose implementation signature —
+  `emit(eventNames: AnyEventNames, ...args: EventArgs)` and
+  `super.emit(eventNames as never, ...args)`, not a narrowed
+  `emit(eventName: 'data', …)`, which compiled up to `v5.1.0` because the
+  class's own loose declaration was the only base member it had to match. And
+  for as long as the loose override is declared, that one member is loose
+  again for callers of the subclass — a member in a class body wins over the
+  merged interface, which is the whole reason the base class stopped declaring
+  its own.
 
-### Seven fixes that behave like breaks
+### Also changed, but not breaking
 
-None of them is visible to the type checker, and all seven change what runs.
+Two internal changes ride along in the same release. Neither is a breaking
+change — nothing that calls the public API is affected — so they are not
+counted among the twenty-two above.
+
+- **The marker slot on `EventizedObject` is opaque.** `EventStore`,
+  `EventKeeper` and `EventListener` no longer appear in `lib/index.d.ts`.
+  Only code that annotated the slot structurally is affected, and that already
+  answered `TS7053` against `v5.1.0` — the slot's key was never an exported
+  type to annotate against.
+- **An `EventListener` built directly with a `null` listener** dispatches to
+  nothing instead of throwing. Only reachable by constructing the class
+  yourself, which the package has never exported in either namespace — no
+  `v5.1.0` consumer could reach this path.
+
+### Eight fixes that behave like breaks
+
+None of them is visible to the type checker, and all eight change what runs.
 
 **Event names inherited from `Object.prototype` dispatch to nothing.**
 `toString`, `toLocaleString`, `valueOf`, `constructor`, `hasOwnProperty`,
@@ -772,6 +795,25 @@ object's *named* subscriptions) can now narrow to what it meant. Named
 subscriptions of the same object survive, retained state is untouched, and
 reference counting is not consulted — one call releases a `refCount`-2
 registration outright.
+
+**`off(ε, eventName, listenerObject)` now detaches the method-name and
+context forms too.** Up to `v5.1.0` the association test compared
+`listenerObject` only against the slot a plain object listener is stored in.
+A method-name registration `on(ε, eventName, methodName, listenerObject)` and
+the context form `on(ε, eventName, fn, context)` park that object in a
+different slot, so the targeted three-argument `off()` matched nothing there
+and reported nothing. Cleanup code that called
+`off(ε, eventName, listenerObject)` after subscribing with
+`on(ε, eventName, 'method', listenerObject)` believed it had detached the
+subscription while the emitter went on holding it — it detaches now.
+
+```
+rg "off\(\s*\w+,\s*['\"][^'\"]+['\"]\s*,\s*\w+\s*\)" src/
+```
+
+That finds three-argument `off()` calls with a string-literal event name;
+read each hit against how the matching `on()` call was made — the ones paired
+with a method-name or context subscription are the ones that used to no-op.
 
 **`eventize.inject()`'s nine methods no longer show up in `Object.keys()`, `for…in`, or a spread.**
 They used to be installed with `Object.assign()`, so they were own enumerable
@@ -968,8 +1010,11 @@ only ways to satisfy the constraint without `as any`.
 method signatures (`on`, `emit`, `retain`, …) and will collide with any
 same-named method on the host class.
 
-One call site still needs help after the merge:
+Two call sites still need help after the merge:
 
+- **Polymorphic `this` plus listener-object form.** `on(this, listenerObj)`
+  fails because TS can't reduce `NonTypedEmitter<this>` while `this` is
+  generic. Cast to the concrete class: `on(this as MyClass, listenerObj)`.
 - **`on.bind(undefined, this, eventName)` patterns.** TS picks the
   priority-as-number overload and rejects the string event name. Cast the
   reference: `(on as (...args: unknown[]) => unknown).bind(undefined, this, eventName)`.
