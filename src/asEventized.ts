@@ -4,7 +4,7 @@ import {NAMESPACE, PROTOCOL_VERSION} from './constants';
 import {internalsOf} from './internals';
 import {isEventized} from './isEventized';
 import type {EventizedObject} from './types';
-import {defineSealedHiddenProperty} from './utils';
+import {defineSealedHiddenProperty, isAttachableTarget} from './utils';
 
 export function asEventized<T extends object>(obj: T): T & EventizedObject {
   if (isEventized(obj)) {
@@ -20,7 +20,7 @@ export function asEventized<T extends object>(obj: T): T & EventizedObject {
     return obj;
   }
 
-  if (obj === null || (typeof obj !== 'object' && typeof obj !== 'function')) {
+  if (!isAttachableTarget(obj)) {
     // `Object.isExtensible()` below returns `false` for every primitive, so
     // without this precondition `eventize(42)` fell into that branch and
     // blamed freezing for a value that was never an object to begin with —
@@ -28,8 +28,14 @@ export function asEventized<T extends object>(obj: T): T & EventizedObject {
     // `isEventized()` guard above (a foreign marker on a non-object is not
     // reachable anyway) and before `Object.isExtensible()`, so that check
     // keeps its one job: objects and functions that cannot be extended.
+    //
+    // The set lives in `isAttachableTarget()`, shared with the duck-typed
+    // dispatch path; only the wording of the rejection is this function's own,
+    // because `null` and a primitive are worth telling apart to whoever wrote
+    // the call.
+    const value: unknown = obj;
     throw new TypeError(
-      `eventize() cannot attach to ${obj === null ? 'null' : `a value of type '${typeof obj}'`} — eventize needs an object or a function to attach to`,
+      `eventize() cannot attach to ${value === null ? 'null' : `a value of type '${typeof value}'`} — eventize needs an object or a function to attach to`,
     );
   }
 

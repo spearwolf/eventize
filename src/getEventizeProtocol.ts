@@ -1,4 +1,4 @@
-import {NAMESPACE} from './constants';
+import {readMarker} from './internals';
 
 /**
  * Which copy of eventize eventized this object — the protocol number from its
@@ -18,9 +18,14 @@ import {NAMESPACE} from './constants';
  */
 export const getEventizeProtocol = (obj: unknown): number | undefined => {
   if (!obj) return undefined;
-  const marker = (obj as Record<symbol, {protocol?: unknown} | undefined>)[
-    NAMESPACE
-  ];
-  const protocol = marker?.protocol;
+  // Read through `readMarker()` rather than off `obj` here, which is the whole
+  // point of `readMarker()` existing: this function used to declare the
+  // payload's `protocol` field a second time, outside `internals.ts`, where a
+  // rename would have left it compiling and answering `undefined` for every
+  // object — "never eventized", for objects that are.
+  const protocol = readMarker(obj)?.protocol;
+  // The `typeof` test stays even though the declared shape says `number`: this
+  // is the one caller that reads a slot nothing in this copy wrote, so the type
+  // describes our own marker rather than promising anything about a foreign one.
   return typeof protocol === 'number' ? protocol : undefined;
 };

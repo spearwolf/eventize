@@ -30,4 +30,8 @@ import type {EventizeGuard, EventizedObject} from './types';
 export const isEventized: EventizeGuard = (
   obj: unknown,
 ): obj is EventizedObject =>
+  // The cast is a probe onto the slot, not a second reading of what is in it:
+  // the result is `unknown` and nothing here looks inside, so no field of the
+  // payload is named outside `internals.ts`. That is where the one-cast rule
+  // draws its line — `readMarker()` is the only door a shape comes back out of.
   Boolean(obj && (obj as Record<symbol, unknown>)[NAMESPACE]);

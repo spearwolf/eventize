@@ -13,8 +13,7 @@ import type {
   EventizedObject,
   NonTypedEmitter,
 } from './types';
-import type {DispatchTarget} from './utils';
-import {dispatchToTarget} from './utils';
+import {asDispatchTarget, dispatchToTarget, isAttachableTarget} from './utils';
 
 /**
  * The dispatch callback, at module level and capturing nothing. Everything it
@@ -113,7 +112,7 @@ const _duckEmitOne = (
       "emit() must be called with a concrete event name — '*' is reserved for subscribing to all events and cannot be emitted",
     );
   }
-  dispatchToTarget(obj as DispatchTarget, eventName, args, returnValue);
+  dispatchToTarget(asDispatchTarget(obj), eventName, args, returnValue);
 };
 
 const _duckEmit = (
@@ -137,8 +136,13 @@ const _duckEmit = (
 // no longer means something different before and after `eventize(fn)`. The
 // member boundary in `dispatchableMember()` is what makes it safe: without it
 // every function target answers `call`, `apply` and `bind`.
-const isDuckTarget = (obj: unknown): obj is object =>
-  obj != null && (typeof obj === 'object' || typeof obj === 'function');
+//
+// The sameness is the predicate itself now, not a claim about two conditions:
+// `asEventized()` asks `isAttachableTarget()` too. The alias stays because on
+// this side the set answers a different question — "will a dispatch to this
+// reach anything" rather than "can a marker be attached to it" — and because
+// the name is what the two call sites below read as.
+const isDuckTarget = isAttachableTarget;
 
 // ---------------------------------------------------------------------------
 // emit() / emitAsync() — typed overload first; loose fallback preserves

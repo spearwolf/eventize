@@ -14,6 +14,37 @@ export const isEventName = (eventName: unknown): eventName is EventName => {
   }
 };
 
+/**
+ * The set of values eventize will attach to, and the set it will dispatch to
+ * without attaching — one predicate, because they have to be the same set.
+ * `asEventized()` decides the first question, `emit()`'s duck-typed path the
+ * second, and up to the split they were two hand-written conditions phrased
+ * inversely of each other with a comment claiming they matched. If they ever
+ * stopped matching, `emit(x, 'foo')` would mean different things before and
+ * after `eventize(x)` — which is exactly the divergence v6.0.0 removed when
+ * functions became duck targets.
+ *
+ * Functions are in on purpose (since v6.0.0): a class with static handlers, a
+ * factory carrying methods. Primitives are out — every one of them carries a
+ * prototype whose method names an event can collide with. The message a
+ * rejection needs stays at the throw site, where the difference between `null`
+ * and a primitive is worth a word to the caller; here it is one answer.
+ */
+export const isAttachableTarget = (obj: unknown): obj is object =>
+  obj != null && (typeof obj === 'object' || typeof obj === 'function');
+
+/**
+ * `Array.isArray()` with the one thing the standard library's declaration does
+ * not give: it is typed `(arg: any) => arg is any[]`, so narrowing an honestly
+ * `unknown` value through it hands back `any` elements — weaker than what went
+ * in, and silently, which is the failure mode an explicit assertion at least
+ * spells out. This predicate keeps the narrowing and keeps the element type
+ * `unknown`, so whatever reads the elements still has to establish what they
+ * are.
+ */
+export const isUnknownArray = (value: unknown): value is unknown[] =>
+  Array.isArray(value);
+
 const objectPrototype = Object.prototype as Record<EventName, unknown>;
 
 /**
@@ -209,6 +240,22 @@ export const prependEventName = (
  * callable: `dispatchToTarget()` tests before it invokes.
  */
 export type DispatchTarget = Record<EventName, unknown> & {emit?: unknown};
+
+/**
+ * The index signature `DispatchTarget` claims, granted to a plain `object` —
+ * the assertion the duck path needs and the only one it needs, kept next to the
+ * type it produces instead of loose at the call site.
+ *
+ * It asserts nothing about the values behind those keys: every read off a
+ * `DispatchTarget` comes back `unknown` and has to pass a callability test
+ * before anything happens to it. The listener path reaches the same type
+ * through the predicates in `EventListener.ts`, which have a runtime check to
+ * narrow on; here the caller has already run `isAttachableTarget()` and there
+ * is nothing left to test — an object either has a member under that name or
+ * reads `undefined` for it.
+ */
+export const asDispatchTarget = (target: object): DispatchTarget =>
+  target as DispatchTarget;
 
 /**
  * Invokes `func` with `context` as its `this` if — and only if — it is callable,

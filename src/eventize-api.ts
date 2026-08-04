@@ -12,14 +12,13 @@ import type {
   EventKeysOf,
   EventMap,
   EventizedObject,
-  ListenerFuncType,
   NonTypedEmitter,
   OnceAsyncOptions,
   StandaloneSubscribeFunc,
   SubscribeArgs,
   UnsubscribeFunc,
 } from './types';
-import {isEventName} from './utils';
+import {isEventName, isUnknownArray} from './utils';
 
 // The handle is idempotent by construction: a second call is inert, not a
 // second release. Without the guard a shared registration was decremented
@@ -264,13 +263,13 @@ export function onceAsync<ReturnType = void>(
   let onAbort: (() => void) | undefined;
   // A retained event fires inside once(), before there is anything to attach.
   let resolved = false;
-  const unsubscribe = once(obj, eventNames, ((...args: EventArgs) => {
+  const unsubscribe = once(obj, eventNames, (...args: EventArgs) => {
     resolved = true;
     if (signal != null && onAbort != null) {
       signal.removeEventListener('abort', onAbort);
     }
     resolve(args[0] as ReturnType);
-  }) as ListenerFuncType);
+  });
   if (signal != null && !resolved) {
     onAbort = () => {
       unsubscribe();
@@ -316,7 +315,11 @@ export function off(
   // a listener object named, off(ε, [name, …], listenerObject) unsubscribes
   // nothing and clears nothing, and the flattened copy was allocated for a
   // path that never looks at it.
-  const flatListener =
+  //
+  // Typed `unknown` rather than left to the ternary, which collapses to the
+  // same thing without saying so: the value is whatever the consumer handed in,
+  // and both readers below establish what they need about it themselves.
+  const flatListener: unknown =
     listenerObject == null && Array.isArray(listener)
       ? listener.flat(Infinity)
       : listener;
@@ -339,7 +342,14 @@ export function off(
     return;
   }
 
-  if (listenerObject == null && Array.isArray(listener)) {
+  // The array test asks about `flatListener` rather than about `listener`, and
+  // selects the same calls either way: with `listenerObject == null` already
+  // established, the flattened value is an array exactly when `listener` was
+  // one. Asking the value that is about to be filtered is what lets the element
+  // type come out of the check instead of out of an assertion —
+  // `isUnknownArray()` and not `Array.isArray()`, because the latter would
+  // trade the assertion for `any` elements rather than for `unknown` ones.
+  if (listenerObject == null && isUnknownArray(flatListener)) {
     // Only the event-name elements are meaningful to the keeper. One caller
     // reaches this branch: an explicit off(ε, [name, …]). The multi-event on()
     // handle used to be a second, passing an array of EventListener instances
@@ -357,7 +367,7 @@ export function off(
     // listener identity and nothing is unsubscribed. Without this guard the
     // keeper cleared retained state for a call shape that detached no
     // listener at all.
-    keeper.remove((flatListener as unknown[]).filter(isEventName));
+    keeper.remove(flatListener.filter(isEventName));
   } else if (isEventName(listener)) {
     keeper.remove(listener);
   }
