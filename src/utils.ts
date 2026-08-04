@@ -5,6 +5,24 @@ export const isCatchEmAll = (
   eventName: unknown,
 ): eventName is typeof EVENT_CATCH_EM_ALL => eventName === EVENT_CATCH_EM_ALL;
 
+// The one wildcard-rejection literal, shared by both emit-api.ts dispatch
+// paths and by retain() in retain-api.ts (AGENTS.md, ARCH-007: a corrected
+// wording in one place must not let the others drift). `verb` alone
+// determines both the leading function name and the trailing participle, so
+// there is exactly one template rather than one per caller.
+//
+// Lives here rather than beside its two heaviest callers in emit-api.ts:
+// `index.ts` re-exports that module wholesale (`export * from './emit-api'`),
+// so anything exported from it becomes public package API. `utils.ts` is not
+// re-exported that way — `isEventName` a few lines up is the precedent, a
+// helper `retain-api.ts` needs but that stays unlisted in the package surface.
+export const rejectWildcard = (verb: 'emitted' | 'retained'): never => {
+  const fnName = verb === 'emitted' ? 'emit' : 'retain';
+  throw new Error(
+    `${fnName}() must be called with a concrete event name — '*' is reserved for subscribing to all events and cannot be ${verb}`,
+  );
+};
+
 export const isEventName = (eventName: unknown): eventName is EventName => {
   switch (typeof eventName) {
     case 'string':

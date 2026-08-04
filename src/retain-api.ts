@@ -1,5 +1,6 @@
 import {asEventized} from './asEventized';
 import {EVENT_CATCH_EM_ALL} from './constants';
+import type {EventKeeper} from './EventKeeper';
 import {internalsOf} from './internals';
 import {isEventized} from './isEventized';
 import type {
@@ -9,7 +10,7 @@ import type {
   EventizedObject,
   NonTypedEmitter,
 } from './types';
-import {isEventName} from './utils';
+import {isEventName, rejectWildcard} from './utils';
 
 const hasWildcard = (eventNames: unknown): boolean =>
   Array.isArray(eventNames)
@@ -84,6 +85,35 @@ const assertRetainNamesAreUsable = (
   }
 };
 
+/**
+ * The shared body of `retainClear()` and `unretain()` (ARCH-006): both are
+ * the same guard, the same message template save the function name, and the
+ * same wildcard branch onto an all-pair of keeper methods. `retain()` is not
+ * folded in here — its guard order differs (wildcard checked before
+ * `isEventized()`), and unifying that too would change observable behaviour,
+ * not just remove duplication.
+ */
+const keeperCommand = (
+  fnName: 'retainClear' | 'unretain',
+  eventizedObj: object,
+  eventNames: AnyEventNames,
+  all: (keeper: EventKeeper) => void,
+  one: (keeper: EventKeeper, eventNames: AnyEventNames) => void,
+): void => {
+  if (!isEventized(eventizedObj)) {
+    throw new TypeError(
+      `${fnName}() cannot operate on a non-eventized object — eventize(obj) first, or guard the call with isEventized(obj)`,
+    );
+  }
+  const {keeper} = internalsOf(eventizedObj);
+  if (hasWildcard(eventNames)) {
+    all(keeper);
+    return;
+  }
+  assertRetainNamesAreUsable(fnName, eventNames);
+  one(keeper, eventNames);
+};
+
 // ---------------------------------------------------------------------------
 // retain() / retainClear() / unretain() — typed event-name overload first.
 // ---------------------------------------------------------------------------
@@ -104,9 +134,7 @@ export function retain<T extends object>(
 // implementation
 export function retain(obj: object, eventNames: AnyEventNames): void {
   if (hasWildcard(eventNames)) {
-    throw new Error(
-      "retain() must be called with a concrete event name — '*' is reserved for subscribing to all events and cannot be retained",
-    );
+    rejectWildcard('retained');
   }
   // Checked before asEventized() runs, same as the wildcard rejection above:
   // a call that is going to throw either way must not have the side effect
@@ -131,18 +159,13 @@ export function retainClear(
   eventizedObj: object,
   eventNames: AnyEventNames,
 ): void {
-  if (!isEventized(eventizedObj)) {
-    throw new TypeError(
-      'retainClear() cannot operate on a non-eventized object — eventize(obj) first, or guard the call with isEventized(obj)',
-    );
-  }
-  const {keeper} = internalsOf(eventizedObj);
-  if (hasWildcard(eventNames)) {
-    keeper.clearAll();
-    return;
-  }
-  assertRetainNamesAreUsable('retainClear', eventNames);
-  keeper.clear(eventNames);
+  keeperCommand(
+    'retainClear',
+    eventizedObj,
+    eventNames,
+    (keeper) => keeper.clearAll(),
+    (keeper, names) => keeper.clear(names),
+  );
 }
 
 export function unretain<TEvents extends EventMap>(
@@ -159,16 +182,11 @@ export function unretain(
   eventizedObj: object,
   eventNames: AnyEventNames,
 ): void {
-  if (!isEventized(eventizedObj)) {
-    throw new TypeError(
-      'unretain() cannot operate on a non-eventized object — eventize(obj) first, or guard the call with isEventized(obj)',
-    );
-  }
-  const {keeper} = internalsOf(eventizedObj);
-  if (hasWildcard(eventNames)) {
-    keeper.removeAll();
-    return;
-  }
-  assertRetainNamesAreUsable('unretain', eventNames);
-  keeper.remove(eventNames);
+  keeperCommand(
+    'unretain',
+    eventizedObj,
+    eventNames,
+    (keeper) => keeper.removeAll(),
+    (keeper, names) => keeper.remove(names),
+  );
 }

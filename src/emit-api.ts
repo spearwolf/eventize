@@ -13,7 +13,12 @@ import type {
   EventizedObject,
   NonTypedEmitter,
 } from './types';
-import {asDispatchTarget, dispatchToTarget, isAttachableTarget} from './utils';
+import {
+  asDispatchTarget,
+  dispatchToTarget,
+  isAttachableTarget,
+  rejectWildcard,
+} from './utils';
 
 /**
  * The dispatch callback, at module level and capturing nothing. Everything it
@@ -49,9 +54,7 @@ const _emitOne = (
   internals?: EventizeInternals,
 ): EventizeInternals => {
   if (eventName === EVENT_CATCH_EM_ALL) {
-    throw new Error(
-      "emit() must be called with a concrete event name — '*' is reserved for subscribing to all events and cannot be emitted",
-    );
+    rejectWildcard('emitted');
   }
   const resolved = internals ?? internalsOf(eventizedObj);
   resolved.store.forEach(
@@ -119,9 +122,7 @@ const _duckEmitOne = (
   returnValue?: (val: unknown) => void,
 ) => {
   if (eventName === EVENT_CATCH_EM_ALL) {
-    throw new Error(
-      "emit() must be called with a concrete event name — '*' is reserved for subscribing to all events and cannot be emitted",
-    );
+    rejectWildcard('emitted');
   }
   dispatchToTarget(asDispatchTarget(obj), eventName, args, returnValue);
 };

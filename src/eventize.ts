@@ -56,140 +56,13 @@ const unretainLoose = unretain as (
   eventNames: AnyEventNames,
 ) => void;
 
-export const eventize: EventizerFuncAPI = (() => {
-  const e = <
-    TEvents extends EventMap = DefaultEventMap,
-    T extends object = object,
-  >(
-    obj: T = {} as T,
-  ): T & EventizedObject<TEvents> =>
-    asEventized(obj) as T & EventizedObject<TEvents>;
-
-  e.inject = <
-    TEvents extends EventMap = DefaultEventMap,
-    T extends object = object,
-  >(
-    obj: T = {} as T,
-  ): T & EventizeApi<TEvents> => {
-    obj = asEventized(obj);
-
-    // Object.defineProperties(), not Object.assign() — same descriptor, same
-    // reason, see the comment on the class surface below.
-    Object.defineProperties(obj, {
-      on: {
-        value: (...args: SubscribeArgs): UnsubscribeFunc => on(obj, ...args),
-        writable: true,
-        enumerable: false,
-        configurable: true,
-      },
-
-      once: {
-        value: (...args: SubscribeArgs): UnsubscribeFunc => once(obj, ...args),
-        writable: true,
-        enumerable: false,
-        configurable: true,
-      },
-
-      onceAsync: {
-        value: <ReturnType = void>(
-          eventNames: AnyEventNames,
-          options?: OnceAsyncOptions,
-        ): Promise<ReturnType> =>
-          onceAsyncLoose<ReturnType>(obj, eventNames, options),
-        writable: true,
-        enumerable: false,
-        configurable: true,
-      },
-
-      off: {
-        value: (listener?: unknown, listenerObject?: unknown): void =>
-          offLoose(obj, listener, listenerObject),
-        writable: true,
-        enumerable: false,
-        configurable: true,
-      },
-
-      emit: {
-        value: (eventNames: AnyEventNames, ...args: EventArgs): void =>
-          emitLoose(obj, eventNames, ...args),
-        writable: true,
-        enumerable: false,
-        configurable: true,
-      },
-
-      emitAsync: {
-        value: (
-          eventNames: AnyEventNames,
-          ...args: EventArgs
-        ): Promise<any[] | undefined> =>
-          emitAsyncLoose(obj, eventNames, ...args),
-        writable: true,
-        enumerable: false,
-        configurable: true,
-      },
-
-      retain: {
-        value: (eventNames: AnyEventNames): void =>
-          retainLoose(obj, eventNames),
-        writable: true,
-        enumerable: false,
-        configurable: true,
-      },
-
-      retainClear: {
-        value: (eventNames: AnyEventNames): void =>
-          retainClearLoose(obj, eventNames),
-        writable: true,
-        enumerable: false,
-        configurable: true,
-      },
-
-      unretain: {
-        value: (eventNames: AnyEventNames): void =>
-          unretainLoose(obj, eventNames),
-        writable: true,
-        enumerable: false,
-        configurable: true,
-      },
-    });
-
-    return obj as T & EventizeApi<TEvents>;
-  };
-
-  e.is = isEventized;
-
-  return e;
-})();
-
-export interface Eventize<
-  TEvents extends EventMap = DefaultEventMap,
-> extends EventizeApi<TEvents> {}
-
-// The class declares no members of its own, and that is the whole point. A
-// method in the class body wins over the same name inherited through the
-// merged interface, so `on(...args: SubscribeArgs)` used to replace
-// `SubscribeFunc<TEvents>` outright — the class surface accepted every wrong
-// event name and inferred every listener parameter as `any`, while
-// `eventize.inject()` did not. Installing the implementations on the prototype
-// leaves the merged interface as the single type source, so the class inherits
-// whatever the other two surfaces get.
-//
-// `Object.defineProperties`, not `Object.assign`: class methods are
-// non-enumerable, and an enumerable prototype method shows up in every
-// `for…in` over an instance. The descriptors below reproduce exactly what
-// `class { on() {} }` produced.
-//
-// The rule below guards against an interface promising members that have no
-// runtime implementation. The implementations are installed on the prototype
-// below, so every member of `EventizeApi` is there — the merge is what gives
-// them their public signatures.
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class Eventize<TEvents extends EventMap = DefaultEventMap> {
-  constructor() {
-    eventize<TEvents>(this);
-  }
-}
-
+// The nine members, described once (ARCH-004). Both `eventize.inject()` below
+// and the `Eventize.prototype` installation further down build their
+// descriptors from this one object instead of each spelling the same nine
+// names out — `EventizeApi` in types.ts is the only other place the list is
+// allowed to stand. The bodies read `this` rather than closing over an
+// object, which is what lets `inject()` reuse them via `fn.bind(obj)` while
+// the class surface uses them unbound, one per prototype method.
 const eventizeMethods = {
   on(this: object, ...args: SubscribeArgs): UnsubscribeFunc {
     return on(this, ...args);
@@ -227,6 +100,82 @@ const eventizeMethods = {
     unretainLoose(this, eventNames);
   },
 };
+
+export const eventize: EventizerFuncAPI = (() => {
+  const e = <
+    TEvents extends EventMap = DefaultEventMap,
+    T extends object = object,
+  >(
+    obj: T = {} as T,
+  ): T & EventizedObject<TEvents> =>
+    asEventized(obj) as T & EventizedObject<TEvents>;
+
+  e.inject = <
+    TEvents extends EventMap = DefaultEventMap,
+    T extends object = object,
+  >(
+    obj: T = {} as T,
+  ): T & EventizeApi<TEvents> => {
+    obj = asEventized(obj);
+
+    // Object.defineProperties(), not Object.assign() — same descriptor, same
+    // reason, see the comment on the class surface below. `fn.bind(obj)`
+    // costs the same nine function objects the nine hand-written closures
+    // used to, and keeps `obj` destructurable exactly as before — pinned by
+    // "all nine descriptors match the class prototype shape" in
+    // api-surfaces.spec.ts, which now guards a derivation instead of a
+    // second copy of the member list.
+    Object.defineProperties(
+      obj,
+      Object.fromEntries(
+        Object.entries(eventizeMethods).map(([name, fn]) => [
+          name,
+          {
+            value: fn.bind(obj),
+            writable: true,
+            enumerable: false,
+            configurable: true,
+          },
+        ]),
+      ),
+    );
+
+    return obj as T & EventizeApi<TEvents>;
+  };
+
+  e.is = isEventized;
+
+  return e;
+})();
+
+export interface Eventize<
+  TEvents extends EventMap = DefaultEventMap,
+> extends EventizeApi<TEvents> {}
+
+// The class declares no members of its own, and that is the whole point. A
+// method in the class body wins over the same name inherited through the
+// merged interface, so `on(...args: SubscribeArgs)` used to replace
+// `SubscribeFunc<TEvents>` outright — the class surface accepted every wrong
+// event name and inferred every listener parameter as `any`, while
+// `eventize.inject()` did not. Installing the implementations on the prototype
+// leaves the merged interface as the single type source, so the class inherits
+// whatever the other two surfaces get.
+//
+// `Object.defineProperties`, not `Object.assign`: class methods are
+// non-enumerable, and an enumerable prototype method shows up in every
+// `for…in` over an instance. The descriptors below reproduce exactly what
+// `class { on() {} }` produced.
+//
+// The rule below guards against an interface promising members that have no
+// runtime implementation. The implementations are installed on the prototype
+// below, so every member of `EventizeApi` is there — the merge is what gives
+// them their public signatures.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Eventize<TEvents extends EventMap = DefaultEventMap> {
+  constructor() {
+    eventize<TEvents>(this);
+  }
+}
 
 Object.defineProperties(
   Eventize.prototype,
