@@ -245,7 +245,7 @@ Eventize splits its API into four families by how each function treats a target 
 | ------------------------------------------- | -------------------------------------------- |
 | `on()`, `once()`, `onceAsync()`, `retain()` | Auto-eventizes the object                    |
 | `emit()`, `emitAsync()` (v5+)               | Duck-types: calls `obj[eventName](...args)` — a function target too (v6.0.0) |
-| `off()`, `getSubscriptionCount()`, `getRetainedCount()`, `getRetainedEventNames()` | Silently does nothing / returns `0` / `[]` |
+| `off()`, `getSubscriptionCount()`, `getSubscribedEventNames()`, `getRetainedCount()`, `getRetainedEventNames()` | Silently does nothing / returns `0` / `[]` |
 | `retainClear()`, `unretain()`               | Throws `TypeError`                           |
 
 **Why the split?**
@@ -752,11 +752,16 @@ Edge cases worth knowing:
 ### Inspecting emitter state
 
 - `getSubscriptionCount(ε)` — how many listeners are registered.
+- `getSubscribedEventNames(ε)` — every event name with an active listener, named
+  plus `EVENT_CATCH_EM_ALL` if a wildcard listener is registered, in
+  unspecified order. `getSubscribedEventNames(ε).length === 0` agrees with
+  `getSubscriptionCount(ε) === 0` exactly, and says which names when it
+  doesn't.
 - `getRetainedCount(ε)` — how many events hold a retained value.
 - `getRetainedEventNames(ε)` — every name carrying a retain policy, fired or not.
 - `getEventizeProtocol(ε)` — which copy of eventize owns the marker.
 
-The first three return `0` / `[]` for objects that were never eventized. Their
+The first four return `0` / `[]` for objects that were never eventized. Their
 TypeScript signature takes `object`, which is the typed contract — but the
 runtime check underneath is a plain truthy/property probe with no `typeof`
 guard, so none of them throw even when a `null`, `undefined`, or primitive
@@ -765,7 +770,7 @@ helper). They exist for debugging, testing, and verifying that cleanup
 actually happened.
 
 The one input they do not survive is an object marked by an incompatible copy
-of the library: the three counters read the emitter's internals and therefore
+of the library: the four counters read the emitter's internals and therefore
 raise the same protocol-mismatch `TypeError` every other entry point does. That
 is deliberate — a plausible-looking `0` from a store nobody can reach is worse
 than a diagnosis. `getEventizeProtocol()` is the one that answers without

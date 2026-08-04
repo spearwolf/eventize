@@ -1624,4 +1624,30 @@ export class EventStore {
     }
     return count;
   }
+
+  /**
+   * Every event name with at least one active listener: the keys of
+   * `namedBuckets`, plus `EVENT_CATCH_EM_ALL` if a wildcard listener is
+   * registered. Safe against the stand-ins from `namedBuckets` and
+   * `catchEmAllBucket`'s own declarations — reading `.keys()` on the frozen
+   * empty `Map` and `.length` on the frozen empty bucket materializes
+   * neither, the same way `getSubscriptionCount()` above does not.
+   *
+   * `namedBuckets` never holds a key with an empty bucket: `add()` only
+   * reaches `getListenersForEventName()` for a non-wildcard name (`'*'`
+   * goes to `mutableCatchEmAllBucket()` instead, see `add()` above), and
+   * every place that empties a bucket — `dropListener()`,
+   * `removeByEventNameAndListenerObject()`, `removeByEventName()` — deletes
+   * the map entry in the same step. No filtering is needed here for that
+   * reason; the `getListenersForEventName('*')` impostor-bucket edge is
+   * reachable only by calling that method directly, which nothing on the
+   * public API path does.
+   */
+  getSubscribedEventNames(): EventName[] {
+    const names: EventName[] = Array.from(this.namedBuckets.keys());
+    if (this.catchEmAllBucket.length > 0) {
+      names.push(EVENT_CATCH_EM_ALL);
+    }
+    return names;
+  }
 }

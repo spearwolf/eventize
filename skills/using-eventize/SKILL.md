@@ -45,7 +45,7 @@ eventized objects `ε` (epsilon).
 import {eventize, on, once, onceAsync, emit, emitAsync,
         off, retain, retainClear, unretain, Priority,
         isEventized, asEventized, getEventizeProtocol, getSubscriptionCount,
-        getRetainedCount, getRetainedEventNames,
+        getSubscribedEventNames, getRetainedCount, getRetainedEventNames,
         Eventize, EVENT_CATCH_EM_ALL} from '@spearwolf/eventize';
 ```
 
@@ -64,6 +64,7 @@ import {eventize, on, once, onceAsync, emit, emitAsync,
 | `asEventized(obj)` | attach the slot only, no API methods | `obj` |
 | `getEventizeProtocol(obj)` | which copy of eventize owns the marker; `6` for this one, `undefined` without one — never throws | `number \| undefined` |
 | `getSubscriptionCount(obj)` | listener count, `0` for non-eventized | `number` |
+| `getSubscribedEventNames(obj)` | every name with an active listener, wildcard as `EVENT_CATCH_EM_ALL`, order unspecified; `[]` for non-eventized | `EventName[]` |
 | `getRetainedCount(obj)` | count of events holding a retained value, `0` for non-eventized | `number` |
 | `getRetainedEventNames(obj)` | every name carrying a retain policy (fired or not), `[]` for non-eventized | `EventName[]` |
 | `Priority` | `Max Critical High Medium Normal Low Min` (higher runs first) | object |
@@ -82,7 +83,7 @@ common source of surprise:
 | --- | --- |
 | `on`, `once`, `onceAsync`, `retain` | **auto-eventize** it, then proceed |
 | `emit`, `emitAsync` | **duck-type**: `obj[eventName](…args)`, else `obj.emit(eventName, …args)`, else no-op — a function or class target too (v6.0.0), and an inherited `Object.prototype` / `Function.prototype` member is not a match (pitfall 11) |
-| `off`, `getSubscriptionCount`, `getRetainedCount`, `getRetainedEventNames` | **permissive**: silent no-op / `0` / `[]`, even for `null` |
+| `off`, `getSubscriptionCount`, `getSubscribedEventNames`, `getRetainedCount`, `getRetainedEventNames` | **permissive**: silent no-op / `0` / `[]`, even for `null` |
 | `retainClear`, `unretain` | **throw** a `TypeError` naming the function and the remedy |
 
 `on`-family functions install behavior, so auto-eventizing is a meaningful

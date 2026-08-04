@@ -227,11 +227,15 @@ all.
 
 ```js
 getSubscriptionCount(ε); // listeners registered, named + wildcard
+getSubscribedEventNames(ε); // which names still have a listener, wildcard as EVENT_CATCH_EM_ALL, order unspecified
 getRetainedCount(ε); // event names holding a retained value
 getRetainedEventNames(ε); // every name carrying a retain policy, fired or not
 ```
 
-`getRetainedEventNames(ε).length >= getRetainedCount(ε)` always holds. All three
+`getSubscribedEventNames(ε).length === 0` agrees with
+`getSubscriptionCount(ε) === 0` exactly, and names what's left when it doesn't
+— the listener-side counterpart to `getRetainedEventNames()`.
+`getRetainedEventNames(ε).length >= getRetainedCount(ε)` always holds. All four
 return `0` / `[]` for a non-eventized object rather than throwing.
 
 Calling handles back only empties the listener registry. A teardown that stops

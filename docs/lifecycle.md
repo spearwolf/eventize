@@ -432,18 +432,26 @@ emitter — not just from whatever code the signal was originally built for.
 
 ## Verifying cleanup
 
-Three functions read emitter state from the outside without reaching into
-`ε[Symbol.for('eventize')]`, and all three return a zero-ish value rather than
+Four functions read emitter state from the outside without reaching into
+`ε[Symbol.for('eventize')]`, and all four return a zero-ish value rather than
 throwing on a non-eventized object:
 
 - `getSubscriptionCount(ε)` — how many listeners are registered, named plus
   wildcard.
+- `getSubscribedEventNames(ε)` — every event name with at least one active
+  listener, named plus `EVENT_CATCH_EM_ALL` if a wildcard listener is
+  registered, in unspecified order. `getSubscribedEventNames(ε).length === 0`
+  agrees with `getSubscriptionCount(ε) === 0` exactly, and says which names
+  when it doesn't — the listener-side counterpart to `getRetainedEventNames()`
+  below.
 - `getRetainedCount(ε)` — how many event names currently hold a retained *value*.
 - `getRetainedEventNames(ε)` — every name carrying a retain *policy*, whether or
   not it has fired. `getRetainedEventNames(ε).length >= getRetainedCount(ε)`
   always holds.
 
-A teardown assertion in this shape catches both halves of emitter state at once:
+A teardown assertion in this shape catches both halves of emitter state at
+once, and names which listener side is still hanging on when the count isn't
+zero:
 
 ```javascript
 function teardown(component) {
@@ -453,7 +461,7 @@ function teardown(component) {
 
 teardown(component);
 
-expect(getSubscriptionCount(component.ε)).toBe(0);
+expect(getSubscribedEventNames(component.ε)).toEqual([]);
 expect(getRetainedCount(component.ε)).toBe(0);
 expect(getRetainedEventNames(component.ε)).toEqual([]);
 ```

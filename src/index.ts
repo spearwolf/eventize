@@ -10,6 +10,7 @@ export * from './isEventized';
 export * from './asEventized';
 export * from './getEventizeProtocol';
 export * from './getSubscriptionCount';
+export * from './getSubscribedEventNames';
 export * from './getRetainedCount';
 
 export {EVENT_CATCH_EM_ALL} from './constants';
