@@ -567,7 +567,7 @@ off(ε, '*', listenerObject);   // that object's wildcard subscription only
 
 A nullish second argument is **not** a no-op. `off(ε, handlers[name])` empties the whole emitter when the lookup misses, and one `null` or `undefined` element turns an array form into the same total wipe. Guard the lookup, or keep the handle `on()` returned and call that.
 
-Calling `off()` on a non-eventized object (or on `null`/`undefined` as the *emitter*) is a no-op, which makes it safe in cleanup paths without an `isEventized()` check.
+Calling `off()` on a non-eventized object (or on `null`/`undefined` as the *emitter*) is a no-op, which makes it safe in cleanup paths without an `isEventized()` check — safe against anything except an object eventized by an incompatible copy of the library, which throws the same protocol `TypeError` every other call does.
 
 Since v6.0.0 the bulk forms `off(ε)` and `off(ε, '*')` also empty the retained-events keeper — every retained value and every retain policy goes with the listeners. Before that they cleared only the listeners, so a subscriber arriving afterwards was still handed the old payload.
 

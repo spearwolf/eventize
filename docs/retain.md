@@ -99,7 +99,11 @@ throws while a retained value is being replayed to it does not end the batch:
   before the first one started;
 - the throw is reported through `console.warn`, prefixed `[eventize]`, with the
   event name and the error object — it is not rethrown, and there is no other
-  hook for it;
+  hook for it. The library binds this call to `console.warn` once, at module
+  load, so replacing `console.warn` afterwards — a log-capture setup, a Sentry
+  wrapper, `jest.spyOn(console, 'warn')` — does not redirect it; the
+  replacement has to be in place before `@spearwolf/eventize` is first
+  imported;
 - `on()` and `once()` return their handle as usual, for the complete
   registration the call made.
 
@@ -418,4 +422,4 @@ on(ε, 'bar', console.log); // (nothing — retain is off)
 
 ### Inspecting what's retained
 
-`getRetainedCount(ε)` and `getRetainedEventNames(ε)` (see [README → Inspecting emitter state](../README.md#inspecting-emitter-state)) let you check retained state from the outside instead of reaching into `ε[Symbol.for('eventize')].keeper`. The two report different things on purpose — a name can carry a retain policy without ever having fired — so `getRetainedEventNames(ε).length >= getRetainedCount(ε)` always holds. Both return `0` / `[]` for a non-eventized object rather than throwing, unlike `retainClear()` and `unretain()`, which throw a `TypeError` naming the function and the remedy (`eventize(obj)` first, or guard the call with `isEventized(obj)`). `retain()` throws for neither reason — it eventizes the object instead, as the first bullet at the top of this page says. Its throws are about the *name*, not the object: the wildcard rejection, and, since v6.0.0, the argument validation described above.
+`getRetainedCount(ε)` and `getRetainedEventNames(ε)` (see [README → Inspecting emitter state](../README.md#inspecting-emitter-state)) let you check retained state from the outside instead of reaching into `ε[Symbol.for('eventize')].keeper`. The two report different things on purpose — a name can carry a retain policy without ever having fired — so `getRetainedEventNames(ε).length >= getRetainedCount(ε)` always holds. Both return `0` / `[]` for a non-eventized object rather than throwing, unlike `retainClear()` and `unretain()`, which throw a `TypeError` naming the function and the remedy (`eventize(obj)` first, or guard the call with `isEventized(obj)`) — and, for an object eventized by an incompatible copy of the library, the differently worded protocol `TypeError` that any call throws which needs the store or the keeper to do its work. The two probes built to answer instead of throwing are the exception: `isEventized(obj)` reports `true` for a foreign marker too, and `getEventizeProtocol(obj)` is exactly how a consumer tells which copy wrote it — the diagnosis for the `TypeError` above, not a second instance of it. `retain()` throws for neither reason — it eventizes the object instead, as the first bullet at the top of this page says. That does not make it throw-free: it does not throw for *that* reason, but the wildcard rejection and the argument validation above still apply, and so do the throws `eventize()` itself carries when the object cannot be eventized at all — a frozen or otherwise non-extensible target, a primitive or `null`, or a marker written by an incompatible copy of the library.

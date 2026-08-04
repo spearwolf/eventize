@@ -13,8 +13,8 @@ instead.
   any array containing `'*'`, `null` or `undefined` (`off(ε, ['*', …])`,
   `off(ε, [null, …])`) used to empty only the listener registry, leaving
   retained values and retain policies intact. All of them now wipe the
-  keeper too. Targeted forms — `off(ε, eventName)`, `off(ε, [names])`,
-  `off(ε, eventName, listenerObject)` — are unchanged.
+  keeper too. Targeted forms — `off(ε, eventName)`, `off(ε, [names])` —
+  are unchanged.
 - **`off(ε, listenerFunc)` no longer cares which context the subscription
   was drawn under.** It used to match only registrations whose stored
   context was `null`, so `on(ε, 'evt', this.handler, this)` survived
@@ -38,6 +38,17 @@ instead.
   `on(ε, 'evt', 'reset', Registry)` detaches instead of leaving the class
   subscribed and firing. Again "removes more": a function that is another
   listener's context goes as well — `off(ε, otherHandler, fn)` narrows it.
+- **`off(ε, eventName, listenerObject)` widened too — it now also detaches
+  the method-name form** `on(ε, eventName, methodName, listenerObject)` and
+  `on(ε, eventName, fn, context)`. Up to `v5.1.0` the association test
+  compared `listenerObject` only against the slot a plain object listener is
+  stored in; a method-name or context registration parks it in a different
+  slot, so the targeted `off()` matched nothing there and reported nothing.
+  Cleanup code calling `off(ε, eventName, listenerObject)` after registering
+  with `on(ε, eventName, 'method', listenerObject)` believed it had detached
+  the subscription while the emitter went on holding it. Grep targeted
+  three-argument `off()` calls paired with a method-name `on()` — they now
+  detach where they used to no-op.
 - **`off(ε, listenerObject, ctx)` narrows to exactly that pair**, where up to
   `v5.1.0` it also swept every subscription that merely carried the object as
   its context. The association match runs for the two-argument forms only

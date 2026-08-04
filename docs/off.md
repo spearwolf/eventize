@@ -21,7 +21,7 @@
 | `off(emitter, '*', listenerObject)`       | Unsubscribes a listener object from the **wildcard** bucket only. Named subscriptions of the same object stay, and retained state is untouched. |
 
 > [!NOTE]
-> Calling `off()` on a non-eventized object (or on `null`/`undefined`) is a no-op — it returns silently. This makes `off()` safe in cleanup paths without first checking `isEventized()`.
+> Calling `off()` on a non-eventized object (or on `null`/`undefined`) is a no-op — it returns silently. This makes `off()` safe in cleanup paths without first checking `isEventized()` — safe against anything except an object eventized by an incompatible copy of the library, which throws the same protocol `TypeError` every other call does.
 
 ## Using the unsubscribe function
 
