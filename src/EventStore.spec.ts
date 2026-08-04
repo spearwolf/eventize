@@ -2,6 +2,7 @@ import {createOnceObligation, EventListener} from './EventListener';
 import {dedupIndexOf, EventStore} from './EventStore';
 
 import {EVENT_CATCH_EM_ALL} from './constants';
+import type {EventName} from './types';
 import {emit, eventize, off, on, once} from './index';
 import {storeOf} from './__test-utils__/listeners';
 
@@ -21,28 +22,47 @@ describe('EventStore', () => {
 
     it('adding a named listener adds the listener to namedListeners store', () => {
       expect(store.namedListeners.get('a')).toBe(undefined);
-      store.add(new EventListener('a', 0, NOOP));
+      store.add('a', 0, NOOP);
       expect(store.namedListeners.get('a')).toHaveLength(1);
       expect(store.getSubscriptionCount()).toBe(1);
     });
 
     it('adding a catch-em-all listener adds the listener to the catchEmAllListeners array', () => {
       expect(store.catchEmAllListeners).toHaveLength(0);
-      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, NOOP));
+      store.add(EVENT_CATCH_EM_ALL, 0, NOOP);
       expect(store.catchEmAllListeners).toHaveLength(1);
       expect(store.getSubscriptionCount()).toBe(1);
+    });
+
+    it('builds no listener for a registration that aggregates', () => {
+      const service = {};
+      const first = store.add('a', 0, service);
+
+      expect(store.lastAddCreatedListener).toBe(true);
+      expect(store.add('a', 0, service)).toBe(first);
+      expect(store.lastAddCreatedListener).toBe(false);
+
+      // The ids come from one module-global counter, handed out in the
+      // constructor and never anywhere else, so a gap here is a listener that
+      // was built only to be thrown away again. That is the whole point of
+      // add() taking the subscription's slots instead of an instance: the
+      // aggregating call in between must not have consumed an id.
+      expect(store.add('a', 0, {}).id).toBe(first.id + 1);
+      expect(store.lastAddCreatedListener).toBe(true);
     });
   });
 
   describe('without previously added catch-em-all listeners', () => {
     const store = new EventStore();
-    const origListener = [
-      new EventListener('a', -7, NOOP),
-      new EventListener('a', 0, NOOP),
-      new EventListener('a', 666, NOOP),
-      new EventListener('b', 0, NOOP),
-      new EventListener('a', 0, NOOP), // similar to [1] — deduped into it
-    ].map((listener) => store.add(listener));
+    const origListener = (
+      [
+        ['a', -7],
+        ['a', 0],
+        ['a', 666],
+        ['b', 0],
+        ['a', 0], // similar to [1] — deduped into it
+      ] as Array<[EventName, number]>
+    ).map(([eventName, priority]) => store.add(eventName, priority, NOOP));
 
     it('catchEmAllListeners store should be empty', () => {
       expect(store.catchEmAllListeners).toHaveLength(0);
@@ -62,12 +82,9 @@ describe('EventStore', () => {
 
   describe('without previously added named listeners', () => {
     const store = new EventStore();
-    const origListener = [
-      new EventListener(EVENT_CATCH_EM_ALL, -7, NOOP),
-      new EventListener(EVENT_CATCH_EM_ALL, 0, NOOP),
-      new EventListener(EVENT_CATCH_EM_ALL, 666, NOOP),
-      new EventListener(EVENT_CATCH_EM_ALL, 0, NOOP), // similar to [1]
-    ].map((listener) => store.add(listener));
+    const origListener = [-7, 0, 666, 0 /* similar to [1] */].map((priority) =>
+      store.add(EVENT_CATCH_EM_ALL, priority, NOOP),
+    );
 
     it('catchEmAllListeners should not be empty', () => {
       expect(store.catchEmAllListeners).toHaveLength(3);
@@ -88,7 +105,7 @@ describe('EventStore', () => {
   describe('namedListeners memory cleanup', () => {
     it('removing the last listener for an event name deletes the map entry (release())', () => {
       const store = new EventStore();
-      const listener = store.add(new EventListener('foo', 0, () => {}));
+      const listener = store.add('foo', 0, () => {});
       expect(store.namedListeners.has('foo')).toBe(true);
 
       store.release(listener);
@@ -99,8 +116,8 @@ describe('EventStore', () => {
 
     it('removing all listeners for an event name deletes the map entry (off by name)', () => {
       const store = new EventStore();
-      store.add(new EventListener('foo', 0, () => {}));
-      store.add(new EventListener('foo', 0, () => {}));
+      store.add('foo', 0, () => {});
+      store.add('foo', 0, () => {});
       expect(store.namedListeners.has('foo')).toBe(true);
 
       store.remove('foo', null);
@@ -112,8 +129,8 @@ describe('EventStore', () => {
     it('removing by listener function cleans empty map entries (off by fn)', () => {
       const store = new EventStore();
       const fn = () => {};
-      store.add(new EventListener('foo', 0, fn));
-      store.add(new EventListener('bar', 0, () => {}));
+      store.add('foo', 0, fn);
+      store.add('bar', 0, () => {});
 
       store.remove(fn, null);
 
@@ -125,7 +142,7 @@ describe('EventStore', () => {
     it('removing similar listeners cleans empty map entries (off by name+obj)', () => {
       const store = new EventStore();
       const obj = {};
-      store.add(new EventListener('foo', 0, obj));
+      store.add('foo', 0, obj);
 
       store.remove('foo', obj, true);
 
@@ -137,7 +154,7 @@ describe('EventStore', () => {
       const store = new EventStore();
       for (let i = 0; i < 1000; i++) {
         const name = `event-${i}`;
-        const listener = store.add(new EventListener(name, 0, () => {}));
+        const listener = store.add(name, 0, () => {});
         store.release(listener);
       }
       expect(store.namedListeners.size).toBe(0);
@@ -190,7 +207,7 @@ describe('EventStore', () => {
 
     it('reads the live bucket once one exists, by reference — not a copy', () => {
       const store = new EventStore();
-      const listener = store.add(new EventListener('foo', 0, () => {}));
+      const listener = store.add('foo', 0, () => {});
 
       const result = store.peekListeners('foo');
 
@@ -205,9 +222,7 @@ describe('EventStore', () => {
 
     it("reads the wildcard bucket for '*', the same special case listenersOf() makes", () => {
       const store = new EventStore();
-      const wildcard = store.add(
-        new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}),
-      );
+      const wildcard = store.add(EVENT_CATCH_EM_ALL, 0, () => {});
 
       const result = store.peekListeners(EVENT_CATCH_EM_ALL);
 
@@ -226,7 +241,7 @@ describe('EventStore', () => {
     // only case that catches the map-entry side of it.
     it("leaves namedListeners without a '*' key, unlike getListenersForEventName('*')", () => {
       const store = new EventStore();
-      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}));
+      store.add(EVENT_CATCH_EM_ALL, 0, () => {});
       expect(store.namedListeners.has(EVENT_CATCH_EM_ALL)).toBe(false);
 
       store.peekListeners(EVENT_CATCH_EM_ALL);
@@ -236,7 +251,7 @@ describe('EventStore', () => {
 
     it('refuses mutation through its declared type — reaching the live array needs a cast', () => {
       const store = new EventStore();
-      store.add(new EventListener('foo', 0, () => {}));
+      store.add('foo', 0, () => {});
       const result = store.peekListeners('foo');
 
       // @ts-expect-error ReadonlyArray<EventListener> has no push(): the
@@ -258,9 +273,7 @@ describe('EventStore', () => {
       const store = new EventStore();
       // priorities chosen so that insertion order != sort order
       const priorities = [0, 100, -50, 50, 0, 25, 100, -10, 75, 0];
-      const added = priorities.map((p, idx) =>
-        store.add(new EventListener('e', p, `L${idx}`)),
-      );
+      const added = priorities.map((p, idx) => store.add('e', p, `L${idx}`));
 
       const seen: EventListener[] = [];
       store.forEach('e', (l) => seen.push(l));
@@ -274,7 +287,7 @@ describe('EventStore', () => {
     it('keeps insertion stable for equal-priority listeners (FIFO by id)', () => {
       const store = new EventStore();
       const listeners = Array.from({length: 20}, (_, i) =>
-        store.add(new EventListener('e', 0, `L${i}`)),
+        store.add('e', 0, `L${i}`),
       );
       const seen: EventListener[] = [];
       store.forEach('e', (l) => seen.push(l));
@@ -284,17 +297,21 @@ describe('EventStore', () => {
 
   describe('with named and catch-em-all listeners', () => {
     const store = new EventStore();
-    [
-      new EventListener('a', -7, '0'),
-      new EventListener(EVENT_CATCH_EM_ALL, 100, '1'),
-      new EventListener('a', 0, '2'),
-      new EventListener(EVENT_CATCH_EM_ALL, 666, '3'),
-      new EventListener('a', 666, '4'),
-      new EventListener(EVENT_CATCH_EM_ALL, 0, '5'),
-      new EventListener('b', 0, '6'),
-      new EventListener(EVENT_CATCH_EM_ALL, -3, '7'),
-      new EventListener('a', 0, '8'),
-    ].forEach((listener) => store.add(listener));
+    (
+      [
+        ['a', -7, '0'],
+        [EVENT_CATCH_EM_ALL, 100, '1'],
+        ['a', 0, '2'],
+        [EVENT_CATCH_EM_ALL, 666, '3'],
+        ['a', 666, '4'],
+        [EVENT_CATCH_EM_ALL, 0, '5'],
+        ['b', 0, '6'],
+        [EVENT_CATCH_EM_ALL, -3, '7'],
+        ['a', 0, '8'],
+      ] as Array<[EventName, number, string]>
+    ).forEach(([eventName, priority, listener]) =>
+      store.add(eventName, priority, listener),
+    );
 
     it('forEach() calls the listener in highest-priority-and-id-comes-first order for all listeners', () => {
       const listeners: Array<EventListener> = [];
@@ -333,10 +350,8 @@ describe('EventStore', () => {
   describe('equal-priority merge across the named/wildcard split favors the named listener', () => {
     it('runs the named listener first when the wildcard was registered first', () => {
       const store = new EventStore();
-      const wildcard = store.add(
-        new EventListener(EVENT_CATCH_EM_ALL, 0, 'wildcard'),
-      );
-      const named = store.add(new EventListener('e', 0, 'named'));
+      const wildcard = store.add(EVENT_CATCH_EM_ALL, 0, 'wildcard');
+      const named = store.add('e', 0, 'named');
 
       const seen: EventListener[] = [];
       store.forEach('e', (l) => seen.push(l));
@@ -350,10 +365,8 @@ describe('EventStore', () => {
 
     it('runs the named listener first when the named listener was registered first', () => {
       const store = new EventStore();
-      const named = store.add(new EventListener('e', 0, 'named'));
-      const wildcard = store.add(
-        new EventListener(EVENT_CATCH_EM_ALL, 0, 'wildcard'),
-      );
+      const named = store.add('e', 0, 'named');
+      const wildcard = store.add(EVENT_CATCH_EM_ALL, 0, 'wildcard');
 
       const seen: EventListener[] = [];
       store.forEach('e', (l) => seen.push(l));
@@ -369,9 +382,9 @@ describe('EventStore', () => {
     it('removes a named listener without scanning other buckets', () => {
       const store = new EventStore();
       for (let i = 0; i < 100; i++) {
-        store.add(new EventListener(`other-${i}`, 0, () => {}));
+        store.add(`other-${i}`, 0, () => {});
       }
-      const target = store.add(new EventListener('target', 0, () => {}));
+      const target = store.add('target', 0, () => {});
       expect(store.namedListeners.size).toBe(101);
 
       store.release(target);
@@ -383,10 +396,8 @@ describe('EventStore', () => {
 
     it('removes a catch-em-all listener', () => {
       const store = new EventStore();
-      const target = store.add(
-        new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}),
-      );
-      store.add(new EventListener('named', 0, () => {}));
+      const target = store.add(EVENT_CATCH_EM_ALL, 0, () => {});
+      store.add('named', 0, () => {});
 
       store.release(target);
 
@@ -397,8 +408,8 @@ describe('EventStore', () => {
     it('removes by event name and listener object without touching other names', () => {
       const store = new EventStore();
       const listenerObject = {};
-      store.add(new EventListener('foo', 0, listenerObject));
-      store.add(new EventListener('bar', 0, listenerObject));
+      store.add('foo', 0, listenerObject);
+      store.add('bar', 0, listenerObject);
 
       store.remove('foo', listenerObject, true);
 
@@ -410,14 +421,11 @@ describe('EventStore', () => {
     it('aggregates a once() obligation onto a similar listener', () => {
       const store = new EventStore();
       const listenerObject = {};
-      const first = store.add(new EventListener('foo', 0, listenerObject));
+      const first = store.add('foo', 0, listenerObject);
       const obligation = createOnceObligation();
       // what once() passes: the identity is already registered, so the
       // obligation joins it instead of inserting a second listener
-      const second = store.add(
-        new EventListener('foo', 0, listenerObject),
-        obligation,
-      );
+      const second = store.add('foo', 0, listenerObject, null, obligation);
 
       expect(second).toBe(first);
       expect(first.refCount).toBe(1);
@@ -435,11 +443,8 @@ describe('EventStore', () => {
       const store = new EventStore();
       const listenerObject = {};
       const obligation = createOnceObligation();
-      const listener = store.add(
-        new EventListener('foo', 0, listenerObject),
-        obligation,
-      );
-      store.add(new EventListener('foo', 0, listenerObject));
+      const listener = store.add('foo', 0, listenerObject, null, obligation);
+      store.add('foo', 0, listenerObject);
 
       store.settleOneShots(listener, obligation.sequence + 1);
       expect(obligation.settled).toBe(true);
@@ -458,7 +463,7 @@ describe('EventStore', () => {
 
     it('settleOneShots() is a no-op for a listener with no pending obligations', () => {
       const store = new EventStore();
-      const listener = store.add(new EventListener('foo', 0, {}));
+      const listener = store.add('foo', 0, {});
 
       expect(() => store.settleOneShots(listener, 0)).not.toThrow();
 
@@ -470,10 +475,7 @@ describe('EventStore', () => {
       const store = new EventStore();
       const listenerObject = {};
       const before = createOnceObligation();
-      const listener = store.add(
-        new EventListener('foo', 0, listenerObject),
-        before,
-      );
+      const listener = store.add('foo', 0, listenerObject, null, before);
       // The watermark a dispatch would have captured right here — before
       // anything re-subscribes. `reArmed` is created after it on purpose,
       // simulating a once() that re-subscribed itself from inside its own
@@ -481,7 +483,7 @@ describe('EventStore', () => {
       // this watermark.
       const watermark = before.sequence + 1;
       const reArmed = createOnceObligation();
-      store.add(new EventListener('foo', 0, listenerObject), reArmed);
+      store.add('foo', 0, listenerObject, null, reArmed);
 
       store.settleOneShots(listener, watermark);
 
@@ -502,7 +504,7 @@ describe('EventStore', () => {
       const listenerObject = {};
       const older = createOnceObligation();
       const newer = createOnceObligation();
-      const listener = store.add(new EventListener('foo', 0, listenerObject));
+      const listener = store.add('foo', 0, listenerObject);
       // Built out of registration order on purpose: `newer` occupies index 0,
       // `older` index 1 — the reverse of creation order.
       listener.onceObligations = [newer, older];
@@ -528,9 +530,11 @@ describe('EventStore', () => {
         const store = new EventStore();
         const obligation = createOnceObligation();
         obligation.settled = true;
-        const listener = new EventListener('foo', 0, {});
+        // Registered first, then given the mismatched bookkeeping: add() builds
+        // the listener itself, so a state it never produces has to be written
+        // onto the instance it hands back.
+        const listener = store.add('foo', 0, {});
         listener.onceObligations = [obligation];
-        store.add(listener);
 
         expect(() =>
           store.settleOneShots(listener, obligation.sequence + 1),
@@ -543,7 +547,7 @@ describe('EventStore', () => {
 
       it('releaseObligation() tolerates a member with no obligations of its own', () => {
         const store = new EventStore();
-        const persistentOnly = store.add(new EventListener('foo', 0, {}));
+        const persistentOnly = store.add('foo', 0, {});
         const obligation = {
           ...createOnceObligation(),
           members: [persistentOnly],
@@ -558,7 +562,7 @@ describe('EventStore', () => {
 
       it('releaseObligation() tolerates a member whose obligations list a different one', () => {
         const store = new EventStore();
-        const listener = store.add(new EventListener('foo', 0, {}));
+        const listener = store.add('foo', 0, {});
         const otherObligation = createOnceObligation();
         listener.onceObligations = [otherObligation];
         const obligation = {...createOnceObligation(), members: [listener]};
@@ -575,8 +579,8 @@ describe('EventStore', () => {
     it('honours refCount before removing anything', () => {
       const store = new EventStore();
       const listenerObject = {};
-      const first = store.add(new EventListener('foo', 0, listenerObject));
-      const second = store.add(new EventListener('foo', 0, listenerObject));
+      const first = store.add('foo', 0, listenerObject);
+      const second = store.add('foo', 0, listenerObject);
       expect(second).toBe(first);
       expect(first.refCount).toBe(2);
 
@@ -590,7 +594,7 @@ describe('EventStore', () => {
     it('ignores an event name with no bucket', () => {
       const store = new EventStore();
       const listenerObject = {};
-      store.add(new EventListener('foo', 0, listenerObject));
+      store.add('foo', 0, listenerObject);
 
       store.remove('never-subscribed', listenerObject, true);
 
@@ -607,8 +611,8 @@ describe('EventStore', () => {
     it('a foreign EventListener instance never matches by identity', () => {
       const a = new EventStore();
       const b = new EventStore();
-      const target = a.add(new EventListener('foo', 0, () => {}));
-      b.add(new EventListener('foo', 0, () => {})); // same name, different instance
+      const target = a.add('foo', 0, () => {});
+      b.add('foo', 0, () => {}); // same name, different instance
 
       expect(() => b.remove(target, null)).not.toThrow();
       expect(b.getSubscriptionCount()).toBe(1);
@@ -624,8 +628,8 @@ describe('EventStore', () => {
     it('releasing a foreign listener detaches it without touching this store’s bucket for that name', () => {
       const a = new EventStore();
       const b = new EventStore();
-      const target = a.add(new EventListener('foo', 0, () => {}));
-      b.add(new EventListener('foo', 0, () => {})); // same name, different instance, own bucket
+      const target = a.add('foo', 0, () => {});
+      b.add('foo', 0, () => {}); // same name, different instance, own bucket
 
       expect(() => b.release(target)).not.toThrow();
 
@@ -637,7 +641,7 @@ describe('EventStore', () => {
     it('releasing a foreign listener whose event name has no bucket here does not throw', () => {
       const a = new EventStore();
       const b = new EventStore();
-      const target = a.add(new EventListener('foo', 0, () => {}));
+      const target = a.add('foo', 0, () => {});
 
       expect(() => b.release(target)).not.toThrow();
 
@@ -660,7 +664,7 @@ describe('EventStore', () => {
   describe('clone-on-mutate: a bucket is copied only when a dispatch mutates it', () => {
     it('reuses the named bucket across a dispatch that mutates nothing', () => {
       const store = new EventStore();
-      store.add(new EventListener('foo', 0, () => {}));
+      store.add('foo', 0, () => {});
       const before = store.namedListeners.get('foo');
 
       store.forEach('foo', () => {});
@@ -671,7 +675,7 @@ describe('EventStore', () => {
 
     it('reuses the wildcard bucket across a dispatch that mutates nothing', () => {
       const store = new EventStore();
-      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}));
+      store.add(EVENT_CATCH_EM_ALL, 0, () => {});
       const before = store.catchEmAllListeners;
 
       store.forEach('foo', () => {});
@@ -681,8 +685,8 @@ describe('EventStore', () => {
 
     it('reuses both buckets across a mutation-free merge dispatch', () => {
       const store = new EventStore();
-      store.add(new EventListener('foo', 0, () => {}));
-      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}));
+      store.add('foo', 0, () => {});
+      store.add(EVENT_CATCH_EM_ALL, 0, () => {});
       const beforeNamed = store.namedListeners.get('foo');
       const beforeWildcard = store.catchEmAllListeners;
 
@@ -696,11 +700,11 @@ describe('EventStore', () => {
 
     it('replaces the named bucket when a listener subscribes mid-dispatch', () => {
       const store = new EventStore();
-      store.add(new EventListener('foo', 10, () => {}));
+      store.add('foo', 10, () => {});
       const before = store.namedListeners.get('foo');
 
       store.forEach('foo', () => {
-        store.add(new EventListener('foo', 5, () => {}));
+        store.add('foo', 5, () => {});
       });
 
       const after = store.namedListeners.get('foo');
@@ -713,8 +717,8 @@ describe('EventStore', () => {
 
     it('replaces the named bucket when a listener unsubscribes mid-dispatch', () => {
       const store = new EventStore();
-      store.add(new EventListener('foo', 10, () => {}));
-      const doomed = store.add(new EventListener('foo', 5, () => {}));
+      store.add('foo', 10, () => {});
+      const doomed = store.add('foo', 5, () => {});
       const before = store.namedListeners.get('foo');
 
       let dispatched = 0;
@@ -734,10 +738,8 @@ describe('EventStore', () => {
 
     it('replaces the wildcard bucket when a wildcard listener unsubscribes mid-dispatch', () => {
       const store = new EventStore();
-      store.add(new EventListener(EVENT_CATCH_EM_ALL, 10, () => {}));
-      const doomed = store.add(
-        new EventListener(EVENT_CATCH_EM_ALL, 5, () => {}),
-      );
+      store.add(EVENT_CATCH_EM_ALL, 10, () => {});
+      const doomed = store.add(EVENT_CATCH_EM_ALL, 5, () => {});
       const before = store.catchEmAllListeners;
 
       store.forEach('foo', () => {
@@ -751,9 +753,9 @@ describe('EventStore', () => {
 
     it('replaces both buckets when everything is removed mid-dispatch', () => {
       const store = new EventStore();
-      store.add(new EventListener('foo', 10, () => {}));
-      store.add(new EventListener('foo', 5, () => {}));
-      store.add(new EventListener(EVENT_CATCH_EM_ALL, 7, () => {}));
+      store.add('foo', 10, () => {});
+      store.add('foo', 5, () => {});
+      store.add(EVENT_CATCH_EM_ALL, 7, () => {});
       const beforeNamed = store.namedListeners.get('foo');
       const beforeWildcard = store.catchEmAllListeners;
 
@@ -781,15 +783,15 @@ describe('EventStore', () => {
     // passes every other spec in this repo.
     it('clones a bucket once per walk, not once per mutation', () => {
       const store = new EventStore();
-      store.add(new EventListener('foo', 10, () => {}));
+      store.add('foo', 10, () => {});
       const before = store.namedListeners.get('foo');
 
       let afterFirst: EventListener[] | undefined;
       store.forEach('foo', () => {
-        store.add(new EventListener('foo', 5, () => {}));
+        store.add('foo', 5, () => {});
         afterFirst = store.namedListeners.get('foo');
-        store.add(new EventListener('foo', 4, () => {}));
-        store.add(new EventListener('foo', 3, () => {}));
+        store.add('foo', 4, () => {});
+        store.add('foo', 3, () => {});
       });
 
       expect(afterFirst).not.toBe(before);
@@ -802,18 +804,18 @@ describe('EventStore', () => {
 
     it('clones again once a nested walk has taken the clone over', () => {
       const store = new EventStore();
-      store.add(new EventListener('foo', 10, () => {}));
+      store.add('foo', 10, () => {});
       const original = store.namedListeners.get('foo');
 
       let outerClone: EventListener[] | undefined;
       let innerClone: EventListener[] | undefined;
       store.forEach('foo', () => {
-        store.add(new EventListener('foo', 5, () => {}));
+        store.add('foo', 5, () => {});
         outerClone = store.namedListeners.get('foo');
         store.forEach('foo', () => {
           // This nested walk started *after* the clone was installed, so it is
           // holding it and the clone is no longer free to change.
-          store.add(new EventListener('foo', 4, () => {}));
+          store.add('foo', 4, () => {});
           innerClone = store.namedListeners.get('foo');
         });
       });
@@ -830,20 +832,20 @@ describe('EventStore', () => {
     // the second walk an array it is itself stepping through.
     it('clones again for a second nested walk over the first one’s clone', () => {
       const store = new EventStore();
-      store.add(new EventListener('outer', 0, () => {}));
-      store.add(new EventListener('inner', 0, () => {}));
+      store.add('outer', 0, () => {});
+      store.add('inner', 0, () => {});
 
       let firstClone: EventListener[] | undefined;
       let secondClone: EventListener[] | undefined;
       store.forEach('outer', () => {
         store.forEach('inner', () => {
-          store.add(new EventListener('inner', -1, () => {}));
+          store.add('inner', -1, () => {});
           firstClone = store.namedListeners.get('inner');
         });
         // The first nested walk is over; this one is new, and it grabs the
         // clone that walk left behind.
         store.forEach('inner', () => {
-          store.add(new EventListener('inner', -2, () => {}));
+          store.add('inner', -2, () => {});
           secondClone = store.namedListeners.get('inner');
         });
       });
@@ -858,11 +860,9 @@ describe('EventStore', () => {
 
     it('clones each of the two buckets it walks at most once', () => {
       const store = new EventStore();
-      store.add(new EventListener('foo', 10, () => {}));
-      const namedDoomed = store.add(new EventListener('foo', 5, () => {}));
-      const wildcardDoomed = store.add(
-        new EventListener(EVENT_CATCH_EM_ALL, 7, () => {}),
-      );
+      store.add('foo', 10, () => {});
+      const namedDoomed = store.add('foo', 5, () => {});
+      const wildcardDoomed = store.add(EVENT_CATCH_EM_ALL, 7, () => {});
 
       let step = 0;
       let namedAfterFirst: EventListener[] | undefined;
@@ -876,7 +876,7 @@ describe('EventStore', () => {
         } else if (step === 2) {
           store.release(wildcardDoomed);
         } else {
-          store.add(new EventListener('foo', 1, () => {}));
+          store.add('foo', 1, () => {});
         }
       });
 
@@ -897,9 +897,9 @@ describe('EventStore', () => {
     it('does not clone a bucket no walk is holding', () => {
       const store = new EventStore();
       const context = {};
-      store.add(new EventListener('go', 0, () => {}));
+      store.add('go', 0, () => {});
       for (const name of ['a', 'b', 'c']) {
-        store.add(new EventListener(name, 0, NOOP, context));
+        store.add(name, 0, NOOP, context);
       }
       const before = {
         go: store.namedListeners.get('go'),
@@ -926,14 +926,14 @@ describe('EventStore', () => {
 
     it('does not clone anything when a dispatch only subscribes to other events', () => {
       const store = new EventStore();
-      store.add(new EventListener('go', 0, () => {}));
+      store.add('go', 0, () => {});
       const names = ['n0', 'n1', 'n2', 'n3', 'n4'];
-      for (const name of names) store.add(new EventListener(name, 0, () => {}));
+      for (const name of names) store.add(name, 0, () => {});
       const before = names.map((n) => store.namedListeners.get(n));
 
       store.forEach('go', () => {
         for (const name of names) {
-          store.add(new EventListener(name, -1, () => {}));
+          store.add(name, -1, () => {});
         }
       });
 
@@ -950,9 +950,9 @@ describe('EventStore', () => {
     // reading it.
     it('clones an enclosing walk’s bucket when a nested walk mutates it', () => {
       const store = new EventStore();
-      store.add(new EventListener('outer', 10, () => {}));
-      const doomed = store.add(new EventListener('outer', 5, () => {}));
-      store.add(new EventListener('inner', 0, () => {}));
+      store.add('outer', 10, () => {});
+      const doomed = store.add('outer', 5, () => {});
+      store.add('inner', 0, () => {});
       const before = store.namedListeners.get('outer');
 
       let dispatched = 0;
@@ -978,13 +978,13 @@ describe('EventStore', () => {
     // is spared a copy of an array with nothing in it.
     it('does not clone an empty wildcard bucket the walk skipped', () => {
       const store = new EventStore();
-      store.add(new EventListener('foo', 0, () => {}));
+      store.add('foo', 0, () => {});
       const before = store.catchEmAllListeners;
       const seen: EventListener[] = [];
 
       store.forEach('foo', (l) => {
         seen.push(l);
-        store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}));
+        store.add(EVENT_CATCH_EM_ALL, 0, () => {});
       });
 
       expect(seen).toHaveLength(1);
@@ -1003,18 +1003,18 @@ describe('EventStore', () => {
       const store = new EventStore();
 
       const named = store.getListenersForEventName('foo');
-      store.add(new EventListener('foo', 0, () => {}));
+      store.add('foo', 0, () => {});
       expect(store.namedListeners.get('foo')).toBe(named);
 
       const wildcards = store.catchEmAllListeners;
-      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}));
+      store.add(EVENT_CATCH_EM_ALL, 0, () => {});
       expect(store.catchEmAllListeners).toBe(wildcards);
     });
 
     it('mutates the wildcard bucket a mid-dispatch off(ε) installed in place', () => {
       const store = new EventStore();
-      store.add(new EventListener('foo', 0, () => {}));
-      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}));
+      store.add('foo', 0, () => {});
+      store.add(EVENT_CATCH_EM_ALL, 0, () => {});
 
       let step = 0;
       let fresh: Array<EventListener> | undefined;
@@ -1022,7 +1022,7 @@ describe('EventStore', () => {
         if (++step > 1) return;
         store.remove(null, null); // off(ε) — hands the store a fresh bucket
         fresh = store.catchEmAllListeners;
-        store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}));
+        store.add(EVENT_CATCH_EM_ALL, 0, () => {});
       });
 
       expect(fresh).not.toBe(undefined);
@@ -1036,14 +1036,14 @@ describe('EventStore', () => {
     // the mutation an array the outer walk is still reading.
     it('still clones after a nested walk over the same bucket has returned', () => {
       const store = new EventStore();
-      store.add(new EventListener('foo', 10, () => {}));
+      store.add('foo', 10, () => {});
       const before = store.namedListeners.get('foo');
 
       let step = 0;
       store.forEach('foo', () => {
         if (++step > 1) return;
         store.forEach('foo', () => {});
-        store.add(new EventListener('foo', 5, () => {}));
+        store.add('foo', 5, () => {});
       });
 
       expect(store.namedListeners.get('foo')).not.toBe(before);
@@ -1053,8 +1053,8 @@ describe('EventStore', () => {
 
     it('still clones after a nested dispatch has returned', () => {
       const store = new EventStore();
-      store.add(new EventListener('outer', 0, () => {}));
-      store.add(new EventListener('inner', 0, () => {}));
+      store.add('outer', 0, () => {});
+      store.add('inner', 0, () => {});
       const before = store.namedListeners.get('outer');
 
       store.forEach('outer', () => {
@@ -1062,7 +1062,7 @@ describe('EventStore', () => {
         // walk's buckets back, not declare the store free of walks — the outer
         // one is still running over 'outer'.
         store.forEach('inner', () => {});
-        store.add(new EventListener('outer', -1, () => {}));
+        store.add('outer', -1, () => {});
       });
 
       expect(store.namedListeners.get('outer')).not.toBe(before);
@@ -1078,9 +1078,9 @@ describe('EventStore', () => {
     it('clones once when off(ε, listenerObject) takes several entries out of the walked bucket', () => {
       const store = new EventStore();
       const context = {};
-      store.add(new EventListener('foo', 10, () => {}));
-      store.add(new EventListener('foo', 5, NOOP, context));
-      store.add(new EventListener('foo', 4, NOOP, context));
+      store.add('foo', 10, () => {});
+      store.add('foo', 5, NOOP, context);
+      store.add('foo', 4, NOOP, context);
       const before = store.namedListeners.get('foo');
 
       let afterFirst: EventListener[] | undefined;
@@ -1102,9 +1102,9 @@ describe('EventStore', () => {
     it('clones once when off(ε, name, listenerObject) takes several entries out of the walked bucket', () => {
       const store = new EventStore();
       const context = {};
-      store.add(new EventListener('foo', 10, () => {}));
-      store.add(new EventListener('foo', 5, NOOP, context));
-      store.add(new EventListener('foo', 4, NOOP, context));
+      store.add('foo', 10, () => {});
+      store.add('foo', 5, NOOP, context);
+      store.add('foo', 4, NOOP, context);
       const before = store.namedListeners.get('foo');
 
       let afterFirst: EventListener[] | undefined;
@@ -1131,16 +1131,14 @@ describe('EventStore', () => {
     // out of reach of the one name where the two disagree.
     it("forEach('*') walks the wildcard bucket and leaves a '*' key in namedListeners alone", () => {
       const store = new EventStore();
-      const wildcard = store.add(
-        new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}),
-      );
+      const wildcard = store.add(EVENT_CATCH_EM_ALL, 0, () => {});
       const impostor = store.getListenersForEventName(EVENT_CATCH_EM_ALL);
       impostor.push(new EventListener(EVENT_CATCH_EM_ALL, 0, () => {}));
 
       const seen: EventListener[] = [];
       store.forEach(EVENT_CATCH_EM_ALL, (l) => {
         seen.push(l);
-        store.add(new EventListener('foo', 0, () => {}));
+        store.add('foo', 0, () => {});
       });
 
       expect(seen).toEqual([wildcard]);
@@ -1151,7 +1149,7 @@ describe('EventStore', () => {
 
     it('mutates in place again after a listener threw mid-dispatch', () => {
       const store = new EventStore();
-      store.add(new EventListener('foo', 0, () => {}));
+      store.add('foo', 0, () => {});
       const before = store.namedListeners.get('foo');
 
       expect(() =>
@@ -1163,7 +1161,7 @@ describe('EventStore', () => {
       // The buckets are released from a finally block: a throwing listener
       // must not leave a dead walk holding one, or every later mutation of it
       // clones for the rest of the store's life.
-      store.add(new EventListener('foo', -1, () => {}));
+      store.add('foo', -1, () => {});
       expect(store.namedListeners.get('foo')).toBe(before);
       expect(before).toHaveLength(2);
     });
@@ -1185,8 +1183,8 @@ describe('EventStore', () => {
       const first = () => {};
       const second = () => {};
 
-      const a = store.add(new EventListener('foo', 0, first));
-      const b = store.add(new EventListener('foo', 0, second));
+      const a = store.add('foo', 0, first);
+      const b = store.add('foo', 0, second);
 
       // A function listener still never dedups — two of them stay two, and the
       // case below this one says so from the other side. It is filed all the
@@ -1209,7 +1207,7 @@ describe('EventStore', () => {
     it('files a listener with no identity in either slot nowhere', () => {
       const store = new EventStore();
       const bucket = store.getListenersForEventName('foo');
-      const listener = store.add(new EventListener('foo', 0, null));
+      const listener = store.add('foo', 0, null);
 
       expect(bucket).toHaveLength(1);
       // The Map itself is created before the keys are worked out, so this
@@ -1232,8 +1230,8 @@ describe('EventStore', () => {
       const bucket = store.getListenersForEventName('foo');
       const fn = () => {};
 
-      const a = store.add(new EventListener('foo', 0, fn));
-      const b = store.add(new EventListener('foo', 0, fn));
+      const a = store.add('foo', 0, fn);
+      const b = store.add('foo', 0, fn);
 
       // The dedup gate sits in findSimilarListener(), not at the filing site,
       // so widening what is filed cannot widen what aggregates: the search
@@ -1250,7 +1248,7 @@ describe('EventStore', () => {
       const fn = () => {};
       const ctx = {};
 
-      const listener = store.add(new EventListener('foo', 0, fn, ctx));
+      const listener = store.add('foo', 0, fn, ctx);
 
       // off(ε, fn) and off(ε, ctx) both name this one registration, so both
       // values have to be keys. The second is what the removal side gained.
@@ -1265,9 +1263,7 @@ describe('EventStore', () => {
       const bucket = store.getListenersForEventName('foo');
       const target = {handler() {}};
 
-      const listener = store.add(
-        new EventListener('foo', 0, 'handler', target),
-      );
+      const listener = store.add('foo', 0, 'handler', target);
 
       // A string can never be the listener argument of a removal that reaches
       // detachByIdentity() — remove() routes one to removeByEventName(), or to
@@ -1285,8 +1281,8 @@ describe('EventStore', () => {
       const target = {handler() {}};
       const self = {foo() {}};
 
-      const named = store.add(new EventListener('foo', 0, 'handler', target));
-      const object = store.add(new EventListener('foo', 0, self));
+      const named = store.add('foo', 0, 'handler', target);
+      const object = store.add('foo', 0, self);
 
       const index = dedupIndexOf(bucket);
       // The listener object for a method-name subscription, the listener
@@ -1306,8 +1302,8 @@ describe('EventStore', () => {
       const bucket = store.getListenersForEventName('foo');
       const target = {handler() {}, foo() {}};
 
-      const named = store.add(new EventListener('foo', 0, 'handler', target));
-      const object = store.add(new EventListener('foo', 0, target));
+      const named = store.add('foo', 0, 'handler', target);
+      const object = store.add('foo', 0, target);
 
       expect(object).not.toBe(named);
       expect(bucket).toHaveLength(2);
@@ -1324,8 +1320,8 @@ describe('EventStore', () => {
       const bucket = store.getListenersForEventName('foo');
       const target = {handler() {}};
       const fn = () => {};
-      const named = store.add(new EventListener('foo', 0, 'handler', target));
-      const func = store.add(new EventListener('foo', 0, fn, target));
+      const named = store.add('foo', 0, 'handler', target);
+      const func = store.add('foo', 0, fn, target);
 
       expect(dedupIndexOf(bucket)?.get(target)).toEqual([named, func]);
 
@@ -1340,9 +1336,7 @@ describe('EventStore', () => {
       const store = new EventStore();
       const bucket = store.getListenersForEventName('foo');
       const target = {handler() {}};
-      const listener = store.add(
-        new EventListener('foo', 0, 'handler', target),
-      );
+      const listener = store.add('foo', 0, 'handler', target);
 
       store.release(listener);
 
@@ -1355,8 +1349,8 @@ describe('EventStore', () => {
       const store = new EventStore();
       const bucket = store.getListenersForEventName('foo');
       const target = {handler() {}};
-      store.add(new EventListener('foo', 0, 'handler', target));
-      store.add(new EventListener('foo', 100, 'handler', target));
+      store.add('foo', 0, 'handler', target);
+      store.add('foo', 100, 'handler', target);
 
       store.remove('foo', target, true);
 
@@ -1368,7 +1362,7 @@ describe('EventStore', () => {
       const store = new EventStore();
       const wildcards = store.catchEmAllListeners;
       const self = {foo() {}};
-      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, self));
+      store.add(EVENT_CATCH_EM_ALL, 0, self);
 
       store.remove(self, null);
 
@@ -1385,7 +1379,7 @@ describe('EventStore', () => {
       const bucket = store.getListenersForEventName('foo');
       const fn = () => {};
       const ctx = {};
-      store.add(new EventListener('foo', 0, fn, ctx));
+      store.add('foo', 0, fn, ctx);
 
       expect(dedupIndexOf(bucket)?.size).toBe(2);
 
@@ -1401,7 +1395,7 @@ describe('EventStore', () => {
       const bucket = store.getListenersForEventName('foo');
       const fn = () => {};
       const ctx = {};
-      store.add(new EventListener('foo', 0, fn, ctx));
+      store.add('foo', 0, fn, ctx);
 
       // The context slot is the key the removal side gained. Up to v5.1.0 a
       // linear scan answered both spellings; now the index has to.
@@ -1428,7 +1422,7 @@ describe('EventStore', () => {
         const store = new EventStore();
         const bucket = store.getListenersForEventName('foo');
         const self = {foo() {}};
-        const listener = store.add(new EventListener('foo', 0, self));
+        const listener = store.add('foo', 0, self);
 
         rawIndex(bucket).delete(self);
 
@@ -1445,7 +1439,7 @@ describe('EventStore', () => {
         const store = new EventStore();
         const bucket = store.getListenersForEventName('foo');
         const self = {foo() {}};
-        const listener = store.add(new EventListener('foo', 0, self));
+        const listener = store.add('foo', 0, self);
 
         const [slot] = Object.getOwnPropertySymbols(bucket).filter(
           (symbol) => symbol.description === 'eventize.EventStore.dedupIndex',
@@ -1465,7 +1459,7 @@ describe('EventStore', () => {
         const store = new EventStore();
         const bucket = store.getListenersForEventName('foo');
         const self = {foo() {}};
-        const listener = store.add(new EventListener('foo', 0, self));
+        const listener = store.add('foo', 0, self);
 
         const candidates = rawIndex(bucket).get(self) as EventListener[];
         expect(candidates).toHaveLength(1);
@@ -1484,8 +1478,8 @@ describe('EventStore', () => {
       const named = store.getListenersForEventName('foo');
       const wildcards = store.catchEmAllListeners;
       const target = {handler() {}};
-      store.add(new EventListener('foo', 0, 'handler', target));
-      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, 'handler', target));
+      store.add('foo', 0, 'handler', target);
+      store.add(EVENT_CATCH_EM_ALL, 0, 'handler', target);
 
       store.remove(null, null);
 
@@ -1500,15 +1494,15 @@ describe('EventStore', () => {
     it('hands a clone the index of the bucket it copies', () => {
       const store = new EventStore();
       const target = {handler() {}};
-      const first = store.add(new EventListener('foo', 0, 'handler', target));
+      const first = store.add('foo', 0, 'handler', target);
       const before = store.getListenersForEventName('foo');
 
       let aggregated: EventListener | undefined;
       store.forEach('foo', () => {
         // Mutates the bucket this walk is holding, so the store swaps in a
         // clone — and the second add() has to find `first` through it.
-        store.add(new EventListener('foo', -1, () => {}));
-        aggregated = store.add(new EventListener('foo', 0, 'handler', target));
+        store.add('foo', -1, () => {});
+        aggregated = store.add('foo', 0, 'handler', target);
       });
 
       const clone = store.getListenersForEventName('foo');
@@ -1524,11 +1518,11 @@ describe('EventStore', () => {
     it('never aggregates onto a listener that has already been removed', () => {
       const store = new EventStore();
       const target = {handler() {}};
-      const first = store.add(new EventListener('foo', 0, 'handler', target));
+      const first = store.add('foo', 0, 'handler', target);
       store.release(first);
       expect(first.isRemoved).toBe(true);
 
-      const second = store.add(new EventListener('foo', 0, 'handler', target));
+      const second = store.add('foo', 0, 'handler', target);
 
       // Two guards stand behind this, and it holds if either does: the removal
       // unfiled `first`, and isSimilar() could not have matched it anyway —
@@ -1558,9 +1552,15 @@ describe('EventStore', () => {
       const bucket = store.getListenersForEventName('foo');
       bucket.length = 3; // three holes, no real listeners
 
+      // Anchors the last assertion of this case: the field is left standing at
+      // true by a registration that did succeed, so the false below is the
+      // throwing call's own answer and not the initial value.
+      store.add('other', 0, () => {});
+      expect(store.lastAddCreatedListener).toBe(true);
+
       // The assertion is specific to the message this throw produces — it is
       // not simply "add() throws on a holey bucket".
-      expect(() => store.add(new EventListener('foo', 0, () => {}))).toThrow(
+      expect(() => store.add('foo', 0, () => {})).toThrow(
         'EventStore: findInsertIndex encountered a hole',
       );
       // Up to the dedup index, an object listener died before ever reaching
@@ -1570,9 +1570,15 @@ describe('EventStore', () => {
       // search reads a Map now and never sees the array, so both types reach
       // the same explicit throw. A corrupted bucket is not a reachable state
       // either way; what changed is which of the two guards reports it.
-      expect(() => store.add(new EventListener('foo', 0, {}))).toThrow(
+      expect(() => store.add('foo', 0, {})).toThrow(
         'EventStore: findInsertIndex encountered a hole',
       );
+
+      // A rejected insertion leaves no registration behind, so the side
+      // channel must not describe one. The write that says "created" sits
+      // after the splice for exactly this reason — deriving it from the dedup
+      // search instead would have it survive the throw.
+      expect(store.lastAddCreatedListener).toBe(false);
     });
 
     it('forEach() throws instead of silently dispatching a truncated prefix', () => {
@@ -1640,12 +1646,12 @@ describe('EventStore', () => {
       const store = new EventStore();
       const untouched = new EventStore();
 
-      store.add(new EventListener('foo', 0, NOOP));
+      store.add('foo', 0, NOOP);
       expect(store.namedListeners).not.toBe(untouched.namedListeners);
       // A named subscription buys the Map, never the wildcard bucket.
       expect(wildcardBucketOf(store)).toBe(wildcardBucketOf(untouched));
 
-      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, NOOP));
+      store.add(EVENT_CATCH_EM_ALL, 0, NOOP);
       expect(wildcardBucketOf(store)).not.toBe(wildcardBucketOf(untouched));
 
       expect(untouched.namedListeners.size).toBe(0);
@@ -1831,8 +1837,8 @@ describe('EventStore', () => {
     it('keeps the containers it has once built, even after off(ε)', () => {
       const pristine = new EventStore();
       const store = new EventStore();
-      store.add(new EventListener('foo', 0, NOOP));
-      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, NOOP));
+      store.add('foo', 0, NOOP);
+      store.add(EVENT_CATCH_EM_ALL, 0, NOOP);
       const wildcards = store.catchEmAllListeners;
 
       store.remove(null, null); // off(ε)

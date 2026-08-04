@@ -395,6 +395,47 @@ describe('on()/once() aggregate by listener identity', () => {
       expect(getSubscriptionCount(ε)).toBe(1);
     });
 
+    // The tightest nesting the public API can build: a registration whose
+    // retained replay runs consumer code that registers again, while that
+    // outer registration has not finished answering "was I new?" for itself.
+    // The two answers differ on purpose — the outer one inserts, the inner one
+    // aggregates — so a decision leaking from one registration to the other is
+    // visible in whichever direction it leaks: the outer would lose the replay
+    // it is owed, or the inner would get one it is not.
+    //
+    // What this really pins is the premise `EventStore.lastAddCreatedListener`
+    // rests on, namely that no consumer code runs between the write and the
+    // read. Nothing in `add()` reaches consumer code today, and nothing but
+    // this case would notice if something did.
+    it('a subscription made from inside a retained replay keeps its own replay decision', () => {
+      const ε = eventize();
+      const outer = fake();
+      const inner = {b: fake()};
+
+      retain(ε, ['a', 'b']);
+      emit(ε, 'a', 'A');
+      emit(ε, 'b', 'B');
+
+      // Registered up front, so the identical registration made from inside
+      // the replay below aggregates onto it.
+      on(ε, 'b', inner);
+      expect(inner.b.callCount).toBe(1);
+
+      on(ε, 'a', (value: string) => {
+        outer(value);
+        on(ε, 'b', inner);
+      });
+
+      // The outer registration inserted, so it is owed the retained value —
+      // and owed it with the value, not merely a call.
+      expect(outer.callCount).toBe(1);
+      expect(outer.calledWith('A')).toBe(true);
+      // The inner one aggregated onto a listener that has already seen 'B',
+      // so an aggregating on() gets no second replay.
+      expect(inner.b.callCount).toBe(1);
+      expect(getSubscriptionCount(ε)).toBe(2);
+    });
+
     it('a once() on a retained event never reaches an aggregate', () => {
       const ε = eventize();
       const listenerObject = {foo: fake()};

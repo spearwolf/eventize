@@ -1,10 +1,11 @@
-import type {EventListener, OnceObligation} from './EventListener';
+import {detectListenerType, EventListener} from './EventListener';
+import type {OnceObligation} from './EventListener';
 import {
   EVENT_CATCH_EM_ALL,
   LISTENER_IS_NAMED_FUNC,
   LISTENER_IS_OBJ,
 } from './constants';
-import type {EventName} from './types';
+import type {EventName, ListenerObjectType} from './types';
 import {isAttachableTarget, isCatchEmAll, isEventName} from './utils';
 
 type HasPriorityOrIdType = {priority: number; id: number};
@@ -323,26 +324,36 @@ const detachAll = (bucket: ListenerBucket) => {
   bucket[DEDUP_INDEX] = undefined;
 };
 
+// The five slots a subscription is identified by, spelled out rather than
+// bundled into a descriptor object: the sole caller is a search that runs
+// before the `EventListener` exists, and a literal built per registration to
+// carry them would reintroduce the very allocation that search was rebuilt to
+// avoid — a smaller one, but on the same path and with the same frequency.
+//
+// Both listener slots are `unknown`, so swapping them compiles in silence and
+// costs a comment nothing to prevent: `listener` before `listenerObject`,
+// everywhere in this file and in `EventListener`'s constructor. Add a
+// parameter list that holds the pair and it takes that order too — the search
+// side has no descriptor left to name its arguments for it.
+//
 // `unknown` for the two listener slots, not `any`: the store never calls into
 // them, it only compares them by identity. Saying `any` here claimed a
 // knowledge the registry does not have and switched off checking inside a
 // function whose whole job is comparison.
 const isSimilar = (
-  a: {
-    listenerType: number | undefined;
-    priority: number;
-    eventName: string | symbol;
-    listenerObject: unknown;
-    listener: unknown;
-  },
-  b: EventListener,
+  listenerType: number | undefined,
+  priority: number,
+  eventName: EventName,
+  listener: unknown,
+  listenerObject: unknown,
+  candidate: EventListener,
 ) => {
-  if (a.listenerType === b.listenerType) {
+  if (listenerType === candidate.listenerType) {
     return (
-      a.priority === b.priority &&
-      a.eventName === b.eventName &&
-      a.listenerObject === b.listenerObject &&
-      a.listener === b.listener
+      priority === candidate.priority &&
+      eventName === candidate.eventName &&
+      listenerObject === candidate.listenerObject &&
+      listener === candidate.listener
     );
   }
   return false;
@@ -472,13 +483,19 @@ const mergeWalk = (
  * dedup lookup reads. Only meaningful for the two listener types that can dedup
  * at all — see `DEDUP_INDEX`.
  *
- * Read it *before* `detach()`: detaching nulls both slots, so a detached
- * listener no longer knows where it was filed.
+ * Takes the three slots rather than an `EventListener`, because its two callers
+ * hold different things: `eachIndexKey()` files a listener that exists,
+ * `findSimilarListener()` searches for one that may not be built yet. The rule
+ * which slot carries the identity is the same for both and stays written once.
+ *
+ * On a listener, read it *before* `detach()`: detaching nulls both slots, so a
+ * detached listener no longer knows where it was filed.
  */
-const dedupKeyOf = (listener: EventListener): unknown =>
-  listener.listenerType === LISTENER_IS_OBJ
-    ? listener.listener
-    : listener.listenerObject;
+const dedupKeyOf = (
+  listenerType: number | undefined,
+  listener: unknown,
+  listenerObject: unknown,
+): unknown => (listenerType === LISTENER_IS_OBJ ? listener : listenerObject);
 
 /**
  * Whether a value can be the *listener* argument of a removal that reaches
@@ -536,7 +553,9 @@ const eachIndexKey = (
   const context = listener.listenerObject;
 
   const dedupable = isSimilarListenerType(listener.listenerType);
-  const dedupKey = dedupable ? dedupKeyOf(listener) : undefined;
+  const dedupKey = dedupable
+    ? dedupKeyOf(listener.listenerType, identity, context)
+    : undefined;
   if (dedupable) {
     visit(index, dedupKey, listener);
   }
@@ -618,20 +637,43 @@ const indexRemove = (bucket: ListenerBucket, listener: EventListener): void => {
  * ever satisfy `isSimilar()` — a second one would have deduped into the first
  * when it was registered — so which candidate comes back first is not a
  * question, and the index answers exactly what the linear scan answered.
+ *
+ * It searches from the *description* of a subscription, never from a listener
+ * instance, and that is the whole point: a registration that aggregates now
+ * builds nothing at all. Measured on repeated `on(ε, 'foo', service)` against
+ * one identity, dropping the throwaway instance is worth ~112 B and ~8 ns per
+ * call — the numbers are in the doc comment at `registerEventListener()`.
  */
 const findSimilarListener = (
-  searchFor: EventListener,
+  listenerType: number | undefined,
+  priority: number,
+  eventName: EventName,
+  listener: unknown,
+  listenerObject: unknown,
   bucket: ListenerBucket,
 ) => {
-  if (!isSimilarListenerType(searchFor.listenerType)) return undefined;
+  if (!isSimilarListenerType(listenerType)) return undefined;
   const index = bucket[DEDUP_INDEX];
   if (index === undefined) return undefined;
-  const candidates = index.get(dedupKeyOf(searchFor));
+  const candidates = index.get(
+    dedupKeyOf(listenerType, listener, listenerObject),
+  );
   if (candidates === undefined) return undefined;
   // for…of, not find(): the callback find() wants is a fresh closure on every
   // subscription, and this list is short enough that the loop is the whole cost.
   for (const candidate of candidates) {
-    if (isSimilar(searchFor, candidate)) return candidate;
+    if (
+      isSimilar(
+        listenerType,
+        priority,
+        eventName,
+        listener,
+        listenerObject,
+        candidate,
+      )
+    ) {
+      return candidate;
+    }
   }
   return undefined;
 };
@@ -1026,10 +1068,44 @@ export class EventStore {
   }
 
   /**
-   * Returns the listener the registration landed on: the given one when it was
-   * inserted, or an existing one with the same identity. Either way the
-   * registration is recorded on it, which is what makes `on()` and `once()`
-   * aggregate in both registration orders.
+   * Whether the `add()` that returned last built the listener it handed back,
+   * rather than finding one to aggregate onto. Meaningful only on the statement
+   * that follows the call — a reader that stashes it for later is reading the
+   * *next* registration's answer.
+   *
+   * It exists because `add()` no longer receives the listener it might insert:
+   * the caller used to answer "was this one new?" by comparing the return value
+   * against the instance it had just built, and that instance is precisely what
+   * a deduplicating registration must stop allocating. A `{listener, created}`
+   * result object would put the allocation straight back, one field narrower.
+   *
+   * The one reader is `registerEventListener()`, deciding whether a retained
+   * value is replayed to a registration that aggregated.
+   *
+   * **What makes a single slot safe is that nothing between the write and the
+   * read can register anything.** `add()` runs no consumer code after the
+   * write — no dispatch, no `warn()`, no member read that could reach a getter
+   * or a proxy trap — so a nested registration can only start outside `add()`,
+   * where the pair it belongs to has already closed. Adding anything that
+   * re-enters consumer code between the two breaks this field and nothing else
+   * would say so, which is why the premise is pinned rather than asserted:
+   * `once_on_aggregation.spec.ts` subscribes to a second retained event from
+   * inside a retained replay, the tightest nesting the public API can build.
+   */
+  lastAddCreatedListener = false;
+
+  /**
+   * Returns the listener the registration landed on: a newly built one, or an
+   * existing one with the same identity. Either way the registration is
+   * recorded on it, which is what makes `on()` and `once()` aggregate in both
+   * registration orders — see `lastAddCreatedListener` for how a caller tells
+   * the two apart.
+   *
+   * Takes the subscription's five identifying slots rather than a listener,
+   * and builds the `EventListener` only where one is actually inserted. The
+   * dedup search reads nothing else (`findSimilarListener()`), so an
+   * aggregating call now allocates nothing at all and burns no id from
+   * `EventListener`'s module-global counter.
    *
    * `obligation` is what used to be a `noDedup`/`kind` flag: `null` for a
    * persistent `on()`, an `OnceObligation` for a `once()`. Its *presence*, not
@@ -1039,7 +1115,10 @@ export class EventStore {
    * obligation across two listeners instead of building two.
    */
   add(
-    listener: EventListener,
+    eventName: EventName,
+    priority: number,
+    listener: unknown,
+    listenerObject: ListenerObjectType = null,
     obligation: OnceObligation | null = null,
   ): EventListener {
     // Materialized up front rather than at the splice below, and that is not
@@ -1048,12 +1127,28 @@ export class EventStore {
     // here with it means the insertion at the end of this method is certain.
     // Both branches create — `getListenersForEventName()` is the named twin of
     // the materializer.
-    const bucket = listener.isCatchEmAll
+    const bucket = isCatchEmAll(eventName)
       ? this.mutableCatchEmAllBucket()
-      : this.getListenersForEventName(listener.eventName);
+      : this.getListenersForEventName(eventName);
 
-    const similar = findSimilarListener(listener, bucket);
-    const target = similar ?? listener;
+    // Recomputed here rather than read off a listener, and the constructor
+    // below computes it a second time on the inserting path. That is the one
+    // duplicated `typeof` switch this rebuild costs, and it is paid only where
+    // an object is allocated anyway — an aggregating call pays it once and
+    // allocates nothing.
+    const listenerType = detectListenerType(listener);
+
+    const similar = findSimilarListener(
+      listenerType,
+      priority,
+      eventName,
+      listener,
+      listenerObject,
+      bucket,
+    );
+    const target =
+      similar ??
+      new EventListener(eventName, priority, listener, listenerObject);
 
     if (obligation === null) {
       target.refCount += 1;
@@ -1065,12 +1160,21 @@ export class EventStore {
       obligation.members.push(target);
     }
 
+    // Two writes, and the optimistic one comes last — the field says "created"
+    // only once the splice has actually happened. Deriving it from `similar`
+    // in one write up here would leave it claiming a registration that does
+    // not exist whenever `findInsertIndex()` rejects a corrupted bucket: that
+    // throw skips the insertion, not the write. Written pessimistically first
+    // for the same reason, so the throwing path leaves behind the answer that
+    // is true of it.
+    this.lastAddCreatedListener = false;
+
     // An aggregation touches no array and no index, so it owes no clone —
     // reading the live bucket's index above is safe for the same reason.
     if (similar) return similar;
 
-    const arr = this.bucketForMutation(listener.eventName, bucket);
-    arr.splice(findInsertIndex(arr, listener), 0, listener);
+    const arr = this.bucketForMutation(eventName, bucket);
+    arr.splice(findInsertIndex(arr, target), 0, target);
     // Filed on the array the store holds afterwards, which is also the array the
     // next lookup will read — the clone shares the index of the bucket it came
     // from, so this lands in the same Map either way.
@@ -1081,8 +1185,9 @@ export class EventStore {
     // is filed so off() can find it, and still never dedups, because the search
     // never asks about one — and could not match it if it did, isSimilar()
     // comparing listenerType first.
-    indexAdd(arr, listener);
-    return listener;
+    indexAdd(arr, target);
+    this.lastAddCreatedListener = true;
+    return target;
   }
 
   remove(
