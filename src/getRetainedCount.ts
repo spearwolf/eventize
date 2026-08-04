@@ -14,7 +14,7 @@ const keeperOf = (o: object): EventKeeper | undefined =>
  * emitted is *not* counted here — see `getRetainedEventNames()`.
  */
 export const getRetainedCount = (o: object): number =>
-  keeperOf(o)?.events.size ?? 0;
+  keeperOf(o)?.retainedCount ?? 0;
 
 /**
  * Every event name carrying a retain policy, whether or not it has fired.
@@ -25,5 +25,5 @@ export const getRetainedCount = (o: object): number =>
  */
 export const getRetainedEventNames = (o: object): EventName[] => {
   const keeper = keeperOf(o);
-  return keeper ? Array.from(keeper.eventNames) : [];
+  return keeper ? keeper.retainedNames() : [];
 };

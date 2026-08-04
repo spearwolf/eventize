@@ -47,10 +47,7 @@ const rejectMutation = (field: string) => (): never => {
  * the CJS build side by side creates a second pair, but a keeper is only ever
  * touched by the methods of the class that built it, so the identity test in
  * the materializers always compares against its own module's stand-in. A
- * foreign pair is simply a pair this code never sees. `getRetainedCount.ts`
- * reads `events`/`eventNames` straight off the field, past the class — harmless
- * as long as it only reads; the premise would stop holding the day something
- * outside the class assigns one of these fields instead.
+ * foreign pair is simply a pair this code never sees.
  */
 const EMPTY_EVENTS: Map<EventName, KeeperEventItem> = Object.freeze(
   Object.defineProperties(new Map<EventName, KeeperEventItem>(), {
@@ -141,6 +138,28 @@ export class EventKeeper {
     return this.eventNames;
   }
 
+  /**
+   * How many events currently hold a retained value.
+   *
+   * Not the counterpart of `retainedNames()`: this counts entries in
+   * `events`, that one lists entries in `eventNames`, and a policy without a
+   * value — `add()` without a following `retain()` — is in the second and
+   * not the first. `retainedCount !== retainedNames().length` is the normal
+   * case, not an edge case; see `getRetainedCount.ts`, which states the same
+   * relation for the public wrappers.
+   */
+  get retainedCount(): number {
+    return this.events.size;
+  }
+
+  /**
+   * Every event name currently carrying a retain policy, whether or not it
+   * has a retained value — see `retainedCount` above for the value count.
+   */
+  retainedNames(): EventName[] {
+    return Array.from(this.eventNames);
+  }
+
   add(eventNames: AnyEventNames): void {
     if (Array.isArray(eventNames)) {
       // Since v6.0.0 `retain()` rejects an empty array before this is ever
@@ -166,6 +185,20 @@ export class EventKeeper {
       } else {
         names.delete(eventNames);
       }
+      // Same reasoning as `removeAll()`: a named removal that empties the
+      // container is behaviourally identical to never having allocated one,
+      // so give it back rather than keep an empty Set alive for the rest of
+      // the emitter's life. Checked against `this.eventNames`, not the local
+      // `names` reference: `eventNames.forEach()` is caller-supplied and can
+      // run arbitrary code (an `Array` subclass overriding `forEach`, for
+      // instance), which can swap `this.eventNames` for a fresh container
+      // before this line runs. Deciding from `names.size` would then release
+      // based on the size of a Set this keeper no longer holds and overwrite
+      // the field the swap just installed — a lost policy or value, not a
+      // corrupted stand-in, but still the wrong outcome. `EventStore` names
+      // the same rule: never decide from a reference held across a callback,
+      // always re-read the field.
+      if (this.eventNames.size === 0) this.eventNames = EMPTY_EVENT_NAMES;
     }
     this.clear(eventNames);
   }
@@ -178,6 +211,11 @@ export class EventKeeper {
     } else {
       events.delete(eventNames);
     }
+    // Same reasoning as `clearAll()`, and the same re-read-the-field rule as
+    // `remove()` above: decide from `this.events`, not the local `events`
+    // reference, in case a caller-supplied `forEach()` swapped the field
+    // mid-walk.
+    if (this.events.size === 0) this.events = EMPTY_EVENTS;
   }
 
   /**
@@ -198,7 +236,14 @@ export class EventKeeper {
   }
 
   retain(eventName: EventName, args: EventArgs): void {
-    if (this.eventNames.has(eventName)) {
+    // `_emitOne()` calls this on every dispatch, retained or not, so this is
+    // the hottest method on the class — and the one sibling among
+    // `remove()`/`clear()` that lacked their size-gate. An empty Set answers
+    // `has()` in O(1) too, but the size check is cheaper still and, unlike
+    // `remove()`/`clear()`, this skips a hash lookup on the shared stand-in
+    // rather than a mutation on it: no behaviour changes, an empty Set
+    // contains nothing either way.
+    if (this.eventNames.size !== 0 && this.eventNames.has(eventName)) {
       this.mutableEvents().set(eventName, {args, order: nextOrderId++});
     }
   }
@@ -216,9 +261,13 @@ export class EventKeeper {
    * container instead of about its own name.
    */
   hasRetainedFor(eventName: EventName): boolean {
-    return isCatchEmAll(eventName)
-      ? this.events.size !== 0
-      : this.events.has(eventName);
+    // `registerEventListener()` calls this once per name on every on()/once(),
+    // so the size check earns its keep here too — same reasoning as the
+    // wildcard arm already had, extended to the named one.
+    return (
+      this.events.size !== 0 &&
+      (isCatchEmAll(eventName) || this.events.has(eventName))
+    );
   }
 
   /**

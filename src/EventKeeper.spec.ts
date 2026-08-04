@@ -436,6 +436,102 @@ describe('EventKeeper', () => {
       expect(cleared.eventNames).not.toBe(fresh.eventNames);
     });
 
+    it('remove() and clear() release the container once the last name is gone, not just removeAll()/clearAll()', () => {
+      const fresh = new EventKeeper();
+
+      const removedByName = new EventKeeper();
+      removedByName.add('foo');
+      removedByName.retain('foo', ['payload']);
+      removedByName.remove('foo');
+
+      expect(removedByName.events).toBe(fresh.events);
+      expect(removedByName.eventNames).toBe(fresh.eventNames);
+
+      const clearedByName = new EventKeeper();
+      clearedByName.add('foo');
+      clearedByName.retain('foo', ['payload']);
+      clearedByName.clear('foo');
+
+      expect(clearedByName.events).toBe(fresh.events);
+      // clear() only drops the value, so the policy — and its container —
+      // survives, same as clearAll().
+      expect(clearedByName.eventNames).not.toBe(fresh.eventNames);
+
+      // one of several names removed: still holding something, so the
+      // container must stay allocated rather than being released early.
+      const partial = new EventKeeper();
+      partial.add(['foo', 'bar']);
+      partial.retain('foo', ['a']);
+      partial.retain('bar', ['b']);
+      partial.remove('foo');
+
+      expect(partial.events).not.toBe(fresh.events);
+      expect(partial.eventNames).not.toBe(fresh.eventNames);
+      expect(partial.events.has('bar')).toBe(true);
+      expect(partial.eventNames.has('bar')).toBe(true);
+    });
+
+    // `clear()`/`remove()` decide whether to release from the *live* field,
+    // not from the local `events`/`names` reference captured before the
+    // deletion loop. `eventNames.forEach()` runs caller-supplied iteration —
+    // an own `forEach` shadowing `Array.prototype.forEach` on the argument
+    // array is enough to run code between two elements, no subclass needed —
+    // and that code can call another keeper method that reassigns the field
+    // outright (`removeAll()`, or a `retain()` that has to materialize a
+    // fresh container because the field was just released). Deciding from
+    // the stale local reference would then release based on the size of a
+    // Map/Set this keeper no longer holds, clobbering whatever the reentrant
+    // call just built. `EventStore` names this same rule for its own
+    // mutating paths: never decide from a reference held across a callback.
+    it('clear() reads the live field, not a reference captured before a reentrant forEach', () => {
+      const keeper = new EventKeeper();
+      keeper.add('foo');
+      keeper.retain('foo', ['before']);
+
+      const names: string[] = ['foo'];
+      names.forEach = (
+        callback: (name: string, index: number, arr: string[]) => void,
+      ) => {
+        callback('foo', 0, names); // deletes 'foo' from the *original* events Map
+        keeper.removeAll(); // discards that Map; events -> the shared stand-in
+        keeper.add('bar');
+        keeper.retain('bar', ['after']); // materializes a brand-new Map
+      };
+
+      keeper.clear(names);
+
+      // The Map built during the reentrant call must survive: clear() must
+      // not release it based on the size of the Map it started with.
+      expect(keeper.events.size).toBe(1);
+      expect(keeper.events.get('bar')).toEqual({
+        args: ['after'],
+        order: expect.any(Number),
+      });
+    });
+
+    it('remove() reads the live field, not a reference captured before a reentrant forEach', () => {
+      const keeper = new EventKeeper();
+      keeper.add('foo');
+      // no retained value: keeps `events` on the shared stand-in throughout,
+      // isolating the bug to the `eventNames` half `remove()` owns.
+
+      const names: string[] = ['foo'];
+      names.forEach = (
+        callback: (name: string, index: number, arr: string[]) => void,
+      ) => {
+        callback('foo', 0, names); // deletes 'foo' from the *original* eventNames Set
+        keeper.removeAll(); // discards that Set; eventNames -> the stand-in
+        keeper.add('bar'); // materializes a brand-new Set
+      };
+
+      keeper.remove(names);
+
+      // The Set built during the reentrant call must survive: remove() must
+      // not release it based on the size of the Set it started with.
+      expect(keeper.eventNames.size).toBe(1);
+      expect(keeper.eventNames.has('bar')).toBe(true);
+    });
+
     it('a no-op remove(), clear() or retain() leaves the stand-in in place', () => {
       const fresh = new EventKeeper();
 
@@ -679,6 +775,26 @@ describe('EventKeeper', () => {
           keeper.replayTo(name, emitter).length > 0,
         );
       }
+    });
+  });
+
+  describe('retainedCount / retainedNames()', () => {
+    it('mirror events.size and eventNames without reaching past the class', () => {
+      const keeper = new EventKeeper();
+
+      expect(keeper.retainedCount).toBe(0);
+      expect(keeper.retainedNames()).toEqual([]);
+
+      keeper.add(['foo', bar]);
+      expect(keeper.retainedCount).toBe(0);
+      expect(keeper.retainedNames()).toEqual(['foo', bar]);
+
+      keeper.retain('foo', ['payload']);
+      expect(keeper.retainedCount).toBe(1);
+
+      keeper.remove('foo');
+      expect(keeper.retainedCount).toBe(0);
+      expect(keeper.retainedNames()).toEqual([bar]);
     });
   });
 });
