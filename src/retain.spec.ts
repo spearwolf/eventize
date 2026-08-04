@@ -18,7 +18,10 @@ import {warn} from './utils';
 import {
   Eventize,
   eventize,
+  getRetainedCount,
+  getRetainedEventNames,
   getSubscriptionCount,
+  isEventized,
   off,
   on,
   once,
@@ -441,6 +444,126 @@ describe('retain()', () => {
       // through the '*' entry in eventNames until the stack blew
       const listener = fake();
       expect(() => on(obj, '*', listener)).not.toThrow();
+    });
+  });
+
+  // retain() used to pass any value straight to EventKeeper.add(), which
+  // dumps it into a Set unchecked — retain(ε, 42) filed a policy under `42`
+  // that no emit() could ever fill and getRetainedEventNames() would still
+  // report. on() has rejected the equivalent shapes since v6.0.0
+  // (subscribeTo.ts's assertEventNameIsUsable()); retain() now matches, atom
+  // for atom, with the same cause vocabulary but its own message — the
+  // subscribeTo helper is private to that module and its message literally
+  // says "subscribeTo() called...", which would misname the call here.
+  describe('argument validation', () => {
+    it('rejects a non-name single value', () => {
+      const obj = eventize();
+      expect(() => retain(obj, 42 as any)).toThrow(Error);
+    });
+
+    it('rejects null', () => {
+      const obj = eventize();
+      expect(() => retain(obj, null as any)).toThrow(Error);
+    });
+
+    it('carries the "invalid-name" cause for a non-name single value', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        retain(obj, 42 as any);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect(caught).not.toBeInstanceOf(TypeError);
+      expect((caught as Error).cause).toBe('invalid-name');
+    });
+
+    // Second half of the API-006 asymmetry: on(ε, [], fn) throws, but
+    // retain(ε, []) used to be a silent no-op — EventKeeper.add() returned
+    // early without building a container. It now throws instead, the same
+    // 'empty-names' cause on() uses for the equivalent shape.
+    it('rejects an empty array instead of silently doing nothing', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        retain(obj, []);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect(caught).not.toBeInstanceOf(TypeError);
+      expect((caught as Error).cause).toBe('empty-names');
+    });
+
+    it('rejects a sparse array of event names', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        retain(
+          obj,
+          Object.assign(new Array(3), {0: 'a', 2: 'b'}) as unknown as string[],
+        );
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect(caught).not.toBeInstanceOf(TypeError);
+      expect((caught as Error).cause).toBe('sparse-names');
+    });
+
+    it('rejects an array entry that is not an event name', () => {
+      const obj = eventize();
+      let caught: unknown;
+      try {
+        retain(obj, ['a', 123, 'c'] as any);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).cause).toBe('invalid-name');
+    });
+
+    // Atomicity: none of the rejections above may leave a trace in the
+    // keeper, whether the object already carried retained state or not.
+    it('leaves an already-retaining emitter unchanged after each rejection', () => {
+      const obj = eventize();
+      retain(obj, 'existing');
+      emit(obj, 'existing', 'payload');
+
+      const namesBefore = getRetainedEventNames(obj);
+      const countBefore = getRetainedCount(obj);
+
+      expect(() => retain(obj, 42 as any)).toThrow();
+      expect(() => retain(obj, [])).toThrow();
+      expect(() =>
+        retain(
+          obj,
+          Object.assign(new Array(2), {0: 'x'}) as unknown as string[],
+        ),
+      ).toThrow();
+      expect(() => retain(obj, ['x', 123] as any)).toThrow();
+
+      expect(getRetainedEventNames(obj)).toEqual(namesBefore);
+      expect(getRetainedCount(obj)).toBe(countBefore);
+    });
+
+    // And a genuinely plain object — never eventize()d, never touched by
+    // retain() before — must not become eventized as a side effect of a
+    // call that is going to throw either way. This is the assertion the
+    // ordering comment above (validate before asEventized()) actually
+    // buys: a refactor that moved assertRetainNamesAreUsable() below
+    // asEventized() would still throw the same Error, still leave the
+    // keeper empty, and only this check would go red.
+    it('does not eventize a plain object through a rejected call', () => {
+      const obj = {};
+
+      expect(isEventized(obj)).toBe(false);
+      expect(() => retain(obj, 42 as any)).toThrow();
+
+      expect(isEventized(obj)).toBe(false);
+      expect(getRetainedEventNames(obj)).toEqual([]);
+      expect(getRetainedCount(obj)).toBe(0);
     });
   });
 

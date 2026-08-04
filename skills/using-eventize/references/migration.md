@@ -3,8 +3,8 @@
 ## v5 → v6
 
 Against the last released version, `v5.1.0` — and `v6.0.0` is the only
-`6.x` there is, so this is the whole jump. Nineteen breaking changes.
-Twelve are runtime changes on signatures that don't change shape, so grep
+`6.x` there is, so this is the whole jump. Twenty breaking changes.
+Thirteen are runtime changes on signatures that don't change shape, so grep
 for the call patterns rather than relying on the type checker to find
 affected sites. Seven are type-only and surface as compile errors
 instead.
@@ -100,6 +100,18 @@ instead.
   reads the same way). Code that matched the error class or the exact
   message breaks. Catch `TypeError`, or match
   `/cannot operate on a non-eventized object/` instead.
+- **`retain()` / `unretain()` / `retainClear()` reject a non-name, an empty
+  array or a sparse array of event names.** `retain(ε, 42)` used to file a
+  policy under `42` that no `emit()` could ever fill, and `retain(ε, [])`
+  was a silent no-op. All three now throw an `Error` (not `TypeError` —
+  that stays reserved for a non-eventized target) atomically, before the
+  keeper changes, with `Error.cause: 'invalid-name'`, `'empty-names'` or
+  `'sparse-names'` — the same vocabulary `on()` / `once()` use. The
+  wildcard form is unaffected: `retain(ε, '*')` still throws its own
+  message, and an array containing `'*'` still takes the bulk path on
+  `unretain()` / `retainClear()`. Filter runtime-assembled name lists to
+  strings and symbols before calling, and stop relying on an empty array
+  being a no-op.
 - **`UnsubscribeFunc.listener` / `.listeners` are gone, and so is the
   `EventListener` type export.** The handle is `() => void`. The union
   that declared the two fields made either access a `TS2339` at every call

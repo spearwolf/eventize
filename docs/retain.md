@@ -13,6 +13,7 @@ Key behaviors:
 - Retained events are delivered to new subscribers synchronously, during `on()` — but only once the whole call is registered. The replays are queued while subscribing and flushed as a batch afterwards, so every name of an `on(ε, ['a', 'b'], fn)` is already live when the first replay runs. Two consequences: a replay that emits another retained name reaches the listener live *and* still gets that name's queued replay afterwards, and a listener that throws on a replay does not take the rest of the batch with it — see [A listener that throws on a replay](#a-listener-that-throws-on-a-replay).
 - With several retained events, a new subscriber receives them in completion order — the order in which each event's `emit()` call returned, not the order in which the calls started. The two coincide only when no `emit()` call is nested inside another. Nesting is not a corner case: any listener that itself calls `emit()` before returning — most commonly a forwarding listener, `on(upstream, downstream)`, relaying one event onto another — reverses completion order relative to start order for the events involved. See below.
 - String and symbol event names both work.
+- Since v6.0.0, `eventNames` is validated atomically before anything changes: a value that is not a string or a symbol, an empty array, or an array with a hole all throw an `Error` with `Error.cause` set to `'invalid-name'`, `'empty-names'` or `'sparse-names'` respectively — the same three causes `on()` / `once()` use for the equivalent shapes. **`retain(ε, [])` used to be a silent no-op; it now throws** (`Error.cause: 'empty-names'`), which is the behavior change worth knowing about if code ever called `retain()` with an empty, possibly-empty, or otherwise unchecked array. `retain(ε, 42)` used to file a policy under `42` that no `emit()` could ever fill — `getRetainedEventNames(ε)` reported it forever after — and now throws instead. See [`docs/migration.md` → `retain()` / `unretain()` / `retainClear()` reject a non-name, an empty array or a sparse array of event names](./migration.md#retain--unretain--retainclear-reject-a-non-name-an-empty-array-or-a-sparse-array-of-event-names) for the grep pattern.
 
 ```javascript
 import {eventize, retain, emit, on} from '@spearwolf/eventize';
@@ -253,6 +254,7 @@ Discards the currently stored value but keeps the retain policy active, so futur
 - Does **not** disable retain — only clears the stored value.
 - Throws on a non-eventized object.
 - Accepts a single name or an array; string and symbol names both work.
+- Since v6.0.0, outside the wildcard form below, `eventNames` is validated atomically the same way `retain()`'s is — see the bullet list under `retain()` above for the cause vocabulary.
 - Clearing a non-existent or already-cleared event is a no-op.
 - `retainClear(ε, '*')` is the bulk form — it drops **every** stored value and keeps every policy. See the wildcard note under [Retain order under nested `emit()`](#retain-order-under-nested-emit).
 
@@ -329,6 +331,7 @@ Fully reverses `retain()`: the stored value is dropped **and** future emissions 
 - Does not affect already-subscribed listeners — they keep receiving new emissions.
 - Throws on a non-eventized object.
 - Accepts a single name or an array; string and symbol names both work.
+- Since v6.0.0, outside the wildcard form below, `eventNames` is validated atomically the same way `retain()`'s is — see the bullet list under `retain()` above for the cause vocabulary.
 - Unretaining an event that was never retained is a no-op.
 - `unretain(ε, '*')` is the bulk form — it drops **every** policy and **every** stored value. See the wildcard note under [Retain order under nested `emit()`](#retain-order-under-nested-emit).
 - `off(ε)` and `off(ε, '*')` do the same to retained state since v6.0.0, on top of removing every listener; `off(ε, eventName)` matches `unretain(ε, eventName)` for that one name. Reach for `unretain()` when the listeners are supposed to stay subscribed.
@@ -369,4 +372,4 @@ on(ε, 'bar', console.log); // (nothing — retain is off)
 
 ### Inspecting what's retained
 
-`getRetainedCount(ε)` and `getRetainedEventNames(ε)` (see [README → Inspecting emitter state](../README.md#inspecting-emitter-state)) let you check retained state from the outside instead of reaching into `ε[Symbol.for('eventize')].keeper`. The two report different things on purpose — a name can carry a retain policy without ever having fired — so `getRetainedEventNames(ε).length >= getRetainedCount(ε)` always holds. Both return `0` / `[]` for a non-eventized object rather than throwing, unlike `retainClear()` and `unretain()`, which throw a `TypeError` naming the function and the remedy (`eventize(obj)` first, or guard the call with `isEventized(obj)`). `retain()` throws for neither reason — it eventizes the object instead, as the first bullet at the top of this page says; its only throw is the wildcard rejection.
+`getRetainedCount(ε)` and `getRetainedEventNames(ε)` (see [README → Inspecting emitter state](../README.md#inspecting-emitter-state)) let you check retained state from the outside instead of reaching into `ε[Symbol.for('eventize')].keeper`. The two report different things on purpose — a name can carry a retain policy without ever having fired — so `getRetainedEventNames(ε).length >= getRetainedCount(ε)` always holds. Both return `0` / `[]` for a non-eventized object rather than throwing, unlike `retainClear()` and `unretain()`, which throw a `TypeError` naming the function and the remedy (`eventize(obj)` first, or guard the call with `isEventized(obj)`). `retain()` throws for neither reason — it eventizes the object instead, as the first bullet at the top of this page says. Its throws are about the *name*, not the object: the wildcard rejection, and, since v6.0.0, the argument validation described above.

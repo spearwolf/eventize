@@ -143,8 +143,11 @@ export class EventKeeper {
 
   add(eventNames: AnyEventNames): void {
     if (Array.isArray(eventNames)) {
-      // `retain(ε, [])` writes nothing, so it must not build a container
-      // either.
+      // Since v6.0.0 `retain()` rejects an empty array before this is ever
+      // called (`Error.cause: 'empty-names'`, see `assertRetainNamesAreUsable()`
+      // in `retain-api.ts`) — this is the only caller. Kept as a defensive
+      // no-build: building a container for zero names would be pure waste
+      // even if a future caller skipped that validation.
       if (eventNames.length === 0) return;
       const names = this.mutableEventNames();
       eventNames.forEach((name) => names.add(name));

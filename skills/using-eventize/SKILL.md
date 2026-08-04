@@ -242,6 +242,20 @@ compile time) or an explicit `isEventized()` guard.
     the event name. A target without `.emit` is unaffected (silent no-op). This is
     the protocol applied literally, unavoidable when the event name matches the
     fallback method.
+17. **`retain()` / `unretain()` / `retainClear()` reject what they cannot file a
+    policy under**, since v6.0.0 — the same shapes `on()` rejects (pitfall 14),
+    minus the listener and priority checks that don't apply here: a value that
+    is not a string or a symbol, an empty array, a sparse array. `retain(ε, 42)`
+    used to file a policy under `42` that no `emit()` could ever fill, and
+    `retain(ε, [])` was a silent no-op instead of throwing — the second half of
+    that asymmetry with `on(ε, [], fn)`, which has thrown since v6.0.0 too. All
+    three reject atomically, before the keeper changes, with `Error.cause`:
+    `'invalid-name'`, `'empty-names'`, `'sparse-names'`. The message names its
+    own function (`retain() called with …`) rather than reusing `subscribeTo()`'s
+    wording, and the error class is `Error`, not the `TypeError` reserved for a
+    non-eventized target. Checked after the wildcard check (pitfall 1): an array
+    containing `'*'` still takes the bulk path on `unretain()` / `retainClear()`
+    whatever else it lists.
 
 ## Idiomatic shape
 

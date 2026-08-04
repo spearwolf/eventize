@@ -9,7 +9,7 @@ to grep for and what to write instead.
 ## v5 → v6
 
 `v6.0.0` is the only `6.x` there is, so a `v5.1.0` consumer takes the whole jump
-at once. Nineteen breaking changes. Twelve are runtime changes on signatures that
+at once. Twenty breaking changes. Thirteen are runtime changes on signatures that
 do not change shape, so the type checker will not find the call sites for you —
 grep for the patterns below where one is given. Seven are type-only and do surface
 as compile errors.
@@ -396,6 +396,53 @@ if (names.length > 0) on(ε, names, handler);
 
 The `length` guard is not optional — an empty array throws too
 (`Error.cause: 'empty-names'`), which is the older half of the same rule.
+
+### `retain()` / `unretain()` / `retainClear()` reject a non-name, an empty array or a sparse array of event names
+
+The three retain-family functions used to hand `eventNames` straight to
+`EventKeeper.add()` / `.remove()` / `.clear()`, which take any value: it goes
+into a `Set` or is used as a `Map` key unchecked. `retain(ε, 42)` filed a
+policy under `42` that no `emit()` could ever fill, and `getRetainedEventNames(ε)`
+reported it forever after. `retain(ε, [])` was a silent no-op — the one shape
+`on(ε, [], fn)` already threw on before this change. All three functions now
+validate atomically, before anything in the keeper changes, with the same
+three causes `on()` / `once()` use on `Error.cause`: `'invalid-name'` (not a
+string or a symbol), `'empty-names'` (`[]`), `'sparse-names'` (a hole, `new
+Array(2)` or `['a', , 'b']`).
+
+The message names the function that was actually called —
+`retain() called with a value that cannot be an event name`,
+`unretain() called with an empty array of event names`, and so on — rather
+than reusing `subscribeTo()`'s wording, since none of these three calls goes
+through `subscribeTo()`. The error class is `Error`, not `TypeError`:
+`TypeError` stays reserved for `retainClear()` / `unretain()` on a
+non-eventized target, an unrelated rejection that predates this change.
+
+The wildcard form is unaffected by any of this: `retain(ε, '*')` still throws
+its own message ("`'*'` is reserved for subscribing to all events"), and on
+`unretain()` / `retainClear()` the wildcard still means *every* retained
+event — an array containing `'*'` still takes that bulk path whatever else it
+lists, checked before the new validation runs.
+
+```
+rg "\b(retain|unretain|retainClear)\(\s*[^,]+,\s*\[" src/
+rg "\b(retain|unretain|retainClear)\(\s*[^,]+,\s*[a-zA-Z_$][\w.$]*\s*\)" src/
+```
+
+The first finds an array-shaped call; the second finds a variable in the name
+slot, which is where a non-name or an unchecked empty array is likeliest to
+come from. Filter a runtime-assembled list the same way the `on()` section
+above does:
+
+```js
+const names = raw.filter(
+  (n) => typeof n === 'string' || typeof n === 'symbol',
+);
+if (names.length > 0) retain(ε, names);
+```
+
+And stop relying on `retain(ε, [])` doing nothing — an empty array now has to
+be filtered out before the call, not after.
 
 ### A method name needs a listener object
 

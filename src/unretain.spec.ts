@@ -1,6 +1,15 @@
 import {fake} from 'sinon';
 
-import {Eventize, eventize, emit, on, retain, unretain} from './index';
+import {
+  Eventize,
+  eventize,
+  emit,
+  getRetainedCount,
+  getRetainedEventNames,
+  on,
+  retain,
+  unretain,
+} from './index';
 
 describe('unretain()', () => {
   it('removes the retain policy and the currently stored value', () => {
@@ -196,6 +205,99 @@ describe('unretain()', () => {
 
     expect(sub1.called).toBeFalsy();
     expect(sub2.called).toBeFalsy();
+  });
+
+  // unretain() forwarded eventNames straight to EventKeeper.remove(), which
+  // takes any value. The bare wildcard and an array containing it stay a
+  // valid bulk form (tested below) — this covers everything else the
+  // non-wildcard path now rejects, atomically and with the same cause
+  // vocabulary retain() uses.
+  describe('argument validation', () => {
+    it('rejects a non-name single value', () => {
+      const obj = eventize();
+      retain(obj, 'foo'); // must already be eventized — unretain() never auto-eventizes
+      expect(() => unretain(obj, 42 as any)).toThrow(Error);
+    });
+
+    it('carries the "invalid-name" cause and is not a TypeError', () => {
+      const obj = eventize();
+      retain(obj, 'foo');
+      let caught: unknown;
+      try {
+        unretain(obj, 42 as any);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect(caught).not.toBeInstanceOf(TypeError);
+      expect((caught as Error).cause).toBe('invalid-name');
+    });
+
+    it('rejects an empty array', () => {
+      const obj = eventize();
+      retain(obj, 'foo');
+      let caught: unknown;
+      try {
+        unretain(obj, []);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect(caught).not.toBeInstanceOf(TypeError);
+      expect((caught as Error).cause).toBe('empty-names');
+    });
+
+    it('rejects a sparse array of event names', () => {
+      const obj = eventize();
+      retain(obj, 'foo');
+      let caught: unknown;
+      try {
+        unretain(
+          obj,
+          Object.assign(new Array(3), {0: 'a', 2: 'b'}) as unknown as string[],
+        );
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect(caught).not.toBeInstanceOf(TypeError);
+      expect((caught as Error).cause).toBe('sparse-names');
+    });
+
+    it('rejects an array entry that is not an event name', () => {
+      const obj = eventize();
+      retain(obj, 'foo');
+      let caught: unknown;
+      try {
+        unretain(obj, ['foo', 123] as any);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect((caught as Error).cause).toBe('invalid-name');
+    });
+
+    it('leaves retained state unchanged after each rejection', () => {
+      const obj = eventize();
+      retain(obj, 'foo');
+      emit(obj, 'foo', 'payload');
+
+      const namesBefore = getRetainedEventNames(obj);
+      const countBefore = getRetainedCount(obj);
+
+      expect(() => unretain(obj, 42 as any)).toThrow();
+      expect(() => unretain(obj, [])).toThrow();
+      expect(() =>
+        unretain(
+          obj,
+          Object.assign(new Array(2), {0: 'x'}) as unknown as string[],
+        ),
+      ).toThrow();
+      expect(() => unretain(obj, ['x', 123] as any)).toThrow();
+
+      expect(getRetainedEventNames(obj)).toEqual(namesBefore);
+      expect(getRetainedCount(obj)).toBe(countBefore);
+    });
   });
 
   describe("bulk form unretain(ε, '*')", () => {
