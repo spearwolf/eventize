@@ -343,7 +343,7 @@ export const dispatchToTarget = (
     returnValue,
   ) || emitFallback(target, eventName, args, returnValue);
 
-export const hasConsole = typeof console !== 'undefined';
+const hasConsole = typeof console !== 'undefined';
 
 // `console.warn` is non-optional in lib.dom, so a truthiness test on it reads
 // as always-true to the compiler (TS2774). The typeof form keeps the same

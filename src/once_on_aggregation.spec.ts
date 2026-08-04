@@ -158,7 +158,7 @@ describe('on()/once() aggregate by listener identity', () => {
     // included — the same race as above, but triggered by subscribeTo()'s
     // own queued replays instead of a live emit(). Each name the call covers
     // queues its own replay against the one shared obligation, and
-    // EventKeeper.publish() runs every one of them before returning. Without
+    // publishReplays() runs every one of them before returning. Without
     // a guard, whichever runs first settles the obligation through a real
     // dispatch — same as any once() firing — and every later replay in the
     // same batch would go on to call the listener again anyway, because

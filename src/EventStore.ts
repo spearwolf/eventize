@@ -590,7 +590,7 @@ export class EventStore {
   }
 
   /** Splices one known instance out, if it is in there. Returns the bucket the store holds afterwards. */
-  private removeItem(
+  private spliceOut(
     eventName: EventName,
     bucket: ListenerBucket,
     item: EventListener,
@@ -977,11 +977,11 @@ export class EventStore {
    */
   private dropListener(listener: EventListener): void {
     if (listener.isCatchEmAll) {
-      this.removeItem(listener.eventName, this.catchEmAllBucket, listener);
+      this.spliceOut(listener.eventName, this.catchEmAllBucket, listener);
     } else {
       const bucket = this.namedListeners.get(listener.eventName);
       if (bucket) {
-        const remaining = this.removeItem(listener.eventName, bucket, listener);
+        const remaining = this.spliceOut(listener.eventName, bucket, listener);
         if (remaining.length === 0) {
           this.namedListeners.delete(listener.eventName);
         }

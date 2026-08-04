@@ -12,7 +12,7 @@ jest.mock('./utils', () => ({
   warn: jest.fn(),
 }));
 
-import {EventKeeper} from './EventKeeper';
+import {EventKeeper, publishReplays} from './EventKeeper';
 import type {EventName} from './types';
 import {warn} from './utils';
 
@@ -93,7 +93,7 @@ describe('EventKeeper', () => {
     keeper.retain('foo', [1, 2, 3]);
 
     const emitter = {apply: jest.fn()};
-    EventKeeper.publish(keeper.replayTo('foo', emitter));
+    publishReplays(keeper.replayTo('foo', emitter));
 
     expect(emitter.apply).not.toHaveBeenCalled();
   });
@@ -106,7 +106,7 @@ describe('EventKeeper', () => {
     keeper.retain('foo', [1, 2, 3]);
 
     const emitter = {apply: jest.fn()};
-    EventKeeper.publish(keeper.replayTo('foo', emitter));
+    publishReplays(keeper.replayTo('foo', emitter));
 
     expect(emitter.apply.mock.calls[0]).toEqual(['foo', [1, 2, 3]]);
   });
@@ -170,7 +170,7 @@ describe('EventKeeper', () => {
     keeper.retain('foo', ['third']);
 
     const emitter = {apply: jest.fn()};
-    EventKeeper.publish(keeper.replayTo('foo', emitter));
+    publishReplays(keeper.replayTo('foo', emitter));
 
     expect(emitter.apply).toHaveBeenCalledTimes(1);
     expect(emitter.apply.mock.calls[0]).toEqual(['foo', ['third']]);
@@ -185,7 +185,7 @@ describe('EventKeeper', () => {
     keeper.retain('baz', ['bazData']);
 
     const emitter = {apply: jest.fn()};
-    EventKeeper.publish(keeper.replayTo('*', emitter));
+    publishReplays(keeper.replayTo('*', emitter));
 
     expect(emitter.apply).toHaveBeenCalledTimes(3);
     const calls = emitter.apply.mock.calls.map((c) => c[0]);
@@ -232,7 +232,7 @@ describe('EventKeeper', () => {
       }),
     };
 
-    EventKeeper.publish(keeper.replayTo('*', emitter));
+    publishReplays(keeper.replayTo('*', emitter));
 
     expect(order).toEqual(['first', 'second', 'third']);
   });
@@ -257,7 +257,7 @@ describe('EventKeeper', () => {
     keeper.retain('foo', []);
 
     const emitter = {apply: jest.fn()};
-    EventKeeper.publish(keeper.replayTo('foo', emitter));
+    publishReplays(keeper.replayTo('foo', emitter));
 
     expect(emitter.apply).toHaveBeenCalledWith('foo', []);
   });
@@ -338,7 +338,7 @@ describe('EventKeeper', () => {
     // returned at all — the point of the guard
     expect(result.length).toBe(1);
 
-    EventKeeper.publish(result);
+    publishReplays(result);
 
     expect(emitter.apply).toHaveBeenCalledTimes(1);
     expect(emitter.apply.mock.calls[0]).toEqual(['foo', ['payload']]);
@@ -362,7 +362,7 @@ describe('EventKeeper', () => {
     keeper.retain('policy-137', ['onlyValue']);
 
     const emitter = {apply: jest.fn()};
-    EventKeeper.publish(keeper.replayTo('*', emitter));
+    publishReplays(keeper.replayTo('*', emitter));
 
     expect(emitter.apply).toHaveBeenCalledTimes(1);
     expect(emitter.apply.mock.calls[0]).toEqual(['policy-137', ['onlyValue']]);
@@ -453,10 +453,10 @@ describe('EventKeeper', () => {
   });
 
   // A replay runs consumer code that the on() caller never asked to run at
-  // this moment, so publish() catches instead of unwinding the registration
-  // it is the tail of. These cases watch the batch itself; retain.spec.ts
-  // watches what an on() caller sees.
-  describe('publish() isolates a throwing replay', () => {
+  // this moment, so publishReplays() catches instead of unwinding the
+  // registration it is the tail of. These cases watch the batch itself;
+  // retain.spec.ts watches what an on() caller sees.
+  describe('publishReplays() isolates a throwing replay', () => {
     it('runs the rest of the batch, in order, and warns for the one that threw', () => {
       const keeper = new EventKeeper();
       keeper.add(['first', 'second', 'third']);
@@ -473,9 +473,7 @@ describe('EventKeeper', () => {
         },
       };
 
-      expect(() =>
-        EventKeeper.publish(keeper.replayTo('*', emitter)),
-      ).not.toThrow();
+      expect(() => publishReplays(keeper.replayTo('*', emitter))).not.toThrow();
 
       // sorting happens before the first replay runs, so a throw in the
       // middle of the batch cannot reshuffle what is left of it
@@ -501,7 +499,7 @@ describe('EventKeeper', () => {
         },
       };
 
-      EventKeeper.publish(keeper.replayTo('*', emitter));
+      publishReplays(keeper.replayTo('*', emitter));
 
       expect(warnMock).toHaveBeenCalledTimes(2);
       expect(warnMock.mock.calls.map((c) => c[1])).toEqual(['a', 'b']);
@@ -519,7 +517,7 @@ describe('EventKeeper', () => {
       };
 
       expect(() =>
-        EventKeeper.publish(keeper.replayTo('foo', emitter)),
+        publishReplays(keeper.replayTo('foo', emitter)),
       ).not.toThrow();
       expect(warnMock).toHaveBeenCalledTimes(1);
     });
@@ -529,7 +527,7 @@ describe('EventKeeper', () => {
       keeper.add('foo');
       keeper.retain('foo', ['payload']);
 
-      EventKeeper.publish(keeper.replayTo('foo', {apply: jest.fn()}));
+      publishReplays(keeper.replayTo('foo', {apply: jest.fn()}));
 
       expect(warnMock).not.toHaveBeenCalled();
     });

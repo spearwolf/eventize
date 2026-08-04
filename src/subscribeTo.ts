@@ -1,5 +1,5 @@
-import {EventKeeper} from './EventKeeper';
-import type {KeeperEvent} from './EventKeeper';
+import {publishReplays} from './EventKeeper';
+import type {EventKeeper, KeeperEvent} from './EventKeeper';
 import {detectListenerType, EventListener} from './EventListener';
 import type {OnceObligation} from './EventListener';
 import type {EventStore} from './EventStore';
@@ -55,7 +55,7 @@ const registerEventListener = (
   // existence of an on() with the same handler.
   //
   // A multi-name once() queues one such replay per name it covers, all
-  // against the one obligation it shares, and EventKeeper.publish() runs
+  // against the one obligation it shares, and publishReplays() runs
   // every replay queued by this call in sequence before returning. Whichever
   // one runs first can settle that obligation — through the real dispatch it
   // triggers, same as any other emit — and a once() promises at most one
@@ -65,7 +65,7 @@ const registerEventListener = (
   // after the dispatch returns, so a replay that throws settles nothing, the
   // guard below still reads `settled === false`, and the next replay of the
   // same batch reaches this very handler again — a batch is no longer stopped
-  // by one throwing replay. See the doc comment at `EventKeeper.publish()`,
+  // by one throwing replay. See the doc comment at `publishReplays()`,
   // which is where that isolation lives and why.
   //
   // `isRemoved` cannot be what
@@ -312,11 +312,11 @@ export const subscribeTo = (
   obligation: OnceObligation | null = null,
 ): EventListener | Array<EventListener> => {
   // No array here — see the ReplayQueue doc comment above. Most calls never
-  // populate `.events`, and then `EventKeeper.publish()` is never even called.
+  // populate `.events`, and then `publishReplays()` is never even called.
   const replayQueue: ReplayQueue = {};
   const listeners = _subscribeTo(store, keeper, args, replayQueue, obligation);
   if (replayQueue.events !== undefined) {
-    EventKeeper.publish(replayQueue.events);
+    publishReplays(replayQueue.events);
   }
   return listeners;
 };
