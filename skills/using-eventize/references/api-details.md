@@ -164,7 +164,7 @@ emit(ε, ['name1', 'name2'], a, b)   // same args to each event, in order
 const values = await emitAsync(ε, 'load')
 ```
 
-`emitAsync` collects each listener's return value, dropping `null` and `undefined`. A listener returning an array has its elements awaited with `Promise.all`, but the array stays one entry: a lone listener returning `[1, Promise.resolve(2)]` gives `[[1, 2]]`, not `[1, 2]`. With nothing collected the promise resolves to `undefined` rather than an empty array.
+`emitAsync` collects each listener's return value, dropping `null` and `undefined`. A listener returning an array has its elements awaited with `Promise.all`, but the array stays one entry: a lone listener returning `[1, Promise.resolve(2)]` gives `[[1, 2]]`, not `[1, 2]`. With nothing collected the promise resolves to `undefined` rather than an empty array. The unwrapping goes exactly one level: a promise nested deeper — `[[Promise.reject(...)]]` — belongs to the listener, not to the aggregation, and a rejection inside it is reported as an unowned unhandled rejection even when the caller correctly catches `emitAsync()`'s own result.
 
 A listener that throws synchronously aborts the dispatch in both functions. In `emitAsync` that throw leaves the call *synchronously* — the function is not `async`, and the dispatch runs before any promise is built — so it is not a rejected promise and `.catch()` on the result cannot see it. Wrap the call, not only the `await`. A listener returning a rejected promise only rejects the awaited result of `emitAsync` — by then every listener has already run, since invocation is synchronous.
 

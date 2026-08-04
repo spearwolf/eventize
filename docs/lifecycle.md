@@ -343,10 +343,10 @@ getSubscriptionCount(ε); // => 0 — settled once the nesting unwinds
 ```
 
 This is not a separate defect: it is the same tension the throwing-listener
-case above resolves the same way, meeting [the deliberate absence of a
-recursion guard](../AGENTS.md#known-asymmetries) — `A → B → A` forwarding and
-same-event re-emission already overflow the stack by design, and a `once()`
-firing twice under the same conditions costs nothing extra to accept.
+case above resolves the same way, meeting the deliberate absence of a
+recursion guard — `A → B → A` forwarding and same-event re-emission already
+overflow the stack by design, and a `once()` firing twice under the same
+conditions costs nothing extra to accept.
 
 A callback that knows it re-enters has the way out in its own hand: the handle
 `once()` returned detaches the listener immediately, so releasing it ahead of

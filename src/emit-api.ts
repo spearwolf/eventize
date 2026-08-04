@@ -216,6 +216,15 @@ const ignoreRejection = () => {
 // array of promises hides its rejections one level down. Non-promise values
 // cost a throwaway wrapper each; this runs only on the error path, where the
 // aggregation is already lost.
+//
+// Both this and the aggregation below unwrap exactly one level. A promise
+// nested deeper than that — a listener returning `[[Promise.reject(...)]]` —
+// belongs to the listener, not to emitAsync(): the inner array is not a
+// thenable, so Promise.all() hands it back as a value instead of reaching
+// into it, and a rejection sitting inside it is reported as an unowned
+// unhandled rejection even when the caller correctly catches emitAsync()'s
+// own result. Unwrapping deeper would spend a recursive walk on every
+// dispatch to save one such listener from itself; not worth the cost.
 const markCollectedAsHandled = (values: any[]) => {
   for (const val of values) {
     if (Array.isArray(val)) {

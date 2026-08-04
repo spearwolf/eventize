@@ -830,6 +830,11 @@ Everything below is exported from the package root, and each exists to be writte
 | `UnsubscribeFunc` | what `on()` and `once()` hand back — `() => void`, nothing else |
 | `OnceAsyncOptions` | the `{signal?: AbortSignal}` bag `onceAsync()` takes |
 | `EventNameWithPriority` | the `[eventName, priority]` tuple the array form of `on()` accepts |
+| `StandaloneSubscribeFunc` | the exported overload set of the standalone `on()` / `once()`, for a wrapper that needs to match it exactly rather than widen to `SubscribeImpl` |
+| `ListenerObjectSlot<L>` | the listener-object constraint that rejects an array, a function and nullish — appears in the published `on()` / `once()` signatures |
+| `MultiArgsFor<T, K>` | the merged argument list for a listener serving several event keys at once |
+| `AnyEventNames` | the event-name argument of `emit()` / `retain()`: a single name or an array of names, with no notion of priority |
+| `EventArgs` | `any[]`, the loose argument-list type a subclass override of `emit()` forwards through untyped |
 | `SubscribeImpl` | the implementation signature to cast to when writing a forwarding wrapper around `on()` / `once()` |
 | `SubscribeArgs` | the union of every accepted argument shape, plus eleven named arms so a wrapper can name the one it handles |
 

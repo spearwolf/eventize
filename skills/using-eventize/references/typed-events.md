@@ -14,8 +14,8 @@ const ε = eventize<ChatEvents>();
 on(ε, 'message', (from, text) => {/* from: string, text: string */});
 
 emit(ε, 'message', 'alice', 'hello'); // ✅
-emit(ε, 'unknown', 1);                // ❌ unknown event name
-emit(ε, 'message', 'alice');          // ❌ missing 'text'
+// emit(ε, 'unknown', 1);             // ❌ unknown event name
+// emit(ε, 'message', 'alice');       // ❌ missing 'text'
 
 const first = await onceAsync(ε, 'message'); // string — the tuple's first element
 ```
