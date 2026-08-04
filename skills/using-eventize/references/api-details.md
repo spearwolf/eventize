@@ -205,6 +205,15 @@ the read-only helpers `getSubscriptionCount()` / `getRetainedCount()` /
 can reach would be worse than the diagnosis. `asEventized()` and `eventize()`
 throw it too rather than handing back a foreign emitter.
 
+This is one instance of a rule that holds across every validation throw in the
+library: `TypeError` means the object doesn't work (not eventized, not
+attachable, not extensible, or eventized by an incompatible copy); plain
+`Error` means the arguments don't work (a bad event name, a forbidden
+wildcard, an empty or sparse name array, a `NaN` priority — see the
+`Error.cause` table above and the retain-family note below). Catching on
+class alone tells "wrong target" from "wrong call" apart without reading the
+message.
+
 Two functions deliberately stay quiet:
 
 - `isEventized(obj)` is a type guard and probes the slot only. It answers `true`

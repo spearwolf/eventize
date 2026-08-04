@@ -125,6 +125,14 @@ describe('a marker written by another copy of eventize', () => {
   });
 });
 
+// The first two cases below observe a strict-mode property: deleting a
+// non-configurable own property throws only under strict mode, and is a
+// silent no-op under sloppy mode. ts-jest compiles every module (spec and
+// source alike) to strict-mode output, so the throw is real here — but the
+// case pins a property of that compile target as much as one of the code.
+// The runtime configurable:false already holds either way (see the third
+// case below), which is what actually protects the slot; the throw is the
+// consequence a strict caller sees, not an independent guarantee.
 describe('the marker slot cannot be deleted', () => {
   it('throws on delete instead of silently un-eventizing the object', () => {
     const obj = eventize();

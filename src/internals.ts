@@ -98,6 +98,19 @@ const isCurrentProtocol = (
  * code cannot drive; without the compare the mismatch surfaced calls later as
  * `store.add is not a function`, from a stack frame that named neither eventize
  * nor the cause.
+ *
+ * The `TypeError` this throws is one half of a rule that holds across every
+ * consumer-facing validation throw in the library, not just this one:
+ * `TypeError` means the object doesn't work — not eventized, not attachable,
+ * not extensible, or (here) eventized by an incompatible copy. Plain `Error`
+ * means the arguments don't work — a bad event name, a forbidden wildcard, an
+ * empty or sparse name array, a `NaN` priority. The two classes line up with
+ * *what* was rejected, not with *where* the throw happens, and the split is
+ * accidental only in the sense that nobody wrote it down before now — every
+ * throw site in `asEventized.ts`, `retain-api.ts`, `subscribeTo.ts` and
+ * `utils.ts` (`rejectWildcard`) already sorts into one side or the other.
+ * Not something to unify: collapsing the two classes would be breaking
+ * against v5.1.0, where callers may already distinguish on `instanceof`.
  */
 export const internalsOf = <T extends EventMap>(
   obj: EventizedObject<T>,

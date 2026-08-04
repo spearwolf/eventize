@@ -120,6 +120,14 @@ const createUniqId = () => ++lastId;
 // against the same eventized objects is unsupported for exactly this reason,
 // not merely a guarantee this counter happens to provide. See AGENTS.md,
 // "Counters are per module instance".
+//
+// The same failure shape also waits at the top of this counter's range, with
+// no module-instance question attached: past `Number.MAX_SAFE_INTEGER`, the
+// increment stops changing the value, every obligation created from then on
+// stamps the same number, and `sequence < watermark` stops telling a new
+// obligation from an old one — a `once()` that fires on every emit again.
+// Accepted rather than guarded: reaching it takes on the order of 9 * 10^15
+// once()/onceAsync() registrations within one module instance's lifetime.
 let nextObligationSequence = 0;
 
 /**

@@ -312,10 +312,21 @@ export function onceAsync<ReturnType = void>(
 }
 
 // ---------------------------------------------------------------------------
-// off() — fully permissive: accepts any object and any listener / listener
-// object shape, mirroring the runtime which silently no-ops on anything it
-// doesn't recognize. Typed event maps deliberately do NOT narrow the args
-// here — cleanup paths often hand off arbitrary values.
+// off() — permissive towards any shape: accepts any object and any listener /
+// listener object shape, mirroring the runtime which silently no-ops on
+// anything it doesn't recognize. Typed event maps deliberately do NOT narrow
+// the args here — cleanup paths often hand off arbitrary values.
+//
+// Not permissive towards any structure, though: EventStore.remove()'s array
+// branch recurses once per element with no depth limit, and it runs before
+// the flatten further down gets a chance to (which recurses via
+// flat(Infinity) and would throw the same way if it were reached first). A
+// self-referencing array — const a = []; a.push(a); off(ε, a) — throws
+// RangeError: Maximum call stack size exceeded out of the store, not a
+// no-op. Accepted rather than guarded: a cyclic array is not a listener
+// shape a caller constructs on purpose, and a WeakSet of visited arrays
+// would tax the documented shapes to protect one nobody in this library's
+// history has actually passed.
 // ---------------------------------------------------------------------------
 export function off(
   eventizedObj: unknown,

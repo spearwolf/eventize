@@ -1195,7 +1195,11 @@ export class EventStore {
     listenerObject: unknown,
     removeSimilar = false,
   ): void {
-    // off([...])
+    // off([...]) — recurses once per element, depth unbounded on purpose: a
+    // self-referencing element re-enters this same branch and overflows the
+    // stack with a RangeError rather than looping forever. That is the one
+    // structure off()'s "accepts any shape" promise does not cover — see the
+    // comment above off() in eventize-api.ts.
     if (listenerObject == null && Array.isArray(listener)) {
       listener.forEach((li) => this.remove(li, null, removeSimilar));
       return;
