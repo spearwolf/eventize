@@ -1177,16 +1177,104 @@ describe('EventStore', () => {
   // believes it has unsubscribed from. Delete the indexRemove() calls and
   // nothing outside this block notices.
   describe('the dedup index', () => {
-    it('files nothing for a bucket that only holds function listeners', () => {
+    it('files a function listener under the function itself', () => {
       const store = new EventStore();
       const bucket = store.getListenersForEventName('foo');
+      const first = () => {};
+      const second = () => {};
 
-      store.add(new EventListener('foo', 0, () => {}));
-      store.add(new EventListener('foo', 0, () => {}));
+      const a = store.add(new EventListener('foo', 0, first));
+      const b = store.add(new EventListener('foo', 0, second));
 
-      // A function listener never dedups, so it is never searched for and
-      // never filed — and the bucket is spared the Map.
-      expect(dedupIndexOf(bucket)).toBe(undefined);
+      // A function listener still never dedups — two of them stay two, and the
+      // case below this one says so from the other side. It is filed all the
+      // same, because off(ε, fn) reads this Map to find it. What the index
+      // holds and what aggregates are two questions.
+      expect(bucket).toHaveLength(2);
+      const index = dedupIndexOf(bucket);
+      expect(index?.get(first)).toEqual([a]);
+      expect(index?.get(second)).toEqual([b]);
+      expect(index?.size).toBe(2);
+    });
+
+    // The other half of the same rule, and the one detachByIdentity()'s
+    // shortcut rests on: no index means nothing in this bucket is filed, and
+    // nothing filed means nothing that any off() argument could match. A
+    // listener with no identity in either slot is the only way to build such a
+    // bucket, and only by hand — on() rejects a listener detectListenerType()
+    // gives no tag. Removing it must not go looking for a Map that is not
+    // there.
+    it('files a listener with no identity in either slot nowhere', () => {
+      const store = new EventStore();
+      const bucket = store.getListenersForEventName('foo');
+      const listener = store.add(new EventListener('foo', 0, null));
+
+      expect(bucket).toHaveLength(1);
+      // The Map itself is created before the keys are worked out, so this
+      // bucket gets an empty one. Nothing reachable through on() lands here —
+      // every listener type it admits carries an identity in one slot or the
+      // other — so the allocation is not worth a second pass to avoid.
+      expect(dedupIndexOf(bucket)?.size).toBe(0);
+
+      // Nothing an off() can name reaches it, and giving it back is quiet.
+      store.remove({}, null);
+      expect(bucket).toHaveLength(1);
+
+      expect(() => store.release(listener)).not.toThrow();
+      expect(bucket).toHaveLength(0);
+      expect(dedupIndexOf(bucket)?.size).toBe(0);
+    });
+
+    it('files the same function twice without aggregating it', () => {
+      const store = new EventStore();
+      const bucket = store.getListenersForEventName('foo');
+      const fn = () => {};
+
+      const a = store.add(new EventListener('foo', 0, fn));
+      const b = store.add(new EventListener('foo', 0, fn));
+
+      // The dedup gate sits in findSimilarListener(), not at the filing site,
+      // so widening what is filed cannot widen what aggregates: the search
+      // never asks about a function listener, and isSimilar() compares
+      // listenerType first and so could not match one if it did.
+      expect(b).not.toBe(a);
+      expect(bucket).toHaveLength(2);
+      expect(dedupIndexOf(bucket)?.get(fn)).toEqual([a, b]);
+    });
+
+    it('files a listener under both of its identity slots when they differ', () => {
+      const store = new EventStore();
+      const bucket = store.getListenersForEventName('foo');
+      const fn = () => {};
+      const ctx = {};
+
+      const listener = store.add(new EventListener('foo', 0, fn, ctx));
+
+      // off(ε, fn) and off(ε, ctx) both name this one registration, so both
+      // values have to be keys. The second is what the removal side gained.
+      const index = dedupIndexOf(bucket);
+      expect(index?.get(fn)).toEqual([listener]);
+      expect(index?.get(ctx)).toEqual([listener]);
+      expect(index?.size).toBe(2);
+    });
+
+    it('gives a method name no key of its own', () => {
+      const store = new EventStore();
+      const bucket = store.getListenersForEventName('foo');
+      const target = {handler() {}};
+
+      const listener = store.add(
+        new EventListener('foo', 0, 'handler', target),
+      );
+
+      // A string can never be the listener argument of a removal that reaches
+      // detachByIdentity() — remove() routes one to removeByEventName(), or to
+      // the association path when a listener object comes with it — so a key
+      // for it would be one nothing ever looks up.
+      const index = dedupIndexOf(bucket);
+      expect(index?.get('handler')).toBe(undefined);
+      expect(index?.get(target)).toEqual([listener]);
+      expect(index?.size).toBe(1);
     });
 
     it('files each listener under the slot that carries its identity', () => {
@@ -1225,11 +1313,11 @@ describe('EventStore', () => {
       expect(dedupIndexOf(bucket)?.get(target)).toEqual([named, object]);
     });
 
-    // A function listener with a context object reads its key from the same
-    // slot a method-name listener does, so it can land on a populated candidate
-    // list — while never having been filed there itself, because functions
-    // never dedup. Taking it out must leave that list exactly as it was.
-    it('leaves a shared key alone when an unfiled listener is removed', () => {
+    // A function listener with a context object is filed under that context,
+    // in the same candidate list a method-name listener on the same object
+    // lands in. Taking one of the two out must leave the other's entry exactly
+    // as it was, and must take the function's own key with it.
+    it('leaves a shared key populated when one of its two listeners goes', () => {
       const store = new EventStore();
       const bucket = store.getListenersForEventName('foo');
       const target = {handler() {}};
@@ -1237,10 +1325,13 @@ describe('EventStore', () => {
       const named = store.add(new EventListener('foo', 0, 'handler', target));
       const func = store.add(new EventListener('foo', 0, fn, target));
 
+      expect(dedupIndexOf(bucket)?.get(target)).toEqual([named, func]);
+
       store.release(func);
 
       expect(bucket).toHaveLength(1);
       expect(dedupIndexOf(bucket)?.get(target)).toEqual([named]);
+      expect(dedupIndexOf(bucket)?.get(fn)).toBe(undefined);
     });
 
     it('unfiles a listener whose last registration is given back', () => {
@@ -1281,6 +1372,109 @@ describe('EventStore', () => {
 
       expect(wildcards).toHaveLength(0);
       expect(dedupIndexOf(wildcards)?.size).toBe(0);
+    });
+
+    // A listener filed under two keys has to lose both. Missing the second
+    // leaves the emitter holding whichever value it was — the failure
+    // AGENTS.md calls the quiet one, and the one this whole block exists for:
+    // no count and no dispatch anywhere else in this repo can see it.
+    it('unfiles a two-key listener from both of its keys', () => {
+      const store = new EventStore();
+      const bucket = store.getListenersForEventName('foo');
+      const fn = () => {};
+      const ctx = {};
+      store.add(new EventListener('foo', 0, fn, ctx));
+
+      expect(dedupIndexOf(bucket)?.size).toBe(2);
+
+      // Names the function; the context has to go with it all the same.
+      store.remove(fn, null);
+
+      expect(bucket).toHaveLength(0);
+      expect(dedupIndexOf(bucket)?.size).toBe(0);
+    });
+
+    it('finds a two-key listener through either of its keys', () => {
+      const store = new EventStore();
+      const bucket = store.getListenersForEventName('foo');
+      const fn = () => {};
+      const ctx = {};
+      store.add(new EventListener('foo', 0, fn, ctx));
+
+      // The context slot is the key the removal side gained. Up to v5.1.0 a
+      // linear scan answered both spellings; now the index has to.
+      store.remove(ctx, null);
+
+      expect(bucket).toHaveLength(0);
+      expect(dedupIndexOf(bucket)?.size).toBe(0);
+    });
+
+    // unfileFrom()'s two early returns. Neither is reachable through on() /
+    // off(): a listener is only ever unfiled under a key it was filed under,
+    // and nothing else empties a candidate list. What they stand between is
+    // `indexOf()` on `undefined` and a `splice(-1, 1)` that would unfile a
+    // listener still in the bucket, so they are pinned the way the
+    // holey-bucket throws are — by corrupting the structure by hand.
+    describe('survives an index that has already lost the entry', () => {
+      // Reaches past `dedupIndexOf()`'s readonly return type, which is the
+      // whole exercise: these two cases are the ones only a caller doing
+      // exactly that can produce.
+      const rawIndex = (bucket: ReadonlyArray<EventListener>) =>
+        dedupIndexOf(bucket) as Map<unknown, EventListener[]>;
+
+      it('when the key is gone', () => {
+        const store = new EventStore();
+        const bucket = store.getListenersForEventName('foo');
+        const self = {foo() {}};
+        const listener = store.add(new EventListener('foo', 0, self));
+
+        rawIndex(bucket).delete(self);
+
+        expect(() => store.release(listener)).not.toThrow();
+        expect(bucket).toHaveLength(0);
+      });
+
+      // indexRemove()'s own guard, one level above unfileFrom()'s two. It was
+      // reachable and covered while filing was conditional; since indexAdd()
+      // runs for every listener, a bucket holding one always has a Map. Same
+      // class of access as rawIndex(), one level deeper — the slot rather than
+      // the Map in it.
+      it('when the whole index is gone', () => {
+        const store = new EventStore();
+        const bucket = store.getListenersForEventName('foo');
+        const self = {foo() {}};
+        const listener = store.add(new EventListener('foo', 0, self));
+
+        const [slot] = Object.getOwnPropertySymbols(bucket).filter(
+          (symbol) => symbol.description === 'eventize.EventStore.dedupIndex',
+        );
+        (bucket as unknown as Record<symbol, unknown>)[slot as symbol] =
+          undefined;
+        // The corruption has to have taken, or the rest of this case asserts
+        // nothing at all — a symbol description that stops matching would
+        // otherwise leave a green test measuring the ordinary path.
+        expect(dedupIndexOf(bucket)).toBe(undefined);
+
+        expect(() => store.release(listener)).not.toThrow();
+        expect(bucket).toHaveLength(0);
+      });
+
+      it('when the key is there and the candidate is not', () => {
+        const store = new EventStore();
+        const bucket = store.getListenersForEventName('foo');
+        const self = {foo() {}};
+        const listener = store.add(new EventListener('foo', 0, self));
+
+        const candidates = rawIndex(bucket).get(self) as EventListener[];
+        expect(candidates).toHaveLength(1);
+        candidates.length = 0;
+
+        expect(() => store.release(listener)).not.toThrow();
+        expect(bucket).toHaveLength(0);
+        // The emptied list stays — nothing deletes a key it did not empty
+        // itself, which is the point of the guard rather than an oversight.
+        expect(rawIndex(bucket).has(self)).toBe(true);
+      });
     });
 
     it('drops the index of every bucket off(ε) empties', () => {
@@ -1350,10 +1544,12 @@ describe('EventStore', () => {
   // general hole-tolerance for the class, and the paths differ: add() reaches
   // findInsertIndex()'s throw for every listener type since the dedup search
   // became an index lookup — it no longer touches the bucket at all, so a hole
-  // in it cannot be what the search dies on — while both removal loops walk
-  // holes silently instead, each guarding its candidate with `!== undefined`.
-  // Only add()'s no-similar-listener path and forEach()'s merge loop are
-  // pinned here.
+  // in it cannot be what the search dies on. On the removal side
+  // detachByAssociation() still walks the bucket and skips holes silently,
+  // guarding its candidate with `!== undefined`, while detachByIdentity() has
+  // stopped walking it at all: it reads candidates from the index and lets
+  // spliceOut()'s indexOf() find them, which sees no hole either. Only add()'s
+  // no-similar-listener path and forEach()'s merge loop are pinned here.
   describe('pins the two defensive branches that throw on a holey bucket', () => {
     it('findInsertIndex throws instead of silently choosing an insert position', () => {
       const store = new EventStore();

@@ -150,7 +150,14 @@ That is the form to use in a teardown that shares a prototype method across inst
 The context has to be a real value to narrow anything. `off(ε, handler, null)` and `off(ε, handler, undefined)` are the two-argument form spelled with a placeholder — a nullish third argument *is* "no listener object given" — so neither is a way to address only the registration made without a context. Nothing addresses that one on its own any more; keep the `unsubscribe` handle `on()` returned when a single registration has to be removed and no other, since it removes exactly what it created and asks no identity question at all.
 
 > [!NOTE]
-> There is no index from a listener back to the event names it is registered under, so `off(ε, listenerFunc)`, `off(ε, listenerFunc, context)` and `off(ε, listenerObject)` all scan every event name the emitter has ever seen to find where it sits — roughly 11 ns per registered event name, per call, regardless of how many of those names the listener actually holds a subscription for. Negligible for the usual handful of names; worth knowing if a hot teardown path calls one of these forms against an emitter carrying many distinct names. `unsubscribe()` handles and the event-name forms of `off()` don't pay this — they already know where to look.
+> There is no index from a listener back to the event names it is registered under, so `off(ε, listenerFunc)`, `off(ε, listenerFunc, context)` and `off(ε, listenerObject)` all visit every event name the emitter has ever seen to find where it sits. Two things add up, and only the first is about names:
+>
+> - **one lookup per registered event name**, whether or not your listener is subscribed under it. Negligible for the usual handful of names; worth knowing if a hot teardown path calls one of these forms against an emitter carrying many distinct names.
+> - **one removal per subscription actually found**, and a removal is an array splice, so a bucket holding many listeners under the *same* event name makes each of its removals proportionally more expensive to shift out.
+>
+> Up to v5.1.0 the second cost was far worse and hid inside the first: every call read both identity slots of every listener under every name, so tearing down _n_ listener objects registered on one event name was quadratic in _n_ — 8000 of them measured 81–93 ms, against 3–4 ms since v6.0.0. What is left is the array work, not the search.
+>
+> `unsubscribe()` handles and the event-name forms of `off()` don't pay the per-name cost at all — they already know where to look.
 
 ## Removing listener objects
 

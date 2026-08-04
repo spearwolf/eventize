@@ -11,6 +11,7 @@ import {
   once,
   retain,
 } from './index';
+import {collect} from './__test-utils__/gc';
 import {latestListener} from './__test-utils__/listeners';
 
 describe('off()', () => {
@@ -1613,6 +1614,200 @@ describe('off()', () => {
       expect(getSubscriptionCount(obj)).toBe(0);
       expect(getRetainedCount(obj)).toBe(1);
       expect(getRetainedEventNames(obj)).toEqual(['keep']);
+    });
+  });
+
+  // Every other case in this file asks what the emitter still *does*. This one
+  // asks what it still *holds*, and nothing above can: a removal that splices
+  // the listener out and detaches it satisfies every count and every dispatch
+  // assertion in this file while the emitter keeps the consumer's own object
+  // alive — as the key of an index entry nobody unfiled. Since v6.0.0 that
+  // index is also what `off(ε, obj)` reads to decide what to remove, so the
+  // entry now sits on the hot path of the very call whose job is to drop it.
+  //
+  // What makes a missed unfiling permanent is the *bucket* outliving the
+  // removal, and there are two ways that happens. The wildcard array is a
+  // fixed member of the store and survives emptied, so it always outlives one.
+  // A named bucket outlives one whenever a sibling listener stays behind: the
+  // bucket does not empty, `namedListeners` keeps the entry, and the index
+  // hanging off it keeps a key nobody unfiled. Only the third case — a named
+  // bucket emptied down to nothing — is self-healing, because dropping the map
+  // entry takes the whole index with it, and the cases below that register a
+  // single listener per name are all of that kind. They are the weak ones.
+  // The two sibling cases at the end of this block and the wildcard shapes are
+  // what actually bites: with `indexRemove()` neutered, each reports "still
+  // reachable" while the single-listener named cases stay green.
+  describe('lets go of the object it detaches', () => {
+    // `eventize()`'s own return type, not `EventizedObject<object>`: the
+    // `__TEventsBrand` phantom field is invariant in the event map, so the
+    // wider spelling is not a supertype of what `eventize()` hands back — the
+    // same reason `__test-utils__/listeners.ts` binds its type parameter per
+    // call.
+    const newEmitter = () => eventize();
+    type Emitter = ReturnType<typeof newEmitter>;
+
+    // Everything the case needs is built and dropped inside the callback, so
+    // no local of the spec keeps the target reachable. The emitter travels
+    // back out: what is under test is that *it* holds nothing, not that it
+    // died too.
+    const detachAndDrop = (
+      subscribe: (emitter: Emitter, target: object) => void,
+      remove: (emitter: Emitter, target: object) => void,
+    ) => {
+      const emitter = newEmitter();
+      const target = {handler() {}};
+      const ref = new WeakRef(target);
+      subscribe(emitter, target);
+      remove(emitter, target);
+      return {emitter, ref};
+    };
+
+    const cases: Array<[string, (e: Emitter, t: object) => void]> = [
+      ['on(ε, name, obj)', (e, t) => on(e, 'foo', t)],
+      ['on(ε, name, "method", obj)', (e, t) => on(e, 'foo', 'handler', t)],
+      ['on(ε, name, fn, obj)', (e, t) => on(e, 'foo', () => {}, t)],
+      ['on(ε, "*", obj)', (e, t) => on(e, '*', t)],
+      ['on(ε, "*", "method", obj)', (e, t) => on(e, '*', 'handler', t)],
+      ['on(ε, "*", fn, obj)', (e, t) => on(e, '*', () => {}, t)],
+      ['on(ε, [n1, n2], obj)', (e, t) => on(e, ['foo', 'bar'], t)],
+      ['on(ε, name, obj, ctx)', (e, t) => on(e, 'foo', t, {})],
+    ];
+
+    describe.each(cases)('after %s', (_label, subscribe) => {
+      it('off(ε, obj) releases it', async () => {
+        const {emitter, ref} = detachAndDrop(subscribe, (e, t) => off(e, t));
+
+        const verdict = await collect(ref);
+
+        expect(getSubscriptionCount(emitter)).toBe(0);
+        expect(verdict).toMatch(/^collected/);
+      });
+
+      it('off(ε, [obj]) releases it', async () => {
+        const {emitter, ref} = detachAndDrop(subscribe, (e, t) => off(e, [t]));
+
+        const verdict = await collect(ref);
+
+        expect(getSubscriptionCount(emitter)).toBe(0);
+        expect(verdict).toMatch(/^collected/);
+      });
+
+      it('off(ε) releases it', async () => {
+        const {emitter, ref} = detachAndDrop(subscribe, (e) => off(e));
+
+        const verdict = await collect(ref);
+
+        expect(getSubscriptionCount(emitter)).toBe(0);
+        expect(verdict).toMatch(/^collected/);
+      });
+    });
+
+    it('off(ε, fn) releases the function itself', async () => {
+      const {emitter, ref} = ((): {emitter: Emitter; ref: WeakRef<object>} => {
+        const e = newEmitter();
+        const fn = () => {};
+        on(e, 'foo', fn);
+        off(e, fn);
+        return {emitter: e, ref: new WeakRef(fn)};
+      })();
+
+      const verdict = await collect(ref);
+
+      expect(getSubscriptionCount(emitter)).toBe(0);
+      expect(verdict).toMatch(/^collected/);
+    });
+
+    it('off(ε, fn, ctx) releases the context as well as the function', async () => {
+      const {emitter, ref} = ((): {emitter: Emitter; ref: WeakRef<object>} => {
+        const e = newEmitter();
+        const ctx = {};
+        const fn = () => {};
+        on(e, 'foo', fn, ctx);
+        off(e, fn, ctx);
+        return {emitter: e, ref: new WeakRef(ctx)};
+      })();
+
+      const verdict = await collect(ref);
+
+      expect(getSubscriptionCount(emitter)).toBe(0);
+      expect(verdict).toMatch(/^collected/);
+    });
+
+    // The named-bucket case that does not clean up after itself. Every case
+    // above registers one listener per name, so the bucket empties and
+    // `namedListeners` drops the entry, index and all — which would forgive a
+    // missed unfiling rather than expose it. Leave a sibling behind and the
+    // bucket stays, the entry stays, and the key stays with it. The surviving
+    // listener is deliberately a *different* object: one that shared the key
+    // would keep the candidate list alive for its own reasons and say nothing
+    // about the removed one.
+    it('off(ε, obj) releases it out of a bucket a sibling keeps alive', async () => {
+      const {emitter, keep, ref} = ((): {
+        emitter: Emitter;
+        keep: object;
+        ref: WeakRef<object>;
+      } => {
+        const e = newEmitter();
+        const sibling = {handler() {}};
+        const target = {handler() {}};
+        on(e, 'foo', sibling);
+        on(e, 'foo', target);
+        off(e, target);
+        return {emitter: e, keep: sibling, ref: new WeakRef(target)};
+      })();
+
+      const verdict = await collect(ref);
+
+      // Reading `keep` after the rounds is what makes the bucket provably
+      // still populated while they ran.
+      expect(typeof keep).toBe('object');
+      expect(getSubscriptionCount(emitter)).toBe(1);
+      expect(verdict).toMatch(/^collected/);
+    });
+
+    // Both surviving-bucket kinds in one call: a named bucket a sibling keeps
+    // populated, and the wildcard array that survives however empty it gets.
+    it('off(ε, obj) reaches a shared named bucket and the wildcard array at once', async () => {
+      const {emitter, keep, ref} = ((): {
+        emitter: Emitter;
+        keep: object;
+        ref: WeakRef<object>;
+      } => {
+        const e = newEmitter();
+        const sibling = {handler() {}};
+        const target = {handler() {}};
+        on(e, 'foo', sibling);
+        on(e, 'foo', target);
+        on(e, '*', target);
+        off(e, target);
+        return {emitter: e, keep: sibling, ref: new WeakRef(target)};
+      })();
+
+      const verdict = await collect(ref);
+
+      expect(typeof keep).toBe('object');
+      expect(getSubscriptionCount(emitter)).toBe(1);
+      expect(verdict).toMatch(/^collected/);
+    });
+
+    // The control. Without the off() the emitter must still be holding the
+    // object, or the assertions above are satisfied by a collector that
+    // collects everything — including things that are still reachable, which
+    // would mean it is broken rather than thorough. The `harness ok` half is
+    // what separates the two; see `__test-utils__/gc.ts`.
+    it('keeps holding it while the subscription stands (control)', async () => {
+      const {emitter, ref} = detachAndDrop(
+        (e, t) => {
+          on(e, 'foo', t);
+          on(e, '*', 'handler', t);
+        },
+        () => {},
+      );
+
+      const verdict = await collect(ref);
+
+      expect(getSubscriptionCount(emitter)).toBe(2);
+      expect(verdict).toMatch(/^still reachable.*harness ok/);
     });
   });
 });

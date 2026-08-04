@@ -5,7 +5,7 @@ import {
   LISTENER_IS_OBJ,
 } from './constants';
 import type {EventName} from './types';
-import {isCatchEmAll, isEventName} from './utils';
+import {isAttachableTarget, isCatchEmAll, isEventName} from './utils';
 
 type HasPriorityOrIdType = {priority: number; id: number};
 
@@ -42,29 +42,60 @@ type HasPriorityOrIdType = {priority: number; id: number};
 const HELD_BY = Symbol('eventize.EventStore.heldBy');
 
 /**
- * A bucket's dedup index: identity slot → the listeners filed under it, or
- * `undefined` while nothing in this bucket can dedup at all.
+ * A bucket's identity index: an identity value → the listeners filed under it,
+ * or `undefined` while nothing in this bucket is filed at all.
  *
- * `add()` has to find an already registered listener with the same identity
- * before it inserts, and up to v5.1.0 it did that with a linear `find()` over
- * the whole bucket. Only object and method-name subscriptions can ever match —
- * a function listener never dedups — so the scan stayed invisible in every
- * function-listener benchmark and was quadratic in exactly the listener-object
- * pattern this library advertises. Registering n object listeners on one event
- * name, measured: 1000 → 1.8 ms, 2000 → 6.9 ms, 4000 → 27.9 ms, while 4000
- * function listeners cost 0.5 ms. Doubling quadrupled. Through the index the
- * same 4000 cost 0.7 ms, which is the function form's own price.
+ * Two readers, and they ask different questions of the same Map.
  *
- * The key is the slot carrying the *identity* of a subscription: `listener` for
- * `on(ε, 'foo', obj)`, `listenerObject` for `on(ε, 'foo', 'method', obj)`. The
- * rest of the similarity test — priority, and the method name itself — is left
- * to a linear pass over the candidates under that key. That list holds one entry
- * for the pattern that hurt (many objects, one name) and never grows past the
- * number of priorities and method names a single object uses on a single event
- * name.
+ * **`add()`**, which has to find an already registered listener with the same
+ * identity before it inserts. Up to v5.1.0 it did that with a linear `find()`
+ * over the whole bucket. Only object and method-name subscriptions can ever
+ * match — a function listener never dedups — so the scan stayed invisible in
+ * every function-listener benchmark and was quadratic in exactly the
+ * listener-object pattern this library advertises. Registering n object
+ * listeners on one event name, measured: 1000 → 1.8 ms, 2000 → 6.9 ms,
+ * 4000 → 27.9 ms, while 4000 function listeners cost 0.5 ms. Doubling
+ * quadrupled. Through the index the same 4000 cost 0.7 ms, which is the
+ * function form's own price.
  *
- * Lazy, and `undefined` on a bucket that never saw a dedupable listener: an
- * empty Map costs 160 B and most buckets hold nothing but function listeners.
+ * **`detachByIdentity()`**, which has to find every listener a bare
+ * `off(ε, fn)` / `off(ε, obj)` names. That one kept the linear scan a release
+ * longer and paid the same quadratic price on the same shape — n listener
+ * objects under one event name, then one `off(ε, o)` each. Medians of five to
+ * seven, ranged over three runs of the pair, one process per variant:
+ *
+ * | n | scanning | through the index |
+ * | --- | --- | --- |
+ * | 1000 | 1.3–1.4 ms | 0.3–0.4 ms |
+ * | 2000 | 4.7–5.2 ms | 0.4–0.7 ms |
+ * | 4000 | 18–22 ms | 1.1–1.4 ms |
+ * | 8000 | 81–91 ms | 3.1–3.7 ms |
+ *
+ * Doubling quadrupled, and worse than on the registration side, because the
+ * scan ran to the end of the bucket after every match instead of stopping at
+ * it. What is left grows a little faster than linearly, and the shape of what
+ * is left is on `removeByListener()`: unsubscribing in reverse registration
+ * order — `indexOf()`'s worst case rather than its best — costs ~8 ms at
+ * n = 8000 instead of ~3.6, while the scan measured ~87–93 ms either way.
+ * A function listener, which the index did not hold before, measures the same
+ * as an object one on both halves.
+ *
+ * What the two readers share is the key, and the reason the index can serve
+ * both: a key is a value some caller may later hand back. `add()` looks up the
+ * slot carrying the *identity* of a subscription — `listener` for
+ * `on(ε, 'foo', obj)`, `listenerObject` for `on(ε, 'foo', 'method', obj)` —
+ * and leaves the rest of the similarity test (priority, and the method name
+ * itself) to a linear pass over the candidates. `detachByIdentity()` looks up
+ * the value `off()` was given and runs the identity test it would have run per
+ * element. Both lists stay short: one entry for the pattern that hurt (many
+ * objects, one name), never more than the priorities and method names a single
+ * object uses on a single event name.
+ *
+ * Serving the second reader is what makes a listener with no dedup of its own
+ * worth filing, so a bucket of nothing but function listeners now carries a Map
+ * (~160 B) and one one-element array per listener. That is the price of the
+ * measurement above, paid on subscription; `eachIndexKey()` says which slots
+ * earn a key and why the set is exactly big enough.
  *
  * Written in `createBucket()` like `HELD_BY`, for the same hidden-class reason,
  * and a clone inherits **the same Map by reference**. What makes that sound is
@@ -102,6 +133,12 @@ type DedupIndex = Map<unknown, EventListener[]>;
  * — alive on an emitter the consumer believes it has unsubscribed from. Before
  * the cases that read this, deleting every `indexRemove()` call left all 33
  * suites green: a promise nothing can read is a promise nothing can hold.
+ *
+ * Still true now that `detachByIdentity()` reads the index too, and for the
+ * same reason it was true before: a stale entry is a listener already spliced
+ * out, hence already detached, hence carrying two nulled identity slots that
+ * match no `off()` argument. A *missing* entry is the loud half — the removal
+ * finds nothing and the listener keeps firing.
  */
 export const dedupIndexOf = (
   listeners: ReadonlyArray<EventListener>,
@@ -347,9 +384,9 @@ const mergeWalk = (
 };
 
 /**
- * The slot a subscription's identity lives in, and therefore the key it is filed
- * under. Only meaningful for the two listener types that can dedup at all — see
- * `DEDUP_INDEX`.
+ * The slot a subscription's identity lives in, and therefore the key `add()`'s
+ * dedup lookup reads. Only meaningful for the two listener types that can dedup
+ * at all — see `DEDUP_INDEX`.
  *
  * Read it *before* `detach()`: detaching nulls both slots, so a detached
  * listener no longer knows where it was filed.
@@ -359,10 +396,83 @@ const dedupKeyOf = (listener: EventListener): unknown =>
     ? listener.listener
     : listener.listenerObject;
 
-/** Files a freshly inserted listener, creating the bucket's index on first use. */
-const indexAdd = (bucket: ListenerBucket, listener: EventListener): void => {
-  const index = (bucket[DEDUP_INDEX] ??= new Map());
-  const key = dedupKeyOf(listener);
+/**
+ * Whether a value can be the *listener* argument of a removal that reaches
+ * `detachByIdentity()` — and therefore whether filing a listener under this
+ * slot buys anything, or only a Map entry nobody will ever look up.
+ *
+ * The three excluded kinds are excluded because `EventStore.remove()` routes
+ * them elsewhere long before the identity fall-through: a nullish listener goes
+ * to `removeAllListeners()`, and a string or symbol goes to
+ * `removeByEventName()` — or, with a listener object named, through `off()`'s
+ * `forceRemove` to the association path. This function and that routing are one
+ * rule read from both ends; widening the routing means widening this.
+ *
+ * Everything else can arrive: a function, an object, and — only through a
+ * directly constructed `EventListener`, never through `on()` — a number or a
+ * boolean.
+ */
+const isRemovalKey = (value: unknown): boolean =>
+  value != null && typeof value !== 'string' && typeof value !== 'symbol';
+
+/**
+ * Visits every key one listener is filed under, exactly once each. `indexAdd()`
+ * and `indexRemove()` are this function with the two halves of the pairing rule
+ * plugged in, which is the whole reason it exists: neither can file or unfile a
+ * key the other does not know about. AGENTS.md says why the unfiling half is
+ * the one worth that trouble — it is the failure nothing goes red for.
+ *
+ * At most two distinct keys out of three candidate slots:
+ *
+ * - the **dedup key**, for the two types that can dedup, filed whatever it
+ *   holds. Not narrowed by `isRemovalKey()`: `on(ε, 'foo', 'toFixed', 42)`
+ *   dedups against a primitive listener object today and has to keep doing so.
+ * - the **identity slot**, when a removal could name it. Covers `off(ε, fn)` on
+ *   a function listener and `off(ε, obj)` on an object one.
+ * - the **listener-object slot**, when it is a value `off(ε, obj)` could name.
+ *   That is the object-or-function test rather than `isRemovalKey()`, because
+ *   the association disjunct in `detachByIdentity()` is gated on exactly that.
+ *
+ * Together those cover every listener a removal by identity can match, and that
+ * coverage is what lets `detachByIdentity()` read the index instead of the
+ * bucket: a listener not filed under the argument cannot match it. The
+ * contrapositive is the thing to check when changing either end — a match needs
+ * `listener === x` or `listenerObject === x`, so it needs a slot holding `x`,
+ * so it needs the key one of the branches below writes.
+ *
+ * `visit` is one of two module-level functions, never a closure: this runs once
+ * per subscription and once per removal.
+ */
+const eachIndexKey = (
+  index: DedupIndex,
+  listener: EventListener,
+  visit: (index: DedupIndex, key: unknown, listener: EventListener) => void,
+): void => {
+  const identity = listener.listener;
+  const context = listener.listenerObject;
+
+  const dedupable = isSimilarListenerType(listener.listenerType);
+  const dedupKey = dedupable ? dedupKeyOf(listener) : undefined;
+  if (dedupable) {
+    visit(index, dedupKey, listener);
+  }
+  if (isRemovalKey(identity) && !(dedupable && dedupKey === identity)) {
+    visit(index, identity, listener);
+  }
+  if (
+    isAttachableTarget(context) &&
+    context !== identity &&
+    !(dedupable && dedupKey === context)
+  ) {
+    visit(index, context, listener);
+  }
+};
+
+const fileUnder = (
+  index: DedupIndex,
+  key: unknown,
+  listener: EventListener,
+): void => {
   const candidates = index.get(key);
   if (candidates === undefined) {
     index.set(key, [listener]);
@@ -372,33 +482,51 @@ const indexAdd = (bucket: ListenerBucket, listener: EventListener): void => {
 };
 
 /**
- * Unfiles a listener that is being spliced out. Every path that removes a single
- * listener from a bucket calls it, and calls it before `detach()`.
- *
- * A path that forgot to would not corrupt a lookup: `findSimilarListener()`
- * still runs the full `isSimilar()` over whatever the index hands it, and a
- * detached listener can never pass that test — `detach()` sets both of its
- * identity slots to `null`, while a listener arriving at `add()` always carries
- * a non-null one (`_subscribeTo()` rejects a falsy listener before it ever gets
- * here). What such a path would leave behind is the entry, and with it a strong
- * reference to the object in the key, on an emitter the consumer believes it has
- * unsubscribed from.
- *
- * Takes no shortcut for a function listener, which is never filed: its key reads
- * from the same slot as a method-name listener's, so it can land on a populated
- * candidate list, and `indexOf()` answering -1 there is both the correct result
- * and cheaper than the type test that would avoid the lookup.
+ * The two early returns are unreachable through `on()` / `off()`: a listener
+ * reaches this only under a key `fileUnder()` wrote for it, and no other path
+ * empties a candidate list. They stay because the alternative to a missed guard
+ * here is `indexOf()` on `undefined` or a `splice(-1, 1)` that silently unfiles
+ * a listener still in the bucket, and `EventStore.spec.ts` pins both by
+ * corrupting the index by hand.
  */
-const indexRemove = (bucket: ListenerBucket, listener: EventListener): void => {
-  const index = bucket[DEDUP_INDEX];
-  if (index === undefined) return;
-  const key = dedupKeyOf(listener);
+const unfileFrom = (
+  index: DedupIndex,
+  key: unknown,
+  listener: EventListener,
+): void => {
   const candidates = index.get(key);
   if (candidates === undefined) return;
   const idx = candidates.indexOf(listener);
   if (idx < 0) return;
   candidates.splice(idx, 1);
   if (candidates.length === 0) index.delete(key);
+};
+
+/** Files a freshly inserted listener, creating the bucket's index on first use. */
+const indexAdd = (bucket: ListenerBucket, listener: EventListener): void => {
+  eachIndexKey((bucket[DEDUP_INDEX] ??= new Map()), listener, fileUnder);
+};
+
+/**
+ * Unfiles a listener that is being spliced out. Every path that removes a single
+ * listener from a bucket calls it, and calls it before `detach()`.
+ *
+ * A path that forgot to would not corrupt `add()`'s lookup:
+ * `findSimilarListener()` still runs the full `isSimilar()` over whatever the
+ * index hands it, and a detached listener can never pass that test — `detach()`
+ * sets both of its identity slots to `null`, while a listener arriving at
+ * `add()` always carries a non-null one (`_subscribeTo()` rejects a falsy
+ * listener before it ever gets here). Nor would it corrupt
+ * `detachByIdentity()`, for the same reason: two nulled slots match no `off()`
+ * argument. What it would leave behind is the entry, and with it a strong
+ * reference to the object in the key, on an emitter the consumer believes it
+ * has unsubscribed from.
+ */
+const indexRemove = (bucket: ListenerBucket, listener: EventListener): void => {
+  const index = bucket[DEDUP_INDEX];
+  if (index !== undefined) {
+    eachIndexKey(index, listener, unfileFrom);
+  }
 };
 
 /**
@@ -720,6 +848,31 @@ export class EventStore {
    * of one idea: the first asks what kind of thing the caller passed, the
    * second how much of the pair they named. Only the second is a question about
    * the call.
+   *
+   * The candidates come from the bucket's index rather than from the bucket,
+   * and the test below is the one the scan ran per element, unchanged. What the
+   * index buys is which elements it runs on: up to v5.1.0 — and, on the removal
+   * side, up to the release this comment ships in — every `off(ε, fn)` and
+   * `off(ε, obj)` read both identity slots of every listener under every event
+   * name, and it read them to the end of each bucket rather than stopping at
+   * the match, because a bucket can hold several. `eachIndexKey()` carries the
+   * argument that makes the shortcut sound: a listener not filed under the
+   * value `off()` names cannot match it.
+   *
+   * An index a bucket does not have means no listener in it is filed, which by
+   * that same argument means none of them can match. Reachable and common
+   * rather than theoretical: it is the wildcard bucket of every emitter nobody
+   * ever subscribed a `'*'` listener to, visited once per `off(ε, fn)`.
+   *
+   * A copy of the candidate list, because unfiling a match splices it out of
+   * that very list. Taken up front and therefore also when nothing matches —
+   * `off(ε, fn, someOtherCtx)` pays for it and removes nothing — which is one
+   * short array against a scan of the whole bucket, and the price of not
+   * having to decide mid-loop whether the list is still the one being walked.
+   * `spliceOut()` does the rest, and does it against `target` each time — so
+   * the position is looked up in the array the store holds at that moment, and
+   * neither the clone nor the shift from the previous splice has to be
+   * reasoned about here.
    */
   private detachByIdentity(
     eventName: EventName,
@@ -728,25 +881,25 @@ export class EventStore {
     listenerObject: unknown,
     isObjectListener: boolean,
   ): ListenerBucket {
+    const index = bucket[DEDUP_INDEX];
+    if (index === undefined) return bucket;
+    const candidates = index.get(listener);
+    if (candidates === undefined) return bucket;
+
     const matchListenerOnly = listenerObject == null;
     let target = bucket;
-    for (let i = bucket.length - 1; i >= 0; i--) {
-      const current = bucket[i];
+    for (const current of candidates.slice()) {
       if (
-        current !== undefined &&
-        ((matchListenerOnly
+        (matchListenerOnly
           ? current.listener === listener
           : current.isEqual(listener, listenerObject)) ||
-          (matchListenerOnly &&
-            isObjectListener &&
-            current.listenerObject === listener))
+        (matchListenerOnly &&
+          isObjectListener &&
+          current.listenerObject === listener)
       ) {
-        if (target === bucket) {
-          target = this.bucketForMutation(eventName, bucket);
-        }
-        target.splice(i, 1);
-        // Unfiled before it is detached, which nulls the slot it is keyed by.
-        indexRemove(target, current);
+        // spliceOut() unfiles before this detaches, which nulls the slots the
+        // listener is keyed by.
+        target = this.spliceOut(eventName, target, current);
         current.detach();
       }
     }
@@ -796,9 +949,14 @@ export class EventStore {
     // Filed on the array the store holds afterwards, which is also the array the
     // next lookup will read — the clone shares the index of the bucket it came
     // from, so this lands in the same Map either way.
-    if (isSimilarListenerType(listener.listenerType)) {
-      indexAdd(arr, listener);
-    }
+    //
+    // Unconditional, while the dedup *gate* stays where it always was, in
+    // findSimilarListener(): what the index holds and what aggregates are two
+    // questions since the index gained its second reader. A function listener
+    // is filed so off() can find it, and still never dedups, because the search
+    // never asks about one — and could not match it if it did, isSimilar()
+    // comparing listenerType first.
+    indexAdd(arr, listener);
     return listener;
   }
 
@@ -1033,10 +1191,29 @@ export class EventStore {
    * `off(ε, listenerObject)`. There is no reverse index from a listener back
    * to the event names it sits under, so this walks every bucket in
    * `namedListeners` plus the catch-em-all one and asks each "is this
-   * listener here?" Cost is O(registered event names) per call — roughly
-   * 11 ns per name on this emitter, independent of how many of those names
-   * the listener actually holds a subscription for. See `docs/off.md` for
-   * the consumer-facing version of this note.
+   * listener here?"
+   *
+   * Two terms, and the first one used to be the whole model:
+   *
+   * - **once per registered event name**, whether or not the listener is
+   *     subscribed under it — one Map lookup into that bucket's index, which
+   *     answers `undefined` for every name the listener has nothing to do with;
+   * - **once per listener actually removed**, plus the array work that removal
+   *     costs: `spliceOut()` finds the position with `indexOf()` and then
+   *     splices, so a removal from a bucket of depth d moves O(d) slots in the
+   *     worst case and the memory traffic, not the identity test, is what is
+   *     left of the old shape.
+   *
+   * Bucket depth is in that second term and nowhere else, which is the whole
+   * change: what a removal *reads* is no longer proportional to how many
+   * other listeners share the event name, only what it *moves* is. The claim
+   * this replaces — "O(registered event names), roughly 11 ns per name" —
+   * modelled the first term alone and predicted ~0.09 ms for a case that
+   * measured ~85 ms, three orders of magnitude out, because the scan it was
+   * written for read every listener of every name and the model counted only
+   * the names. Any successor to it has to keep both terms, whatever happens to
+   * the second. See `docs/off.md` for the consumer-facing version of this note,
+   * and `DEDUP_INDEX` for the measurements.
    */
   private removeByListener(listener: unknown, listenerObject: unknown): void {
     // Both `typeof` values, because both are listener objects: the set is
