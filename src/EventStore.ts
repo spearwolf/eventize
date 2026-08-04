@@ -177,6 +177,90 @@ const createBucket = (source?: ListenerBucket): ListenerBucket => {
   return bucket;
 };
 
+const rejectMutation = (container: string) => (): never => {
+  throw new Error(
+    `EventStore: ${container} is the shared empty stand-in — replace it, never mutate it`,
+  );
+};
+
+/**
+ * Shared stand-ins for the two listener containers, one pair per module
+ * instance — the same arrangement `EventKeeper` runs for its retain index, and
+ * for the same reason: most emitters are eventized long before anyone
+ * subscribes, and plenty never see an `on()` at all. A `new Map()` plus a
+ * bucket in the constructor spent both allocations on every `eventize(obj)`
+ * regardless. Both fields start out pointing here, every write path swaps in a
+ * real container first, and every reader — `forEach()`, `peekListeners()`,
+ * `getSubscriptionCount()`, the `removeBy*` family — works unchanged, because
+ * all any of them touch is `.get()`, `.forEach()`, `.length`.
+ *
+ * The Map is poisoned exactly like the keeper's, and for the reason spelled out
+ * there: `Object.freeze()` seals a Map's own properties and leaves `set()`,
+ * `delete()` and `clear()` working on the internal slots, so one missed
+ * materialization would hand one emitter's listeners to every other emitter
+ * this module built. Throwing stubs turn that silent corruption into a failure
+ * at the first offending call.
+ *
+ * The bucket is the interesting half, because an array is not a Map: everything
+ * that mutates one goes through an ordinary property write — the elements,
+ * `length`, and the two symbol slots — so `Object.freeze()` really does close
+ * it, and closes the three the stubs cannot reach. `bucket[HELD_BY] += 1` and
+ * the `??= new Map()` in `indexAdd()` throw on the frozen stand-in, which are
+ * precisely the two writes that would otherwise make one emitter's dispatch
+ * bookkeeping and one emitter's index visible to all of them. The stubs on top
+ * are for the message: a stray `splice()` says which object it hit and what to
+ * do instead, where the native error would only report a read-only property of
+ * `[object Array]`.
+ *
+ * Nothing gets through on the strength of writing what is already there.
+ * Assignment goes to `[[Set]]`, which gives up the moment it finds the own
+ * property non-writable and never compares values — `length = 0` on the empty
+ * stand-in and `[DEDUP_INDEX] = undefined` on the unindexed one throw exactly
+ * like a write that would have changed something. Only a redefinition
+ * (`Object.defineProperty` with the same value) is let through, and nothing
+ * here redefines anything. Every module in `src/` is strict, and
+ * `tsconfig.json` pins that with `alwaysStrict` — a sloppy-mode caller would
+ * see these same writes fail silently instead, which is one more reason the
+ * store never offers the stand-in to one.
+ *
+ * Born in `createBucket()` like every other bucket, which is not a formality —
+ * see the note there. A hand-rolled `[]` would arrive without `HELD_BY`, read
+ * as *held*, and send the first mutation of a materialized bucket through a
+ * clone it does not owe.
+ */
+const EMPTY_NAMED_LISTENERS: Map<EventName, ListenerBucket> = Object.freeze(
+  Object.defineProperties(new Map<EventName, ListenerBucket>(), {
+    set: {value: rejectMutation('namedListeners')},
+    delete: {value: rejectMutation('namedListeners')},
+    clear: {value: rejectMutation('namedListeners')},
+  }),
+);
+
+const EMPTY_CATCH_EM_ALL: ListenerBucket = createBucket();
+
+// Every mutator `Array.prototype` carries, not only the `splice()` this file
+// uses: the point of a stand-in is to catch the path nobody thought of. Defined
+// rather than assigned, so they arrive non-enumerable and stay out of
+// `Object.keys()`, a spread and Jest's `toEqual` — same treatment `HELD_BY` and
+// `DEDUP_INDEX` get from being symbols.
+for (const method of [
+  'push',
+  'pop',
+  'shift',
+  'unshift',
+  'splice',
+  'sort',
+  'reverse',
+  'fill',
+  'copyWithin',
+]) {
+  Object.defineProperty(EMPTY_CATCH_EM_ALL, method, {
+    value: rejectMutation(`the catch-em-all bucket (${method}())`),
+  });
+}
+
+Object.freeze(EMPTY_CATCH_EM_ALL);
+
 const sortByPriorityAndId = (
   a: HasPriorityOrIdType,
   b: HasPriorityOrIdType,
@@ -563,23 +647,54 @@ const findSimilarListener = (
 const EMPTY_LISTENERS: ReadonlyArray<EventListener> = Object.freeze([]);
 
 export class EventStore {
-  readonly namedListeners: Map<EventName, ListenerBucket>;
+  // Both start on the shared stand-ins and are swapped for a container of
+  // their own by the first write — see `EMPTY_NAMED_LISTENERS` above. Neither
+  // is `readonly` any more for that reason, and both are private for the one
+  // they always should have been: read-only from the outside, swappable from
+  // the inside. Clone-on-mutate has replaced the wildcard reference since
+  // v6.0.0, and lazy allocation now replaces the named one too; a getter over
+  // a private field buys that without widening what a holder of the store may
+  // do with it. (Consumers never see the store at all — the internals slot is
+  // opaque in the published types — but this is the boundary AGENTS.md asks to
+  // keep drawn, not a hypothetical.)
+  private namedBuckets: Map<EventName, ListenerBucket> = EMPTY_NAMED_LISTENERS;
 
-  // Read-only from the outside, swappable from the inside. It used to be a
-  // `readonly` field; clone-on-mutate needs to replace the reference, and a
-  // getter over a private field buys that without widening what a holder of
-  // the store may do with it. (Consumers never see the store at all since
-  // v6.0.0 — the internals slot is opaque in the published types — but this is
-  // the boundary AGENTS.md asks to keep drawn, not a hypothetical.)
-  private catchEmAllBucket: ListenerBucket;
+  private catchEmAllBucket: ListenerBucket = EMPTY_CATCH_EM_ALL;
 
-  get catchEmAllListeners(): Array<EventListener> {
-    return this.catchEmAllBucket;
+  get namedListeners(): Map<EventName, ListenerBucket> {
+    return this.namedBuckets;
   }
 
-  constructor() {
-    this.namedListeners = new Map();
-    this.catchEmAllBucket = createBucket();
+  /**
+   * The wildcard bucket, live and mutable — which makes this the creating door
+   * of the pair, the way `getListenersForEventName()` is for a named one.
+   * Handing the stand-in out through a mutable `Array<EventListener>` would be
+   * handing out the one array in the module nobody may write to, and a caller
+   * that then writes to it has neither reached the registry nor been told so.
+   * `peekListeners('*')` is the looking door: it promises no mutation through
+   * its return type and creates nothing, so it answers from the field and may
+   * hand back the stand-in.
+   *
+   * Nothing in the library reads this — `add()` goes to the materializer
+   * directly — so the allocation it forces lands on the specs and the test
+   * utils that ask for the array by name.
+   */
+  get catchEmAllListeners(): Array<EventListener> {
+    return this.mutableCatchEmAllBucket();
+  }
+
+  private mutableNamedBuckets(): Map<EventName, ListenerBucket> {
+    if (this.namedBuckets === EMPTY_NAMED_LISTENERS) {
+      this.namedBuckets = new Map();
+    }
+    return this.namedBuckets;
+  }
+
+  private mutableCatchEmAllBucket(): ListenerBucket {
+    if (this.catchEmAllBucket === EMPTY_CATCH_EM_ALL) {
+      this.catchEmAllBucket = createBucket();
+    }
+    return this.catchEmAllBucket;
   }
 
   /**
@@ -595,10 +710,13 @@ export class EventStore {
    * `peekListeners()`'s own doc comment for the reading side of it.
    */
   getListenersForEventName(eventName: string | symbol): ListenerBucket {
-    let namedListeners = this.namedListeners.get(eventName);
+    let namedListeners = this.namedBuckets.get(eventName);
     if (!namedListeners) {
       namedListeners = createBucket();
-      this.namedListeners.set(eventName, namedListeners);
+      // The first named subscription on this emitter is also what buys it a
+      // Map of its own; up to here it shared the stand-in with every other
+      // store this module built.
+      this.mutableNamedBuckets().set(eventName, namedListeners);
     }
     return namedListeners;
   }
@@ -620,9 +738,10 @@ export class EventStore {
    * use-it-immediately discipline `getListenersForEventName()` can only ask
    * for in a comment is half enforced here instead: the compiler takes the
    * no-mutation half, and freshness stays the caller's problem either way. Frozen-ness is not part of that promise and is not uniform: it
-   * holds only for the shared empty answer to an unknown name — a known
-   * bucket, `'*'` included, is a live array underneath and stays mutable via
-   * a cast, because `bucketForMutation()` still has to splice it in place.
+   * holds for the shared empty answer to an unknown name and for the
+   * catch-em-all stand-in an emitter without wildcard listeners still sits on,
+   * while a bucket that exists is a live array underneath and stays mutable
+   * via a cast, because `bucketForMutation()` still has to splice it in place.
    * Nobody outside this file may rely on either state.
    *
    * `eventName === '*'` reads `catchEmAllBucket`, not a `'*'` key in
@@ -645,7 +764,7 @@ export class EventStore {
     if (isCatchEmAll(eventName)) {
       return this.catchEmAllBucket;
     }
-    return this.namedListeners.get(eventName) ?? EMPTY_LISTENERS;
+    return this.namedBuckets.get(eventName) ?? EMPTY_LISTENERS;
   }
 
   /**
@@ -712,7 +831,7 @@ export class EventStore {
     if (bucket === this.catchEmAllBucket) {
       this.catchEmAllBucket = clone;
     } else {
-      this.namedListeners.set(eventName, clone);
+      this.namedBuckets.set(eventName, clone);
     }
     return clone;
   }
@@ -923,8 +1042,14 @@ export class EventStore {
     listener: EventListener,
     obligation: OnceObligation | null = null,
   ): EventListener {
+    // Materialized up front rather than at the splice below, and that is not
+    // the speculative call `bucketForMutation()`'s rule forbids: the stand-in
+    // is empty, an empty bucket holds nothing to aggregate onto, so reaching
+    // here with it means the insertion at the end of this method is certain.
+    // Both branches create — `getListenersForEventName()` is the named twin of
+    // the materializer.
     const bucket = listener.isCatchEmAll
-      ? this.catchEmAllBucket
+      ? this.mutableCatchEmAllBucket()
       : this.getListenersForEventName(listener.eventName);
 
     const similar = findSimilarListener(listener, bucket);
@@ -1000,21 +1125,24 @@ export class EventStore {
   }
 
   private removeByEventName(eventName: EventName): void {
-    const bucket = this.namedListeners.get(eventName);
-    if (bucket !== undefined) {
-      detachAll(bucket);
-      // Dropping the map entry is what empties the store here — this bucket is
-      // not being *changed*, it is being let go of, which is why it needs no
-      // clone. The truncation on top of it is a courtesy to a caller still
-      // holding the array from getListenersForEventName(), and it is the one
-      // thing a walk stepping through this very array must not suffer, so it
-      // is skipped exactly then. A named bucket, hence the `false`. See
-      // AGENTS.md, "the truncation exception".
-      if (bucket[HELD_BY] === 0) {
-        bucket.length = 0;
-      }
+    const bucket = this.namedBuckets.get(eventName);
+    // Returning early rather than deleting the key unconditionally: a bucket
+    // under this name is also the proof that the Map is this store's own and
+    // not the shared stand-in, which rejects `delete()` like every other write.
+    if (bucket === undefined) return;
+
+    detachAll(bucket);
+    // Dropping the map entry is what empties the store here — this bucket is
+    // not being *changed*, it is being let go of, which is why it needs no
+    // clone. The truncation on top of it is a courtesy to a caller still
+    // holding the array from getListenersForEventName(), and it is the one
+    // thing a walk stepping through this very array must not suffer, so it
+    // is skipped exactly then. A named bucket, hence the `false`. See
+    // AGENTS.md, "the truncation exception".
+    if (bucket[HELD_BY] === 0) {
+      bucket.length = 0;
     }
-    this.namedListeners.delete(eventName);
+    this.namedBuckets.delete(eventName);
   }
 
   /**
@@ -1137,11 +1265,11 @@ export class EventStore {
     if (listener.isCatchEmAll) {
       this.spliceOut(listener.eventName, this.catchEmAllBucket, listener);
     } else {
-      const bucket = this.namedListeners.get(listener.eventName);
+      const bucket = this.namedBuckets.get(listener.eventName);
       if (bucket) {
         const remaining = this.spliceOut(listener.eventName, bucket, listener);
         if (remaining.length === 0) {
-          this.namedListeners.delete(listener.eventName);
+          this.namedBuckets.delete(listener.eventName);
         }
       }
     }
@@ -1174,7 +1302,7 @@ export class EventStore {
     // walk every other bucket. Catch-em-all listeners are not in this one:
     // they live in the array the branch above handles, which is where they
     // have always been and where this path only started looking in v6.0.0.
-    const bucket = this.namedListeners.get(eventName);
+    const bucket = this.namedBuckets.get(eventName);
     if (!bucket) return;
     const remaining = this.detachByAssociation(
       eventName,
@@ -1182,7 +1310,7 @@ export class EventStore {
       listenerObject,
     );
     if (remaining.length === 0) {
-      this.namedListeners.delete(eventName);
+      this.namedBuckets.delete(eventName);
     }
   }
 
@@ -1230,7 +1358,7 @@ export class EventStore {
     const isObjectListener =
       typeof listener === 'object' || typeof listener === 'function';
 
-    this.namedListeners.forEach((bucket, name) => {
+    this.namedBuckets.forEach((bucket, name) => {
       // Replacing the value of a key the Map is currently iterating is
       // defined behaviour and does not re-visit the entry — which is what
       // lets bucketForMutation() swap a clone in from right here.
@@ -1242,7 +1370,7 @@ export class EventStore {
         isObjectListener,
       );
       if (remaining.length === 0) {
-        this.namedListeners.delete(name);
+        this.namedBuckets.delete(name);
       }
     });
 
@@ -1256,17 +1384,36 @@ export class EventStore {
   }
 
   removeAllListeners(): void {
-    this.namedListeners.forEach((bucket) => {
-      detachAll(bucket);
-      // The truncation exception again — see removeByEventName(). The map is
-      // cleared right after, so the store lets go of these arrays either way.
-      if (bucket[HELD_BY] === 0) {
-        bucket.length = 0;
-      }
-    });
-    this.namedListeners.clear();
+    // Nothing registered under a name means nothing to detach — and skipping
+    // the walk is also what keeps `clear()` off the shared stand-in, the same
+    // shape of guard `EventKeeper.remove()` carries. The Map itself stays: a
+    // spec holds the wildcard array across an `off(ε)` and expects the same
+    // array back, and emptying one container while releasing the other would
+    // be two rules where the truncation exception already states one.
+    if (this.namedBuckets.size !== 0) {
+      this.namedBuckets.forEach((bucket) => {
+        detachAll(bucket);
+        // The truncation exception again — see removeByEventName(). The map is
+        // cleared right after, so the store lets go of these arrays either way.
+        if (bucket[HELD_BY] === 0) {
+          bucket.length = 0;
+        }
+      });
+      this.namedBuckets.clear();
+    }
 
     const wildcards = this.catchEmAllBucket;
+    // An emitter no `'*'` listener ever reached has nothing here to detach and
+    // nothing to truncate — and this is the one place in the class where a
+    // removal path can reach a stand-in with a write in hand rather than a
+    // lookup. Load-bearing, not tidiness: `detachAll()` clears the index slot
+    // unconditionally, and on the frozen stand-in that assignment throws even
+    // though it would be writing the `undefined` already sitting there. Taking
+    // the guard out turns every `off(ε)` on an emitter without wildcard
+    // listeners into a `TypeError` naming the frozen index slot — verified by
+    // removing it, across seven suites.
+    if (wildcards === EMPTY_CATCH_EM_ALL) return;
+
     detachAll(wildcards);
     if (wildcards[HELD_BY] !== 0) {
       // A walk is stepping through this array. Hand the store a fresh one
@@ -1329,7 +1476,7 @@ export class EventStore {
     const namedBucket =
       eventName === EVENT_CATCH_EM_ALL
         ? undefined
-        : this.namedListeners.get(eventName);
+        : this.namedBuckets.get(eventName);
     const named =
       namedBucket !== undefined && namedBucket.length > 0
         ? namedBucket
@@ -1370,7 +1517,7 @@ export class EventStore {
 
   getSubscriptionCount(): number {
     let count = this.catchEmAllBucket.length;
-    for (const namedListeners of this.namedListeners.values()) {
+    for (const namedListeners of this.namedBuckets.values()) {
       count += namedListeners.length;
     }
     return count;

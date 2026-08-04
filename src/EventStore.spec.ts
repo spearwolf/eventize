@@ -2,6 +2,8 @@ import {createOnceObligation, EventListener} from './EventListener';
 import {dedupIndexOf, EventStore} from './EventStore';
 
 import {EVENT_CATCH_EM_ALL} from './constants';
+import {emit, eventize, off, on, once} from './index';
+import {storeOf} from './__test-utils__/listeners';
 
 // A stand-in listener for the fixtures that only care about bookkeeping, not
 // about dispatch. It has to be a *real* listener value: a `null` listener has
@@ -1584,6 +1586,261 @@ describe('EventStore', () => {
         'EventStore: forEach encountered a hole',
       );
       expect(seen).toHaveLength(0);
+    });
+  });
+
+  // Both containers are lazy, and until the first write both fields point at
+  // one pair shared by every store this module instance built — the same
+  // arrangement EventKeeper.spec.ts watches for the retain index. That makes
+  // every write path a place where a forgotten materialization would put one
+  // emitter's listeners into all of them at once, a corruption no behavioural
+  // spec can see because the emitter under test would still behave correctly.
+  // These cases watch the stand-ins themselves.
+  describe('the shared empty containers', () => {
+    // peekListeners() is the only door that hands the wildcard stand-in out:
+    // catchEmAllListeners returns a mutable array and therefore materializes,
+    // the way getListenersForEventName() does for a named bucket.
+    const wildcardBucketOf = (
+      store: EventStore,
+    ): ReadonlyArray<EventListener> => store.peekListeners(EVENT_CATCH_EM_ALL);
+
+    // Reaching past the ReadonlyArray, which is what a stray write inside the
+    // store would do too — the type is not what protects the shared object.
+    const asMutable = (listeners: ReadonlyArray<EventListener>) =>
+      listeners as EventListener[];
+
+    it('a fresh store builds neither a map nor a bucket of its own', () => {
+      const a = new EventStore();
+      const b = new EventStore();
+
+      expect(a.namedListeners).toBe(b.namedListeners);
+      expect(wildcardBucketOf(a)).toBe(wildcardBucketOf(b));
+      expect(a.namedListeners.size).toBe(0);
+      expect(wildcardBucketOf(a)).toHaveLength(0);
+      expect(a.getSubscriptionCount()).toBe(0);
+    });
+
+    // The stand-in is handed out by peekListeners() and read by dedupIndexOf(),
+    // so it has to be a bucket in full — AGENTS.md: every array that can become
+    // one is born in createBucket(), the shared empty one included. An array
+    // literal would arrive without the held count, read as *held*, and buy the
+    // first mutation a clone it does not owe.
+    it('the wildcard stand-in is a bucket, not a bare array', () => {
+      const store = new EventStore();
+      const standIn = wildcardBucketOf(store);
+      const real = store.getListenersForEventName('foo');
+
+      expect(Object.getOwnPropertySymbols(standIn)).toEqual(
+        Object.getOwnPropertySymbols(real),
+      );
+      expect(dedupIndexOf(standIn)).toBe(undefined);
+    });
+
+    it('the first write replaces the stand-in, and only for that store', () => {
+      const store = new EventStore();
+      const untouched = new EventStore();
+
+      store.add(new EventListener('foo', 0, NOOP));
+      expect(store.namedListeners).not.toBe(untouched.namedListeners);
+      // A named subscription buys the Map, never the wildcard bucket.
+      expect(wildcardBucketOf(store)).toBe(wildcardBucketOf(untouched));
+
+      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, NOOP));
+      expect(wildcardBucketOf(store)).not.toBe(wildcardBucketOf(untouched));
+
+      expect(untouched.namedListeners.size).toBe(0);
+      expect(untouched.getSubscriptionCount()).toBe(0);
+    });
+
+    // The poisoning, one entry per write the store makes on either container.
+    // Each of these is what a forgotten materialization would have executed
+    // against the shared object instead of against this emitter's own.
+    it('rejects mutation instead of corrupting every store this module built', () => {
+      const store = new EventStore();
+      const listener = new EventListener(EVENT_CATCH_EM_ALL, 0, NOOP);
+
+      // getListenersForEventName(), bucketForMutation() and the three delete
+      // paths, in that order.
+      expect(() =>
+        store.namedListeners.set('foo', [] as unknown as never),
+      ).toThrow(/shared empty stand-in/);
+      expect(() => store.namedListeners.delete('foo')).toThrow(
+        /shared empty stand-in/,
+      );
+      expect(() => store.namedListeners.clear()).toThrow(
+        /shared empty stand-in/,
+      );
+
+      const standIn = asMutable(wildcardBucketOf(store));
+
+      // add()'s insert, and every other mutator Array.prototype offers.
+      expect(() => standIn.splice(0, 0, listener)).toThrow(
+        /shared empty stand-in/,
+      );
+      expect(() => standIn.push(listener)).toThrow(/shared empty stand-in/);
+      expect(() => standIn.pop()).toThrow(/shared empty stand-in/);
+      expect(() => standIn.shift()).toThrow(/shared empty stand-in/);
+      expect(() => standIn.unshift(listener)).toThrow(/shared empty stand-in/);
+      expect(() => standIn.sort()).toThrow(/shared empty stand-in/);
+      expect(() => standIn.reverse()).toThrow(/shared empty stand-in/);
+
+      // The three writes no stub can shadow, which is why the stand-in is
+      // frozen on top of them: an element, the length, and the two symbol
+      // slots — forEach()'s `bucket[HELD_BY] += 1` and indexAdd()'s
+      // `bucket[DEDUP_INDEX] ??= new Map()`.
+      expect(() => {
+        standIn[0] = listener;
+      }).toThrow();
+      expect(() => {
+        standIn.length = 1;
+      }).toThrow();
+      for (const slot of Object.getOwnPropertySymbols(standIn)) {
+        expect(() => {
+          (standIn as unknown as Record<symbol, unknown>)[slot] = new Map();
+        }).toThrow();
+      }
+
+      expect(standIn).toHaveLength(0);
+      expect(new EventStore().getSubscriptionCount()).toBe(0);
+    });
+
+    // The other half of the poisoning: every path that reads or removes has to
+    // arrive at the stand-in without writing to it. A missed guard here is a
+    // throw rather than a corruption, which is the whole point — but it is a
+    // throw on `off()`, so it is worth one case that names the callers.
+    it('leaves the stand-ins in place across every read and every no-op removal', () => {
+      const pristine = new EventStore();
+      const store = new EventStore();
+      const listenerObject = {handler() {}};
+
+      expect(() => {
+        store.forEach('foo', () => {});
+        store.forEach(EVENT_CATCH_EM_ALL, () => {});
+        store.peekListeners('foo');
+        store.getSubscriptionCount();
+        store.remove('foo', null); // off(ε, 'foo')
+        store.remove(['foo', 'bar'], null); // off(ε, ['foo', 'bar'])
+        store.remove(listenerObject, null); // off(ε, listenerObject)
+        store.remove(listenerObject.handler, listenerObject); // off(ε, fn, ctx)
+        store.remove('foo', listenerObject, true); // off(ε, 'foo', listenerObject)
+        store.remove(EVENT_CATCH_EM_ALL, listenerObject, true); // off(ε, '*', o)
+        store.remove(null, null); // off(ε)
+        store.removeAllListeners();
+      }).not.toThrow();
+
+      expect(store.namedListeners).toBe(pristine.namedListeners);
+      expect(wildcardBucketOf(store)).toBe(wildcardBucketOf(pristine));
+    });
+
+    // Everything above watches a store built by hand. The three cases below
+    // watch the library driving it, because the saving is easier to give back
+    // than to make: `catchEmAllListeners` reads like a getter and allocates,
+    // so an internal caller that starts using it — a debug helper, a
+    // `forEach()` refactored to read the array by name — would undo MEM-001
+    // without turning a single bar red. Every count and every dispatch would
+    // go on being right; only the stand-ins would be gone. Same reasoning as
+    // retain.spec.ts's case for the keeper's pair, and the same shape.
+    //
+    // One case per emitter shape, because the two containers are earned
+    // separately and each shape drives a different set of store methods. The
+    // wildcard stand-in is read through peekListeners(), never through
+    // catchEmAllListeners — the latter is the door that creates.
+    // Takes the two stores rather than the emitter: `storeOf()` binds its type
+    // parameter per call, because the phantom brand on `EventizedObject` makes
+    // it invariant, and a helper that took the object would need the same
+    // generic signature to stay cast-free.
+    const wildcardStandInIntact = (store: EventStore, pristine: EventStore) =>
+      expect(store.peekListeners(EVENT_CATCH_EM_ALL)).toBe(
+        pristine.peekListeners(EVENT_CATCH_EM_ALL),
+      );
+
+    it('a dispatch on an emitter nobody subscribed to builds neither container', () => {
+      const pristine = storeOf(eventize({}));
+      const silent = eventize({});
+
+      // `'*'` is not emittable — the wildcard bucket is reached by every
+      // ordinary dispatch instead, which is the read this case is about.
+      emit(silent, 'foo', 'payload');
+      emit(silent, ['bar', 'baz'], 'payload');
+
+      expect(storeOf(silent).namedListeners).toBe(pristine.namedListeners);
+      wildcardStandInIntact(storeOf(silent), pristine);
+    });
+
+    // Every removal route the named half has, the unsubscribe handle included:
+    // off(name) reaches removeByEventName(), off(ε) reaches
+    // removeAllListeners(), and the handles on/once hand back reach
+    // release()/releaseObligation() → dropListener(), which is a path of its
+    // own and the only one that touches the wildcard array directly.
+    it('an emitter with named subscriptions only never reaches for the wildcard stand-in', () => {
+      const pristine = storeOf(eventize({}));
+      const named = eventize({});
+      const heard: unknown[] = [];
+
+      const unsubscribeOn = on(named, 'handled', (v: unknown) => heard.push(v));
+      const unsubscribeOnce = once(named, 'pending', () => heard.push('never'));
+      on(named, 'foo', (v: unknown) => heard.push(v));
+      once(named, 'bar', (v: unknown) => heard.push(v));
+
+      emit(named, 'handled', 0);
+      emit(named, 'foo', 1);
+      emit(named, 'bar', 2);
+      emit(named, 'never-subscribed', 3);
+
+      unsubscribeOn(); // release() → dropListener()
+      unsubscribeOnce(); // releaseObligation() → dropListener()
+      off(named, 'foo'); // removeByEventName()
+      off(named); // removeAllListeners()
+
+      expect(heard).toEqual([0, 1, 2]);
+      expect(storeOf(named).namedListeners).not.toBe(pristine.namedListeners);
+      wildcardStandInIntact(storeOf(named), pristine);
+    });
+
+    // The mirror. `add()`'s wildcard arm does not touch `namedBuckets` today,
+    // and `dropListener()`'s wildcard arm does not either — but that is a
+    // property of how the two branches happen to be written, and nothing else
+    // in the suite would notice if either started resolving a named bucket on
+    // the way past.
+    it('an emitter with wildcard subscriptions only never reaches for the named stand-in', () => {
+      const pristine = storeOf(eventize({}));
+      const wild = eventize({});
+      const heard: unknown[] = [];
+
+      const unsubscribe = on(wild, '*', (v: unknown) => heard.push(v));
+      once(wild, '*', (v: unknown) => heard.push(v));
+
+      emit(wild, 'foo', 1);
+      emit(wild, 'bar', 2);
+
+      unsubscribe(); // dropListener() takes the catch-em-all branch
+      off(wild);
+
+      expect(heard).toEqual([1, 1, 2]);
+      expect(storeOf(wild).namedListeners).toBe(pristine.namedListeners);
+      expect(storeOf(wild).peekListeners(EVENT_CATCH_EM_ALL)).not.toBe(
+        pristine.peekListeners(EVENT_CATCH_EM_ALL),
+      );
+    });
+
+    // The keeper's containers come back on a bulk teardown; the store's do
+    // not, and that asymmetry is deliberate rather than an omission. A caller
+    // holding the wildcard array across an off(ε) gets the same array back,
+    // truncated — the truncation exception in AGENTS.md — and releasing the
+    // Map while keeping the array would make two rules out of one.
+    it('keeps the containers it has once built, even after off(ε)', () => {
+      const pristine = new EventStore();
+      const store = new EventStore();
+      store.add(new EventListener('foo', 0, NOOP));
+      store.add(new EventListener(EVENT_CATCH_EM_ALL, 0, NOOP));
+      const wildcards = store.catchEmAllListeners;
+
+      store.remove(null, null); // off(ε)
+
+      expect(store.getSubscriptionCount()).toBe(0);
+      expect(store.namedListeners).not.toBe(pristine.namedListeners);
+      expect(store.catchEmAllListeners).toBe(wildcards);
+      expect(wildcards).toHaveLength(0);
     });
   });
 });
