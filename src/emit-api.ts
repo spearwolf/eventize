@@ -165,6 +165,13 @@ const isDuckTarget = isAttachableTarget;
 // duck-typing on plain objects, multi-event-name calls, etc.
 // ---------------------------------------------------------------------------
 
+/**
+ * Dispatches an event synchronously to every subscribed listener, in
+ * priority order, and updates the retained value for that name.
+ *
+ * Throws if the event name is (or, for an array of names, contains) the
+ * wildcard `'*'` — emit a concrete name instead.
+ */
 export function emit<
   TEvents extends EventMap,
   K extends EventKeysOf<TEvents> | symbol,
@@ -219,6 +226,14 @@ const markCollectedAsHandled = (values: any[]) => {
   }
 };
 
+/**
+ * Like `emit()`, but awaits every listener's return value — including a
+ * promise or an array of promises among them — before resolving.
+ *
+ * Resolves `undefined`, not `[]`, when no listener returned anything; check
+ * for that before indexing the result. Throws the same way `emit()` does
+ * for a wildcard name.
+ */
 export function emitAsync<
   TEvents extends EventMap,
   K extends EventKeysOf<TEvents> | symbol,

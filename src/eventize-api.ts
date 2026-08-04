@@ -154,6 +154,16 @@ const isBulkRemoval = (listener: unknown): boolean =>
 // around the internals.
 // ---------------------------------------------------------------------------
 
+/**
+ * Subscribes a listener to one or more event names; returns a function that
+ * unsubscribes it.
+ *
+ * A method-name subscription without a listener object throws
+ * (`Error.cause: 'missing-listener-object'`), as does a non-name anywhere a
+ * name is expected — a single name or inside an array — (`'invalid-name'`)
+ * or a `NaN` priority (`'invalid-priority'`); `Priority.Min`/`Priority.Max`
+ * are the signed infinities, not `NaN`.
+ */
 export const on: StandaloneSubscribeFunc = (
   obj: object,
   ...args: SubscribeArgs
@@ -163,6 +173,13 @@ export const on: StandaloneSubscribeFunc = (
   return makeOnUnsubscribe(eventizedObj, subscribeTo(store, keeper, args));
 };
 
+/**
+ * Like `on()`, but the subscription removes itself after firing once.
+ *
+ * Same argument validation as `on()`. A listener that re-emits its own
+ * event before returning fires a second time — this library has no
+ * recursion guard.
+ */
 // once() — auto-unsubscribes after the first call.
 export const once: StandaloneSubscribeFunc = (
   obj: object,
@@ -228,6 +245,15 @@ const abortReason = (signal: AbortSignal): unknown =>
 // The brackets are spelling, not mechanism: they match `ListenerTaking`, where
 // they are load-bearing, but nothing would distribute here either way —
 // `NonNullable<TEvents[K]>` is not a naked type parameter.
+/**
+ * Like `once()`, but resolves a `Promise` with the first matching event's
+ * first argument instead of taking a callback.
+ *
+ * An optional `AbortSignal` in `options` rejects the promise and cancels the
+ * subscription; without one, an event that never fires keeps the promise —
+ * and the emitter — alive indefinitely. `off(ε)` does not reach this
+ * subscription; abort via the signal instead.
+ */
 export function onceAsync<
   TEvents extends EventMap,
   K extends EventKeysOf<TEvents> | symbol,
@@ -328,6 +354,13 @@ export function onceAsync<ReturnType = void>(
 // would tax the documented shapes to protect one nobody in this library's
 // history has actually passed.
 // ---------------------------------------------------------------------------
+/**
+ * Detaches listeners. `off(ε)` (equivalently `off(ε, undefined)` or
+ * `off(ε, '*')`) wipes every listener and every retained value on the
+ * emitter; `off(ε, name, listenerObject)` detaches only that one
+ * subscription but still resets the retain policy for `name` — the array
+ * form `off(ε, [names], listenerObject)` does neither.
+ */
 export function off(
   eventizedObj: unknown,
   listener?: unknown,

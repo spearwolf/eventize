@@ -1,3 +1,11 @@
+/**
+ * The wildcard event name, `'*'`, used to subscribe a catch-all listener
+ * with `on()`/`once()`.
+ *
+ * It is subscribe-only: passing it (or an array containing it) to `emit()`,
+ * `emitAsync()` or `retain()` throws rather than dispatching or retaining
+ * every event.
+ */
 export const EVENT_CATCH_EM_ALL = '*';
 
 export const LISTENER_IS_FUNC = 1;

@@ -6,6 +6,15 @@ import {isEventized} from './isEventized';
 import type {EventizedObject} from './types';
 import {defineSealedHiddenProperty, isAttachableTarget} from './utils';
 
+/**
+ * Ensures `obj` carries the eventize marker, attaching it if missing, and
+ * returns `obj` itself (unchanged, just re-typed) so the standalone
+ * `on`/`once`/`emit`/… functions accept it.
+ *
+ * Throws a `TypeError` for anything that is not an object or a function, or
+ * for one that is frozen, sealed or otherwise non-extensible — eventize
+ * before freezing, or eventize a wrapper instead.
+ */
 export function asEventized<T extends object>(obj: T): T & EventizedObject {
   if (isEventized(obj)) {
     // it already has the interface - no need to inject it again.

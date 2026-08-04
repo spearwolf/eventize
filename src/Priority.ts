@@ -1,5 +1,13 @@
 import type {EventizePriority} from './types';
 
+/**
+ * Named priority levels for `on()`/`once()`, from `Max` (called first) to
+ * `Min` (called last); listeners at equal priority run in registration
+ * order. `Max`/`Min` are `+Infinity`/`-Infinity`, not ordinary numbers.
+ *
+ * `AAA`, `BB`, `C` and `Default` are deprecated aliases of `Critical`,
+ * `High`, `Medium` and `Normal` kept for older code — prefer the named ones.
+ */
 export const Priority: EventizePriority = {
   Max: Number.POSITIVE_INFINITY,
   Critical: 1e9,

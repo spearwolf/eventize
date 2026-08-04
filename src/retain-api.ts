@@ -122,6 +122,15 @@ const keeperCommand = (
 // `once` and `emit` carry: a private symbol event is not in the map and never
 // will be, and the loose arm underneath resolves to `never` for a typed map, so
 // without it such an event could be subscribed and fired but never retained.
+/**
+ * Marks one or more event names as retained: the next `emit()` for that
+ * name is remembered and replayed to any listener that subscribes later.
+ *
+ * Validates all names atomically before retaining any of them — a non-name,
+ * an empty array or a sparse array throws and retains nothing (`retain(ε,
+ * [])` is no longer a silent no-op); the wildcard `'*'` always throws
+ * rather than retaining every event.
+ */
 export function retain<TEvents extends EventMap>(
   obj: EventizedObject<TEvents>,
   eventNames:
@@ -145,6 +154,14 @@ export function retain(obj: object, eventNames: AnyEventNames): void {
   keeper.add(eventNames);
 }
 
+/**
+ * Discards the currently stored value for one or more event names, without
+ * disabling retain — a later `emit()` for that name is retained again.
+ *
+ * Throws a `TypeError` if `obj` is not eventized. Name validation is the
+ * same atomic check `retain()` uses; the wildcard `'*'` clears every stored
+ * value at once and keeps every policy.
+ */
 export function retainClear<TEvents extends EventMap>(
   obj: EventizedObject<TEvents>,
   eventNames:
@@ -168,6 +185,15 @@ export function retainClear(
   );
 }
 
+/**
+ * Fully reverses `retain()`: drops the stored value for one or more event
+ * names and stops future emissions from being retained.
+ *
+ * Throws a `TypeError` if `obj` is not eventized. Name validation is the
+ * same atomic check `retain()` uses; the wildcard `'*'` drops every policy
+ * and every stored value. Already-subscribed listeners are unaffected —
+ * they keep receiving new emissions.
+ */
 export function unretain<TEvents extends EventMap>(
   obj: EventizedObject<TEvents>,
   eventNames:

@@ -101,6 +101,18 @@ const eventizeMethods = {
   },
 };
 
+/**
+ * Prepares an object for the standalone `on`/`once`/`emit`/… functions and
+ * returns it, typed as an emitter. `eventize.inject(obj)` does the same but
+ * also attaches the whole API as methods on `obj` itself; `eventize.is` is
+ * `isEventized`.
+ *
+ * `eventize(obj)` alone does not add `obj.on`/`obj.emit`/… — call
+ * `eventize.inject(obj)` (or extend `Eventize`) if the object needs to call
+ * itself. The target must be extensible: a frozen, sealed or
+ * non-extensible object throws a `TypeError`; freezing it after eventizing
+ * it is fine.
+ */
 export const eventize: EventizerFuncAPI = (() => {
   const e = <
     TEvents extends EventMap = DefaultEventMap,
@@ -170,6 +182,16 @@ export interface Eventize<
 // runtime implementation. The implementations are installed on the prototype
 // below, so every member of `EventizeApi` is there — the merge is what gives
 // them their public signatures.
+/**
+ * Base class that gives every instance the full `on`/`once`/`emit`/…
+ * method surface, equivalent to calling `eventize.inject(this)` in the
+ * constructor.
+ *
+ * Each instance is its own emitter — unlike `eventize(SomeClass.prototype)`,
+ * subclassing does not share subscriptions across instances. Prefer
+ * composition (`eventize.inject(this)` in the constructor) when the class
+ * already extends something else.
+ */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Eventize<TEvents extends EventMap = DefaultEventMap> {
   constructor() {
