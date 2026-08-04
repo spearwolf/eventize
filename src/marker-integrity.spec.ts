@@ -36,9 +36,9 @@ describe('a marker written by another copy of eventize', () => {
     expect(() => emit(obj, 'foo', 1, 2)).toThrow(MISMATCH);
   });
 
-  // PERF-001 moved the internals resolution in the array branch of `_emit()`
-  // so a run of concrete names pays `internalsOf()` once instead of once per
-  // name — see the comment beside `_emitOne()` in eventize-api.ts. The one way
+  // The internals resolution in the array branch of `_emit()` was moved so
+  // that a run of concrete names pays `internalsOf()` once instead of once per
+  // name — see the comment beside `_emitOne()` in emit-api.ts. The one way
   // that change could regress this boundary is by resolving the marker before
   // the `'*'` rejection runs. It must not: '*' is checked first, unconditionally,
   // both for the scalar form and for every element of an array — a foreign

@@ -453,7 +453,7 @@ describe('emit() re-entrancy (sub/unsub during dispatch)', () => {
   });
 
   describe('retain order under nested emit()', () => {
-    // _emitOne() (eventize-api.ts) calls keeper.retain() only *after*
+    // _emitOne() (emit-api.ts) calls keeper.retain() only *after*
     // store.forEach() returns — that ordering is what lets a throwing
     // listener leave the previously retained value untouched (docs/retain.md:
     // "the retain write happens after all listeners have run"). The same

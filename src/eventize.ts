@@ -1,16 +1,8 @@
 import {asEventized} from './asEventized';
-import {
-  emit,
-  emitAsync,
-  off,
-  on as _on,
-  once as _once,
-  onceAsync,
-  retain,
-  retainClear,
-  unretain,
-} from './eventize-api';
+import {emit, emitAsync} from './emit-api';
+import {off, on as _on, once as _once, onceAsync} from './eventize-api';
 import {isEventized} from './isEventized';
+import {retain, retainClear, unretain} from './retain-api';
 import type {
   AnyEventNames,
   DefaultEventMap,

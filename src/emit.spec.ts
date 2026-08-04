@@ -65,7 +65,7 @@ describe('emit()', () => {
     });
   });
 
-  // PERF-001's internals-resolution package once passed the array branch
+  // An earlier internals-resolution change once passed the array branch
   // through a `for...of` loop. A `for...of` reads an array hole as `undefined`
   // and dispatches (and retains) an event under that name; `.forEach()`, which
   // both this path and the duck path below use, skips holes the way it always

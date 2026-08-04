@@ -1,4 +1,6 @@
-import {emitAsync, emit, off, on, retain} from './eventize-api';
+import {emitAsync, emit} from './emit-api';
+import {off, on} from './eventize-api';
+import {retain} from './retain-api';
 import {eventize} from './eventize';
 import {Priority} from './Priority';
 import {listenersOf} from './__test-utils__/listeners';

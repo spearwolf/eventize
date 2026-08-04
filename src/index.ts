@@ -3,6 +3,8 @@ import {eventize, Eventize} from './eventize';
 export {Eventize, eventize};
 
 export * from './eventize-api';
+export * from './emit-api';
+export * from './retain-api';
 export * from './Priority';
 export * from './isEventized';
 export * from './asEventized';
