@@ -59,15 +59,56 @@ export type DefaultEventMap = Record<EventName, any[]>;
 export type EventKeysOf<T> = Extract<keyof T, EventName>;
 
 /**
- * Argument tuple for event `K` on event-map `T`. Falls back to `EventArgs`
- * (i.e. `any[]`) when `K` is not in `T` (e.g. user used a symbol event that
- * isn't in the typed map) or `T[K]` is not declared as an array.
+ * Argument tuple for event `K` on event-map `T`.
+ *
+ * Two fallbacks, and they mean opposite things. `K` not in `T` is the symbol
+ * escape hatch — a private event the map never declared — and resolves to
+ * `EventArgs` (`any[]`), i.e. no checking, deliberately. `K` in `T` with a
+ * value that is not an array is a map that breaks the `{[eventName]: tuple}`
+ * convention, and resolves to `never`, so the call site fails the way the
+ * `EventMap` comment above promises. Up to `v5.1.0` it fell back to `EventArgs`
+ * too, which silently switched checking off for exactly the key its author got
+ * wrong.
+ *
+ * The array test is `readonly any[]` and the result is spread back into a
+ * mutable tuple: a `readonly` tuple is what falls out of `as const`, it carries
+ * every bit of positional information a mutable one does, and nothing here ever
+ * writes to the args.
+ *
+ * `NonNullable` runs first so an *optional* key keeps its tuple. `data?: [x]`
+ * is `[x] | undefined`, which is not an array and would otherwise land in the
+ * `never` branch — an optional key is a plausible map shape that worked up to
+ * `v5.1.0`, and optionality says nothing about the argument list.
  */
 export type ArgsFor<T, K> = K extends keyof T
-  ? T[K] extends any[]
-    ? T[K]
-    : EventArgs
+  ? NonNullable<T[K]> extends readonly any[]
+    ? [...NonNullable<T[K]>]
+    : never
   : EventArgs;
+
+/**
+ * A listener function taking the argument list `A` — and *no* listener at all
+ * when `A` is `never`.
+ *
+ * The guard is the difference between checking `on()` and only appearing to.
+ * `(...args: never) => void` is a signature every function is assignable to, so
+ * a key whose `ArgsFor` collapsed to `never` would reject every `emit()` and
+ * accept every listener, which is precisely the half-checked state the `never`
+ * exists to end.
+ *
+ * `[A] extends [never]` rather than `A extends never`, and here the brackets
+ * are load-bearing: `A` is a naked type parameter, so the bare form
+ * distributes. On the case this guard is named for the two agree — both
+ * spellings answer `never` for `A = never`, one by testing and one by
+ * distributing over nothing. They part on a *union* `A`: bracketed builds one
+ * signature over the union argument list, bare builds a union of signatures,
+ * which is the shape a function declaring one parameter is not assignable to
+ * and precisely what `MergeArgs` below exists to prevent. Measured, not
+ * assumed — `[string] | [number]` is the case that shows it.
+ */
+type ListenerTaking<A extends EventArgs> = [A] extends [never]
+  ? never
+  : (...args: A) => void;
 
 type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
   k: infer I,
@@ -216,9 +257,12 @@ export type ListenerFuncType = (...args: EventArgs) => void;
 
 /**
  * Listener function for a single event key. With the default event map this
- * collapses to `(...args: any[]) => void` (the v4 behavior).
+ * collapses to `(...args: any[]) => void` (the v4 behavior), and for a key that
+ * breaks the tuple convention to `never` — see `ListenerTaking`, which is what
+ * makes the `EventMap` comment's promise about the `on()` call site true rather
+ * than only the one about `emit()`.
  */
-export type ListenerFor<TEvents, K> = (...args: ArgsFor<TEvents, K>) => void;
+export type ListenerFor<TEvents, K> = ListenerTaking<ArgsFor<TEvents, K>>;
 
 /**
  * A listener-object whose method names match the event keys of `TEvents`.
@@ -227,7 +271,7 @@ export type ListenerFor<TEvents, K> = (...args: ArgsFor<TEvents, K>) => void;
  * fallback documented in `README.md`.
  */
 export type EventListenerMethods<TEvents extends EventMap = DefaultEventMap> = {
-  [K in EventKeysOf<TEvents>]?: (...args: ArgsFor<TEvents, K>) => void;
+  [K in EventKeysOf<TEvents>]?: ListenerFor<TEvents, K>;
 } & {
   emit?: (eventName: EventKeysOf<TEvents>, ...args: any[]) => void;
 };
@@ -411,12 +455,12 @@ export interface SubscribeFunc<TEvents extends EventMap = DefaultEventMap> {
   // (1c) typed array of event names, per-event priorities allowed
   <K extends EventKeysOf<TEvents>>(
     eventNames: Array<K | [K, number]>,
-    listener: (...args: MultiArgsFor<TEvents, K>) => void,
+    listener: ListenerTaking<MultiArgsFor<TEvents, K>>,
   ): UnsubscribeFunc;
   <K extends EventKeysOf<TEvents>>(
     eventNames: Array<K | [K, number]>,
     priority: number,
-    listener: (...args: MultiArgsFor<TEvents, K>) => void,
+    listener: ListenerTaking<MultiArgsFor<TEvents, K>>,
   ): UnsubscribeFunc;
 
   // (2t) the method-name and object forms keep the *name* checked and leave
@@ -577,13 +621,13 @@ export interface StandaloneSubscribeFunc {
   <TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
     obj: EventizedObject<TEvents>,
     eventNames: Array<K | [K, number]>,
-    listener: (...args: MultiArgsFor<TEvents, K>) => void,
+    listener: ListenerTaking<MultiArgsFor<TEvents, K>>,
   ): UnsubscribeFunc;
   <TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
     obj: EventizedObject<TEvents>,
     eventNames: Array<K | [K, number]>,
     priority: number,
-    listener: (...args: MultiArgsFor<TEvents, K>) => void,
+    listener: ListenerTaking<MultiArgsFor<TEvents, K>>,
   ): UnsubscribeFunc;
   // (2t) the method-name and listener-object forms with a checked event name.
   <TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
@@ -781,11 +825,25 @@ export interface EventizeApi<
   // already carries `AnyEventNames`, which is how a forwarding wrapper types
   // its own parameter: `EventName | EventName[]` matches neither `K` nor `K[]`.
 
-  // typed onceAsync — return type matches the first arg of the tuple for K
-  onceAsync<K extends EventKeysOf<TEvents>>(
+  // typed onceAsync — return type matches the first arg of the tuple for K.
+  // The `K extends keyof TEvents` test in the return type is what carries the
+  // symbol escape hatch: `TEvents[K]` is not writable for a symbol the map
+  // never declared, and such an event resolves nothing positional anyway, so
+  // it takes the `void` branch the same way a declared empty tuple does. The
+  // inner test reads the tuple the way `ArgsFor` reads it — the reasoning is
+  // at the standalone `onceAsync()` in `src/eventize-api.ts`.
+  onceAsync<K extends EventKeysOf<TEvents> | symbol>(
     eventName: K,
     options?: OnceAsyncOptions,
-  ): Promise<TEvents[K] extends [infer A, ...any[]] ? A : void>;
+  ): Promise<
+    K extends keyof TEvents
+      ? [NonNullable<TEvents[K]>] extends [never]
+        ? void
+        : NonNullable<TEvents[K]> extends readonly [infer A, ...any[]]
+          ? A
+          : void
+      : void
+  >;
   onceAsync<ReturnType = void>(
     eventNames: LooseEmitNames<TEvents>,
     options?: OnceAsyncOptions,
@@ -798,7 +856,7 @@ export interface EventizeApi<
     eventName: K,
     ...args: ArgsFor<TEvents, K>
   ): void;
-  emit<K extends EventKeysOf<TEvents>>(
+  emit<K extends EventKeysOf<TEvents> | symbol>(
     eventNames: K[],
     ...args: ArgsFor<TEvents, K>
   ): void;
@@ -808,7 +866,7 @@ export interface EventizeApi<
     eventName: K,
     ...args: ArgsFor<TEvents, K>
   ): Promise<any[] | undefined>;
-  emitAsync<K extends EventKeysOf<TEvents>>(
+  emitAsync<K extends EventKeysOf<TEvents> | symbol>(
     eventNames: K[],
     ...args: ArgsFor<TEvents, K>
   ): Promise<any[] | undefined>;
@@ -817,16 +875,26 @@ export interface EventizeApi<
     ...args: EventArgs
   ): Promise<any[] | undefined>;
 
-  retain(eventNames: EventKeysOf<TEvents> | Array<EventKeysOf<TEvents>>): void;
+  // The `| symbol` in the three name slots below is the same escape hatch
+  // `on`, `once` and `emit` carry: a private symbol event is not in the map and
+  // never will be, and the loose arm underneath is `never` for a typed map, so
+  // without it a symbol event could be subscribed and fired but neither
+  // retained nor awaited.
+  retain(
+    eventNames:
+      EventKeysOf<TEvents> | symbol | Array<EventKeysOf<TEvents> | symbol>,
+  ): void;
   retain(eventNames: LooseEmitNames<TEvents>): void;
 
   retainClear(
-    eventNames: EventKeysOf<TEvents> | Array<EventKeysOf<TEvents>>,
+    eventNames:
+      EventKeysOf<TEvents> | symbol | Array<EventKeysOf<TEvents> | symbol>,
   ): void;
   retainClear(eventNames: LooseEmitNames<TEvents>): void;
 
   unretain(
-    eventNames: EventKeysOf<TEvents> | Array<EventKeysOf<TEvents>>,
+    eventNames:
+      EventKeysOf<TEvents> | symbol | Array<EventKeysOf<TEvents> | symbol>,
   ): void;
   unretain(eventNames: LooseEmitNames<TEvents>): void;
 }

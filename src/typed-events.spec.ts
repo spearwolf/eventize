@@ -222,6 +222,96 @@ describe('typed events — generic event-map support', () => {
       expect(fn).toHaveBeenCalledWith('shh');
     });
 
+    // The symbol escape hatch is documented without a restriction, so every
+    // member has to honour it — up to v5.1.0 the four below restricted their
+    // typed arm to `EventKeysOf<TEvents>` while their loose arm was already
+    // closed by the typed map, which made `retain(ε, SECRET)` a TS2769 on an
+    // emitter that could subscribe and fire the very same event.
+    it('accepts an undeclared symbol event in the retain family and onceAsync', async () => {
+      const ε = eventize<MyEvents>();
+      const SECRET = Symbol('secret');
+      const seen: unknown[] = [];
+
+      retain(ε, SECRET);
+      emit(ε, SECRET, 'kept');
+      on(ε, SECRET, (value) => seen.push(value));
+      expect(seen).toEqual(['kept']);
+
+      retainClear(ε, SECRET);
+      unretain(ε, SECRET);
+      retain(ε, [SECRET]);
+
+      // The resolved value is typed `void`, not `any`: an event the map never
+      // declared has no first tuple element to name. The annotation is the pin
+      // — `unknown` would accept every other resolution too. At runtime the
+      // value is the first argument, the same as for a declared event.
+      const pending = onceAsync(ε, SECRET);
+      emit(ε, SECRET, 'awaited');
+      const resolved: void = await pending;
+      expect(resolved).toBe('awaited');
+
+      // The spelling that gets the value typed: the loose overload with an
+      // explicit return-type argument. It is the standalone form only — the
+      // method surface has no loose arm left once the map is typed.
+      unretain(ε, SECRET); // else the retained 'awaited' replays into it
+      const typed: Promise<string> = onceAsync<string>(ε, SECRET);
+      emit(ε, SECRET, 'annotated');
+      expect(await typed).toBe('annotated');
+    });
+
+    it('accepts an undeclared symbol in the array arm of emit and emitAsync', async () => {
+      const ε = eventize<MyEvents>();
+      const SECRET = Symbol('secret');
+      const fn = jest.fn();
+
+      on(ε, SECRET, fn);
+      emit(ε, [SECRET], 'shh');
+      await emitAsync(ε, [SECRET], 'shh again');
+
+      // The price of the hatch in the array arm, and the sharpest edge of the
+      // documented union gap: one undeclared symbol in the list makes `any[]`
+      // one member of the argument union, so the *declared* names in the same
+      // call are unchecked too. `data` is [string, number] and this compiles.
+      emit(ε, [SECRET, 'data'], 1);
+
+      expect(fn).toHaveBeenCalledTimes(3);
+    });
+
+    // The one member the hatch does not reach, named here so a spec fails if
+    // that changes in either direction: the array arm of on()/once() infers a
+    // key type it also feeds to `MultiArgsFor`, and a symbol has no tuple to
+    // merge.
+    it('does not reach the array arm of on() and once()', () => {
+      const ε = eventize<MyEvents>();
+      const SECRET = Symbol('secret');
+      // @ts-expect-error a symbol is not accepted in the array form of on()
+      on(ε, [SECRET], () => {});
+      // @ts-expect-error nor in the array form of once()
+      once(ε, [SECRET], () => {});
+      expect(true).toBe(true);
+    });
+
+    it('honours the symbol escape hatch on the method surface too', async () => {
+      const ε = eventize.inject<MyEvents>({});
+      const SECRET = Symbol('secret');
+      const seen: unknown[] = [];
+
+      ε.retain(SECRET);
+      ε.emit(SECRET, 'kept');
+      ε.on(SECRET, (value) => seen.push(value));
+      ε.retainClear(SECRET);
+      ε.unretain(SECRET);
+      ε.emit([SECRET], 'again');
+      await ε.emitAsync([SECRET], 'and again');
+
+      const pending = ε.onceAsync(SECRET);
+      ε.emit(SECRET, 'awaited');
+      const resolved: void = await pending;
+
+      expect(seen).toEqual(['kept', 'again', 'and again', 'awaited']);
+      expect(resolved).toBe('awaited');
+    });
+
     it('Eventize<> base class with no generic stays permissive', () => {
       class Loose extends Eventize {}
       const ε = new Loose();
@@ -250,6 +340,160 @@ describe('typed events — generic event-map support', () => {
       // @ts-expect-error data expects [string, number]; passing [number, string]
       emit(ε, 'data', 42, 'flipped');
       expect(true).toBe(true);
+    });
+
+    // The `EventMap` doc comment promises that a map deviating from the
+    // `{[eventName]: arg-tuple}` convention fails at the call site rather than
+    // at the declaration. Up to v5.1.0 it did not: `ArgsFor` fell back to
+    // `any[]` for anything that was not a mutable array, which switched
+    // checking off for the one key its author got wrong.
+    it('rejects every argument list for a map value that is not an array', () => {
+      interface WrongEvents {
+        data: string;
+      }
+      const ε = eventize<WrongEvents>();
+      // @ts-expect-error `data` is declared as `string`, not as an arg tuple
+      emit(ε, 'data', 1, 2, 3, {nonsense: true});
+      // Not even the empty call: there is no argument list a non-tuple
+      // declares, so the slot is `never` rather than "anything goes".
+      // @ts-expect-error same reason — `data` declares no argument tuple
+      emit(ε, 'data');
+      expect(true).toBe(true);
+    });
+
+    // The other half of the same promise, and the half that fails silently:
+    // `never` as an argument list makes `(...args: never) => void`, which every
+    // function is assignable to. Without the guard in `ListenerTaking` a broken
+    // map would reject every emit and accept every listener — checked in one
+    // direction only, which is worse than either.
+    it('rejects a listener for a map value that is not an array, on all three surfaces', () => {
+      interface WrongEvents {
+        data: string;
+      }
+      const ε = eventize<WrongEvents>();
+      const injected = eventize.inject<WrongEvents>({});
+      class WrongClass extends Eventize<WrongEvents> {}
+      const instance = new WrongClass();
+
+      // Parameters annotated so the marker below has exactly one error to
+      // catch — unannotated they would also be an implicit `any` each, and a
+      // marker that swallows two diagnostics pins neither.
+      // @ts-expect-error `data` declares no argument tuple, so it has no listener
+      on(ε, 'data', (payload: string, code: number) => {
+        void payload;
+        void code;
+      });
+      // @ts-expect-error same on the inject surface
+      injected.on('data', () => {});
+      // @ts-expect-error and on the class surface
+      instance.once('data', () => {});
+      // The array form goes the same way — `MultiArgsFor` collapses to `never`
+      // for a single broken name too.
+      // @ts-expect-error `data` declares no argument tuple
+      on(ε, ['data'], () => {});
+      // The typed listener-object form reads the same declaration.
+      // @ts-expect-error `data` declares no argument tuple
+      on(ε, {data() {}});
+      expect(true).toBe(true);
+    });
+
+    // The rule, from its passing side: a broken key fails wherever an argument
+    // list is checked and passes through wherever none is. Pinned so the prose
+    // describing it cannot quietly widen back to "nothing for that key
+    // compiles" — every line below follows from the rule rather than being an
+    // exception to it, which is why neither this case nor the prose counts them.
+    it('passes a broken key through wherever no argument list is checked', () => {
+      interface MixedEvents {
+        message: string; // breaks the convention
+        joined: [user: string]; // sound
+      }
+      const ε = eventize<MixedEvents>();
+      const handlers = {handler() {}, message() {}};
+
+      // No argument list is read here: the method name and the listener object
+      // are resolved at dispatch, which is what late binding means. The event
+      // name is checked and everything after it is not.
+      on(ε, 'message', 'handler', handlers);
+      on(ε, 'message', handlers);
+
+      // A multi-name call distributes `ArgsFor` over the key union, and `never`
+      // is the empty case of a union — so one sound key in the list absorbs the
+      // broken one. This is the documented union gap, seen from its other side.
+      emit(ε, ['message', 'joined'], 'bob');
+      on(ε, ['message', 'joined'], (user) => void user);
+
+      // `onceAsync()` names an event and awaits a value — no argument list is
+      // involved at all. The annotation is the pin, and `void` is the point:
+      // it is exactly what an undeclared symbol event resolves to, so this call
+      // cannot tell a broken key from a private one, and an unannotated await
+      // reports nothing.
+      const p: Promise<void> = onceAsync(ε, 'message');
+      void p;
+
+      // The same array with the broken key alone has no union to hide in.
+      // @ts-expect-error `message` declares no argument tuple
+      emit(ε, ['message'], 'bob');
+      expect(true).toBe(true);
+    });
+
+    it('agrees across emit, on and onceAsync on a key typed undefined', () => {
+      // `NonNullable` empties this declaration out. `never` satisfies the tuple
+      // pattern, so an unguarded `infer` would resolve `Promise<unknown>` here
+      // while emit and on resolve `never` — one member of the API contradicting
+      // the other two about one declaration.
+      interface NothingEvents {
+        nothing: undefined;
+      }
+      const ε = eventize<NothingEvents>();
+      // @ts-expect-error `nothing` declares no argument tuple
+      emit(ε, 'nothing');
+      const pending: Promise<void> = onceAsync(ε, 'nothing');
+      void pending;
+      expect(true).toBe(true);
+    });
+
+    it('keeps an optional key emittable and typed', async () => {
+      // `data?: [payload: string]` is `[payload: string] | undefined`, which is
+      // not an array — without the `NonNullable` in `ArgsFor` the key would be
+      // un-emittable. Optionality says nothing about the argument list.
+      interface OptionalEvents {
+        data?: [payload: string];
+      }
+      const ε = eventize<OptionalEvents>();
+      const fn = jest.fn<void, [string]>();
+      on(ε, 'data', fn);
+      emit(ε, 'data', 'hello');
+      // @ts-expect-error data expects [string]
+      emit(ε, 'data', 42);
+      expect(fn).toHaveBeenCalledWith('hello');
+
+      // Same annotation-as-pin as for the readonly key above.
+      const pending: Promise<string> = onceAsync(ε, 'data');
+      emit(ε, 'data', 'awaited');
+      expect(await pending).toBe('awaited');
+    });
+
+    it('checks a readonly tuple instead of waving it through', async () => {
+      // What falls out of `as const`, and up to v5.1.0 not an `any[]` — so the
+      // key it declared was unchecked.
+      interface ReadonlyEvents {
+        data: readonly [payload: string, code: number];
+      }
+      const ε = eventize<ReadonlyEvents>();
+      const fn = jest.fn<void, [string, number]>();
+      on(ε, 'data', fn);
+      emit(ε, 'data', 'hello', 42);
+      // @ts-expect-error data expects [string, number]; passing [number, string]
+      emit(ε, 'data', 42, 'flipped');
+      expect(fn).toHaveBeenCalledWith('hello', 42);
+
+      // The annotation is the pin: `onceAsync()` reads the same declaration,
+      // and a condition testing for a *mutable* tuple would hand back
+      // `Promise<void>` here — a return type lost without a word, on a key
+      // whose emit and on are fully checked.
+      const pending: Promise<string> = onceAsync(ε, 'data');
+      emit(ε, 'data', 'awaited', 1);
+      expect(await pending).toBe('awaited');
     });
 
     it('rejects wrong listener signature on typed on()', () => {
@@ -678,6 +922,42 @@ describe('typed events — generic event-map support', () => {
       // @ts-expect-error 'nope' is not a key of PairEvents
       ε.emitAsync(['opened', 'nope'], 9);
       expect(true).toBe(true);
+    });
+
+    // `PairEvents` above declares both names with the same tuple, which is
+    // exactly the case where the documented union gap does not show. This map
+    // is the case where it does — both halves pinned, because the gap widening
+    // and the gap closing are each a change nobody would otherwise notice.
+    interface SplitEvents {
+      opened: [id: number];
+      closed: [reason: string];
+    }
+
+    it('checks the array arm against the union of the listed tuples, not a shared one', () => {
+      const ε = eventize.inject<SplitEvents>({});
+      const seen: unknown[] = [];
+      ε.on('closed', (reason) => {
+        seen.push(reason);
+      });
+
+      // The documented gap, deliberately accepted: the call compiles as soon
+      // as the arguments fit at least *one* listed name, and the runtime then
+      // hands the same arguments to every name — so `closed`, whose tuple is
+      // [string], is dispatched a number here without a word from the checker.
+      ε.emit(['opened', 'closed'], 7);
+      expect(seen).toEqual([7]);
+
+      // The other direction of the same gap.
+      ε.emit(['opened', 'closed'], 'boom');
+      expect(seen).toEqual([7, 'boom']);
+
+      // Arguments fitting neither name are still rejected — that is the half
+      // of the check the gap does not swallow. Both lines still run, so they
+      // come after the assertions above.
+      // @ts-expect-error neither [id: number] nor [reason: string] takes a boolean
+      ε.emit(['opened', 'closed'], true);
+      // @ts-expect-error same for the async sibling
+      ε.emitAsync(['opened', 'closed'], true);
     });
   });
 });

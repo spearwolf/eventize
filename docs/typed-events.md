@@ -101,6 +101,36 @@ interface MyEventsBad extends EventMap {
 
 The constraint on `TEvents` is intentionally as loose as `object` so a plain interface satisfies it without an index signature. This is the price of strict narrowing.
 
+Every value has to be an argument tuple — `[]` for an event that carries none. A `readonly` tuple works and is checked positionally, which is what an `as const` lifted into a map gives you, and so does an optional key. Anything that is not an array at all breaks the convention, and since v6.0.0 it fails at the `emit()` *and* the `on()` call site rather than at the declaration:
+
+```ts
+interface ChatEvents {
+  message: string;                 // ❌ not a tuple — see the rule below
+  joined: readonly [user: string]; // ✅ checked positionally
+  left?: [user: string];           // ✅ optional, checked positionally
+  closed: [];                      // ✅ an event with no arguments
+}
+```
+
+Up to v5.1.0 all three of the non-array value, the `readonly` tuple and the optional key fell back to `any[]`, so the key its author got wrong was the one key nothing checked. The listener slot is the half that mattered most and was the last to arrive: an argument list of `never` makes `(...args: never) => void`, a signature every function satisfies, so a broken key would reject each `emit()` and accept each `on()` — checked in one direction only.
+
+One rule decides where that shows up: **a broken key fails wherever an argument list is checked, and passes through wherever none is.** It is not a list of exceptions to memorise — every spelling below follows from it, and so does any spelling added later.
+
+```ts
+emit(ε, 'message', 'anything');        // ❌ checks an argument list — there is none
+emit(ε, 'message');                    // ❌ not even the empty one
+on(ε, 'message', (text) => {});        // ❌ checks a listener signature
+on(ε, ['message'], (text) => {});      // ❌ same, through the array form
+on(ε, {message(text) {}});             // ❌ the typed listener-object reads it too
+
+on(ε, 'message', 'handler', obj);      // ✅ checks the name, nothing after it
+on(ε, 'message', obj);                 // ✅ same
+emit(ε, ['message', 'joined'], 'bob'); // ✅ checks the union of the listed tuples
+onceAsync(ε, 'message');               // ✅ has no argument list to check
+```
+
+The passing side is the same looseness these forms carry for a sound key. The method-name and listener-object forms resolve everything after the name at dispatch time — that is what late binding means. The multi-name call is the union rule in the caveats below seen from its other side: a `never` in a union is the case that contributes nothing, so any sound key in the list absorbs the broken one. And `onceAsync()` names an event and awaits a value; it resolves `Promise<void>` here — which is exactly what an undeclared symbol resolves to, so that call cannot tell you the key is broken and an unannotated `await` says nothing at all.
+
 What *does* widen `keyof` back to `string | symbol` is an index signature written into the map itself — `[key: string]: any[]`. That is a deliberate escape hatch, covered above, and it reopens every loose overload along with the names.
 
 ## Backwards compatibility & duck-typing
@@ -129,7 +159,16 @@ const PRIVATE = Symbol('private');
 const ε = eventize<ChatEvents>();
 on(ε, PRIVATE, (...args) => {/*…*/}); // ✅ symbol always allowed
 emit(ε, PRIVATE, 'anything');         // ✅ permissive args
+retain(ε, PRIVATE);                   // ✅ so is the retain family
+await onceAsync(ε, PRIVATE);          // ✅ resolves `void` — see below
 ```
+
+Since v6.0.0 that holds for `onceAsync`, `retain`, `retainClear` and `unretain` too, and for the array arm of `emit` / `emitAsync`, on all three surfaces. Up to v5.1.0 those four took declared keys only, so a private symbol event could be subscribed and fired but neither retained nor awaited.
+
+Two edges are left, both deliberate:
+
+- **The array arm of `on()` / `once()` takes declared names only.** `on(ε, [PRIVATE], fn)` is a compile error while `on(ε, PRIVATE, fn)` is not — the multi-name form merges the listed tuples into one listener signature, and a name the map never declared brings none. Subscribe a symbol on its own.
+- **`onceAsync(ε, PRIVATE)` resolves to `void`**, because an undeclared event has no first tuple element to name. The value arrives at runtime all the same; the spelling that types it is the explicit generic, `onceAsync<string>(ε, PRIVATE)` — an annotation on the awaited value (`const v: string = await onceAsync(ε, PRIVATE)`) is a `TS2322`. That generic is the standalone form only: a typed map closes the loose arm the method surfaces would need for it. Declaring the symbol in the map types it everywhere.
 
 For strict typing on a symbol event, add it to the map:
 
@@ -143,7 +182,7 @@ interface ChatEvents {
 
 ## Caveats worth knowing
 
-- Multi-event-name calls to `emit(ε, ['a', 'b'], …)` on typed emitters are checked against the *union* of the listed tuples, not against a shared one: the call compiles as soon as the arguments match at least one listed name. `emit(ε, ['message', 'joined'], 'alice')` type-checks and then dispatches `'message'` one argument short, because the runtime hands the same arguments to every name. Only arguments fitting none of the listed events are rejected. Use separate `emit()` calls when the tuples differ — not because the compiler stops you, but because it will not.
+- Multi-event-name calls to `emit(ε, ['a', 'b'], …)` on typed emitters are checked against the *union* of the listed tuples, not against a shared one: the call compiles as soon as the arguments match at least one listed name. `emit(ε, ['message', 'joined'], 'alice')` type-checks and then dispatches `'message'` one argument short, because the runtime hands the same arguments to every name. Only arguments fitting none of the listed events are rejected. Use separate `emit()` calls when the tuples differ — not because the compiler stops you, but because it will not. The sharpest edge of the same rule: an undeclared symbol in the list contributes `any[]` to that union, so `emit(ε, [PRIVATE, 'message'], 1)` checks nothing at all, `'message'` included.
 - `on()` and `once()` are the other way round, deliberately: since v6.0.0 a common listener for several names compiles even when the tuples differ. Identical tuples keep the listener positionally typed; differing ones give every parameter the union of all element types, because positional information genuinely does not exist for one function serving two shapes. Per-event priority tuples (`on(ε, [['a', Priority.High], 'b'], fn)`) work on typed emitters either way, and the names inside the tuples are still checked against the map.
 - The `__TEventsBrand` phantom field on `EventizedObject<T>` is a compile-time-only contrivance: it's never present at runtime and the symbol is not exported, so user code can't accidentally mismatch it.
 - `getSubscriptionCount(ε)` and `EVENT_CATCH_EM_ALL` are intentionally untyped against `TEvents` — they are diagnostic or structural and don't depend on the event map. Untyped is not the same as usable, though: `EVENT_CATCH_EM_ALL` is `'*'`, which no typed map declares, so `on(ε, '*', fn)`, `ε.on('*', fn)` and both spelled with the constant are compile errors on a typed emitter. Reach the wildcard through a form that carries no event name — `on(ε, fn)`, `ε.on(fn)`, or a listener object with an `emit()` member. `isEventized()` is no longer in that group: since v6.0.0 it preserves the map of the emitter it narrows, so a typed `emit()` inside the `if` is checked exactly as it is outside.

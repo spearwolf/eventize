@@ -9,9 +9,9 @@ to grep for and what to write instead.
 ## v5 → v6
 
 `v6.0.0` is the only `6.x` there is, so a `v5.1.0` consumer takes the whole jump
-at once. Twenty breaking changes. Thirteen are runtime changes on signatures that
+at once. Twenty-one breaking changes. Thirteen are runtime changes on signatures that
 do not change shape, so the type checker will not find the call sites for you —
-grep for the patterns below where one is given. Seven are type-only and do surface
+grep for the patterns below where one is given. Eight are type-only and do surface
 as compile errors.
 
 Seven further changes are filed as fixes rather than breaks, but a v5 consumer
@@ -510,6 +510,70 @@ error the same way: `on(ε, ['a', 'b'])`, `on(ε, null)` and
 slot still accepts `null` / `undefined` wherever it carries a `this` context —
 `on(ε, 'foo', fn, null)`. Behind a method name it does not, for the reason two
 sections up.
+
+### An event-map value that is not an argument tuple
+
+Up to `v5.1.0` a map key whose value was not a *mutable* array switched checking
+off for that key — silently, and for the one key its author most likely got
+wrong. Since `v6.0.0` two shapes it wrongly caught are checked as the tuples
+they are — a `readonly` tuple and an optional key — and a genuine non-array
+value rejects the argument list *and* the listener signature.
+
+Nothing points at the map, so grep for the emitters and read the maps they name:
+
+```
+rg "eventize(\.inject)?<|extends Eventize<" src/
+```
+
+Before — compiled everywhere, checked nowhere:
+
+```ts
+interface ChatEvents {
+  message: string;                  // not a tuple at all
+  joined: readonly [user: string];  // readonly, e.g. lifted from `as const`
+  left?: [user: string];            // optional, so `[user: string] | undefined`
+}
+
+emit(ε, 'message', 1, 2, 3);      // accepted up to v5.1.0
+emit(ε, 'joined', 42);            // accepted up to v5.1.0
+emit(ε, 'left', 42);              // accepted up to v5.1.0
+on(ε, 'message', (a, b) => {});   // accepted up to v5.1.0, both params `any`
+```
+
+After — `message` declares no argument list, so neither an `emit()` nor an
+`on()` for it compiles until the declaration is a tuple; `joined` and `left`
+keep their spelling, reject the wrong arguments, and get the `onceAsync()`
+return type they used to lose:
+
+```ts
+interface ChatEvents {
+  message: [text: string];
+  joined: readonly [user: string];
+  left?: [user: string];
+}
+
+emit(ε, 'message', 'hi');
+emit(ε, 'joined', 'bob');
+emit(ε, 'left', 'bob');
+// emit(ε, 'joined', 42);                      // ❌ now a compile error
+// emit(ε, 'left', 42);                        // ❌ now a compile error
+const who: string = await onceAsync(ε, 'left'); // was `void` up to v5.1.0
+```
+
+An event carrying no arguments is `[]`, not `void` and not `never`. A key the
+map does not declare at all is untouched by this — that is the symbol escape
+hatch, and it still takes permissive arguments.
+
+Not every call site finds a broken key, and one rule says which do: it fails
+wherever an argument list is checked, and passes through wherever none is.
+`on(ε, 'message', 'handler', obj)` and `on(ε, 'message', obj)` check the name
+and resolve the rest at dispatch, which is what late binding means.
+`emit(ε, ['message', 'joined'], 'bob')` checks the union of the listed tuples,
+where a `never` contributes nothing — listing the broken key alone
+(`emit(ε, ['message'], 'bob')`) has no union to hide in and fails.
+`onceAsync(ε, 'message')` resolves `Promise<void>`, indistinguishable from an
+undeclared symbol event. Fix the declaration; do not rely on a call site to
+find it for you.
 
 ### Typed maps now narrow on `eventize.inject()` and `class Eventize`
 

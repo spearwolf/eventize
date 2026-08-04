@@ -803,6 +803,8 @@ emit(ε, 'message', 'alice', 'hello'); // ✅
 
 Define the map as a **plain interface**. `extends EventMap` buys nothing — `EventMap` is `object`, so nothing is inherited and the narrowing survives — but it costs an import for no effect. What actually reopens the map is an index signature written into it (`[key: string]: any[]`), which is the deliberate escape hatch for dynamic names.
 
+Every value has to be an argument tuple — `[]` for an event carrying none; a `readonly` tuple and an optional key are both fine and both checked positionally. A value that is not an array makes `emit(ε, 'name', …)`, `on(ε, 'name', fn)` and the typed listener-object form compile errors for that key since v6.0.0; up to v5.1.0 all three shapes fell back to `any[]` and switched checking off for exactly the key its author got wrong. One rule says where that surfaces: such a key fails wherever an argument list is checked and passes through wherever none is — the method-name and listener-object forms, and `onceAsync()`. A multi-name call that also names a sound key passes it too, for the neighbouring reason: the argument list is checked against the union of the listed tuples, and a `never` in a union contributes nothing to fail on. [`docs/typed-events.md`](./docs/typed-events.md) has the detail.
+
 Without a generic, every API behaves exactly like v4.0.x: arbitrary event names, arbitrary arguments, listener-objects with whatever method names you like.
 
 #### Exported types

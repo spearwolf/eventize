@@ -88,9 +88,14 @@ const assertRetainNamesAreUsable = (
 // retain() / retainClear() / unretain() — typed event-name overload first.
 // ---------------------------------------------------------------------------
 
+// The `| symbol` in all three typed name slots below is the escape hatch `on`,
+// `once` and `emit` carry: a private symbol event is not in the map and never
+// will be, and the loose arm underneath resolves to `never` for a typed map, so
+// without it such an event could be subscribed and fired but never retained.
 export function retain<TEvents extends EventMap>(
   obj: EventizedObject<TEvents>,
-  eventNames: EventKeysOf<TEvents> | Array<EventKeysOf<TEvents>>,
+  eventNames:
+    EventKeysOf<TEvents> | symbol | Array<EventKeysOf<TEvents> | symbol>,
 ): void;
 export function retain<T extends object>(
   obj: NonTypedEmitter<T>,
@@ -114,7 +119,8 @@ export function retain(obj: object, eventNames: AnyEventNames): void {
 
 export function retainClear<TEvents extends EventMap>(
   obj: EventizedObject<TEvents>,
-  eventNames: EventKeysOf<TEvents> | Array<EventKeysOf<TEvents>>,
+  eventNames:
+    EventKeysOf<TEvents> | symbol | Array<EventKeysOf<TEvents> | symbol>,
 ): void;
 export function retainClear<T extends object>(
   obj: NonTypedEmitter<T>,
@@ -141,7 +147,8 @@ export function retainClear(
 
 export function unretain<TEvents extends EventMap>(
   obj: EventizedObject<TEvents>,
-  eventNames: EventKeysOf<TEvents> | Array<EventKeysOf<TEvents>>,
+  eventNames:
+    EventKeysOf<TEvents> | symbol | Array<EventKeysOf<TEvents> | symbol>,
 ): void;
 export function unretain<T extends object>(
   obj: NonTypedEmitter<T>,

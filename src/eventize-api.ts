@@ -206,14 +206,44 @@ export const once: StandaloneSubscribeFunc = (
 const abortReason = (signal: AbortSignal): unknown =>
   signal.reason ?? new DOMException('This operation was aborted', 'AbortError');
 
+// The `| symbol` is the escape hatch `on`, `once` and `emit` carry: a private
+// symbol event the map never declared. The return type asks `K extends keyof
+// TEvents` because `TEvents[K]` is not writable for such a symbol — and it
+// resolves nothing positional either, so it takes the `void` branch a declared
+// empty tuple takes.
+//
+// The inner test reads the tuple exactly the way `ArgsFor` does — `readonly`
+// admitted, `NonNullable` first — because it is the same declaration being
+// read. A test for a mutable tuple alone would hand `Promise<void>` to a
+// `readonly` or optional key whose `emit()` and `on()` are fully checked, which
+// is the one failure mode nobody greps for: a return type that quietly went
+// missing.
+//
+// The `[…] extends [never]` guard ahead of it catches the declarations that
+// reach the tuple test empty: a key typed `undefined` or `null`, which
+// `NonNullable` empties out, and one typed `never`, which arrives that way.
+// `never` is assignable to the tuple pattern, so the `infer` would succeed on
+// nothing and hand back `unknown` — wider than the `void` such a key resolved
+// to before, and wider than the `never` its own `emit()` and `on()` resolve to.
+// The brackets are spelling, not mechanism: they match `ListenerTaking`, where
+// they are load-bearing, but nothing would distribute here either way —
+// `NonNullable<TEvents[K]>` is not a naked type parameter.
 export function onceAsync<
   TEvents extends EventMap,
-  K extends EventKeysOf<TEvents>,
+  K extends EventKeysOf<TEvents> | symbol,
 >(
   obj: EventizedObject<TEvents>,
   eventName: K,
   options?: OnceAsyncOptions,
-): Promise<TEvents[K] extends [infer A, ...any[]] ? A : void>;
+): Promise<
+  K extends keyof TEvents
+    ? [NonNullable<TEvents[K]>] extends [never]
+      ? void
+      : NonNullable<TEvents[K]> extends readonly [infer A, ...any[]]
+        ? A
+        : void
+    : void
+>;
 export function onceAsync<ReturnType = void, T extends object = object>(
   obj: NonTypedEmitter<T>,
   eventNames: AnyEventNames,

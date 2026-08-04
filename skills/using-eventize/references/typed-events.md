@@ -83,6 +83,19 @@ interface MyEventsBad extends EventMap {
 
 The constraint on `TEvents` is deliberately as loose as `object` so a plain interface satisfies it without an index signature. That looseness is the price of strict narrowing.
 
+Every value has to be an argument tuple — `[]` for an event carrying none. A `readonly` tuple and an optional key both work and are checked positionally. Anything that is not an array breaks the convention and, since v6.0.0, fails at the `emit()` *and* the `on()` call site rather than at the declaration; up to v5.1.0 all three fell back to `any[]`, so the key its author got wrong was the one key nothing checked.
+
+```ts
+interface MyEvents {
+  message: string; // ❌ not a tuple — see below for what fails
+  joined: readonly [user: string]; // ✅ checked positionally
+  left?: [user: string]; // ✅ optional, checked positionally
+  closed: []; // ✅ an event with no arguments
+}
+```
+
+One rule says where a broken key surfaces: it fails wherever an argument list is checked, and passes through wherever none is. It fails at `emit(ε, 'message', …)` (the empty call included), `on(ε, 'message', fn)`, the array form `on(ε, ['message'], fn)` and the typed listener-object `on(ε, {message() {}})`. It passes through `on(ε, 'message', 'handler', obj)` and `on(ε, 'message', obj)`, which check the name and resolve the rest at dispatch; through `emit(ε, ['message', 'joined'], 'bob')`, where the union of the listed tuples absorbs the `never` (the multi-event rule in the caveats below, seen from its other side); and through `onceAsync(ε, 'message')`, which resolves `Promise<void>` — the same as an undeclared symbol, so that call cannot tell the two apart.
+
 ## Symbols are an escape hatch
 
 Symbol event names are accepted on a typed emitter even when absent from the map, with permissive arguments — useful for private events alongside a typed public surface:
@@ -92,13 +105,20 @@ const PRIVATE = Symbol('private');
 const ε = eventize<ChatEvents>();
 on(ε, PRIVATE, (...args) => {});  // ✅
 emit(ε, PRIVATE, 'anything');     // ✅ permissive
+retain(ε, PRIVATE);               // ✅ the retain family too
+await onceAsync(ε, PRIVATE);      // ✅ resolves `void`
 ```
+
+Since v6.0.0 `onceAsync`, `retain`, `retainClear`, `unretain` and the array arm of `emit` / `emitAsync` honour it too, on all three surfaces — up to v5.1.0 those four took declared keys only, so a private symbol event could be subscribed and fired but neither retained nor awaited. Two edges remain, both deliberate:
+
+- The **array arm of `on()` / `once()`** takes declared names only: `on(ε, [PRIVATE], fn)` is a compile error, `on(ε, PRIVATE, fn)` is not. The multi-name form merges the listed tuples into one listener signature and an undeclared name brings none.
+- **`onceAsync(ε, PRIVATE)` resolves to `void`** — an undeclared event has no first tuple element to name. The value arrives at runtime; `onceAsync<string>(ε, PRIVATE)` is the spelling that types it (standalone only — a typed map closes the loose arm the method surfaces would need), while `const v: string = await onceAsync(ε, PRIVATE)` is a `TS2322`.
 
 Add the symbol to the map (`[PRIVATE]: [reason: string]`) if you want it checked.
 
 ## Caveats
 
-- Multi-event `emit(ε, ['a', 'b'], …)` is checked against the **union** of the listed tuples, not a shared one: it compiles as soon as the arguments match at least one listed name, and the runtime then hands the same arguments to every name. `emit(ε, ['message', 'joined'], 'alice')` compiles and dispatches `message` one argument short. Use separate calls when the tuples differ — the compiler will not stop you.
+- Multi-event `emit(ε, ['a', 'b'], …)` is checked against the **union** of the listed tuples, not a shared one: it compiles as soon as the arguments match at least one listed name, and the runtime then hands the same arguments to every name. `emit(ε, ['message', 'joined'], 'alice')` compiles and dispatches `message` one argument short. Use separate calls when the tuples differ — the compiler will not stop you. Sharpest edge of the same rule: an undeclared symbol in the list contributes `any[]` to that union, so `emit(ε, [PRIVATE, 'message'], 1)` checks nothing at all, the declared name included.
 - Multi-event `on()` / `once()` does **not**: since v6.0.0 a common listener compiles even when the tuples differ. Identical tuples keep it positionally typed; differing ones give each parameter the union of all element types, since positional information does not exist for one function serving two shapes.
 - Per-event priority tuples (`on(ε, [['a', Priority.High], 'b'], fn)`) work on typed emitters, and names inside tuples are still checked against the map — see `api-details.md`.
 - `off()` is intentionally **untyped** against `TEvents` — every parameter accepts `unknown`. Cleanup code routinely handles values of unknown origin, and the runtime is permissive anyway.

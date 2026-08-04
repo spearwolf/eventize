@@ -172,7 +172,10 @@ export function emit<
   eventName: K,
   ...args: ArgsFor<TEvents, K>
 ): void;
-export function emit<TEvents extends EventMap, K extends EventKeysOf<TEvents>>(
+export function emit<
+  TEvents extends EventMap,
+  K extends EventKeysOf<TEvents> | symbol,
+>(
   obj: EventizedObject<TEvents>,
   eventNames: K[],
   ...args: ArgsFor<TEvents, K>
@@ -225,7 +228,7 @@ export function emitAsync<
 ): Promise<any[] | undefined>;
 export function emitAsync<
   TEvents extends EventMap,
-  K extends EventKeysOf<TEvents>,
+  K extends EventKeysOf<TEvents> | symbol,
 >(
   obj: EventizedObject<TEvents>,
   eventNames: K[],

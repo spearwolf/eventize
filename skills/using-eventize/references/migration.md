@@ -3,10 +3,10 @@
 ## v5 → v6
 
 Against the last released version, `v5.1.0` — and `v6.0.0` is the only
-`6.x` there is, so this is the whole jump. Twenty breaking changes.
+`6.x` there is, so this is the whole jump. Twenty-one breaking changes.
 Thirteen are runtime changes on signatures that don't change shape, so grep
 for the call patterns rather than relying on the type checker to find
-affected sites. Seven are type-only and surface as compile errors
+affected sites. Eight are type-only and surface as compile errors
 instead.
 
 - **Bulk `off()` now clears retained state.** `off(ε)`, `off(ε, '*')`, and
@@ -238,6 +238,37 @@ instead.
   callers of the subclass — a member in a class body wins over the merged
   interface, which is the whole reason the base class stopped declaring its
   own.
+- **An event-map value that is not an argument tuple fails at the call
+  site — at `emit()` and at `on()` alike.** Up to `v5.1.0` a key whose value
+  was not a *mutable* array fell back to `any[]`, which switched checking off
+  for that key entirely. Two shapes it wrongly caught are read as the tuples
+  they are now and checked positionally: a `readonly` tuple (what `as const`
+  produces) and an optional key, whose declared type includes `undefined`.
+  Both also regain their `onceAsync()` return type, which used to collapse to
+  `void`. A genuine non-array value resolves to `never` in the argument slot
+  and in the listener slot, and one rule decides where that surfaces: the key
+  fails wherever an argument list is checked and passes through wherever none
+  is. It fails at `emit(ε, 'message', …)`, `on(ε, 'message', fn)` and the typed
+  listener-object `on(ε, {message() {}})`. It passes through
+  `on(ε, 'message', 'handler', obj)` and `on(ε, 'message', obj)`, which check
+  the name and resolve the rest at dispatch; through
+  `emit(ε, ['message', 'joined'], 'bob')`, where the union of the listed tuples
+  absorbs the `never` — `emit(ε, ['message'], 'bob')` has no union to hide in
+  and fails; and through `onceAsync(ε, 'message')`, which resolves
+  `Promise<void>`, indistinguishable from an undeclared symbol. Nothing points at
+  the map, so grep for the emitters (`eventize\.inject<`, `eventize<`,
+  `extends Eventize<`) and read the maps they name:
+
+  ```ts
+  interface ChatEvents {
+    message: string; // ❌ was unchecked; every emit and on for it errors now
+    joined: readonly [user: string]; // ✅ readonly is fine — and now checked
+    left?: [user: string]; // ✅ optional is fine — and now checked
+  }
+  ```
+
+  An event carrying no arguments is `[]`. A key the map does not declare at
+  all is untouched: that is the symbol escape hatch, and it stays permissive.
 
 Verify an upgrade with `getSubscriptionCount(ε)` and `getRetainedCount(ε)`
 around the call in question — they read both halves of an emitter's state
