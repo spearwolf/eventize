@@ -5,7 +5,13 @@ import type {EventListener, OnceObligation} from './EventListener';
 import type {EventStore} from './EventStore';
 import {Priority} from './Priority';
 import {EVENT_CATCH_EM_ALL, LISTENER_IS_NAMED_FUNC} from './constants';
-import type {EventArgs, EventName, ListenerObjectType} from './types';
+import type {
+  EventArgs,
+  EventName,
+  ListenerObjectType,
+  OnEventNames,
+  SubscribeArgs,
+} from './types';
 import {isEventName, warn} from './utils';
 
 /**
@@ -208,7 +214,22 @@ const _subscribeTo = (
   const len = args.length;
   const typeOfFirstArg = typeof args[0];
 
-  let eventName: EventName;
+  // OnEventNames, not EventName: two of the four branches below can hand
+  // this an array of names / [name, priority] tuples, not just a single
+  // name. Branch B destructures `eventName` straight off `args[0]` with no
+  // `Array.isArray()` gate of its own — the array case is real and
+  // exercised, not theoretical: `obj.on(['foo', 'fu'], 0, fn, obj)` takes
+  // this branch, `args[1]` being the priority `0`. Branch C1 gates on
+  // `Array.isArray(args[0])` explicitly, so it can too. Branches A and C2
+  // never do — both assign the `EVENT_CATCH_EM_ALL` constant instead of
+  // reading `args[0]`. The hole scan, map() and entries construction further
+  // down (where the array eventName from B or C1 is walked) are only checked
+  // against something because this declaration says so. Declaring it
+  // EventName (string | symbol) still compiled — Array.isArray() narrows a
+  // string | symbol to `EventName & any[]` rather than to `never`, so every
+  // read past that point silently became `any`. See AGENTS.md,
+  // "`subscribeTo` and `types.ts` move in lockstep".
+  let eventName: OnEventNames;
   let priority: number;
   let listener: unknown;
   let listenerObject: ListenerObjectType;
@@ -403,10 +424,23 @@ const _subscribeTo = (
   return registerOne(priority, eventName);
 };
 
+/**
+ * `on()` and `once()` call this with `args` typed as their own rest
+ * parameter, `SubscribeArgs` — the eleven-arm named-tuple union grouped by
+ * the very branches `_subscribeTo()` decodes. `EventArgs` (`any[]`) stays in
+ * the union as the fallback for callers with no tuple to offer, but it is
+ * not a second accepted shape so much as an admission: past this point
+ * nothing narrows the union further. Positional decoding of a tuple union
+ * would need `args.length` and `typeof` narrowing TypeScript only partly
+ * carries, so `_subscribeTo()` reads `args` as plain `EventArgs` and the
+ * comment on its branches — not the compiler — is what keeps them lined up
+ * with the arms named here. See AGENTS.md, "`subscribeTo` and `types.ts`
+ * move in lockstep".
+ */
 export const subscribeTo = (
   store: EventStore,
   keeper: EventKeeper,
-  args: EventArgs,
+  args: SubscribeArgs | EventArgs,
   obligation: OnceObligation | null = null,
 ): EventListener | Array<EventListener> => {
   // No array here — see the ReplayQueue doc comment above. Most calls never
