@@ -108,7 +108,14 @@ describe('EventKeeper', () => {
     const emitter = {apply: jest.fn()};
     publishReplays(keeper.replayTo('foo', emitter));
 
-    expect(emitter.apply.mock.calls[0]).toEqual(['foo', [1, 2, 3]]);
+    // The third argument is the rejection collector every replay hands to
+    // `EventListener.apply()` — see `collectReplayRejection()`. It is part of
+    // the call shape, not an accident of this test.
+    expect(emitter.apply.mock.calls[0]).toEqual([
+      'foo',
+      [1, 2, 3],
+      expect.any(Function),
+    ]);
   });
 
   it('clear(eventName) removes stored event but keeps event name known', () => {
@@ -173,7 +180,11 @@ describe('EventKeeper', () => {
     publishReplays(keeper.replayTo('foo', emitter));
 
     expect(emitter.apply).toHaveBeenCalledTimes(1);
-    expect(emitter.apply.mock.calls[0]).toEqual(['foo', ['third']]);
+    expect(emitter.apply.mock.calls[0]).toEqual([
+      'foo',
+      ['third'],
+      expect.any(Function),
+    ]);
   });
 
   it('replayTo with wildcard (*) publishes all retained events', () => {
@@ -259,7 +270,7 @@ describe('EventKeeper', () => {
     const emitter = {apply: jest.fn()};
     publishReplays(keeper.replayTo('foo', emitter));
 
-    expect(emitter.apply).toHaveBeenCalledWith('foo', []);
+    expect(emitter.apply).toHaveBeenCalledWith('foo', [], expect.any(Function));
   });
 
   it('removeAll() drops every retain policy and every retained value', () => {
@@ -341,7 +352,11 @@ describe('EventKeeper', () => {
     publishReplays(result);
 
     expect(emitter.apply).toHaveBeenCalledTimes(1);
-    expect(emitter.apply.mock.calls[0]).toEqual(['foo', ['payload']]);
+    expect(emitter.apply.mock.calls[0]).toEqual([
+      'foo',
+      ['payload'],
+      expect.any(Function),
+    ]);
 
     const replayedNames = emitter.apply.mock.calls.map((c) => c[0]);
     expect(replayedNames).toContain('foo');
@@ -365,7 +380,11 @@ describe('EventKeeper', () => {
     publishReplays(keeper.replayTo('*', emitter));
 
     expect(emitter.apply).toHaveBeenCalledTimes(1);
-    expect(emitter.apply.mock.calls[0]).toEqual(['policy-137', ['onlyValue']]);
+    expect(emitter.apply.mock.calls[0]).toEqual([
+      'policy-137',
+      ['onlyValue'],
+      expect.any(Function),
+    ]);
   });
 
   // The two containers are lazy, and until the first write both fields point

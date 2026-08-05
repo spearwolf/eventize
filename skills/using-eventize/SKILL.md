@@ -137,6 +137,13 @@ compile time) or an explicit `isEventized()` guard.
    `unretain()`, a `retainClear()` or an `off()` from inside one takes effect for
    the names still ahead of it, and a name re-emitted there replays the new
    value. Up to v5.1.0 only the `off()` route worked.
+   **An `async` listener is covered too, since v6.0.0.** It returns before it
+   fails, so the `try`/`catch` never sees the rejection; the replay watches the
+   returned value instead and reports a rejection through the same
+   `console.warn` (`a retained replay rejected; …`). Up to v5.1.0 that was an
+   unhandled rejection, fatal under Node's default settings. Two differences to
+   the synchronous case: the report arrives a microtask later, and the `once()`
+   counts as spent — the dispatch saw a listener that returned normally.
 6. **Nested `emit()` retains out of order.** The same after-dispatch write means
    **any** `emit()` nested inside another — not only self-recursion — writes its
    retained state first, innermost call to outermost. The common way in is

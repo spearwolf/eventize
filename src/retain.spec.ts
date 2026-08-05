@@ -906,6 +906,90 @@ describe('a throwing retained replay', () => {
   });
 });
 
+// A macrotask, not `await Promise.resolve()`: the rejection handler runs on a
+// microtask, and one `setTimeout` turn is past the whole queue of them.
+const nextTurn = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+// An async listener rejects after its replay has already returned, so the
+// try/catch around the replay never sees it. Same event, same isolation
+// promise, same warning — the only difference is that the report arrives a
+// microtask later. The warning is also the whole regression guard: it is the
+// rejection handler that emits it, and without that handler the rejection is
+// the unhandled one that used to take the process down.
+describe('a rejecting async retained replay', () => {
+  const warnMock = warn as unknown as jest.Mock;
+
+  beforeEach(() => {
+    warnMock.mockClear();
+  });
+
+  it('warns instead of leaving the rejection unhandled, and keeps the batch', async () => {
+    const obj = eventize({});
+    const seen: string[] = [];
+    const boom = new Error('boom');
+
+    retain(obj, ['a', 'b']);
+    emit(obj, 'a', 'A');
+    emit(obj, 'b', 'B');
+
+    const unsubscribe = on(obj, ['a', 'b'], async (value: string) => {
+      seen.push(value);
+      if (value === 'A') throw boom;
+    });
+
+    // the batch never stalls: an async listener returns before it rejects
+    expect(seen).toEqual(['A', 'B']);
+
+    await nextTurn();
+
+    expect(warnMock).toHaveBeenCalledTimes(1);
+    expect(warnMock.mock.calls[0][1]).toBe('a');
+    expect(warnMock.mock.calls[0][2]).toBe(boom);
+
+    expect(getSubscriptionCount(obj)).toBe(2);
+    unsubscribe();
+    expect(getSubscriptionCount(obj)).toBe(0);
+  });
+
+  // A once() replay reaches the listener through the obligation wrapper in
+  // subscribeTo(), which is a second place the returned value has to survive.
+  it('reports a once() replay rejection too', async () => {
+    const obj = eventize({});
+    const boom = new Error('boom');
+
+    retain(obj, 'a');
+    emit(obj, 'a', 'A');
+
+    once(obj, 'a', async () => {
+      throw boom;
+    });
+
+    await nextTurn();
+
+    expect(warnMock).toHaveBeenCalledTimes(1);
+    expect(warnMock.mock.calls[0][1]).toBe('a');
+    expect(warnMock.mock.calls[0][2]).toBe(boom);
+  });
+
+  // The control: a replay that returns a promise which settles is not an
+  // error, and a replay that returns something with no `then` at all is not
+  // even a candidate.
+  it('stays silent for a replay that resolves', async () => {
+    const obj = eventize({});
+
+    retain(obj, ['a', 'b']);
+    emit(obj, 'a', 'A');
+    emit(obj, 'b', 'B');
+
+    on(obj, 'a', async (value: string) => value);
+    on(obj, 'b', (value: string) => value);
+
+    await nextTurn();
+
+    expect(warnMock).not.toHaveBeenCalled();
+  });
+});
+
 // A replay batch is ordered up front and then run; since v6.0.0 each replay
 // asks the keeper what it holds at the moment that replay runs. Everything a
 // handler does to the retained state therefore reaches the replays still ahead

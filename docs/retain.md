@@ -93,7 +93,9 @@ console.log(result); // => { ready: true }
 ### A listener that throws on a replay
 
 Since v6.0.0 every queued replay runs in its own `try`/`catch`. A listener that
-throws while a retained value is being replayed to it does not end the batch:
+throws while a retained value is being replayed to it does not end the batch —
+and an `async` listener that rejects is treated the same way, see
+[below](#an-async-listener-that-rejects-on-a-replay):
 
 - the remaining replays still run, in the same order they were sorted into
   before the first one started;
@@ -143,6 +145,35 @@ everything a replay sets off synchronously, not just the replayed listener. If
 that listener emits another event and *its* handler throws, the throw is caught
 here as well and reported under the name that was being replayed. The logged
 error object is what says where it actually came from.
+
+### An `async` listener that rejects on a replay
+
+An `async` listener returns a promise before it fails, so the `try`/`catch`
+around its replay never sees the failure. Since v6.0.0 the replay watches the
+returned value instead: anything with a `then` gets a rejection handler, and a
+rejection is reported through the same `console.warn`, with the replayed event
+name and the rejection reason.
+
+```javascript
+retain(ε, 'cfg');
+emit(ε, 'cfg', {});
+
+on(ε, 'cfg', async () => {
+  throw new Error('boom');
+});
+// => [eventize] a retained replay rejected; the batch continues. event: cfg Error: boom
+```
+
+Up to v5.1.0 this was an unhandled rejection, which under Node's default
+`--unhandled-rejections=throw` ends the process — at a call site that had done
+nothing but subscribe. Two things follow from the report being asynchronous:
+the batch itself never waits, because the replay returned long before the
+rejection arrived, and a `once()` counts its one shot as spent, because the
+listener returned normally as far as the dispatch could tell.
+
+This covers the replay only. During an `emit()` a rejecting listener is still
+the caller's business — `emit()` makes no isolation promise, and `emitAsync()`
+is the form that hands the promises back.
 
 ### A handler that changes retained state mid-batch
 

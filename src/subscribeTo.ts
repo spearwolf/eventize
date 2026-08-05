@@ -120,12 +120,22 @@ const registerEventListener = (
     keeper.hasRetainedFor(eventName) &&
     (isNewListener || obligation !== null)
   ) {
-    const replayTarget: {apply: (name: EventName, args?: EventArgs) => void} =
+    // The wrapper forwards the third argument as faithfully as the first two:
+    // it is the collector `EventKeeper.replayTo()` uses to bring a rejecting
+    // async listener back under the replay isolation, and a wrapper that drops
+    // it would exempt every once() from that while leaving on() covered.
+    const replayTarget: {
+      apply: (
+        name: EventName,
+        args?: EventArgs,
+        returnValue?: (retVal: unknown) => void,
+      ) => void;
+    } =
       obligation === null
         ? el
         : {
-            apply: (name, args) => {
-              if (!obligation.settled) el.apply(name, args);
+            apply: (name, args, returnValue) => {
+              if (!obligation.settled) el.apply(name, args, returnValue);
             },
           };
     replayQueue.events = keeper.replayTo(

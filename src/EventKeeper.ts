@@ -120,6 +120,49 @@ export const publishReplays = (events: KeeperEvent[]): void => {
   }
 };
 
+/**
+ * The asynchronous half of the same isolation, built once per replay that
+ * actually runs and handed to `EventListener.apply()` as its return-value
+ * collector.
+ *
+ * An `async` listener returns before it fails, so the `try`/`catch` in
+ * `publishReplays()` sees a fulfilled call and a promise nobody is watching:
+ * the failure surfaced later as an unhandled rejection, which under Node's
+ * default `--unhandled-rejections=throw` ends the process at a point where the
+ * consumer only ever called `on()`. The isolation `docs/retain.md` promises
+ * covers the listener, not the calling convention it happens to use, so a
+ * rejection is reported through the same `warn()` with the same three
+ * arguments — sentence, replayed event name, error — and the batch is as
+ * unaffected as it is by a synchronous throw.
+ *
+ * This lives here rather than in `publishReplays()` for two reasons: the
+ * replayed name is in scope, and the collector has to travel *into* the
+ * dispatch, which the batch runner never touches.
+ *
+ * Duck-typed on `then`, not `instanceof Promise`: a listener may return a
+ * foreign-realm promise or a hand-rolled thenable, and both fail the same way.
+ * For the same reason the handler is attached with `then(undefined, …)` rather
+ * than `.catch()` — a thenable owes us `then` and nothing else, and calling a
+ * missing `.catch` would throw *inside* the replay, turning a rejection this
+ * function exists to absorb into a synchronous failure of its own.
+ *
+ * The regular `emit()` path stays as it is. It makes no isolation promise, and
+ * a listener's rejection there belongs to the caller that caused the event.
+ */
+const collectReplayRejection =
+  (eventName: EventName) =>
+  (retVal: unknown): void => {
+    if (typeof (retVal as PromiseLike<unknown> | null)?.then === 'function') {
+      (retVal as PromiseLike<unknown>).then(undefined, (error: unknown) => {
+        warn(
+          'a retained replay rejected; the batch continues. event:',
+          eventName,
+          error,
+        );
+      });
+    }
+  };
+
 export class EventKeeper {
   events: Map<EventName, KeeperEventItem> = EMPTY_EVENTS;
   eventNames: Set<EventName> = EMPTY_EVENT_NAMES;
@@ -294,7 +337,18 @@ export class EventKeeper {
    */
   replayTo(
     eventName: EventName,
-    eventListener: {apply: (eventName: EventName, args?: EventArgs) => void},
+    // The third parameter of `apply()` is part of what this asks for, not an
+    // implementation detail of the listener: it is how a rejecting async
+    // listener is brought back under the isolation promise — see
+    // `collectReplayRejection()`. Anything standing in for an `EventListener`
+    // here has to pass it on, or its replays fail silently again.
+    eventListener: {
+      apply: (
+        eventName: EventName,
+        args?: EventArgs,
+        returnValue?: (retVal: unknown) => void,
+      ) => void;
+    },
     sortedEvents: KeeperEvent[] = [],
   ): KeeperEvent[] {
     if (!isCatchEmAll(eventName)) {
@@ -309,7 +363,11 @@ export class EventKeeper {
           replay: () => {
             const current = this.events.get(eventName);
             if (current === undefined) return;
-            eventListener.apply(eventName, current.args);
+            eventListener.apply(
+              eventName,
+              current.args,
+              collectReplayRejection(eventName),
+            );
           },
         });
       }
