@@ -130,9 +130,13 @@ describe('a marker written by another copy of eventize', () => {
 // silent no-op under sloppy mode. ts-jest compiles every module (spec and
 // source alike) to strict-mode output, so the throw is real here — but the
 // case pins a property of that compile target as much as one of the code.
-// The runtime configurable:false already holds either way (see the third
-// case below), which is what actually protects the slot; the throw is the
-// consequence a strict caller sees, not an independent guarantee.
+// That compile target is `tsconfig.json`'s `alwaysStrict: true`, which
+// ts-jest reads for the spec compile the same as it does for `src/`; turn it
+// off and the delete below stops throwing while the marker stays exactly as
+// unwritable as before. The runtime configurable:false already holds either
+// way (see the third case below), which is what actually protects the slot;
+// the throw is the consequence a strict caller sees, not an independent
+// guarantee.
 describe('the marker slot cannot be deleted', () => {
   it('throws on delete instead of silently un-eventizing the object', () => {
     const obj = eventize();

@@ -92,13 +92,24 @@ export const listenersOf = <T extends EventMap>(
  * A call that de-duplicates onto an existing registration creates no listener,
  * so this would return the older one it folded into. Every spec using it
  * subscribes something new.
+ *
+ * Throws when the emitter has no listener at all, for the same reason
+ * `latestListenerPair()` does below: a bare `reduce()` on an empty array
+ * throws its own generic `TypeError`, and a spec reading a failure like that
+ * gets pointed at `Array.prototype.reduce` instead of at the emitter it
+ * forgot to subscribe something to.
  */
 export const latestListener = <T extends EventMap>(
   obj: EventizedObject<T>,
-): EventListener =>
-  allListeners(obj).reduce((newest, candidate) =>
+): EventListener => {
+  const listeners = allListeners(obj);
+  if (listeners.length === 0) {
+    throw new Error('latestListener(): no listener registered');
+  }
+  return listeners.reduce((newest, candidate) =>
     candidate.id > newest.id ? candidate : newest,
   );
+};
 
 /**
  * The two most recently created listeners, oldest first — which for a two-name
