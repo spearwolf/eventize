@@ -143,8 +143,11 @@ export const publishReplays = (events: KeeperEvent[]): void => {
  * foreign-realm promise or a hand-rolled thenable, and both fail the same way.
  * For the same reason the handler is attached with `then(undefined, …)` rather
  * than `.catch()` — a thenable owes us `then` and nothing else, and calling a
- * missing `.catch` would throw *inside* the replay, turning a rejection this
- * function exists to absorb into a synchronous failure of its own.
+ * missing `.catch` would throw *inside* the replay. That throw lands in
+ * `publishReplays()`'s own `try`/`catch`, which reports it as *threw* rather
+ * than *rejected* — the batch survives either way, but the warning would name
+ * the wrong cause, and a misattributed cause is harder to track down than an
+ * outright crash.
  *
  * The regular `emit()` path stays as it is. It makes no isolation promise, and
  * a listener's rejection there belongs to the caller that caused the event.

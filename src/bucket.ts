@@ -10,11 +10,11 @@ import type {DedupIndex} from './dedupIndex';
  * Held-ness is a property of the *array*, not of the store, so this is where it
  * lives. `EventStore.forEach()` increments the one or two buckets it walks and
  * decrements them in its `finally`; `EventStore.bucketForMutation()` reads one
- * field. Both are O(1)
- * and neither depends on how deeply emits are nested — the store used to keep a
- * stack of held slots and scan it, which cost one comparison per enclosing walk
- * on exactly the case the whole design is for: a mutation of a bucket nobody is
- * holding, which finds no match and therefore always scans the lot.
+ * field. Both are O(1) and neither depends on how deeply emits are nested — the
+ * store used to keep a stack of held slots and scan it, which cost one
+ * comparison per enclosing walk on exactly the case the whole design is for: a
+ * mutation of a bucket nobody is holding, which finds no match and therefore
+ * always scans the lot.
  *
  * A symbol key, not a name, and not a `defineProperty` descriptor. All three
  * spellings measure the same — symbol against name came out at 0.985× to 1.026×
@@ -47,14 +47,14 @@ export interface ListenerBucket extends Array<EventListener> {
  *
  * The count is written **immediately** after the array is created, before any
  * element goes in, so every bucket in the store passes through the same hidden
- * class in the same order and the field load in `EventStore.bucketForMutation()`
- * stays
- * monomorphic. `slice(0)` copies elements and nothing else — a clone that
- * skipped this would arrive without the property, take a different shape, and
- * quietly deoptimise every read of it. It would also read as *held*
- * (`undefined === 0` is false) and buy itself one copy it does not owe, which
- * installs a well-formed clone and hides the mistake from then on; three specs
- * in `EventStore.spec.ts` watch the four places a bucket can be born.
+ * class in the same order and the field load in
+ * `EventStore.bucketForMutation()` stays monomorphic. `slice(0)` copies
+ * elements and nothing else — a clone that skipped this would arrive without
+ * the property, take a different shape, and quietly deoptimise every read of
+ * it. It would also read as *held* (`undefined === 0` is false) and buy itself
+ * one copy it does not owe, which installs a well-formed clone and hides the
+ * mistake from then on; three specs in `EventStore.spec.ts` watch the four
+ * places a bucket can be born.
  *
  * The source is a `ListenerBucket` rather than any array of listeners, and that
  * is the point: a clone has to carry the dedup index of the array it copies, so
@@ -84,8 +84,8 @@ const rejectMutation = (container: string) => (): never => {
  * regardless. Both fields start out pointing here, every write path swaps in a
  * real container first, and every reader — `EventStore`'s `forEach()`,
  * `peekListeners()`, `getSubscriptionCount()`, the `removeBy*` family — works
- * unchanged, because
- * all any of them touch is `.get()`, `.forEach()`, `.length`.
+ * unchanged, because all any of them touch is `.get()`, `.forEach()`,
+ * `.length`.
  *
  * The Map is poisoned exactly like the keeper's, and for the reason spelled out
  * there: `Object.freeze()` seals a Map's own properties and leaves `set()`,
@@ -99,12 +99,11 @@ const rejectMutation = (container: string) => (): never => {
  * `length`, and the two symbol slots — so `Object.freeze()` really does close
  * it, and closes the three the stubs cannot reach. `bucket[HELD_BY] += 1` and
  * the `??= new Map()` in `dedupIndex.ts`'s `indexAdd()` throw on the frozen
- * stand-in, which are
- * precisely the two writes that would otherwise make one emitter's dispatch
- * bookkeeping and one emitter's index visible to all of them. The stubs on top
- * are for the message: a stray `splice()` says which object it hit and what to
- * do instead, where the native error would only report a read-only property of
- * `[object Array]`.
+ * stand-in, which are precisely the two writes that would otherwise make one
+ * emitter's dispatch bookkeeping and one emitter's index visible to all of
+ * them. The stubs on top are for the message: a stray `splice()` says which
+ * object it hit and what to do instead, where the native error would only
+ * report a read-only property of `[object Array]`.
  *
  * Nothing gets through on the strength of writing what is already there.
  * Assignment goes to `[[Set]]`, which gives up the moment it finds the own
@@ -134,10 +133,10 @@ export const EMPTY_NAMED_LISTENERS: Map<EventName, ListenerBucket> =
 export const EMPTY_CATCH_EM_ALL: ListenerBucket = createBucket();
 
 // Every mutator `Array.prototype` carries, not only the `splice()`
-// `EventStore.ts` uses: the point of a stand-in is to catch the path nobody thought of. Defined
-// rather than assigned, so they arrive non-enumerable and stay out of
-// `Object.keys()`, a spread and Jest's `toEqual` — same treatment `HELD_BY` and
-// `DEDUP_INDEX` get from being symbols.
+// `EventStore.ts` uses: the point of a stand-in is to catch the path nobody
+// thought of. Defined rather than assigned, so they arrive non-enumerable and
+// stay out of `Object.keys()`, a spread and Jest's `toEqual` — same treatment
+// `HELD_BY` and `DEDUP_INDEX` get from being symbols.
 for (const method of [
   'push',
   'pop',
@@ -164,18 +163,18 @@ Object.freeze(EMPTY_CATCH_EM_ALL);
 // The index goes with them. Both callers are letting go of the whole bucket —
 // one drops the map entry, the other clears the map — so there is nothing left
 // to file. Dropping it here rather than at those two call sites also covers the
-// bucket that survives emptied: EventStore.removeAllListeners() truncates an unheld
-// wildcard array in place and keeps it, and an index left standing on it would
-// hold every detached listener plus a strong reference to the object each one
-// was keyed by, none of which the truncated array itself retains any more.
+// bucket that survives emptied: EventStore.removeAllListeners() truncates an
+// unheld wildcard array in place and keeps it, and an index left standing on it
+// would hold every detached listener plus a strong reference to the object each
+// one was keyed by, none of which the truncated array itself retains any more.
 //
 // What this releases is the slot on the bucket it is given, not the contents of
 // the Map. A walk still holding the pre-clone array holds the same Map through
-// that array's own slot, and it survives until the walk returns — bounded by the
-// dispatch, so not a leak, but the one case where the sentence above does not
-// hold. Clearing the Map instead would buy only the keys for that stretch: the
-// held array is not truncated either, so it keeps every detached listener alive
-// regardless.
+// that array's own slot, and it survives until the walk returns — bounded by
+// the dispatch, so not a leak, but the one case where the sentence above does
+// not hold. Clearing the Map instead would buy only the keys for that stretch:
+// the held array is not truncated either, so it keeps every detached listener
+// alive regardless.
 export const detachAll = (bucket: ListenerBucket) => {
   bucket.forEach((listener) => listener.detach());
   bucket[DEDUP_INDEX] = undefined;

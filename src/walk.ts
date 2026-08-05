@@ -50,9 +50,10 @@ export const findInsertIndex = (
  * `<A, B, C>` is — but only on the outside: inside the body the optional
  * parameters read as `A | undefined` and no longer fit the callback's `A`, so a
  * generic implementation buys its checking back with three casts.
- * `EventStore.forEach()` therefore declares the generic signature and implements it against this one:
- * callers get the slots matched against the callback they passed (a swapped
- * pair is rejected), while the walk itself carries values it never reads.
+ * `EventStore.forEach()` therefore declares the generic signature and
+ * implements it against this one: callers get the slots matched against the
+ * callback they passed (a swapped pair is rejected), while the walk itself
+ * carries values it never reads.
  */
 export type WalkCallback = (
   listener: EventListener,
@@ -64,8 +65,7 @@ export type WalkCallback = (
 /**
  * Walks one bucket, for the dispatch that has only one. A module-level function
  * for the same reason as `mergeWalk()` below — `EventStore.forEach()` is close
- * enough to
- * TurboFan's inlining budget that neither loop belongs in its body.
+ * enough to TurboFan's inlining budget that neither loop belongs in its body.
  *
  * An index loop rather than `Array.prototype.forEach`, which hands its callback
  * `(element, index, array)` and would land the index in the first context slot.
@@ -74,8 +74,8 @@ export type WalkCallback = (
  * clones the bucket and leaves this one alone. The `undefined` guard keeps the
  * builtin's behaviour on a holey bucket — the hole is skipped in silence here,
  * while `mergeWalk()` throws on one. It differs on one case the builtin would
- * have visited, an element that really is `undefined`, which no bucket can hold:
- * only `EventListener` instances ever go in.
+ * have visited, an element that really is `undefined`, which no bucket can
+ * hold: only `EventListener` instances ever go in.
  */
 export const walkBucket = (
   listeners: Array<EventListener>,
@@ -97,17 +97,18 @@ export const walkBucket = (
  * Interleaves a named bucket with the wildcard bucket by descending priority,
  * for the dispatch that has both. A module-level function rather than a branch
  * inside `EventStore.forEach()`, and that placement is measured, not cosmetic:
- * `forEach()` carries a `try`/`finally`, which puts it close enough to TurboFan's inlining
- * budget that its exact size decides whether the *caller* inlines it. With the
- * merge loop in the body, two benchmark harnesses differing only in trivia
- * measured the same mutation-free 64-listener dispatch at 535 ns and 653 ns —
- * stably, one value each. Moving the loop out took both to ~535.
+ * `forEach()` carries a `try`/`finally`, which puts it close enough to
+ * TurboFan's inlining budget that its exact size decides whether the *caller*
+ * inlines it. With the merge loop in the body, two benchmark harnesses
+ * differing only in trivia measured the same mutation-free 64-listener dispatch
+ * at 535 ns and 653 ns — stably, one value each. Moving the loop out took both
+ * to ~535.
  *
  * Two traps when re-measuring any of this. Loading two library variants into
  * one process makes the call site polymorphic and moves results by double
- * digits, so a comparison run wants one variant per process — and this
- * function wants a process of its own either way. Individual cells move by ten
- * points between runs: quote ranges, never a single cell.
+ * digits, so a comparison run wants one variant per process — and this function
+ * wants a process of its own either way. Individual cells move by ten points
+ * between runs: quote ranges, never a single cell.
  *
  * Both lengths are read once, up front. That is safe because the walk holds
  * these two arrays: a mutation from inside `fn` clones the bucket it changes
