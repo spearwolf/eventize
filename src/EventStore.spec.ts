@@ -1,5 +1,6 @@
 import {createOnceObligation, EventListener} from './EventListener';
-import {dedupIndexOf, EventStore} from './EventStore';
+import {EventStore} from './EventStore';
+import {dedupIndexOf} from './dedupIndex';
 
 import {EVENT_CATCH_EM_ALL} from './constants';
 import type {EventName} from './types';

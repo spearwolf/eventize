@@ -68,7 +68,7 @@ type ListenerTypeTag = 1 | 2 | 4;
  *
  * `typeof null === 'object'`, hence the explicit null check.
  *
- * The tag is what `EventStore.isSimilar()` compares. It is deliberately *not*
+ * The tag is what `dedupIndex.ts`'s `isSimilar()` compares. It is deliberately *not*
  * what `apply()` dispatches on — see the note there.
  */
 export const detectListenerType = (
@@ -183,7 +183,7 @@ export class EventListener {
   // writes to them outside detach(), and consumers have no reason to either.
   listener: unknown;
   listenerObject: ListenerObjectType;
-  // Read by EventStore.isSimilar(), which needs a value it can compare with
+  // Read by dedupIndex.ts's isSimilar(), which needs a value it can compare with
   // `===`. Never read by apply() — see the note there.
   readonly listenerType: ListenerTypeTag | undefined;
   // Runs after a dispatch that actually invoked the listener. It means "settle

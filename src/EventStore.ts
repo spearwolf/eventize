@@ -1,682 +1,24 @@
 import {detectListenerType, EventListener} from './EventListener';
 import type {OnceObligation} from './EventListener';
-import {
-  EVENT_CATCH_EM_ALL,
-  LISTENER_IS_NAMED_FUNC,
-  LISTENER_IS_OBJ,
-} from './constants';
+import {EVENT_CATCH_EM_ALL} from './constants';
 import type {EventName, ListenerObjectType} from './types';
-import {isAttachableTarget, isCatchEmAll, isEventName} from './utils';
-
-type HasPriorityOrIdType = {priority: number; id: number};
-
-/**
- * A listener bucket: the array itself, plus the count of walks currently
- * stepping through it.
- *
- * Held-ness is a property of the *array*, not of the store, so this is where it
- * lives. `forEach()` increments the one or two buckets it walks and decrements
- * them in its `finally`; `bucketForMutation()` reads one field. Both are O(1)
- * and neither depends on how deeply emits are nested — the store used to keep a
- * stack of held slots and scan it, which cost one comparison per enclosing walk
- * on exactly the case the whole design is for: a mutation of a bucket nobody is
- * holding, which finds no match and therefore always scans the lot.
- *
- * A symbol key, not a name, and not a `defineProperty` descriptor. All three
- * spellings measure the same — symbol against name came out at 0.985× to 1.026×
- * across nine dispatch shapes, mean 1.002 — so the tiebreaker is what each one
- * lets escape. A named key shows up in `Object.keys()`, `for…in` and an object
- * spread of a bucket; the symbol does not, and a descriptor would buy a
- * hidden-class shape nobody else in the store shares, on a read that sits in
- * the hot path.
- *
- * What the symbol still does **not** hide, verified rather than assumed:
- * `Reflect.ownKeys()` and `Object.getOwnPropertySymbols()` list it, and Jest's
- * `toEqual`, `toStrictEqual` and `toMatchObject` all compare own enumerable
- * symbols, so a bucket never equals a plain array literal — the same three fail
- * against a bare-named key too, and the control with a plain array passes.
- * **Compare buckets by identity and length**, as every spec here does.
- * Unaffected either way: `JSON.stringify`, array spread, `slice`, `concat`,
- * `filter`, `flat`, `toHaveLength`, `toBe`, `toContain` and
- * `expect.arrayContaining`.
- */
-const HELD_BY = Symbol('eventize.EventStore.heldBy');
-
-/**
- * A bucket's identity index: an identity value → the listeners filed under it,
- * or `undefined` while nothing in this bucket is filed at all.
- *
- * Two readers, and they ask different questions of the same Map.
- *
- * **`add()`**, which has to find an already registered listener with the same
- * identity before it inserts. Up to v5.1.0 it did that with a linear `find()`
- * over the whole bucket. Only object and method-name subscriptions can ever
- * match — a function listener never dedups — so the scan stayed invisible in
- * every function-listener benchmark and was quadratic in exactly the
- * listener-object pattern this library advertises. Registering n object
- * listeners on one event name, measured: 1000 → 1.8 ms, 2000 → 6.9 ms,
- * 4000 → 27.9 ms, while 4000 function listeners cost 0.5 ms. Doubling
- * quadrupled. Through the index the same 4000 cost 0.7 ms, which is the
- * function form's own price.
- *
- * **`detachByIdentity()`**, which has to find every listener a bare
- * `off(ε, fn)` / `off(ε, obj)` names. That one kept the linear scan a release
- * longer and paid the same quadratic price on the same shape — n listener
- * objects under one event name, then one `off(ε, o)` each. Medians of five to
- * seven, ranged over three runs of the pair, one process per variant:
- *
- * | n | scanning | through the index |
- * | --- | --- | --- |
- * | 1000 | 1.3–1.4 ms | 0.3–0.4 ms |
- * | 2000 | 4.7–5.2 ms | 0.4–0.7 ms |
- * | 4000 | 18–22 ms | 1.1–1.4 ms |
- * | 8000 | 81–91 ms | 3.1–3.7 ms |
- *
- * Doubling quadrupled, and worse than on the registration side, because the
- * scan ran to the end of the bucket after every match instead of stopping at
- * it. What is left grows a little faster than linearly, and the shape of what
- * is left is on `removeByListener()`: unsubscribing in reverse registration
- * order — `indexOf()`'s worst case rather than its best — costs ~8 ms at
- * n = 8000 instead of ~3.6, while the scan measured ~87–93 ms either way.
- * A function listener, which the index did not hold before, measures the same
- * as an object one on both halves.
- *
- * What the two readers share is the key, and the reason the index can serve
- * both: a key is a value some caller may later hand back. `add()` looks up the
- * slot carrying the *identity* of a subscription — `listener` for
- * `on(ε, 'foo', obj)`, `listenerObject` for `on(ε, 'foo', 'method', obj)` —
- * and leaves the rest of the similarity test (priority, and the method name
- * itself) to a linear pass over the candidates. `detachByIdentity()` looks up
- * the value `off()` was given and runs the identity test it would have run per
- * element. Both lists stay short: one entry for the pattern that hurt (many
- * objects, one name), never more than the priorities and method names a single
- * object uses on a single event name.
- *
- * Serving the second reader is what makes a listener with no dedup of its own
- * worth filing, so a bucket of nothing but function listeners now carries a Map
- * (~160 B) and one one-element array per listener. That is the price of the
- * measurement above, paid on subscription; `eachIndexKey()` says which slots
- * earn a key and why the set is exactly big enough.
- *
- * Written in `createBucket()` like `HELD_BY`, for the same hidden-class reason,
- * and a clone inherits **the same Map by reference**. What makes that sound is
- * not that the two arrays are element-for-element identical — they are, but only
- * at the moment of cloning — it is that every index *entry* write goes to the
- * return value of `bucketForMutation()`, hence always to the bucket the store holds
- * afterwards, and no path ever hands a pre-clone array back in. The Map
- * therefore keeps describing the current bucket while the abandoned array drifts
- * away from it, reporting through `dedupIndexOf()` listeners it never contained.
- * Nothing reads it there: a walk dispatches, it does not dedup. Rebuilding the
- * index per clone would instead put an O(n) Map fill on the
- * mutate-during-dispatch path, which is the one path clone-on-mutate exists to
- * keep cheap.
- *
- * A second symbol on the bucket also means a second key `Reflect.ownKeys()` and
- * Jest's `toEqual` see. Nothing changes for the specs: a bucket already failed
- * against a plain array literal because of `HELD_BY`, and buckets are compared
- * by identity and length throughout — see AGENTS.md.
- */
-const DEDUP_INDEX = Symbol('eventize.EventStore.dedupIndex');
-
-type DedupIndex = Map<unknown, EventListener[]>;
-
-/**
- * A bucket's index, for the specs. Nothing in the library reads it through a
- * function, and nothing outside this repo can call it: `EventStore` is not
- * re-exported from `src/index.ts`, so this reaches no published declaration —
- * and being a module-level export nothing in the bundle graph imports, it is
- * tree-shaken out of `lib/` rather than shipped like an unused class method
- * would be.
- *
- * It exists because the bookkeeping below is otherwise unobservable *by
- * construction*: a stale index entry changes no dispatch and no count. All it
- * does is keep a detached listener — and, in the key, the consumer's own object
- * — alive on an emitter the consumer believes it has unsubscribed from. Before
- * the cases that read this, deleting every `indexRemove()` call left all 33
- * suites green: a promise nothing can read is a promise nothing can hold.
- *
- * Still true now that `detachByIdentity()` reads the index too, and for the
- * same reason it was true before: a stale entry is a listener already spliced
- * out, hence already detached, hence carrying two nulled identity slots that
- * match no `off()` argument. A *missing* entry is the loud half — the removal
- * finds nothing and the listener keeps firing.
- */
-export const dedupIndexOf = (
-  listeners: ReadonlyArray<EventListener>,
-): ReadonlyMap<unknown, ReadonlyArray<EventListener>> | undefined =>
-  (listeners as ListenerBucket)[DEDUP_INDEX];
-
-interface ListenerBucket extends Array<EventListener> {
-  [HELD_BY]: number;
-  [DEDUP_INDEX]: DedupIndex | undefined;
-}
-
-/**
- * The only place a bucket is born, and one of the two casts this arrangement
- * costs — `dedupIndexOf()` above holds the other, for the specs.
- *
- * The count is written **immediately** after the array is created, before any
- * element goes in, so every bucket in the store passes through the same hidden
- * class in the same order and the field load in `bucketForMutation()` stays
- * monomorphic. `slice(0)` copies elements and nothing else — a clone that
- * skipped this would arrive without the property, take a different shape, and
- * quietly deoptimise every read of it. It would also read as *held*
- * (`undefined === 0` is false) and buy itself one copy it does not owe, which
- * installs a well-formed clone and hides the mistake from then on; three specs
- * in `EventStore.spec.ts` watch the four places a bucket can be born.
- *
- * The source is a `ListenerBucket` rather than any array of listeners, and that
- * is the point: a clone has to carry the dedup index of the array it copies, so
- * only something that already has one may be cloned.
- */
-const createBucket = (source?: ListenerBucket): ListenerBucket => {
-  const bucket = (
-    source === undefined ? [] : source.slice(0)
-  ) as ListenerBucket;
-  bucket[HELD_BY] = 0;
-  bucket[DEDUP_INDEX] = source === undefined ? undefined : source[DEDUP_INDEX];
-  return bucket;
-};
-
-const rejectMutation = (container: string) => (): never => {
-  throw new Error(
-    `EventStore: ${container} is the shared empty stand-in — replace it, never mutate it`,
-  );
-};
-
-/**
- * Shared stand-ins for the two listener containers, one pair per module
- * instance — the same arrangement `EventKeeper` runs for its retain index, and
- * for the same reason: most emitters are eventized long before anyone
- * subscribes, and plenty never see an `on()` at all. A `new Map()` plus a
- * bucket in the constructor spent both allocations on every `eventize(obj)`
- * regardless. Both fields start out pointing here, every write path swaps in a
- * real container first, and every reader — `forEach()`, `peekListeners()`,
- * `getSubscriptionCount()`, the `removeBy*` family — works unchanged, because
- * all any of them touch is `.get()`, `.forEach()`, `.length`.
- *
- * The Map is poisoned exactly like the keeper's, and for the reason spelled out
- * there: `Object.freeze()` seals a Map's own properties and leaves `set()`,
- * `delete()` and `clear()` working on the internal slots, so one missed
- * materialization would hand one emitter's listeners to every other emitter
- * this module built. Throwing stubs turn that silent corruption into a failure
- * at the first offending call.
- *
- * The bucket is the interesting half, because an array is not a Map: everything
- * that mutates one goes through an ordinary property write — the elements,
- * `length`, and the two symbol slots — so `Object.freeze()` really does close
- * it, and closes the three the stubs cannot reach. `bucket[HELD_BY] += 1` and
- * the `??= new Map()` in `indexAdd()` throw on the frozen stand-in, which are
- * precisely the two writes that would otherwise make one emitter's dispatch
- * bookkeeping and one emitter's index visible to all of them. The stubs on top
- * are for the message: a stray `splice()` says which object it hit and what to
- * do instead, where the native error would only report a read-only property of
- * `[object Array]`.
- *
- * Nothing gets through on the strength of writing what is already there.
- * Assignment goes to `[[Set]]`, which gives up the moment it finds the own
- * property non-writable and never compares values — `length = 0` on the empty
- * stand-in and `[DEDUP_INDEX] = undefined` on the unindexed one throw exactly
- * like a write that would have changed something. Only a redefinition
- * (`Object.defineProperty` with the same value) is let through, and nothing
- * here redefines anything. Every module in `src/` is strict, and
- * `tsconfig.json` pins that with `alwaysStrict` — a sloppy-mode caller would
- * see these same writes fail silently instead, which is one more reason the
- * store never offers the stand-in to one.
- *
- * Born in `createBucket()` like every other bucket, which is not a formality —
- * see the note there. A hand-rolled `[]` would arrive without `HELD_BY`, read
- * as *held*, and send the first mutation of a materialized bucket through a
- * clone it does not owe.
- */
-const EMPTY_NAMED_LISTENERS: Map<EventName, ListenerBucket> = Object.freeze(
-  Object.defineProperties(new Map<EventName, ListenerBucket>(), {
-    set: {value: rejectMutation('namedListeners')},
-    delete: {value: rejectMutation('namedListeners')},
-    clear: {value: rejectMutation('namedListeners')},
-  }),
-);
-
-const EMPTY_CATCH_EM_ALL: ListenerBucket = createBucket();
-
-// Every mutator `Array.prototype` carries, not only the `splice()` this file
-// uses: the point of a stand-in is to catch the path nobody thought of. Defined
-// rather than assigned, so they arrive non-enumerable and stay out of
-// `Object.keys()`, a spread and Jest's `toEqual` — same treatment `HELD_BY` and
-// `DEDUP_INDEX` get from being symbols.
-for (const method of [
-  'push',
-  'pop',
-  'shift',
-  'unshift',
-  'splice',
-  'sort',
-  'reverse',
-  'fill',
-  'copyWithin',
-]) {
-  Object.defineProperty(EMPTY_CATCH_EM_ALL, method, {
-    value: rejectMutation(`the catch-em-all bucket (${method}())`),
-  });
-}
-
-Object.freeze(EMPTY_CATCH_EM_ALL);
-
-const sortByPriorityAndId = (
-  a: HasPriorityOrIdType,
-  b: HasPriorityOrIdType,
-): number =>
-  a.priority !== b.priority ? b.priority - a.priority : a.id - b.id;
-
-const findInsertIndex = (
-  arr: Array<HasPriorityOrIdType>,
-  item: HasPriorityOrIdType,
-): number => {
-  let lo = 0;
-  let hi = arr.length;
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1;
-    // mid is always within [lo, hi) ⊆ [0, arr.length), so arr[mid] is defined
-    // for every dense array this is called with. The old code trusted that
-    // and let a hole surface as a TypeError from inside
-    // sortByPriorityAndId(item, undefined); this throws explicitly instead of
-    // picking hi = mid for it — a hole is a corrupted array, not a value the
-    // search should silently place.
-    const midItem = arr[mid];
-    if (midItem === undefined) {
-      throw new Error('EventStore: findInsertIndex encountered a hole');
-    }
-    if (sortByPriorityAndId(item, midItem) < 0) {
-      hi = mid;
-    } else {
-      lo = mid + 1;
-    }
-  }
-  return lo;
-};
-
-// An undefined tag is similar to nothing — both comparisons already say so.
-const isSimilarListenerType = (listenerType: number | undefined) =>
-  listenerType === LISTENER_IS_OBJ || listenerType === LISTENER_IS_NAMED_FUNC;
-
-// Detaching is a mutation of the listeners, never of the array holding them,
-// so it needs no clone-on-mutate treatment and is safe to run over a bucket a
-// dispatch is currently walking: that is precisely how a wiped listener gets
-// skipped mid-walk (EventListener.apply() bails on isRemoved).
-//
-// The index goes with them. Both callers are letting go of the whole bucket —
-// one drops the map entry, the other clears the map — so there is nothing left
-// to file. Dropping it here rather than at those two call sites also covers the
-// bucket that survives emptied: removeAllListeners() truncates an unheld
-// wildcard array in place and keeps it, and an index left standing on it would
-// hold every detached listener plus a strong reference to the object each one
-// was keyed by, none of which the truncated array itself retains any more.
-//
-// What this releases is the slot on the bucket it is given, not the contents of
-// the Map. A walk still holding the pre-clone array holds the same Map through
-// that array's own slot, and it survives until the walk returns — bounded by the
-// dispatch, so not a leak, but the one case where the sentence above does not
-// hold. Clearing the Map instead would buy only the keys for that stretch: the
-// held array is not truncated either, so it keeps every detached listener alive
-// regardless.
-const detachAll = (bucket: ListenerBucket) => {
-  bucket.forEach((listener) => listener.detach());
-  bucket[DEDUP_INDEX] = undefined;
-};
-
-// The five slots a subscription is identified by, spelled out rather than
-// bundled into a descriptor object: the sole caller is a search that runs
-// before the `EventListener` exists, and a literal built per registration to
-// carry them would reintroduce the very allocation that search was rebuilt to
-// avoid — a smaller one, but on the same path and with the same frequency.
-//
-// Both listener slots are `unknown`, so swapping them compiles in silence and
-// costs a comment nothing to prevent: `listener` before `listenerObject`,
-// everywhere in this file and in `EventListener`'s constructor. Add a
-// parameter list that holds the pair and it takes that order too — the search
-// side has no descriptor left to name its arguments for it.
-//
-// `unknown` for the two listener slots, not `any`: the store never calls into
-// them, it only compares them by identity. Saying `any` here claimed a
-// knowledge the registry does not have and switched off checking inside a
-// function whose whole job is comparison.
-const isSimilar = (
-  listenerType: number | undefined,
-  priority: number,
-  eventName: EventName,
-  listener: unknown,
-  listenerObject: unknown,
-  candidate: EventListener,
-) => {
-  if (listenerType === candidate.listenerType) {
-    return (
-      priority === candidate.priority &&
-      eventName === candidate.eventName &&
-      listenerObject === candidate.listenerObject &&
-      listener === candidate.listener
-    );
-  }
-  return false;
-};
-
-/**
- * The callback a walk dispatches to, plus three context slots the walk carries
- * from the caller through to the callback untouched.
- *
- * The slots exist so that callback can be a module-level function. An arrow
- * built per emit captures what it needs and then escapes into the walk, where
- * V8 cannot scalar-replace it, so every dispatch reaching at least one listener
- * allocated a closure — two thirds of everything an `emit()` allocated.
- *
- * This is the *internal* shape of the hand-off, and `any` is what it costs.
- * `unknown` is not available: a parameter type is checked contravariantly, so
- * it would make every precisely typed callback unassignable. A generic
- * `<A, B, C>` is — but only on the outside: inside the body the optional
- * parameters read as `A | undefined` and no longer fit the callback's `A`, so a
- * generic implementation buys its checking back with three casts. `forEach()`
- * therefore declares the generic signature and implements it against this one:
- * callers get the slots matched against the callback they passed (a swapped
- * pair is rejected), while the walk itself carries values it never reads.
- */
-type WalkCallback = (
-  listener: EventListener,
-  a?: any,
-  b?: any,
-  c?: any,
-) => void;
-
-/**
- * Walks one bucket, for the dispatch that has only one. A module-level function
- * for the same reason as `mergeWalk()` below — `forEach()` is close enough to
- * TurboFan's inlining budget that neither loop belongs in its body.
- *
- * An index loop rather than `Array.prototype.forEach`, which hands its callback
- * `(element, index, array)` and would land the index in the first context slot.
- * The length is read once up front, which is safe for the same reason it is in
- * `mergeWalk()`: the walk holds this array, so a mutation from inside `fn`
- * clones the bucket and leaves this one alone. The `undefined` guard keeps the
- * builtin's behaviour on a holey bucket — the hole is skipped in silence here,
- * while `mergeWalk()` throws on one. It differs on one case the builtin would
- * have visited, an element that really is `undefined`, which no bucket can hold:
- * only `EventListener` instances ever go in.
- */
-const walkBucket = (
-  listeners: Array<EventListener>,
-  fn: WalkCallback,
-  a?: any,
-  b?: any,
-  c?: any,
-): void => {
-  const len = listeners.length;
-  for (let i = 0; i < len; i++) {
-    const listener = listeners[i];
-    if (listener !== undefined) {
-      fn(listener, a, b, c);
-    }
-  }
-};
-
-/**
- * Interleaves a named bucket with the wildcard bucket by descending priority,
- * for the dispatch that has both. A module-level function rather than a branch
- * inside `forEach()`, and that placement is measured, not cosmetic: `forEach()`
- * carries a `try`/`finally`, which puts it close enough to TurboFan's inlining
- * budget that its exact size decides whether the *caller* inlines it. With the
- * merge loop in the body, two benchmark harnesses differing only in trivia
- * measured the same mutation-free 64-listener dispatch at 535 ns and 653 ns —
- * stably, one value each. Moving the loop out took both to ~535.
- *
- * Two traps when re-measuring any of this. Loading two library variants into
- * one process makes the call site polymorphic and moves results by double
- * digits, so a comparison run wants one variant per process — and this
- * function wants a process of its own either way. Individual cells move by ten
- * points between runs: quote ranges, never a single cell.
- *
- * Both lengths are read once, up front. That is safe because the walk holds
- * these two arrays: a mutation from inside `fn` clones the bucket it changes
- * and leaves these alone, so neither can grow, shrink or acquire a hole while
- * the merge runs.
- */
-const mergeWalk = (
-  named: Array<EventListener>,
-  wildcards: Array<EventListener>,
-  fn: WalkCallback,
-  a?: any,
-  b?: any,
-  c?: any,
-): void => {
-  const iLen = named.length;
-  const jLen = wildcards.length;
-  let i = 0;
-  let j = 0;
-  while (i < iLen || j < jLen) {
-    // cur/other are defined exactly when i < iLen / j < jLen — the ternary
-    // re-expresses those bounds checks so the compiler can see it too.
-    const cur = i < iLen ? named[i] : undefined;
-    const other = j < jLen ? wildcards[j] : undefined;
-    if (
-      cur !== undefined &&
-      (other === undefined || cur.priority >= other.priority)
-    ) {
-      fn(cur, a, b, c);
-      ++i;
-      continue;
-    }
-    if (other !== undefined) {
-      fn(other, a, b, c);
-      ++j;
-    } else {
-      // cur/other read as undefined here for one of two reasons: the loop is
-      // legitimately done (i >= iLen and j >= jLen, in which case the
-      // while-condition above already exits first), or one of the buckets is
-      // holey below its own length. A hole is a corrupted array — the same
-      // call findInsertIndex makes — so this throws rather than silently
-      // dispatching a truncated prefix and dropping every real listener still
-      // queued behind the hole.
-      throw new Error('EventStore: forEach encountered a hole');
-    }
-  }
-};
-
-/**
- * The slot a subscription's identity lives in, and therefore the key `add()`'s
- * dedup lookup reads. Only meaningful for the two listener types that can dedup
- * at all — see `DEDUP_INDEX`.
- *
- * Takes the three slots rather than an `EventListener`, because its two callers
- * hold different things: `eachIndexKey()` files a listener that exists,
- * `findSimilarListener()` searches for one that may not be built yet. The rule
- * which slot carries the identity is the same for both and stays written once.
- *
- * On a listener, read it *before* `detach()`: detaching nulls both slots, so a
- * detached listener no longer knows where it was filed.
- */
-const dedupKeyOf = (
-  listenerType: number | undefined,
-  listener: unknown,
-  listenerObject: unknown,
-): unknown => (listenerType === LISTENER_IS_OBJ ? listener : listenerObject);
-
-/**
- * Whether a value can be the *listener* argument of a removal that reaches
- * `detachByIdentity()` — and therefore whether filing a listener under this
- * slot buys anything, or only a Map entry nobody will ever look up.
- *
- * The three excluded kinds are excluded because `EventStore.remove()` routes
- * them elsewhere long before the identity fall-through: a nullish listener goes
- * to `removeAllListeners()`, and a string or symbol goes to
- * `removeByEventName()` — or, with a listener object named, through `off()`'s
- * `forceRemove` to the association path. This function and that routing are one
- * rule read from both ends; widening the routing means widening this.
- *
- * Everything else can arrive: a function, an object, and — only through a
- * directly constructed `EventListener`, never through `on()` — a number or a
- * boolean.
- */
-const isRemovalKey = (value: unknown): boolean =>
-  value != null && typeof value !== 'string' && typeof value !== 'symbol';
-
-/**
- * Visits every key one listener is filed under, exactly once each. `indexAdd()`
- * and `indexRemove()` are this function with the two halves of the pairing rule
- * plugged in, which is the whole reason it exists: neither can file or unfile a
- * key the other does not know about. AGENTS.md says why the unfiling half is
- * the one worth that trouble — it is the failure nothing goes red for.
- *
- * At most two distinct keys out of three candidate slots:
- *
- * - the **dedup key**, for the two types that can dedup, filed whatever it
- *   holds. Not narrowed by `isRemovalKey()`: `on(ε, 'foo', 'toFixed', 42)`
- *   dedups against a primitive listener object today and has to keep doing so.
- * - the **identity slot**, when a removal could name it. Covers `off(ε, fn)` on
- *   a function listener and `off(ε, obj)` on an object one.
- * - the **listener-object slot**, when it is a value `off(ε, obj)` could name.
- *   That is the object-or-function test rather than `isRemovalKey()`, because
- *   the association disjunct in `detachByIdentity()` is gated on exactly that.
- *
- * Together those cover every listener a removal by identity can match, and that
- * coverage is what lets `detachByIdentity()` read the index instead of the
- * bucket: a listener not filed under the argument cannot match it. The
- * contrapositive is the thing to check when changing either end — a match needs
- * `listener === x` or `listenerObject === x`, so it needs a slot holding `x`,
- * so it needs the key one of the branches below writes.
- *
- * `visit` is one of two module-level functions, never a closure: this runs once
- * per subscription and once per removal.
- */
-const eachIndexKey = (
-  index: DedupIndex,
-  listener: EventListener,
-  visit: (index: DedupIndex, key: unknown, listener: EventListener) => void,
-): void => {
-  const identity = listener.listener;
-  const context = listener.listenerObject;
-
-  const dedupable = isSimilarListenerType(listener.listenerType);
-  const dedupKey = dedupable
-    ? dedupKeyOf(listener.listenerType, identity, context)
-    : undefined;
-  if (dedupable) {
-    visit(index, dedupKey, listener);
-  }
-  if (isRemovalKey(identity) && !(dedupable && dedupKey === identity)) {
-    visit(index, identity, listener);
-  }
-  if (
-    isAttachableTarget(context) &&
-    context !== identity &&
-    !(dedupable && dedupKey === context)
-  ) {
-    visit(index, context, listener);
-  }
-};
-
-const fileUnder = (
-  index: DedupIndex,
-  key: unknown,
-  listener: EventListener,
-): void => {
-  const candidates = index.get(key);
-  if (candidates === undefined) {
-    index.set(key, [listener]);
-  } else {
-    candidates.push(listener);
-  }
-};
-
-/**
- * The two early returns are unreachable through `on()` / `off()`: a listener
- * reaches this only under a key `fileUnder()` wrote for it, and no other path
- * empties a candidate list. They stay because the alternative to a missed guard
- * here is `indexOf()` on `undefined` or a `splice(-1, 1)` that silently unfiles
- * a listener still in the bucket, and `EventStore.spec.ts` pins both by
- * corrupting the index by hand.
- */
-const unfileFrom = (
-  index: DedupIndex,
-  key: unknown,
-  listener: EventListener,
-): void => {
-  const candidates = index.get(key);
-  if (candidates === undefined) return;
-  const idx = candidates.indexOf(listener);
-  if (idx < 0) return;
-  candidates.splice(idx, 1);
-  if (candidates.length === 0) index.delete(key);
-};
-
-/** Files a freshly inserted listener, creating the bucket's index on first use. */
-const indexAdd = (bucket: ListenerBucket, listener: EventListener): void => {
-  eachIndexKey((bucket[DEDUP_INDEX] ??= new Map()), listener, fileUnder);
-};
-
-/**
- * Unfiles a listener that is being spliced out. Every path that removes a single
- * listener from a bucket calls it, and calls it before `detach()`.
- *
- * A path that forgot to would not corrupt `add()`'s lookup:
- * `findSimilarListener()` still runs the full `isSimilar()` over whatever the
- * index hands it, and a detached listener can never pass that test — `detach()`
- * sets both of its identity slots to `null`, while a listener arriving at
- * `add()` always carries a non-null one (`_subscribeTo()` rejects a falsy
- * listener before it ever gets here). Nor would it corrupt
- * `detachByIdentity()`, for the same reason: two nulled slots match no `off()`
- * argument. What it would leave behind is the entry, and with it a strong
- * reference to the object in the key, on an emitter the consumer believes it
- * has unsubscribed from.
- */
-const indexRemove = (bucket: ListenerBucket, listener: EventListener): void => {
-  const index = bucket[DEDUP_INDEX];
-  if (index !== undefined) {
-    eachIndexKey(index, listener, unfileFrom);
-  }
-};
-
-/**
- * The lookup `add()` makes before it inserts. At most one entry in a bucket can
- * ever satisfy `isSimilar()` — a second one would have deduped into the first
- * when it was registered — so which candidate comes back first is not a
- * question, and the index answers exactly what the linear scan answered.
- *
- * It searches from the *description* of a subscription, never from a listener
- * instance, and that is the whole point: a registration that aggregates now
- * builds nothing at all. Measured on repeated `on(ε, 'foo', service)` against
- * one identity, dropping the throwaway instance is worth ~112 B and ~8 ns per
- * call — the numbers are in the doc comment at `registerEventListener()`.
- */
-const findSimilarListener = (
-  listenerType: number | undefined,
-  priority: number,
-  eventName: EventName,
-  listener: unknown,
-  listenerObject: unknown,
-  bucket: ListenerBucket,
-) => {
-  if (!isSimilarListenerType(listenerType)) return undefined;
-  const index = bucket[DEDUP_INDEX];
-  if (index === undefined) return undefined;
-  const candidates = index.get(
-    dedupKeyOf(listenerType, listener, listenerObject),
-  );
-  if (candidates === undefined) return undefined;
-  // for…of, not find(): the callback find() wants is a fresh closure on every
-  // subscription, and this list is short enough that the loop is the whole cost.
-  for (const candidate of candidates) {
-    if (
-      isSimilar(
-        listenerType,
-        priority,
-        eventName,
-        listener,
-        listenerObject,
-        candidate,
-      )
-    ) {
-      return candidate;
-    }
-  }
-  return undefined;
-};
+import {isCatchEmAll, isEventName} from './utils';
+import {
+  createBucket,
+  detachAll,
+  EMPTY_CATCH_EM_ALL,
+  EMPTY_NAMED_LISTENERS,
+  HELD_BY,
+} from './bucket';
+import type {ListenerBucket} from './bucket';
+import {
+  DEDUP_INDEX,
+  findSimilarListener,
+  indexAdd,
+  indexRemove,
+} from './dedupIndex';
+import {findInsertIndex, mergeWalk, walkBucket} from './walk';
+import type {WalkCallback} from './walk';
 
 /**
  * `peekListeners()`'s answer for a name nothing is registered under. One
@@ -690,10 +32,10 @@ const EMPTY_LISTENERS: ReadonlyArray<EventListener> = Object.freeze([]);
 
 export class EventStore {
   // Both start on the shared stand-ins and are swapped for a container of
-  // their own by the first write — see `EMPTY_NAMED_LISTENERS` above. Neither
-  // is `readonly` any more for that reason, and both are private for the one
-  // they always should have been: read-only from the outside, swappable from
-  // the inside. Clone-on-mutate has replaced the wildcard reference since
+  // their own by the first write — see `EMPTY_NAMED_LISTENERS` in `bucket.ts`.
+  // Neither is `readonly` any more for that reason, and both are private for
+  // the one they always should have been: read-only from the outside,
+  // swappable from the inside. Clone-on-mutate has replaced the wildcard reference since
   // v6.0.0, and lazy allocation now replaces the named one too; a getter over
   // a private field buys that without widening what a holder of the store may
   // do with it. (Consumers never see the store at all — the internals slot is
@@ -846,7 +188,7 @@ export class EventStore {
    *    `indexRemove()` before the `detach()` that follows a removal: skip it
    *    and nothing goes red except the handful of cases that read the index
    *    directly, while the consumer's own object stays held by an emitter they
-   *    have unsubscribed from — see `indexRemove()`.
+   *    have unsubscribed from — see `indexRemove()` in `dedupIndex.ts`.
    *
    * Indices computed against `bucket` stay valid in what comes back: the clone
    * is a `slice(0)`, element for element.
@@ -1016,7 +358,8 @@ export class EventStore {
    * side, up to the release this comment ships in — every `off(ε, fn)` and
    * `off(ε, obj)` read both identity slots of every listener under every event
    * name, and it read them to the end of each bucket rather than stopping at
-   * the match, because a bucket can hold several. `eachIndexKey()` carries the
+   * the match, because a bucket can hold several. `dedupIndex.ts`'s
+   * `eachIndexKey()` carries the
    * argument that makes the shortcut sound: a listener not filed under the
    * value `off()` names cannot match it.
    *
@@ -1103,7 +446,8 @@ export class EventStore {
    *
    * Takes the subscription's five identifying slots rather than a listener,
    * and builds the `EventListener` only where one is actually inserted. The
-   * dedup search reads nothing else (`findSimilarListener()`), so an
+   * dedup search reads nothing else (`dedupIndex.ts`'s `findSimilarListener()`),
+   * so an
    * aggregating call now allocates nothing at all and burns no id from
    * `EventListener`'s module-global counter.
    *
@@ -1163,7 +507,8 @@ export class EventStore {
     // Two writes, and the optimistic one comes last — the field says "created"
     // only once the splice has actually happened. Deriving it from `similar`
     // in one write up here would leave it claiming a registration that does
-    // not exist whenever `findInsertIndex()` rejects a corrupted bucket: that
+    // not exist whenever `walk.ts`'s `findInsertIndex()` rejects a corrupted
+    // bucket: that
     // throw skips the insertion, not the write. Written pessimistically first
     // for the same reason, so the throwing path leaves behind the answer that
     // is true of it.
@@ -1447,7 +792,7 @@ export class EventStore {
    * written for read every listener of every name and the model counted only
    * the names. Any successor to it has to keep both terms, whatever happens to
    * the second. See `docs/off.md` for the consumer-facing version of this note,
-   * and `DEDUP_INDEX` for the measurements.
+   * and `DEDUP_INDEX` in `dedupIndex.ts` for the measurements.
    */
   private removeByListener(listener: unknown, listenerObject: unknown): void {
     // Both `typeof` values, because both are listener objects: the set is
@@ -1535,7 +880,8 @@ export class EventStore {
 
   /**
    * Walks the listeners for `eventName` in dispatch order and hands each one to
-   * `fn`, together with `a`, `b` and `c` unchanged — see `WalkCallback` for why
+   * `fn`, together with `a`, `b` and `c` unchanged — see `WalkCallback` in
+   * `walk.ts` for why
    * the context travels as arguments rather than in a closure.
    *
    * The three slots are typed against the callback's own parameters, so passing

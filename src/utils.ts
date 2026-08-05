@@ -362,7 +362,7 @@ const emitFallback = (
  * obligation watermark that has to be read before any of this runs.
  *
  * Three flat module-level functions taking positional arguments, rather than one
- * body or anything that builds a closure: `EventStore.ts` explains the mechanism
+ * body or anything that builds a closure: `walk.ts` explains the mechanism
  * at `mergeWalk()` — on this path the size of a function decides whether its
  * caller inlines it — and a closure factory or an options object would put an
  * allocation on every dispatch on top of that. The split is not a device
