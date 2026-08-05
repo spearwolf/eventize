@@ -6,12 +6,11 @@ Canonical guide for coding agents in this repo. `CLAUDE.md` is a symlink to this
 
 ## Versioning right now
 
-`package.json` carries **`6.0.0-dev`**. The registry is on `v5.1.0` — no `6.x` has ever been published, and the `-dev` suffix is what keeps it that way: `scripts/publishPackage.cjs` exits before `npm publish` for any version ending in `-dev`. **Do not drop the suffix, and do not bump the version.** Releasing is a human's call.
+`package.json` carries **`6.0.0`**, released 2026-08-05 — the `-dev` suffix that had been holding `scripts/publishPackage.cjs` back is gone, so `npm run publish:pkg` is armed. **Releasing, and choosing what the next version is called, stays a human's call.** Nothing here authorises a bump.
 
-Two consequences:
+One consequence outlives the release:
 
-- **Everything unreleased goes under `## \`v6.0.0\` (unreleased)` in `CHANGELOG.md`** — one section, no new version headings above it. A change that would ordinarily demand a major only widens what that section already carries; nothing inside it can break a consumer who has never had a `6.x`.
-- **Version references in prose are `v5.1.0` or `v6.0.0`, never anything between.** "Since v6.0.0" for what this release introduces, "up to v5.1.0" for what it replaces. The intermediate versions reached nobody, and naming one sends a reader looking for an upgrade path that does not exist.
+- **Version references in prose are `v5.1.0` or `v6.0.0`, never anything between.** "Since v6.0.0" for what this release introduced, "up to v5.1.0" for what it replaced. The intermediate versions reached nobody, and naming one sends a reader looking for an upgrade path that does not exist.
 
 ## Verification
 
@@ -92,7 +91,7 @@ Progressive disclosure applies to this repo's own docs — the deep material liv
 
 | Change | Update |
 | --- | --- |
-| Public API or runtime behavior | `CHANGELOG.md`, under `## \`v6.0.0\` (unreleased)` |
+| Public API or runtime behavior | `CHANGELOG.md`. `v6.0.0` is released, so its section is closed — a change landing after it needs a heading, and which version that heading names is a human's call |
 | Anything breaking against `v5.1.0` | `docs/migration.md` as well — with the grep pattern and the replacement, not just the fact |
 | Documented behavior or an example | `README.md`, plus the matching `docs/*.md` if the detail lives there |
 | Dispatch semantics, retain behavior, or any quirk above | `skills/using-eventize/` — `SKILL.md` for the summary, `references/*.md` for detail |

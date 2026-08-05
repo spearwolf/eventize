@@ -1,10 +1,10 @@
 # CHANGELOG
 
-## `v6.0.0` (unreleased)
+## `v6.0.0` (2026-08-05) — the whole jump from `v5.1.0`
 
-**Not published.** `package.json` carries `6.0.0-dev`, and `scripts/publishPackage.cjs` refuses to publish any version ending in `-dev`, so the registry stays on `v5.1.0` until this heading loses the suffix and gains a date.
+A heavily AI-assisted major release, and the largest refactor this package has had. No new capability drove it. The work went into four things: references an emitter kept holding after a cleanup that read as complete, the allocation and search costs of dispatch and removal, behaviour that was documented one way and implemented another, and a type surface that compiled calls the runtime could never serve. Most of what is listed as breaking below is a defect being fixed or rejected outright rather than a design being changed.
 
-Everything below is stated against `v5.1.0` — the version consumers actually have. `v6.0.0` is the only `6.x` there is, so this is the whole jump. Twenty-two breaking changes — thirteen runtime, nine type-only; the two with the widest reach are every bulk `off()` form now clearing retained state along with listeners, and `on()` and `once()` aggregating by listener identity. [`docs/migration.md`](./docs/migration.md) walks the upgrade with before/after code.
+Everything below is stated against `v5.1.0`, the version this release replaces. `v6.0.0` is the only `6.x` there is, so this is the whole jump. Twenty-two breaking changes — thirteen runtime, nine type-only; the two with the widest reach are every bulk `off()` form now clearing retained state along with listeners, and `on()` and `once()` aggregating by listener identity. [`docs/migration.md`](./docs/migration.md) walks the upgrade with before/after code.
 
 ### Breaking
 

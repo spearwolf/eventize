@@ -1,7 +1,8 @@
 # Integration tests: eventize vs. signalize
 
-Runs `@spearwolf/signalize`'s test suite against the **local, unreleased**
-eventize build, inside a container. Not part of CI, not part of `cbt`. Local,
+Runs `@spearwolf/signalize`'s test suite against the **local working-tree**
+eventize build — whatever `npm pack` produces right now, released or not —
+inside a container. Not part of CI, not part of `cbt`. Local,
 on demand.
 
     npm run test:integrations
@@ -44,7 +45,7 @@ Per phase, under `tmp/integration/<phase>/`: `install.log`, `typecheck.log`,
 {
   "phase": "baseline",
   "signalize": {"ref": "359d939a…", "commit": "359d939a…"},
-  "eventize":  {"version": "6.0.0-dev", "resolvedVersion": "6.0.0-dev"},
+  "eventize":  {"version": "6.0.0", "resolvedVersion": "6.0.0"},
   "patches":   {"applied": [], "failed": []},
   "steps": [
     {"name": "install",        "exitCode": 0, "durationMs": 1933, "log": "install.log"},
@@ -105,7 +106,9 @@ throwaway fixtures do that; none of them belongs in a commit.
 
 **Is the version assertion live?** Change the injected override in
 `entrypoint.sh` from `file:${EVENTIZE_TARBALL}` to `^5.0.0`, rebuild, run.
-Expected: exit `11`, `FATAL: expected eventize 6.0.0-dev, resolved '5.0.0'`.
+Expected: exit `11`, `FATAL: expected eventize 6.0.0, resolved '5.0.0'` — the
+expected version is whatever `package.json` carries, passed in as
+`EVENTIZE_VERSION`, so this line tracks the version rather than pinning it.
 
 **Is the typecheck live?** Drop in this canary and run the patched phase:
 
@@ -123,10 +126,13 @@ new file mode 100644
 +export const canary: number = on;
 ```
 
-Expected: exit `20` and a `TS2322` quoting eventize's own overload signature
-(`EventizedObject`, `ListenerFor`, `UnsubscribeFunc`). A `TS2307` instead means
-the module does not resolve at all, which is a finding about eventize's
-`exports` map rather than a passing canary.
+Expected: exit `20` and a `TS2322` naming a type of eventize's own — since
+`v6.0.0` the standalone `on()` is declared against one interface rather than 35
+rolled-out overloads, so the message reads
+`Type 'StandaloneSubscribeFunc' is not assignable to type 'number'`. Which type
+it names is incidental; that it names one of eventize's is the whole check. A
+`TS2307` instead means the module does not resolve at all, which is a finding
+about eventize's `exports` map rather than a passing canary.
 
 The fixture creates a new file on purpose: no context lines, so it cannot go
 stale when the pinned ref moves.

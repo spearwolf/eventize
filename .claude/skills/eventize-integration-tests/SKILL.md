@@ -1,11 +1,11 @@
 ---
 name: eventize-integration-tests
-description: Use when running or interpreting the signalize integration tests for eventize — "integration tests", "test:integrations", "läuft signalize noch gegen v6", checking whether unreleased eventize changes break a real consumer, or triaging a red baseline into CHANGELOG gaps and regressions.
+description: Use when running or interpreting the signalize integration tests for eventize — "integration tests", "test:integrations", "läuft signalize noch gegen v6", checking whether local eventize changes break a real consumer, or triaging a red baseline into CHANGELOG gaps and regressions.
 ---
 
 # eventize ↔ signalize integration tests
 
-Runs signalize's suite against the local unreleased eventize build and turns the
+Runs signalize's suite against the local working-tree eventize build and turns the
 result into a classified list of breakages. The green run is not the product;
 the classification is.
 
@@ -25,9 +25,9 @@ Never call `docker` directly — the script owns that, this skill owns judgement
    that before interpreting anything. Exit `11` in particular means the run
    proved nothing.
 
-3. **Read before guessing.** Read `CHANGELOG.md` under
-   `` ## `v6.0.0` (unreleased) `` and `docs/migration.md` **before** interpreting
-   a single error message. The order is binding: reversed, you write patches that
+3. **Read before guessing.** Read the newest section of `CHANGELOG.md` — down to
+   and including `` ## `v6.0.0` ``, the release the local build descends from —
+   and `docs/migration.md` **before** interpreting a single error message. The order is binding: reversed, you write patches that
    paper over a genuine regression.
 
 4. **Classify.** Every baseline breakage gets exactly one category:
@@ -81,5 +81,6 @@ bar.
 - Never commit, push or open a PR in signalize.
 - Never read or write `~/spaceland/signalize`. The container clones from GitHub.
 - Never add this to `cbt` or to a workflow.
-- Never publish eventize.
-- Never bump the version out of `6.0.0-dev`.
+- Never publish eventize, and never change the version in `package.json`. Both
+  are a human's call, and `v6.0.0` being released means the `-dev` suffix no
+  longer stands between a stray command and the registry.
