@@ -12,7 +12,7 @@ import {
   retainClear,
   unretain,
 } from './index';
-import type {AnyEventNames} from './index';
+import type {AnyEventNames, EventizeApi} from './index';
 
 // Compile-time tests are interleaved with runtime assertions. The runtime
 // assertions verify duck-typing & backwards compatibility actually works;
@@ -959,5 +959,551 @@ describe('typed events — generic event-map support', () => {
       // @ts-expect-error same for the async sibling
       ε.emitAsync(['opened', 'closed'], true);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Arm-group parity — on() / once() across the three subscribe surfaces
+//
+// `SubscribeFunc` (the method form) and `StandaloneSubscribeFunc` (the same set
+// with the emitter moved into the first slot) state the same call shapes twice,
+// and what kept them in step was the comment at `StandaloneSubscribeFunc`
+// asking nicely: "diverge here and the three API surfaces start disagreeing at
+// a new place". This table is that sentence turned into something `tsc` runs.
+//
+// The eleven groups are not invented for the table. They are the eleven arms of
+// `SubscribeArgs` in `src/types.ts` — the shapes `_subscribeTo()` decodes — so a
+// group that loses its spelling on one surface is a call the runtime handles and
+// the types refuse. Listed below with the arms that carry them on each side; the
+// arm labels are the (1a)/(2t)/(4t) group markers written in `src/types.ts`
+// itself, because line numbers in a comment go stale on the next edit.
+//
+//  1  NamedFuncArgs                (names, listener, listenerObject?)
+//     SubscribeFunc:  (1a) two- and three-arg arms, plus the LooseNames pair
+//     Standalone:     (1a) three- and four-arg arms, plus the (1) NonTypedEmitter pair
+//
+//  2  NamedMethodArgs              (names, methodName, listenerObject)
+//     SubscribeFunc:  (2t) first arm, plus its LooseNames twin
+//     Standalone:     (2t) first arm, plus (2) first arm
+//
+//  3  NamedObjectArgs              (names, listenerObject, listenerContext?)
+//     SubscribeFunc:  (2t) third arm, plus its LooseNames twin
+//     Standalone:     (2t) third arm, plus (3) three- and four-arg arms
+//
+//  4  NamedPriorityFuncArgs        (names, priority, listener, listenerObject?)
+//     SubscribeFunc:  (1a) priority arms, plus the LooseNames pair
+//     Standalone:     (1a) priority arms, plus the (1) priority pair
+//
+//  5  NamedPriorityMethodArgs      (names, priority, methodName, listenerObject)
+//     SubscribeFunc:  (2t) second arm, plus its LooseNames twin
+//     Standalone:     (2t) second arm, plus (2) second arm
+//
+//  6  NamedPriorityObjectArgs      (names, priority, listenerObject, listenerContext?)
+//     SubscribeFunc:  (2t) fourth arm, plus its LooseNames twin
+//     Standalone:     (2t) fourth arm, plus (3) four- and five-arg arms
+//
+//  7  CatchAllFuncArgs             (listener, listenerObject?)
+//     SubscribeFunc:  (4) first arm — unguarded, so it serves both maps
+//     Standalone:     (4t) first arm, plus (4) two- and three-arg arms
+//
+//  8  CatchAllObjectArgs           (listenerObject, listenerContext?)
+//     SubscribeFunc:  (1b) for the bare form, (4) fourth arm otherwise
+//     Standalone:     (1b) for the bare form, (4t) fourth arm and (4)/(3) otherwise
+//
+//  9  CatchAllPriorityFuncArgs     (priority, listener, listenerObject?)
+//     SubscribeFunc:  (4) second arm
+//     Standalone:     (4t) second arm, plus the (4) priority pair
+//
+// 10  CatchAllPriorityMethodArgs   (priority, methodName, listenerObject)
+//     SubscribeFunc:  (4) third arm
+//     Standalone:     (4t) third arm, plus the catch-all sibling in (2)
+//
+// 11  CatchAllPriorityObjectArgs   (priority, listenerObject, listenerContext?)
+//     SubscribeFunc:  (4) fifth arm
+//     Standalone:     (4t) fifth arm, plus (4) last arm and (3) fifth arm
+//
+// Two of the group markers in `src/types.ts` are spellings rather than groups of
+// their own, and they are folded in above: (1c) is the array form of groups 1
+// and 4 — the event-name slot is `OnEventNames`, which already admits a list and
+// `[name, priority]` tuples — and (1b) is the typed form of group 8's bare arm.
+//
+// Every case below runs each group's literal on all three surfaces, once against
+// an untyped emitter (where the loose arms carry it) and once against a typed one
+// (where the typed arms do). The runtime assertion is `getSubscriptionCount()`:
+// the calls are compile assertions first, the count only proves they registered
+// rather than merely type-checked.
+// ---------------------------------------------------------------------------
+
+describe('arm-group parity across the three subscribe surfaces', () => {
+  const looseTrio = () => ({
+    standalone: eventize(),
+    injected: eventize.inject({}),
+    klass: new (class extends Eventize {})(),
+  });
+
+  const typedTrio = () => ({
+    standalone: eventize<MyEvents>(),
+    injected: eventize.inject<MyEvents>({}),
+    klass: new (class extends Eventize<MyEvents> {})(),
+  });
+
+  const counts = (trio: {
+    standalone: object;
+    injected: object;
+    klass: object;
+  }) => [
+    getSubscriptionCount(trio.standalone),
+    getSubscriptionCount(trio.injected),
+    getSubscriptionCount(trio.klass),
+  ];
+
+  const ctx = {tag: 'ctx'};
+
+  it('(1) NamedFuncArgs — event name(s), listener, optional context', () => {
+    const loose = looseTrio();
+    on(loose.standalone, 'foo', () => {});
+    on(loose.standalone, 'foo', () => {}, ctx);
+    on(loose.standalone, ['foo', ['bar', 10]], () => {});
+    loose.injected.on('foo', () => {});
+    loose.injected.on('foo', () => {}, ctx);
+    loose.injected.on(['foo', ['bar', 10]], () => {});
+    loose.klass.on('foo', () => {});
+    loose.klass.on('foo', () => {}, ctx);
+    loose.klass.on(['foo', ['bar', 10]], () => {});
+
+    const typed = typedTrio();
+    on(typed.standalone, 'data', (payload, code) => void [payload, code]);
+    on(typed.standalone, 'data', (payload) => void payload, ctx);
+    on(typed.standalone, [['data', 10]], (payload) => void payload);
+    typed.injected.on('data', (payload, code) => void [payload, code]);
+    typed.injected.on('data', (payload) => void payload, ctx);
+    typed.injected.on([['data', 10]], (payload) => void payload);
+    typed.klass.on('data', (payload, code) => void [payload, code]);
+    typed.klass.on('data', (payload) => void payload, ctx);
+    typed.klass.on([['data', 10]], (payload) => void payload);
+
+    expect(counts(loose)).toEqual([4, 4, 4]);
+    expect(counts(typed)).toEqual([3, 3, 3]);
+  });
+
+  it('(2) NamedMethodArgs — event name(s), method name, listener object', () => {
+    const loose = looseTrio();
+    on(loose.standalone, 'foo', 'handler', {handler: () => {}});
+    loose.injected.on('foo', 'handler', {handler: () => {}});
+    loose.klass.on('foo', 'handler', {handler: () => {}});
+
+    const typed = typedTrio();
+    on(typed.standalone, 'data', 'handler', {handler: () => {}});
+    typed.injected.on('data', 'handler', {handler: () => {}});
+    typed.klass.on('data', 'handler', {handler: () => {}});
+
+    expect(counts(loose)).toEqual([1, 1, 1]);
+    expect(counts(typed)).toEqual([1, 1, 1]);
+  });
+
+  it('(3) NamedObjectArgs — event name(s), listener object, optional context', () => {
+    const loose = looseTrio();
+    on(loose.standalone, 'foo', {foo: () => {}});
+    on(loose.standalone, 'foo', {foo: () => {}}, ctx);
+    loose.injected.on('foo', {foo: () => {}});
+    loose.injected.on('foo', {foo: () => {}}, ctx);
+    loose.klass.on('foo', {foo: () => {}});
+    loose.klass.on('foo', {foo: () => {}}, ctx);
+
+    const typed = typedTrio();
+    on(typed.standalone, 'data', {data: () => {}});
+    on(typed.standalone, 'data', {data: () => {}}, ctx);
+    typed.injected.on('data', {data: () => {}});
+    typed.injected.on('data', {data: () => {}}, ctx);
+    typed.klass.on('data', {data: () => {}});
+    typed.klass.on('data', {data: () => {}}, ctx);
+
+    expect(counts(loose)).toEqual([2, 2, 2]);
+    expect(counts(typed)).toEqual([2, 2, 2]);
+  });
+
+  it('(4) NamedPriorityFuncArgs — event name(s), priority, listener, optional context', () => {
+    const loose = looseTrio();
+    on(loose.standalone, 'foo', 10, () => {});
+    on(loose.standalone, 'foo', 10, () => {}, ctx);
+    on(loose.standalone, ['foo', 'bar'], 10, () => {});
+    loose.injected.on('foo', 10, () => {});
+    loose.injected.on('foo', 10, () => {}, ctx);
+    loose.injected.on(['foo', 'bar'], 10, () => {});
+    loose.klass.on('foo', 10, () => {});
+    loose.klass.on('foo', 10, () => {}, ctx);
+    loose.klass.on(['foo', 'bar'], 10, () => {});
+
+    const typed = typedTrio();
+    on(typed.standalone, 'data', 10, (payload, code) => void [payload, code]);
+    on(typed.standalone, 'data', 10, (payload) => void payload, ctx);
+    on(typed.standalone, ['data'], 10, (payload) => void payload);
+    typed.injected.on('data', 10, (payload, code) => void [payload, code]);
+    typed.injected.on('data', 10, (payload) => void payload, ctx);
+    typed.injected.on(['data'], 10, (payload) => void payload);
+    typed.klass.on('data', 10, (payload, code) => void [payload, code]);
+    typed.klass.on('data', 10, (payload) => void payload, ctx);
+    typed.klass.on(['data'], 10, (payload) => void payload);
+
+    expect(counts(loose)).toEqual([4, 4, 4]);
+    expect(counts(typed)).toEqual([3, 3, 3]);
+  });
+
+  it('(5) NamedPriorityMethodArgs — event name(s), priority, method name, listener object', () => {
+    const loose = looseTrio();
+    on(loose.standalone, 'foo', 10, 'handler', {handler: () => {}});
+    loose.injected.on('foo', 10, 'handler', {handler: () => {}});
+    loose.klass.on('foo', 10, 'handler', {handler: () => {}});
+
+    const typed = typedTrio();
+    on(typed.standalone, 'data', 10, 'handler', {handler: () => {}});
+    typed.injected.on('data', 10, 'handler', {handler: () => {}});
+    typed.klass.on('data', 10, 'handler', {handler: () => {}});
+
+    expect(counts(loose)).toEqual([1, 1, 1]);
+    expect(counts(typed)).toEqual([1, 1, 1]);
+  });
+
+  it('(6) NamedPriorityObjectArgs — event name(s), priority, listener object, optional context', () => {
+    const loose = looseTrio();
+    on(loose.standalone, 'foo', 10, {foo: () => {}});
+    on(loose.standalone, 'foo', 10, {foo: () => {}}, ctx);
+    loose.injected.on('foo', 10, {foo: () => {}});
+    loose.injected.on('foo', 10, {foo: () => {}}, ctx);
+    loose.klass.on('foo', 10, {foo: () => {}});
+    loose.klass.on('foo', 10, {foo: () => {}}, ctx);
+
+    const typed = typedTrio();
+    on(typed.standalone, 'data', 10, {data: () => {}});
+    on(typed.standalone, 'data', 10, {data: () => {}}, ctx);
+    typed.injected.on('data', 10, {data: () => {}});
+    typed.injected.on('data', 10, {data: () => {}}, ctx);
+    typed.klass.on('data', 10, {data: () => {}});
+    typed.klass.on('data', 10, {data: () => {}}, ctx);
+
+    expect(counts(loose)).toEqual([2, 2, 2]);
+    expect(counts(typed)).toEqual([2, 2, 2]);
+  });
+
+  it('(7) CatchAllFuncArgs — listener, optional context', () => {
+    const loose = looseTrio();
+    on(loose.standalone, () => {});
+    on(loose.standalone, () => {}, ctx);
+    loose.injected.on(() => {});
+    loose.injected.on(() => {}, ctx);
+    loose.klass.on(() => {});
+    loose.klass.on(() => {}, ctx);
+
+    const typed = typedTrio();
+    on(typed.standalone, () => {});
+    on(typed.standalone, () => {}, ctx);
+    typed.injected.on(() => {});
+    typed.injected.on(() => {}, ctx);
+    typed.klass.on(() => {});
+    typed.klass.on(() => {}, ctx);
+
+    expect(counts(loose)).toEqual([2, 2, 2]);
+    expect(counts(typed)).toEqual([2, 2, 2]);
+  });
+
+  it('(8) CatchAllObjectArgs — listener object, optional context', () => {
+    const loose = looseTrio();
+    on(loose.standalone, {foo: () => {}});
+    on(loose.standalone, {foo: () => {}}, ctx);
+    loose.injected.on({foo: () => {}});
+    loose.injected.on({foo: () => {}}, ctx);
+    loose.klass.on({foo: () => {}});
+    loose.klass.on({foo: () => {}}, ctx);
+
+    // The one group whose literals are allowed to differ, and the reason sits
+    // in `src/types.ts` at the (4t) comment: the bare two-argument standalone
+    // form is owned by (1b), which checks the method names against the map,
+    // while the method surfaces have no `obj` slot for the guard and fall
+    // through to the unchecked (4) arm. That is the accepted divergence at the
+    // `NonTypedEmitter` boundary, not a gap in this table — an undeclared
+    // method is pinned on both sides elsewhere in this file. With a context
+    // object all three take the same unchecked arm again.
+    const typed = typedTrio();
+    on(typed.standalone, {data: () => {}});
+    on(typed.standalone, {data: () => {}}, ctx);
+    typed.injected.on({data: () => {}});
+    typed.injected.on({data: () => {}}, ctx);
+    typed.klass.on({data: () => {}});
+    typed.klass.on({data: () => {}}, ctx);
+
+    expect(counts(loose)).toEqual([2, 2, 2]);
+    expect(counts(typed)).toEqual([2, 2, 2]);
+  });
+
+  it('(9) CatchAllPriorityFuncArgs — priority, listener, optional context', () => {
+    const loose = looseTrio();
+    on(loose.standalone, 10, () => {});
+    on(loose.standalone, 10, () => {}, ctx);
+    loose.injected.on(10, () => {});
+    loose.injected.on(10, () => {}, ctx);
+    loose.klass.on(10, () => {});
+    loose.klass.on(10, () => {}, ctx);
+
+    const typed = typedTrio();
+    on(typed.standalone, 10, () => {});
+    on(typed.standalone, 10, () => {}, ctx);
+    typed.injected.on(10, () => {});
+    typed.injected.on(10, () => {}, ctx);
+    typed.klass.on(10, () => {});
+    typed.klass.on(10, () => {}, ctx);
+
+    expect(counts(loose)).toEqual([2, 2, 2]);
+    expect(counts(typed)).toEqual([2, 2, 2]);
+  });
+
+  it('(10) CatchAllPriorityMethodArgs — priority, method name, listener object', () => {
+    const loose = looseTrio();
+    on(loose.standalone, 10, 'handler', {handler: () => {}});
+    loose.injected.on(10, 'handler', {handler: () => {}});
+    loose.klass.on(10, 'handler', {handler: () => {}});
+
+    const typed = typedTrio();
+    on(typed.standalone, 10, 'handler', {handler: () => {}});
+    typed.injected.on(10, 'handler', {handler: () => {}});
+    typed.klass.on(10, 'handler', {handler: () => {}});
+
+    expect(counts(loose)).toEqual([1, 1, 1]);
+    expect(counts(typed)).toEqual([1, 1, 1]);
+  });
+
+  it('(11) CatchAllPriorityObjectArgs — priority, listener object, optional context', () => {
+    const loose = looseTrio();
+    on(loose.standalone, 10, {foo: () => {}});
+    on(loose.standalone, 10, {foo: () => {}}, ctx);
+    loose.injected.on(10, {foo: () => {}});
+    loose.injected.on(10, {foo: () => {}}, ctx);
+    loose.klass.on(10, {foo: () => {}});
+    loose.klass.on(10, {foo: () => {}}, ctx);
+
+    const typed = typedTrio();
+    on(typed.standalone, 10, {data: () => {}});
+    on(typed.standalone, 10, {data: () => {}}, ctx);
+    typed.injected.on(10, {data: () => {}});
+    typed.injected.on(10, {data: () => {}}, ctx);
+    typed.klass.on(10, {data: () => {}});
+    typed.klass.on(10, {data: () => {}}, ctx);
+
+    expect(counts(loose)).toEqual([2, 2, 2]);
+    expect(counts(typed)).toEqual([2, 2, 2]);
+  });
+
+  // The other half of the table, and the half that makes the first half worth
+  // running. Eleven accepted shapes prove nothing on their own if the overload
+  // sets also accept everything else; each group below violates its *own*
+  // trailing slot with a value `_subscribeTo()` refuses at runtime too — a
+  // nullish listener or listener object, or an array where a listener object
+  // belongs. `@ts-expect-error` is the assertion: an unused one is TS2578 and
+  // fails `npm run typecheck`, so a surface that quietly widens a slot breaks
+  // the build here rather than in a consumer's code.
+  it('rejects the same eleven malformed shapes on all three surfaces', () => {
+    // Never called. `tsc` checks a function body whether or not anything runs
+    // it, and running these would only re-assert `_subscribeTo()`'s runtime
+    // guards, which have their own specs. What is pinned here is the type.
+    const rejected = () => {
+      const loose = looseTrio();
+      const typed = typedTrio();
+
+      // (1) the listener slot takes a function, not a lookup that missed
+      // @ts-expect-error null is not a listener
+      on(loose.standalone, 'foo', null);
+      // @ts-expect-error null is not a listener
+      loose.injected.on('foo', null);
+      // @ts-expect-error null is not a listener
+      loose.klass.on('foo', null);
+      // @ts-expect-error null is not a listener
+      on(typed.standalone, 'data', null);
+      // @ts-expect-error null is not a listener
+      typed.injected.on('data', null);
+      // @ts-expect-error null is not a listener
+      typed.klass.on('data', null);
+
+      // (2) a method name needs an object to be read off at dispatch time
+      // @ts-expect-error a method name needs something to read the method off
+      on(loose.standalone, 'foo', 'handler', null);
+      // @ts-expect-error a method name needs something to read the method off
+      loose.injected.on('foo', 'handler', null);
+      // @ts-expect-error a method name needs something to read the method off
+      loose.klass.on('foo', 'handler', null);
+      // @ts-expect-error a method name needs something to read the method off
+      on(typed.standalone, 'data', 'handler', null);
+      // @ts-expect-error a method name needs something to read the method off
+      typed.injected.on('data', 'handler', null);
+      // @ts-expect-error a method name needs something to read the method off
+      typed.klass.on('data', 'handler', null);
+
+      // (3) an array in the listener-object slot is a mis-typed name list
+      // @ts-expect-error an array is not a listener object
+      on(loose.standalone, 'foo', [1, 2]);
+      // @ts-expect-error an array is not a listener object
+      loose.injected.on('foo', [1, 2]);
+      // @ts-expect-error an array is not a listener object
+      loose.klass.on('foo', [1, 2]);
+      // @ts-expect-error an array is not a listener object
+      on(typed.standalone, 'data', [1, 2]);
+      // @ts-expect-error an array is not a listener object
+      typed.injected.on('data', [1, 2]);
+      // @ts-expect-error an array is not a listener object
+      typed.klass.on('data', [1, 2]);
+
+      // (4) same as (1), with the priority slot filled
+      // @ts-expect-error null is not a listener
+      on(loose.standalone, 'foo', 10, null);
+      // @ts-expect-error null is not a listener
+      loose.injected.on('foo', 10, null);
+      // @ts-expect-error null is not a listener
+      loose.klass.on('foo', 10, null);
+      // @ts-expect-error null is not a listener
+      on(typed.standalone, 'data', 10, null);
+      // @ts-expect-error null is not a listener
+      typed.injected.on('data', 10, null);
+      // @ts-expect-error null is not a listener
+      typed.klass.on('data', 10, null);
+
+      // (5) same as (2), with the priority slot filled
+      // @ts-expect-error a method name needs something to read the method off
+      on(loose.standalone, 'foo', 10, 'handler', null);
+      // @ts-expect-error a method name needs something to read the method off
+      loose.injected.on('foo', 10, 'handler', null);
+      // @ts-expect-error a method name needs something to read the method off
+      loose.klass.on('foo', 10, 'handler', null);
+      // @ts-expect-error a method name needs something to read the method off
+      on(typed.standalone, 'data', 10, 'handler', null);
+      // @ts-expect-error a method name needs something to read the method off
+      typed.injected.on('data', 10, 'handler', null);
+      // @ts-expect-error a method name needs something to read the method off
+      typed.klass.on('data', 10, 'handler', null);
+
+      // (6) same as (3), with the priority slot filled
+      // @ts-expect-error an array is not a listener object
+      on(loose.standalone, 'foo', 10, [1, 2]);
+      // @ts-expect-error an array is not a listener object
+      loose.injected.on('foo', 10, [1, 2]);
+      // @ts-expect-error an array is not a listener object
+      loose.klass.on('foo', 10, [1, 2]);
+      // @ts-expect-error an array is not a listener object
+      on(typed.standalone, 'data', 10, [1, 2]);
+      // @ts-expect-error an array is not a listener object
+      typed.injected.on('data', 10, [1, 2]);
+      // @ts-expect-error an array is not a listener object
+      typed.klass.on('data', 10, [1, 2]);
+
+      // (7) the catch-all listener slot, same rule without an event name
+      // @ts-expect-error null is neither a listener nor a listener object
+      on(loose.standalone, null);
+      // @ts-expect-error null is neither a listener nor a listener object
+      loose.injected.on(null);
+      // @ts-expect-error null is neither a listener nor a listener object
+      loose.klass.on(null);
+      // @ts-expect-error null is neither a listener nor a listener object
+      on(typed.standalone, null);
+      // @ts-expect-error null is neither a listener nor a listener object
+      typed.injected.on(null);
+      // @ts-expect-error null is neither a listener nor a listener object
+      typed.klass.on(null);
+
+      // (8) the catch-all listener-object slot; an array here reads as a name
+      //     list one slot too far to the right
+      // @ts-expect-error an array is not a listener object
+      on(loose.standalone, [1, 2], ctx);
+      // @ts-expect-error an array is not a listener object
+      loose.injected.on([1, 2], ctx);
+      // @ts-expect-error an array is not a listener object
+      loose.klass.on([1, 2], ctx);
+      // @ts-expect-error an array is not a listener object
+      on(typed.standalone, [1, 2], ctx);
+      // @ts-expect-error an array is not a listener object
+      typed.injected.on([1, 2], ctx);
+      // @ts-expect-error an array is not a listener object
+      typed.klass.on([1, 2], ctx);
+
+      // (9) same as (7), with the priority slot filled
+      // @ts-expect-error null is neither a listener nor a listener object
+      on(loose.standalone, 10, null);
+      // @ts-expect-error null is neither a listener nor a listener object
+      loose.injected.on(10, null);
+      // @ts-expect-error null is neither a listener nor a listener object
+      loose.klass.on(10, null);
+      // @ts-expect-error null is neither a listener nor a listener object
+      on(typed.standalone, 10, null);
+      // @ts-expect-error null is neither a listener nor a listener object
+      typed.injected.on(10, null);
+      // @ts-expect-error null is neither a listener nor a listener object
+      typed.klass.on(10, null);
+
+      // (10) the catch-all method-name form, missing its listener object
+      // @ts-expect-error a method name needs something to read the method off
+      on(loose.standalone, 10, 'handler', null);
+      // @ts-expect-error a method name needs something to read the method off
+      loose.injected.on(10, 'handler', null);
+      // @ts-expect-error a method name needs something to read the method off
+      loose.klass.on(10, 'handler', null);
+      // @ts-expect-error a method name needs something to read the method off
+      on(typed.standalone, 10, 'handler', null);
+      // @ts-expect-error a method name needs something to read the method off
+      typed.injected.on(10, 'handler', null);
+      // @ts-expect-error a method name needs something to read the method off
+      typed.klass.on(10, 'handler', null);
+
+      // (11) same as (8), with the priority slot filled
+      // @ts-expect-error an array is not a listener object
+      on(loose.standalone, 10, [1, 2]);
+      // @ts-expect-error an array is not a listener object
+      loose.injected.on(10, [1, 2]);
+      // @ts-expect-error an array is not a listener object
+      loose.klass.on(10, [1, 2]);
+      // @ts-expect-error an array is not a listener object
+      on(typed.standalone, 10, [1, 2]);
+      // @ts-expect-error an array is not a listener object
+      typed.injected.on(10, [1, 2]);
+      // @ts-expect-error an array is not a listener object
+      typed.klass.on(10, [1, 2]);
+    };
+
+    expect(rejected).toBeInstanceOf(Function);
+  });
+
+  // The eleven groups are spelled through `on()` above; `once()` gets them for
+  // free only as long as the two are declared with the same type, which is what
+  // this pins. Identity, not mutual assignability: two overload sets can accept
+  // each other's calls and still disagree about which arm wins, and arm order is
+  // load-bearing in both interfaces. The two-parameter conditional is the usual
+  // way to ask TypeScript for identity — deferring both sides makes the compiler
+  // compare the types rather than relate them.
+  it('declares once() with the same overload set as on(), on every surface', () => {
+    type IdenticalTo<A, B> =
+      (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+        ? true
+        : false;
+
+    const standaloneMatches: IdenticalTo<typeof on, typeof once> = true;
+    const injectMatches: IdenticalTo<
+      EventizeApi<MyEvents>['on'],
+      EventizeApi<MyEvents>['once']
+    > = true;
+    const classMatches: IdenticalTo<
+      Eventize<MyEvents>['on'],
+      Eventize<MyEvents>['once']
+    > = true;
+
+    // And the two method surfaces share one type outright, which is "three API
+    // surfaces, one implementation" stated at the type level: the class body
+    // declares no members of its own, so anything that changed only one of the
+    // two would have to have been written twice on purpose.
+    const surfacesMatch: IdenticalTo<
+      EventizeApi<MyEvents>['on'],
+      Eventize<MyEvents>['on']
+    > = true;
+
+    expect([
+      standaloneMatches,
+      injectMatches,
+      classMatches,
+      surfacesMatch,
+    ]).toEqual([true, true, true, true]);
   });
 });
