@@ -879,7 +879,9 @@ Everything below is exported from the package root, and each exists to be writte
 
 | Type | What it is for |
 | --- | --- |
+| `EventName` | `string \| symbol` — what an event may be called, and the element type `getSubscribedEventNames()` / `getRetainedEventNames()` hand back |
 | `EventMap`, `DefaultEventMap` | the constraint on an event map, and the permissive default |
+| `EventizedObject<TEvents>` | the branded emitter type. A class that calls `eventize(this)` declaration-merges with it — `export interface MyClass extends EventizedObject {}` — so that `emit(this, …)` inside the class type-checks; see the [migration guide](./docs/migration.md#v40x--v43x-the-type-brand-on-classes). Extend this, never `EventizeApi`, which carries the method signatures and collides with same-named methods on the host class |
 | `UnsubscribeFunc` | what `on()` and `once()` hand back — `() => void`, nothing else |
 | `OnceAsyncOptions` | the `{signal?: AbortSignal}` bag `onceAsync()` takes |
 | `EventNameWithPriority` | the `[eventName, priority]` tuple the array form of `on()` accepts |

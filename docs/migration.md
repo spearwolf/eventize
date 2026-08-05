@@ -14,7 +14,7 @@ do not change shape, so the type checker will not find the call sites for you �
 grep for the patterns below where one is given. Nine are type-only and do surface
 as compile errors.
 
-Eight further changes are filed as fixes rather than breaks, but a v5 consumer
+Eleven further changes are filed as fixes rather than breaks, but a v5 consumer
 meets them in the same install; they are at the end.
 
 ### Dedupe `@spearwolf/eventize` before you install v6
@@ -694,9 +694,9 @@ counted among the twenty-two above.
   yourself, which the package has never exported in either namespace — no
   `v5.1.0` consumer could reach this path.
 
-### Eight fixes that behave like breaks
+### Eleven fixes that behave like breaks
 
-None of them is visible to the type checker, and all eight change what runs.
+None of them is visible to the type checker, and all eleven change what runs.
 
 **Event names inherited from `Object.prototype` dispatch to nothing.**
 `toString`, `toLocaleString`, `valueOf`, `constructor`, `hasOwnProperty`,
@@ -815,6 +815,54 @@ That finds three-argument `off()` calls with a string-literal event name;
 read each hit against how the matching `on()` call was made — the ones paired
 with a method-name or context subscription are the ones that used to no-op.
 
+**`off(ε, [eventName, …], listenerObject)` is a complete no-op on both halves.**
+The array form with a listener object never unsubscribed anything: the store's
+array branch requires the listener-object slot to be nullish before it touches
+the registry, so the call fell through to identity matching, where an array
+matches no listener. The keeper half did not ask that question and dropped the
+value *and* the retain policy of every name in the list — so the one thing this
+call shape reliably did was unretain events it had not unsubscribed from. It
+now does nothing at all, which is what its store half always did.
+
+This one removes *less*, and silently: the listeners it never detached still
+run, and the retained state it used to clear now survives. Cleanup written
+against the old effect keeps the payload alive.
+
+```
+rg "off\(\s*\w+,\s*\[[^\]]*\]\s*,\s*\w+\s*\)" src/
+```
+
+Say which half was meant — they are separate calls now:
+
+```js
+off(ε, ['a', 'b']); // detach those names, clear their retained state
+unretain(ε, ['a', 'b']); // clear the retained state only
+off(ε, listenerObject); // detach that object everywhere
+```
+
+**`off(ε, listenerObject)` and `off(ε, listenerFunc)` remove every matching
+registration, not just the first one in each bucket.** The sweep stopped at
+the first hit per event name, so anything filed more than once under one name
+was left partly subscribed and went on firing — while [`docs/off.md`](./off.md)
+promised the opposite the whole time. Two shapes reach that state: an object
+subscribed at two different priorities (identical priorities aggregate into one
+registration since `v6.0.0`, so they are no longer this case), and the same
+function subscribed twice, which never aggregates in either version.
+
+```js
+on(ε, 'foo', obj, Priority.High);
+on(ε, 'foo', obj, Priority.Low);
+
+off(ε, obj);
+getSubscriptionCount(ε); // => 1 up to v5.1.0, and the survivor kept firing
+// => 0 since v6.0.0
+```
+
+Removes *more*, in the same direction as the two seams above, and nothing needs
+rewriting unless a second registration was being kept alive by the shortfall.
+Where one of several is meant to survive, address it by handle or by context —
+`off(ε, fn, ctx)` and `off(ε, obj, ctx)` still name exactly one pair.
+
 **`eventize.inject()`'s nine methods no longer show up in `Object.keys()`, `for…in`, or a spread.**
 They used to be installed with `Object.assign()`, so they were own enumerable
 properties like anything else set that way — `class extends Eventize` already
@@ -855,6 +903,29 @@ call now succeeds silently and leaves a working method in its place. A
 *non-configurable* member still throws, either way — now
 `TypeError: Cannot redefine property: <name>` instead of the assignment
 error above.
+
+**`retain(ε, '*')` throws.** It used to file `'*'` as an ordinary retained name,
+which looked like it worked right up until someone subscribed to the wildcard:
+a later `on(ε, '*', fn)` replayed the entry, which replayed through it again,
+until the stack overflowed with no mention of `retain()` anywhere in the trace.
+`'*'` is subscribe-only, matching `emit()`, and the call now says so:
+
+```
+Error: retain() must be called with a concrete event name — '*' is reserved
+for subscribing to all events and cannot be retained
+```
+
+`unretain(ε, '*')` and `retainClear(ε, '*')` went the other way in the same
+release — both were silent no-ops up to `v5.1.0` and now mean *every* retained
+event. So the wildcard is rejected where it would store something and honoured
+where it clears something.
+
+```
+rg "\bretain\(\s*\w+,\s*(['\"]\*['\"]|EVENT_CATCH_EM_ALL)" src/
+```
+
+A name assembled at runtime is the shape that bites — the same filter the
+retain-family validation above needs, with `'*'` dropped as well.
 
 **A listener that throws on a retained replay no longer throws out of `on()`.**
 Up to v5.1.0 the throw propagated to whoever subscribed: the later names of a
