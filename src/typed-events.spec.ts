@@ -1032,6 +1032,11 @@ describe('typed events — generic event-map support', () => {
 // (where the typed arms do). The runtime assertion is `getSubscriptionCount()`:
 // the calls are compile assertions first, the count only proves they registered
 // rather than merely type-checked.
+//
+// The eleven group cases are spelled through `on()`. A twelfth case re-spells
+// four of them through `once()`, so that both names are exercised rather than
+// one of them being taken on trust; which four, and why those four, is stated
+// there.
 // ---------------------------------------------------------------------------
 
 describe('arm-group parity across the three subscribe surfaces', () => {
@@ -1292,6 +1297,131 @@ describe('arm-group parity across the three subscribe surfaces', () => {
     expect(counts(typed)).toEqual([2, 2, 2]);
   });
 
+  // The eleven cases above are spelled through `on()`. `once()` shares their
+  // overload set by declaration rather than by copy, and the identity
+  // assertions at the end of this file are what check that — but no identity
+  // check shows that the name `once` is actually reachable through the arms on
+  // every surface. Four of the eleven groups are spelled a second time here to
+  // show it.
+  //
+  // Four, not eleven: this is coverage of the name, not a second matrix. The
+  // four span the argument forms the remaining seven only vary within — (1) a
+  // listener function after the event names, (2) a method name with its
+  // listener object, (4) the priority slot in the named form, (11) the
+  // catch-all form, which carries a listener object and a priority at once.
+  // The seven left out recombine those same slots — (7) and (8) drop the name
+  // slot, (5) and (10) add a method name, (3) and (6) put a listener object
+  // where a function stood, (9) moves the priority onto the catch-all form —
+  // and none of them needs a slot the four above leave unspelled.
+  //
+  // The counts are the ones the matching `on()` group asserts, unchanged: a
+  // `once()` subscription sits in the store like any other until something
+  // dispatches it, and nothing here emits.
+  it('spells four of the groups through once() on all three surfaces', () => {
+    // (1) NamedFuncArgs
+    const looseNamed = looseTrio();
+    once(looseNamed.standalone, 'foo', () => {});
+    once(looseNamed.standalone, 'foo', () => {}, ctx);
+    once(looseNamed.standalone, ['foo', ['bar', 10]], () => {});
+    looseNamed.injected.once('foo', () => {});
+    looseNamed.injected.once('foo', () => {}, ctx);
+    looseNamed.injected.once(['foo', ['bar', 10]], () => {});
+    looseNamed.klass.once('foo', () => {});
+    looseNamed.klass.once('foo', () => {}, ctx);
+    looseNamed.klass.once(['foo', ['bar', 10]], () => {});
+
+    const typedNamed = typedTrio();
+    once(
+      typedNamed.standalone,
+      'data',
+      (payload, code) => void [payload, code],
+    );
+    once(typedNamed.standalone, 'data', (payload) => void payload, ctx);
+    once(typedNamed.standalone, [['data', 10]], (payload) => void payload);
+    typedNamed.injected.once('data', (payload, code) => void [payload, code]);
+    typedNamed.injected.once('data', (payload) => void payload, ctx);
+    typedNamed.injected.once([['data', 10]], (payload) => void payload);
+    typedNamed.klass.once('data', (payload, code) => void [payload, code]);
+    typedNamed.klass.once('data', (payload) => void payload, ctx);
+    typedNamed.klass.once([['data', 10]], (payload) => void payload);
+
+    // (2) NamedMethodArgs
+    const looseMethod = looseTrio();
+    once(looseMethod.standalone, 'foo', 'handler', {handler: () => {}});
+    looseMethod.injected.once('foo', 'handler', {handler: () => {}});
+    looseMethod.klass.once('foo', 'handler', {handler: () => {}});
+
+    const typedMethod = typedTrio();
+    once(typedMethod.standalone, 'data', 'handler', {handler: () => {}});
+    typedMethod.injected.once('data', 'handler', {handler: () => {}});
+    typedMethod.klass.once('data', 'handler', {handler: () => {}});
+
+    // (4) NamedPriorityFuncArgs
+    const loosePriority = looseTrio();
+    once(loosePriority.standalone, 'foo', 10, () => {});
+    once(loosePriority.standalone, 'foo', 10, () => {}, ctx);
+    once(loosePriority.standalone, ['foo', 'bar'], 10, () => {});
+    loosePriority.injected.once('foo', 10, () => {});
+    loosePriority.injected.once('foo', 10, () => {}, ctx);
+    loosePriority.injected.once(['foo', 'bar'], 10, () => {});
+    loosePriority.klass.once('foo', 10, () => {});
+    loosePriority.klass.once('foo', 10, () => {}, ctx);
+    loosePriority.klass.once(['foo', 'bar'], 10, () => {});
+
+    const typedPriority = typedTrio();
+    once(
+      typedPriority.standalone,
+      'data',
+      10,
+      (payload, code) => void [payload, code],
+    );
+    once(typedPriority.standalone, 'data', 10, (payload) => void payload, ctx);
+    once(typedPriority.standalone, ['data'], 10, (payload) => void payload);
+    typedPriority.injected.once(
+      'data',
+      10,
+      (payload, code) => void [payload, code],
+    );
+    typedPriority.injected.once('data', 10, (payload) => void payload, ctx);
+    typedPriority.injected.once(['data'], 10, (payload) => void payload);
+    typedPriority.klass.once(
+      'data',
+      10,
+      (payload, code) => void [payload, code],
+    );
+    typedPriority.klass.once('data', 10, (payload) => void payload, ctx);
+    typedPriority.klass.once(['data'], 10, (payload) => void payload);
+
+    // (11) CatchAllPriorityObjectArgs
+    const looseCatchAll = looseTrio();
+    once(looseCatchAll.standalone, 10, {foo: () => {}});
+    once(looseCatchAll.standalone, 10, {foo: () => {}}, ctx);
+    looseCatchAll.injected.once(10, {foo: () => {}});
+    looseCatchAll.injected.once(10, {foo: () => {}}, ctx);
+    looseCatchAll.klass.once(10, {foo: () => {}});
+    looseCatchAll.klass.once(10, {foo: () => {}}, ctx);
+
+    const typedCatchAll = typedTrio();
+    once(typedCatchAll.standalone, 10, {data: () => {}});
+    once(typedCatchAll.standalone, 10, {data: () => {}}, ctx);
+    typedCatchAll.injected.once(10, {data: () => {}});
+    typedCatchAll.injected.once(10, {data: () => {}}, ctx);
+    typedCatchAll.klass.once(10, {data: () => {}});
+    typedCatchAll.klass.once(10, {data: () => {}}, ctx);
+
+    // The loose (1) and (4) trios each hold four: the array spelling covers two
+    // event names, the other two calls one each. Their typed twins list a
+    // single name, so they hold three.
+    expect(counts(looseNamed)).toEqual([4, 4, 4]);
+    expect(counts(typedNamed)).toEqual([3, 3, 3]);
+    expect(counts(looseMethod)).toEqual([1, 1, 1]);
+    expect(counts(typedMethod)).toEqual([1, 1, 1]);
+    expect(counts(loosePriority)).toEqual([4, 4, 4]);
+    expect(counts(typedPriority)).toEqual([3, 3, 3]);
+    expect(counts(looseCatchAll)).toEqual([2, 2, 2]);
+    expect(counts(typedCatchAll)).toEqual([2, 2, 2]);
+  });
+
   // The other half of the table, and the half that makes the first half worth
   // running. Eleven accepted shapes prove nothing on their own if the overload
   // sets also accept everything else; each group below violates its *own*
@@ -1467,10 +1597,21 @@ describe('arm-group parity across the three subscribe surfaces', () => {
     expect(rejected).toBeInstanceOf(Function);
   });
 
-  // The eleven groups are spelled through `on()` above; `once()` gets them for
-  // free only as long as the two are declared with the same type, which is what
-  // this pins. Identity, not mutual assignability: two overload sets can accept
-  // each other's calls and still disagree about which arm wins, and arm order is
+  // The table above spells `on()` in all eleven groups and `once()` in four of
+  // them, so both names are known to reach the arms. What a call literal cannot
+  // show is that no surface has grown a declaration of its own: `on` and `once`
+  // resolve to a single shared type today, and each pair below therefore
+  // compares that type with itself. That is the point of the check rather than
+  // a flaw in it: a compare stops holding as soon as its pair stops being one
+  // type. It takes all four together, though, and they catch different things.
+  // A class body that declares only `on` — the failure `AGENTS.md` names — is
+  // what `classMatches` is there for; declare `on` and `once` there alike and
+  // `classMatches` stays true, and only `surfacesMatch` reports it. None of the
+  // four is, or claims to be, a comparison of two independently written
+  // overload sets.
+  //
+  // Identity, not mutual assignability: two overload sets can accept each
+  // other's calls and still disagree about which arm wins, and arm order is
   // load-bearing in both interfaces. The two-parameter conditional is the usual
   // way to ask TypeScript for identity — deferring both sides makes the compiler
   // compare the types rather than relate them.
