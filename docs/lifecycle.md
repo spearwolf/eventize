@@ -373,14 +373,19 @@ synthesized `AbortError` `DOMException`. An already-aborted signal rejects the
 same way, immediately — that is the `fetch()` shape too, not an argument
 error.
 
-An argument error — an empty or sparse array of event names, a `NaN` priority — throws
-synchronously out of `onceAsync()` itself, at the call site, the same as every
-other programmer-error throw in this library. It does not reach the returned
+An argument error — an empty or sparse array of event names, a `NaN` priority,
+an `options.signal` that is not an `AbortSignal` — throws synchronously out of
+`onceAsync()` itself, at the call site, the same as every other
+programmer-error throw in this library. It does not reach the returned
 promise as a rejection, so a fire-and-forget call with no `await`/`catch`
-fails where the mistake is, instead of becoming an unhandled rejection —
-except when the signal is already aborted at the time of the call, in which
-case that takes precedence and the argument error is never checked: the call
-rejects with the abort reason instead of throwing.
+fails where the mistake is, instead of becoming an unhandled rejection. The
+signal-shape check runs first — ahead of even the abort check — so a
+`signal` without an `addEventListener` always throws and never leaves a
+subscription behind, even if it also happens to already read
+`aborted: true`. The abort check runs next, and it is the one exception to
+the "argument error throws" rule above: when the signal is already aborted
+at the time of the call, that takes precedence over `once()`'s own argument
+validation, and the call rejects with the abort reason instead of throwing.
 
 ```javascript
 const controller = new AbortController();

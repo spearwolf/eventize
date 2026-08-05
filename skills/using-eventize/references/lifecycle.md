@@ -180,14 +180,19 @@ Aborting unsubscribes and rejects with the signal's `reason`, or with an
 `fetch()` would hand back the bare `null`). An already-aborted signal rejects
 without subscribing.
 
-An argument error — an empty array of event names, a `NaN` priority — throws
+An argument error — an empty array of event names, a `NaN` priority, an
+`options.signal` that isn't shaped like an `AbortSignal` — throws
 synchronously out of `onceAsync()` at the call site rather than rejecting,
 so a fire-and-forget call with no `await`/`catch` fails at the mistake
-instead of becoming an unhandled rejection. That throw never happens,
-though, when the signal is already aborted: the abort check runs before
-`once()`'s own validation ever gets a chance to, so
+instead of becoming an unhandled rejection, and a malformed `signal` never
+leaves a subscription behind. The signal-shape check runs first, ahead of
+even the abort check, so an `options.signal` missing `addEventListener`
+always throws — it never gets the chance to reject with an abort reason,
+even if it also happens to already read `aborted: true`. The abort check in
+turn runs before `once()`'s own validation gets a chance to, so
 `onceAsync(ε, [], {signal: alreadyAborted})` rejects with the abort reason
-instead of throwing — the two checks race in a fixed order, and abort wins.
+instead of throwing the empty-array error — the checks race in a fixed
+order.
 
 **Without a signal, an `onceAsync()` on an event that never fires is a leak by
 construction**: the listener, the `resolve` closure and the caller's whole

@@ -145,6 +145,19 @@ describe('onceAsync()', () => {
     await expect(promise).rejects.toMatchObject({name: 'AbortError'});
   });
 
+  // The shape check runs before once(), for the same reason the aborted
+  // check does: a value that cannot possibly work as a signal must not
+  // leave a subscription behind that nobody got a handle to.
+  it('throws synchronously and subscribes nothing when options.signal is not an AbortSignal', () => {
+    const e = eventize();
+    const notASignal: AbortSignal = {} as unknown as AbortSignal;
+
+    expect(() => onceAsync(e, 'foo', {signal: notASignal})).toThrow(
+      /options\.signal/,
+    );
+    expect(getSubscriptionCount(e)).toBe(0);
+  });
+
   describe('AbortSignal support', () => {
     it('unsubscribes and rejects when the signal aborts', async () => {
       const obj = eventize();

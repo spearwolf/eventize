@@ -299,17 +299,29 @@ export function onceAsync<ReturnType = void>(
     reject = rej;
   });
 
-  // Deliberately ahead of once(), and therefore ahead of the argument
-  // validation once() carries out: if the signal already fired there is no
-  // reason to touch the emitter at all. One consequence follows from that
+  // Both checks below are deliberately ahead of once(), and therefore ahead
+  // of the argument validation once() carries out: if the signal is
+  // unusable — already fired, or not an AbortSignal to begin with — there is
+  // no reason to touch the emitter at all. One consequence follows from that
   // ordering and is accepted rather than fixed — onceAsync(ε, [], {signal:
   // alreadyAborted}) rejects with the abort reason instead of throwing the
   // "insufficient arguments" error a bare onceAsync(ε, []) throws. Running
-  // once() first to validate before this check would register a real
+  // once() first to validate before these checks would register a real
   // subscription, and a retained value can resolve that subscription
   // synchronously from inside once() itself — settling the promise with a
-  // stale value the caller already told this call to abandon. Swallowing one
-  // rare argument error is the cheaper mistake of the two.
+  // stale value the caller already told this call to abandon, or, for the
+  // shape check, leaving a subscription behind that the throw never hands a
+  // handle to. Swallowing one rare argument error is the cheaper mistake of
+  // the two.
+  //
+  // Shape first, abort state second: `addEventListener` is what the abort
+  // path below actually depends on, so a value that doesn't have it fails
+  // loudly and synchronously here rather than surfacing later as a bare
+  // "signal.addEventListener is not a function" out of the subscribed
+  // state.
+  if (signal != null && typeof signal.addEventListener !== 'function') {
+    throw new TypeError('options.signal must be an AbortSignal (or omitted)');
+  }
   if (signal?.aborted) {
     reject(abortReason(signal));
     return promise;
