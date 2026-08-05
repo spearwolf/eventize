@@ -481,7 +481,7 @@ describe('retain()', () => {
       expect((caught as Error).cause).toBe('invalid-name');
     });
 
-    // Second half of the API-006 asymmetry: on(ε, [], fn) throws, but
+    // Second half of the asymmetry: on(ε, [], fn) throws, but
     // retain(ε, []) used to be a silent no-op — EventKeeper.add() returned
     // early without building a container. It now throws instead, the same
     // 'empty-names' cause on() uses for the equivalent shape.

@@ -56,7 +56,7 @@ const unretainLoose = unretain as (
   eventNames: AnyEventNames,
 ) => void;
 
-// The nine members, described once (ARCH-004). Both `eventize.inject()` below
+// The nine members, described once. Both `eventize.inject()` below
 // and the `Eventize.prototype` installation further down build their
 // descriptors from this one object instead of each spelling the same nine
 // names out — `EventizeApi` in types.ts is the only other place the list is

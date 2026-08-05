@@ -6,7 +6,7 @@ export const isCatchEmAll = (
 ): eventName is typeof EVENT_CATCH_EM_ALL => eventName === EVENT_CATCH_EM_ALL;
 
 // The one wildcard-rejection literal, shared by both emit-api.ts dispatch
-// paths and by retain() in retain-api.ts (AGENTS.md, ARCH-007: a corrected
+// paths and by retain() in retain-api.ts (AGENTS.md: a corrected
 // wording in one place must not let the others drift). `verb` alone
 // determines both the leading function name and the trailing participle, so
 // there is exactly one template rather than one per caller.

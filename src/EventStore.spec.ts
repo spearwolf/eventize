@@ -1762,10 +1762,11 @@ describe('EventStore', () => {
     // watch the library driving it, because the saving is easier to give back
     // than to make: `catchEmAllListeners` reads like a getter and allocates,
     // so an internal caller that starts using it — a debug helper, a
-    // `forEach()` refactored to read the array by name — would undo MEM-001
-    // without turning a single bar red. Every count and every dispatch would
-    // go on being right; only the stand-ins would be gone. Same reasoning as
-    // retain.spec.ts's case for the keeper's pair, and the same shape.
+    // `forEach()` refactored to read the array by name — would undo the lazy
+    // container allocation without turning a single bar red. Every count and
+    // every dispatch would go on being right; only the stand-ins would be
+    // gone. Same reasoning as retain.spec.ts's case for the keeper's pair, and
+    // the same shape.
     //
     // One case per emitter shape, because the two containers are earned
     // separately and each shape drives a different set of store methods. The

@@ -86,7 +86,7 @@ const assertRetainNamesAreUsable = (
 };
 
 /**
- * The shared body of `retainClear()` and `unretain()` (ARCH-006): both are
+ * The shared body of `retainClear()` and `unretain()`: both are
  * the same guard, the same message template save the function name, and the
  * same wildcard branch onto an all-pair of keeper methods. `retain()` is not
  * folded in here — its guard order differs (wildcard checked before
