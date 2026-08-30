@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## `v6.1.0` (2026-08-30)
+
+### Added
+
+- **`emitSafe(ε, name, …args)` and `emitSafeAsync(ε, name, …args)`** — dispatch variants that isolate a throwing listener: the throw is reported through `console.warn` and the remaining listeners still run. Available on all three API surfaces. `emit()` and `emitAsync()` are unchanged.
+- The guarantee is execution, not completeness: no listener can prevent the others from running. `emitSafeAsync()` keeps `Promise.all`, so a listener returning a rejected promise still rejects the result — by then every listener has already run. A `'*'` event name still throws, from both variants.
+- Two differences from `emit()`, both intended: the retained value is written even when a listener threw, and a `once()` queued behind a throwing listener is spent because it now runs. A throwing listener keeps its own subscription either way.
+
 ## `v6.0.0` (2026-08-05) — the whole jump from `v5.1.0`
 
 A heavily AI-assisted major release, and the largest refactor this package has had. No new capability drove it. The work went into four things: references an emitter kept holding after a cleanup that read as complete, the allocation and search costs of dispatch and removal, behaviour that was documented one way and implemented another, and a type surface that compiled calls the runtime could never serve. Most of what is listed as breaking below is a defect being fixed or rejected outright rather than a design being changed.

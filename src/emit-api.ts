@@ -72,10 +72,21 @@ const warnListenerThrew = (eventName: EventName, error: unknown): void => {
  *
  * A second module-level function rather than a flag read inside the existing
  * one: the flag would put a branch and a `try` into the hottest function in the
- * library, and a program that never calls `emitSafe` would pay for both. The
- * cost of this shape is that `fn(listener, a, b, c)` in `walk.ts` goes
- * bimorphic — but only in a program that actually mixes both variants; one that
- * never emits guarded never sends a second callback through that site.
+ * library, and a program that never calls `emitSafe` would pay for both.
+ *
+ * The cost of this shape lands at the `fn(listener, a, b, c)` call site inside
+ * `walkBucket()` / `mergeWalk()` in `walk.ts` — one place in the source, shared
+ * by every caller. So the bimorphic surcharge is process-wide, not per-emitter:
+ * once anything in a process calls `emitSafe`, every `emit()` in that process
+ * pays it, whatever emitter it targets. Measured over this change, one variant
+ * per process, 1e6 dispatches to 64 listeners per process, 25 processes per
+ * cell, interleaved and then re-run in the opposite order: an emit-only
+ * program stayed at 431.84–470.87 ns (median 437.26) against a baseline of
+ * 425.47–451.14 ns (median 434.71), while a program that first sends 1e5
+ * `emitSafe()` calls through the emitter and only then times `emit()` measured
+ * 554.65–580.52 ns (median 564.63) against a baseline of 428.79–450.11 ns
+ * (median 438.51) — roughly +29%, about 126 ns on a 64-listener dispatch, with
+ * the two ranges not overlapping at all.
  */
 const applyListenerSafe: ApplyListenerFn = (
   listener,
