@@ -156,7 +156,7 @@ A deduped registration does not replay retained events again for an aggregating 
 
 A multi-name `once()` — `once(ε, ['a', 'b'], h)` — still shares one obligation across every listener it registers, so whichever name fires first discharges it for all of them; that race is unchanged by aggregation, including when one of the names aggregates onto an existing `on()` and the other doesn't.
 
-## emit() / emitAsync() / emitSafe() / emitSafeAsync()
+## emit() / emitAsync() / emitSafe() / emitSafeAsync() / emitStrict() / emitStrictAsync()
 
 ```ts
 emit(ε, 'name', a, b)
@@ -164,6 +164,8 @@ emit(ε, ['name1', 'name2'], a, b)   // same args to each event, in order
 const values = await emitAsync(ε, 'load')
 emitSafe(ε, 'name', a, b)            // a throwing listener does not stop the rest
 const values = await emitSafeAsync(ε, 'load')
+emitStrict(ε, 'name', a, b)          // …and the failures still reach the caller
+const values = await emitStrictAsync(ε, 'load')
 ```
 
 `emitAsync` collects each listener's return value, dropping `null` and `undefined`. A listener returning an array has its elements awaited with `Promise.all`, but the array stays one entry: a lone listener returning `[1, Promise.resolve(2)]` gives `[[1, 2]]`, not `[1, 2]`. With nothing collected the promise resolves to `undefined` rather than an empty array. The unwrapping goes exactly one level: a promise nested deeper — `[[Promise.reject(...)]]` — belongs to the listener, not to the aggregation, and a rejection inside it is reported as an unowned unhandled rejection even when the caller correctly catches `emitAsync()`'s own result.
@@ -176,7 +178,13 @@ A listener that throws synchronously aborts the dispatch in both functions. In `
 
 The guard is not free, and the cost is not local: guarded and unguarded dispatch are two callbacks reaching one call site inside the walk, shared by every emitter in the process. A process that never calls `emitSafe()` pays nothing; once anything in it calls `emitSafe()` even once, **every** `emit()` in that process pays roughly +29% on a 64-listener dispatch (about 2 ns per listener) — including emitters that code never touches, and including a host application's own emitters when the single `emitSafe()` call sits in a dependency. Reach for it where the isolation is worth it, not by default.
 
-`emitSafeAsync()` keeps `Promise.all`, so a listener returning a rejected promise still rejects the awaited result. That is not a gap: dispatch is synchronous, so by the time a promise rejects every listener has already run, and a rejection prevents no execution. What it does fix is the paragraph above — a synchronous throw no longer costs the values collected before it. Two behaviours differ from `emit()` and are intended: the retained value is written, because the event was delivered, and a `once()` queued behind a throwing listener is spent, because it now runs. The throwing listener keeps its own subscription in both.
+`emitStrict()` and `emitStrictAsync()` (v6.2.0) are the same guarded dispatch with the errors kept instead of spent. Nothing thrown means a normal return; one failure is rethrown unchanged, same error and same stack, so swapping `emit()` for `emitStrict()` leaves an existing `toThrow(…)` assertion intact; two or more arrive as an `AggregateError` holding them in dispatch order, a shape `emit()` could never produce because it aborted at the first. A caller's own error is not a listener failure but is not dropped either: `'*'` still ends the dispatch, and the rejection joins the same list as its last entry — so a lone wildcard still throws the plain `Error` it always did, while a wildcard behind failing listeners no longer erases what they threw. The corrupted-bucket throw is treated the same way.
+
+`emitStrictAsync()` aggregates with `Promise.allSettled` on both levels, the outer collection and the inner unwrap of a listener that returned an array. `Promise.all` reports whichever promise rejected first *in time* and silently drops the rest; `allSettled` returns positionally, so failures come back in dispatch order — synchronous throws first, then rejections. If anything failed the promise rejects and there is no result array at all; otherwise it resolves exactly what `emitAsync()` would have. And it never throws synchronously: a wildcard name, a foreign protocol marker and a corrupted bucket all arrive through the returned promise, which is the one place `emitStrictAsync(…).catch(report)` can see them. `emitAsync()` and `emitSafeAsync()` keep throwing synchronously — deliberate, and changing them would be breaking.
+
+`emitStrict()` shares the guarded callback with `emitSafe()`, so it does not add a second surcharge on top of the one above: a process paying for one pays the same for both.
+
+`emitSafeAsync()` keeps `Promise.all`, so a listener returning a rejected promise still rejects the awaited result. That is not a gap: dispatch is synchronous, so by the time a promise rejects every listener has already run, and a rejection prevents no execution. What it does fix is the paragraph above — a synchronous throw no longer costs the values collected before it. Two behaviours differ from `emit()` and are intended, under all four guarded variants: the retained value is written, because the event was delivered, and a `once()` queued behind a throwing listener is spent, because it now runs. The throwing listener keeps its own subscription in every case.
 
 ## The marker slot and its protocol
 

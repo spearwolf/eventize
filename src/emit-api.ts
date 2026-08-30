@@ -62,6 +62,74 @@ const warnListenerThrew = (eventName: EventName, error: unknown): void => {
 };
 
 /**
+ * The failure list of the innermost `emitStrict()` / `emitStrictAsync()` frame,
+ * or `null` when no strict dispatch is running on this stack.
+ *
+ * A module-level slot rather than a parameter, and that is what keeps the
+ * guarded callbacks module constants. A closure built per call would allocate a
+ * JSFunction plus a context on every guarded emit and — worse — send a fresh
+ * function identity through the one shared `fn(listener, a, b, c)` call site in
+ * `walk.ts`, which is megamorphic by construction. A third callback identity
+ * would be cheaper than that and still trimorphic, and it would buy a
+ * difference that exists only inside a `catch`. So the callback pair stays two
+ * and the sink moves instead: `emitStrict()` adds nothing to the process-wide
+ * surcharge `applyListenerSafe()` measures above.
+ *
+ * That claim is measured, not argued. Same methodology as the surcharge itself
+ * — one variant per process, 1e6 dispatches to 64 listeners, 25 processes per
+ * cell, interleaved and then re-run in the opposite order. An emit-only program
+ * measured 526.52-588.91 ns against a baseline of 525.83-612.69 ns; a program
+ * that first sends 1e5 `emitSafe()` calls through the emitter measured
+ * 630.03-724.23 ns against 628.48-714.41 ns; and the same program built on
+ * `emitStrict()` measured 623.43-700.03 ns. Medians in that order: 541.09 to
+ * 541.92, 644.49 to 642.29, and 646.26. The third cell is the one this shape
+ * exists for — it lands on top of the second rather than beside it, because
+ * the shared call site saw the same two callbacks either way. Individual cells
+ * wander by ten points between runs; quote ranges, never one value.
+ *
+ * Saved and restored rather than pushed and popped, which makes nesting
+ * reentrant by construction: a listener that emits during a strict dispatch
+ * opens its own frame, and its failures belong to its own call site. `finally`
+ * restores on every exit, so an unwinding frame leaves nothing behind.
+ *
+ * Per module instance, like the counters in `EventListener.ts` — and harmless
+ * for the same reason two of those are: the slot and the callbacks that read it
+ * always come from the same module instance.
+ */
+let collectedFailures: unknown[] | null = null;
+
+/**
+ * Where a caught listener throw goes. Inside a strict frame it joins the
+ * failure list the caller will receive; everywhere else it is reported through
+ * `warn()`, exactly as a guarded dispatch has reported it since v6.1.0.
+ *
+ * This indirection is the entire difference between the two guarded variants.
+ * It sits in a `catch`, so it runs only when something has already thrown.
+ */
+const reportListenerThrow = (eventName: EventName, error: unknown): void => {
+  if (collectedFailures !== null) {
+    collectedFailures.push(error);
+  } else {
+    warnListenerThrew(eventName, error);
+  }
+};
+
+/**
+ * The one-or-many rule, in one place because both strict variants apply it and
+ * they must not drift.
+ *
+ * A single failure is handed back unchanged — same error, same stack, no
+ * wrapping and no `cause` — so that replacing `emit()` with `emitStrict()`
+ * leaves every existing `toThrow(…)` assertion intact. Only a second failure
+ * changes the shape, and a second failure is something `emit()` could never
+ * have produced: it aborted at the first.
+ */
+const collectedError = (failures: unknown[]): unknown =>
+  failures.length === 1
+    ? failures[0]
+    : new AggregateError(failures, 'emitStrict: one or more listeners failed');
+
+/**
  * `applyListener`'s guarded twin, for `emitSafe()` / `emitSafeAsync()`.
  *
  * The `try` goes around `listener.apply()` and must not move inside it.
@@ -87,6 +155,10 @@ const warnListenerThrew = (eventName: EventName, error: unknown): void => {
  * 554.65–580.52 ns (median 564.63) against a baseline of 428.79–450.11 ns
  * (median 438.51) — roughly +29%, about 126 ns on a 64-listener dispatch, with
  * the two ranges not overlapping at all.
+ *
+ * Where the caught error goes is not decided here. `reportListenerThrow()`
+ * answers that, and a variant that wants the failures somewhere else changes
+ * the sink rather than adding a callback beside this one.
  */
 const applyListenerSafe: ApplyListenerFn = (
   listener,
@@ -97,7 +169,7 @@ const applyListenerSafe: ApplyListenerFn = (
   try {
     listener.apply(eventName, args, returnValue);
   } catch (error) {
-    warnListenerThrew(eventName, error);
+    reportListenerThrow(eventName, error);
   }
 };
 
@@ -192,9 +264,9 @@ type DuckDispatchFn = (
 ) => void;
 
 /**
- * The duck path's guard, mirroring `applyListenerSafe()` down to the warning
- * text. Same rule, same reason: both dispatch paths carry the guard, or
- * neither does.
+ * The duck path's guard, mirroring `applyListenerSafe()` down to the report.
+ * Same rule, same reason: both dispatch paths carry the guard, or neither does
+ * — and both reach the same sink, so a strict dispatch collects from either.
  */
 const dispatchGuarded: DuckDispatchFn = (
   target,
@@ -205,7 +277,7 @@ const dispatchGuarded: DuckDispatchFn = (
   try {
     dispatchToTarget(target, eventName, args, returnValue);
   } catch (error) {
-    warnListenerThrew(eventName, error);
+    reportListenerThrow(eventName, error);
   }
 };
 
@@ -351,10 +423,101 @@ export function emitSafe(
   eventNames: AnyEventNames,
   ...args: EventArgs
 ): void {
-  if (isEventized(target)) {
-    _emit(target, eventNames, args, applyListenerSafe);
-  } else if (isDuckTarget(target)) {
-    _duckEmit(target, eventNames, args, dispatchGuarded);
+  // The slot is cleared for the duration of this dispatch, not merely left
+  // alone. A listener running under `emitStrict()` may call `emitSafe()`, and
+  // its caught throws belong in the console: the strict caller asked to be
+  // handed what *its* listeners failed with, not what a nested call decided to
+  // swallow on its own behalf.
+  const previousFailures = collectedFailures;
+  collectedFailures = null;
+  try {
+    if (isEventized(target)) {
+      _emit(target, eventNames, args, applyListenerSafe);
+    } else if (isDuckTarget(target)) {
+      _duckEmit(target, eventNames, args, dispatchGuarded);
+    }
+  } finally {
+    collectedFailures = previousFailures;
+  }
+}
+
+/**
+ * Like `emit()`, but every listener runs *and* every failure reaches you.
+ *
+ * `emitSafe()` buys execution by spending the error; this one keeps both
+ * halves. A throwing listener no longer stops the ones queued behind it, and
+ * what it threw is raised again once the last listener has returned:
+ *
+ * - nothing threw → normal return;
+ * - one failure → rethrown unchanged, same error and same stack, so swapping
+ *   `emit()` for this function leaves an existing `toThrow(…)` assertion
+ *   intact;
+ * - two or more → an `AggregateError` holding them in dispatch order. That
+ *   shape is new by definition: `emit()` aborted at the first failure, so a
+ *   second one could not exist.
+ *
+ * The call's own errors are not listener failures, and they are not dropped
+ * either. `'*'` as an event name is still rejected and still ends the dispatch
+ * — the names behind it in an array do not run — and so is a corrupted bucket.
+ * Both enter the same list, last, where the rule above decides the shape. A
+ * lone wildcard therefore still throws the plain `Error` a caller expects,
+ * while a wildcard behind failing listeners no longer erases what the dispatch
+ * had already collected.
+ *
+ * Retain and `once()` behave as they do under `emitSafe()`, for the same
+ * reason: the event *was* delivered. The retained value is written even though
+ * a listener threw, a `once()` queued behind a failure is spent because it now
+ * runs, and a throwing `once()` keeps its own subscription.
+ */
+export function emitStrict<
+  TEvents extends EventMap,
+  K extends EventKeysOf<TEvents> | symbol,
+>(
+  obj: EventizedObject<TEvents>,
+  eventName: K,
+  ...args: ArgsFor<TEvents, K>
+): void;
+export function emitStrict<
+  TEvents extends EventMap,
+  K extends EventKeysOf<TEvents> | symbol,
+>(
+  obj: EventizedObject<TEvents>,
+  eventNames: K[],
+  ...args: ArgsFor<TEvents, K>
+): void;
+export function emitStrict<T extends object>(
+  obj: NonTypedEmitter<T>,
+  eventNames: AnyEventNames,
+  ...args: EventArgs
+): void;
+// implementation
+export function emitStrict(
+  target: object,
+  eventNames: AnyEventNames,
+  ...args: EventArgs
+): void {
+  const previousFailures = collectedFailures;
+  const failures: unknown[] = [];
+  collectedFailures = failures;
+  try {
+    if (isEventized(target)) {
+      _emit(target, eventNames, args, applyListenerSafe);
+    } else if (isDuckTarget(target)) {
+      _duckEmit(target, eventNames, args, dispatchGuarded);
+    }
+  } catch (err) {
+    // Not a listener's throw: the wildcard rejection or a corrupted bucket,
+    // both raised outside `listener.apply()`. Under `emitSafe()` they leave the
+    // call unguarded, which is right there — the guard is not between a caller
+    // and its own mistake. Here they are collected instead, because the list is
+    // the error channel: dropping them would be the one thing this variant
+    // exists not to do.
+    failures.push(err);
+  } finally {
+    collectedFailures = previousFailures;
+  }
+  if (failures.length > 0) {
+    throw collectedError(failures);
   }
 }
 
@@ -509,6 +672,10 @@ export function emitSafeAsync(
   const returnValue = (val: unknown) => {
     values.push(val);
   };
+  // Same slot discipline as `emitSafe()`, and the dispatch phase this covers is
+  // the synchronous one — the only phase that can reach the guard at all.
+  const previousFailures = collectedFailures;
+  collectedFailures = null;
   try {
     if (isEventized(target)) {
       _emit(target, eventNames, args, applyListenerSafe, returnValue);
@@ -518,6 +685,8 @@ export function emitSafeAsync(
   } catch (err) {
     markCollectedAsHandled(values);
     throw err;
+  } finally {
+    collectedFailures = previousFailures;
   }
   return values.length > 0
     ? Promise.all(
@@ -526,4 +695,159 @@ export function emitSafeAsync(
         ),
       )
     : Promise.resolve(undefined);
+}
+
+/**
+ * Splits `Promise.allSettled` results into the resolved array and the failure
+ * list, positionally — which is the whole reason `emitStrictAsync()` does not
+ * aggregate with `Promise.all`. Positional results mean the failures come back
+ * in the order the listeners were dispatched in, not in the order their
+ * promises happened to settle.
+ *
+ * `values` is consulted for one thing only: telling an inner-array slot from a
+ * plain one. A listener that returned an array was itself aggregated with
+ * `allSettled`, so its slot is always fulfilled and always holds a result
+ * array — the level where `Promise.all` would have hidden every rejection but
+ * the first.
+ */
+const splitSettled = (
+  values: any[],
+  results: PromiseSettledResult<any>[],
+  failures: unknown[],
+): any[] => {
+  const resolved: any[] = [];
+  // `entries()` rather than an index loop: `noUncheckedIndexedAccess` types
+  // `results[i]` as possibly `undefined`, and a guard for a hole this array
+  // cannot have is an untestable branch.
+  for (const [index, result] of results.entries()) {
+    if (result.status === 'rejected') {
+      failures.push(result.reason);
+      continue;
+    }
+    if (!Array.isArray(values[index])) {
+      resolved.push(result.value);
+      continue;
+    }
+    const inner: any[] = [];
+    for (const item of result.value as PromiseSettledResult<any>[]) {
+      if (item.status === 'rejected') {
+        failures.push(item.reason);
+      } else {
+        inner.push(item.value);
+      }
+    }
+    resolved.push(inner);
+  }
+  return resolved;
+};
+
+/**
+ * `emitStrict()`'s asynchronous twin: every listener runs, every failure is
+ * reported, and the promise is the only channel either half arrives through.
+ *
+ * **Why `allSettled` and not `Promise.all`.** `emitAsync()` and
+ * `emitSafeAsync()` are fail-fast by aggregation: of *n* rejected listener
+ * promises the caller sees exactly one, whichever rejected first *in time*, and
+ * the other reasons are gone. Not unhandled — `Promise.all` attaches a handler
+ * to every element, so it owns them — simply unreported. One level down the
+ * same thing repeats for a listener that returned an array of promises. For
+ * `emitSafeAsync()` that is defensible: its guard protects execution, and by
+ * the time any promise rejects every listener has already run. For a variant
+ * whose entire contract is "report everything" it is a hole, and one with a
+ * visible seam — the synchronous half would collect four throws and re-raise
+ * all four while the asynchronous half discarded three rejections out of four.
+ * So both levels aggregate with `allSettled` here.
+ *
+ * The failure order that falls out is dispatch order, extended over time rather
+ * than redefined: synchronous throws first, because they all happened before
+ * any promise settled, then the rejections positionally.
+ *
+ * **Why nothing is thrown synchronously.** Not for a wildcard name, not for a
+ * foreign protocol marker, not for a corrupted bucket. A function that returns
+ * a promise should not also throw, because one construct cannot handle both:
+ * `await emitStrictAsync(…)` inside a `try` catches either, but
+ * `emitStrictAsync(…).catch(report)` catches only the rejection — and that is
+ * the idiomatic call in exactly the place this variant is for, a teardown that
+ * fires the event, collects, and does not block on it. It also dissolves the
+ * awkward case instead of answering it: under `emitStrictAsync(ε, ['a', '*'])`
+ * the listeners of `'a'` have already collected their failures when the
+ * wildcard is rejected, and through the promise channel there is nothing to
+ * decide — the rejection is the last entry of the list. This is a deliberate
+ * asymmetry against `emitAsync()` / `emitSafeAsync()`, both of which keep
+ * throwing synchronously; see AGENTS.md, "Known asymmetries".
+ *
+ * **Why `markCollectedAsHandled()` is absent.** It exists because a mid-walk
+ * throw abandons the values already collected, and an abandoned rejected
+ * promise is an unhandled rejection that ends the process under Node's default.
+ * Nothing is abandoned on this path: every collected value reaches
+ * `allSettled`, which owns it.
+ *
+ * The cost is real and small: one result object per element, and the report
+ * waits for the *slowest* listener promise to settle. `Promise.all` already
+ * waits that long for the success case, so this extends an existing property
+ * rather than introducing one. And a failure means there is no result array at
+ * all, which is what keeps a half-rejected inner array from being a question
+ * anyone has to answer.
+ */
+export function emitStrictAsync<
+  TEvents extends EventMap,
+  K extends EventKeysOf<TEvents> | symbol,
+>(
+  obj: EventizedObject<TEvents>,
+  eventName: K,
+  ...args: ArgsFor<TEvents, K>
+): Promise<any[] | undefined>;
+export function emitStrictAsync<
+  TEvents extends EventMap,
+  K extends EventKeysOf<TEvents> | symbol,
+>(
+  obj: EventizedObject<TEvents>,
+  eventNames: K[],
+  ...args: ArgsFor<TEvents, K>
+): Promise<any[] | undefined>;
+export function emitStrictAsync<T extends object>(
+  obj: NonTypedEmitter<T>,
+  eventNames: AnyEventNames,
+  ...args: EventArgs
+): Promise<any[] | undefined>;
+// implementation
+export function emitStrictAsync(
+  target: object,
+  eventNames: AnyEventNames,
+  ...args: EventArgs
+): Promise<any[] | undefined> {
+  const values: any[] = [];
+  const returnValue = (val: unknown) => {
+    values.push(val);
+  };
+  const previousFailures = collectedFailures;
+  const failures: unknown[] = [];
+  collectedFailures = failures;
+  try {
+    if (isEventized(target)) {
+      _emit(target, eventNames, args, applyListenerSafe, returnValue);
+    } else if (isDuckTarget(target)) {
+      _duckEmit(target, eventNames, args, dispatchGuarded, returnValue);
+    }
+  } catch (err) {
+    failures.push(err);
+  } finally {
+    collectedFailures = previousFailures;
+  }
+  if (values.length === 0) {
+    return failures.length > 0
+      ? Promise.reject(collectedError(failures))
+      : Promise.resolve(undefined);
+  }
+  return Promise.allSettled(
+    values.map((val: any) =>
+      Array.isArray(val) ? Promise.allSettled(val) : Promise.resolve(val),
+    ),
+  ).then((results) => {
+    const resolved = splitSettled(values, results, failures);
+    if (failures.length > 0) {
+      throw collectedError(failures);
+    }
+    return resolved;
+  });
 }

@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## `v6.2.0` (2026-08-30)
+
+### Added
+
+- **`emitStrict(ε, name, …args)` and `emitStrictAsync(ε, name, …args)`** — dispatch variants that serve every listener *and* hand every failure back to the caller. Available on all three API surfaces. `emit()`, `emitAsync()`, `emitSafe()` and `emitSafeAsync()` are unchanged.
+- One failure is rethrown unchanged, so swapping `emit()` for `emitStrict()` leaves an existing `toThrow(…)` assertion intact; two or more arrive as an `AggregateError` in dispatch order, and nothing thrown means a normal return. A caller's own error — `'*'` as an event name, a corrupted bucket — joins the same list, last, so a lone wildcard still throws the plain `Error` it always did.
+- The retained value is written and a `once()` queued behind a failure is spent, for the same reason `emitSafe()` does both: the event was delivered.
+- `emitStrictAsync()` aggregates with `Promise.allSettled` on both levels, so every rejection is reported, in dispatch order, instead of only the one that rejected first in time. It never throws synchronously — a wildcard name, a foreign protocol marker and a corrupted bucket all arrive through the returned promise, unlike `emitAsync()` / `emitSafeAsync()`, which keep throwing.
+- No new cost. The strict pair rides the same guarded callback as `emitSafe()`, so it does not deepen the process-wide surcharge `v6.1.0` documents: a program mixing `emitStrict()` with `emit()` measures the `emitSafe()` figures rather than something beside them. [`docs/emit.md`](./docs/emit.md) has the detail.
+
 ## `v6.1.0` (2026-08-30)
 
 ### Added

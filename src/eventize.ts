@@ -1,5 +1,12 @@
 import {asEventized} from './asEventized';
-import {emit, emitAsync, emitSafe, emitSafeAsync} from './emit-api';
+import {
+  emit,
+  emitAsync,
+  emitSafe,
+  emitSafeAsync,
+  emitStrict,
+  emitStrictAsync,
+} from './emit-api';
 import {off, on as _on, once as _once, onceAsync} from './eventize-api';
 import {isEventized} from './isEventized';
 import {retain, retainClear, unretain} from './retain-api';
@@ -51,6 +58,16 @@ const emitSafeAsyncLoose = emitSafeAsync as (
   eventNames: AnyEventNames,
   ...args: EventArgs
 ) => Promise<any[] | undefined>;
+const emitStrictLoose = emitStrict as (
+  obj: object,
+  eventNames: AnyEventNames,
+  ...args: EventArgs
+) => void;
+const emitStrictAsyncLoose = emitStrictAsync as (
+  obj: object,
+  eventNames: AnyEventNames,
+  ...args: EventArgs
+) => Promise<any[] | undefined>;
 const onceAsyncLoose = onceAsync as <ReturnType = void>(
   obj: object,
   eventNames: AnyEventNames,
@@ -66,9 +83,9 @@ const unretainLoose = unretain as (
   eventNames: AnyEventNames,
 ) => void;
 
-// The eleven members, described once. Both `eventize.inject()` below
+// The thirteen members, described once. Both `eventize.inject()` below
 // and the `Eventize.prototype` installation further down build their
-// descriptors from this one object instead of each spelling the same eleven
+// descriptors from this one object instead of each spelling the same thirteen
 // names out — `EventizeApi` in types.ts is the only other place the list is
 // allowed to stand. The bodies read `this` rather than closing over an
 // object, which is what lets `inject()` reuse them via `fn.bind(obj)` while
@@ -109,6 +126,20 @@ const eventizeMethods = {
     ...args: EventArgs
   ): Promise<any[] | undefined> {
     return emitSafeAsyncLoose(this, eventNames, ...args);
+  },
+  emitStrict(
+    this: object,
+    eventNames: AnyEventNames,
+    ...args: EventArgs
+  ): void {
+    emitStrictLoose(this, eventNames, ...args);
+  },
+  emitStrictAsync(
+    this: object,
+    eventNames: AnyEventNames,
+    ...args: EventArgs
+  ): Promise<any[] | undefined> {
+    return emitStrictAsyncLoose(this, eventNames, ...args);
   },
   retain(this: object, eventNames: AnyEventNames): void {
     retainLoose(this, eventNames);
@@ -166,9 +197,9 @@ export const eventize: EventizerFuncAPI = (() => {
     // entry of `eventizeMethodEntries` rather than a single
     // `defineProperties()` call built from a mapped-and-refolded object:
     // same descriptors installed, no per-call container in between.
-    // `fn.bind(obj)` costs the same eleven function objects the eleven
+    // `fn.bind(obj)` costs the same thirteen function objects the thirteen
     // hand-written closures used to, and keeps `obj` destructurable exactly
-    // as before — pinned by "all eleven descriptors match the class prototype
+    // as before — pinned by "all thirteen descriptors match the class prototype
     // shape" in api-surfaces.spec.ts, which now guards a derivation instead
     // of a second copy of the member list.
     for (const [name, fn] of eventizeMethodEntries) {

@@ -44,7 +44,7 @@ Per phase, under `tmp/integration/<phase>/`: `install.log`, `typecheck.log`,
 ```jsonc
 {
   "phase": "baseline",
-  "signalize": {"ref": "359d939a…", "commit": "359d939a…"},
+  "signalize": {"ref": "62ddd14d…", "commit": "62ddd14d…"},
   "eventize":  {"version": "6.0.0", "resolvedVersion": "6.0.0"},
   "patches":   {"applied": [], "failed": []},
   "steps": [
