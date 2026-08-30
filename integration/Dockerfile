@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1
 
-# signalize declares engines.node ">=24.13". Debian rather than Alpine: the
-# vitest transform runs on @swc/core, whose native binding is less trouble on
-# glibc than on musl.
+# signalize declares engines.node ">=22" and pins pnpm through packageManager,
+# which corepack below reads. Debian rather than Alpine: the vitest transform
+# runs on @swc/core, whose native binding is less trouble on glibc than on musl.
 FROM node:24-slim
 
 ARG SIGNALIZE_REPO=https://github.com/spearwolf/signalize.git
-ARG SIGNALIZE_REF=359d939a8879467ed0e53b314ade9a2157d734ca
+ARG SIGNALIZE_REF=62ddd14d00d5081f8d5fa780bce7bede846c1819
 
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 
@@ -29,9 +29,10 @@ RUN git init -q signalize \
 
 WORKDIR /work/signalize
 
-# Baseline install against the UNMODIFIED manifest: eventize 5.x from the
-# registry. The v6 tarball arrives at runtime, so this expensive layer stays
-# warm across eventize rebuilds. node_modules and the pnpm store both live in
+# Baseline install against the UNMODIFIED manifest: whatever the peer range
+# resolves to from the registry. The locally built tarball arrives at runtime
+# and overrides it, so this expensive layer stays warm across eventize
+# rebuilds. node_modules and the pnpm store both live in
 # the image, which is why no store volume is mounted at runtime — one would
 # shadow the warm store.
 RUN pnpm install --frozen-lockfile
