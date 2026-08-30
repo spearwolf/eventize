@@ -6,11 +6,11 @@ Canonical guide for coding agents in this repo. `CLAUDE.md` is a symlink to this
 
 ## Versioning right now
 
-`package.json` carries **`6.0.0`**, released 2026-08-05 — the `-dev` suffix that had been holding `scripts/publishPackage.cjs` back is gone, so `npm run publish:pkg` is armed. **Releasing, and choosing what the next version is called, stays a human's call.** Nothing here authorises a bump.
+`package.json` carries **`6.1.0`**, prepared on 2026-08-30 and **not yet published**: `v6.0.0` (2026-08-05) is the last release that reached anyone. The `-dev` suffix that once held `scripts/publishPackage.cjs` back is gone, so `npm run publish:pkg` is armed. **Releasing, and choosing what the next version is called, stays a human's call.** Nothing here authorises a bump.
 
-One consequence outlives the release:
+One consequence outlives each release:
 
-- **Version references in prose are `v5.1.0` or `v6.0.0`, never anything between.** "Since v6.0.0" for what this release introduced, "up to v5.1.0" for what it replaced. The intermediate versions reached nobody, and naming one sends a reader looking for an upgrade path that does not exist.
+- **Version references in prose are `v5.1.0`, `v6.0.0` or `v6.1.0`, never anything between.** "Since v6.1.0" for what the guarded dispatch variants introduced, "since v6.0.0" for what that release introduced, "up to v5.1.0" for what it replaced. The intermediate versions reached nobody, and naming one sends a reader looking for an upgrade path that does not exist.
 
 ## Verification
 
