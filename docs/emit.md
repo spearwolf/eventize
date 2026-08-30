@@ -42,11 +42,13 @@ scheduled behind the throwing one runs in its normal position.
 ### The call's own errors still throw
 
 The guard covers what a listener does. It does not cover an error in the call
-itself, and there is one of those: **`'*'` as an event name.**
-`emitSafe(ε, '*')` throws exactly as `emit()` does, and so does a name array
-containing `'*'` — the wildcard is reserved for subscribing. That rejection
-happens before any listener runs, so there is nothing for the guard to be
-between.
+itself, and there is one of those: **`'*'` as an event name.** `emitSafe(ε, '*')`
+throws exactly as `emit()` does — the wildcard is reserved for subscribing, and
+the rejection lands before any listener runs. Inside a name array the same
+rejection is reached in order instead of up front: the names ahead of the `'*'`
+dispatch first, and then the call throws. Either way the throw comes from the
+call rather than from a listener, which is why the guard is not between you and
+it.
 
 A caller's own error stays a caller's error.
 
@@ -120,8 +122,8 @@ dispatched.
 emitSafe(ε, ['foo', '*']); // dispatches 'foo', then throws
 ```
 
-This is identical across the four, and it is one of the two throws a guarded
-dispatch does not catch.
+This is identical across the four, and it is the one throw a guarded dispatch
+does not catch.
 
 ## Which one to reach for
 
