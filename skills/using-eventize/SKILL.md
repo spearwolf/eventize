@@ -1,6 +1,6 @@
 ---
 name: using-eventize
-description: Use when code imports `@spearwolf/eventize`, mentions `eventize`/`Eventize`, or when writing/reviewing synchronous event-emitter code using this library (on, once, emit, emitAsync, off, retain). Covers the API surface, the four behaviour families on non-eventized targets, wildcard quirks, retain semantics, priorities, cleanup and handle lifetime, typed event maps, the v5 → v6 migration, and common pitfalls.
+description: Use when code imports `@spearwolf/eventize`, mentions `eventize`/`Eventize`, or when writing/reviewing synchronous event-emitter code using this library (on, once, emit, emitAsync, off, retain). Covers the API surface, choosing between emit/emitSafe/emitStrict, the four behaviour families on non-eventized targets, wildcard quirks, retain semantics, priorities, cleanup and handle lifetime, typed event maps, the v5 → v6 migration, and common pitfalls.
 ---
 
 # @spearwolf/eventize
@@ -100,6 +100,60 @@ they still surface typos. `emit()` does not throw on plain objects — for typo
 safety use a typed emitter (`eventize<TEvents>()`, which rejects unknown names at
 compile time) or an explicit `isEventized()` guard.
 
+## Choosing a dispatch function
+
+Six functions, and only two questions. First: what should a listener that throws
+do to the others, and to you? Then: do you need the listeners' return values
+awaited — if so, take the `Async` twin of the same row.
+
+| The caller needs | Sync | Async |
+| --- | --- | --- |
+| the first failure to stop the dispatch and reach me | `emit()` | `emitAsync()` |
+| every listener served, and nobody is waiting on a report | `emitSafe()` | `emitSafeAsync()` |
+| every listener served **and** every failure reported | `emitStrict()` | `emitStrictAsync()` |
+
+`emit()` is the default and stays the default. A throwing listener is usually a
+bug, and an exception unwinding into your call is the fastest way to find out.
+
+### Scenarios
+
+| Situation | Reach for | Why |
+| --- | --- | --- |
+| App-internal event, you own every listener | `emit()` | A failure is your bug. Let it surface where it happened. |
+| Frame tick, animation loop, render notification | `emitSafe()` | One bad subscriber must not stall the frame, and no caller is waiting on a report. |
+| Plugin / extension fan-out, listeners you did not write | `emitSafe()` | The subscribers are independent; one failing is not a reason to skip the rest. |
+| `destroy()` / `dispose()` that its own caller must be able to report on | `emitStrict()` | Dismantle everything, then hand back everything that went wrong. |
+| A pipeline step that may not stop at the first failure and may not lose one | `emitStrict()` | The `AggregateError` is the whole record, in dispatch order. |
+| Shutdown that awaits listeners and needs every rejection | `emitStrictAsync()` | `Promise.all` reports whichever rejected first in time and drops the rest. |
+| Awaiting listeners where the first rejection should cancel your own logic | `emitAsync()` | Fail-fast is the point; you are not writing a report. |
+| Exactly one listener needs a policy the others don't (retry, fallback) | `emit()` + `try/catch` in that listener | Error policy belongs at the site that owns it. There is no global handler by design. |
+| You are publishing a library and don't know your consumers | `emit()` | The guarded variants tax the whole process (below), and your consumers cannot see the choice. |
+
+### What each one costs
+
+- **`emitSafe()` hands you no error object.** A caught throw goes to
+  `console.warn` and nowhere else. That is the trade; if you need the error, the
+  function is `emitStrict()`.
+- **`emitStrict()` raises after the dispatch**, so the retained value is already
+  written and a `once()` behind the failure is already spent when the error
+  reaches you. One failure arrives unchanged — an existing `toThrow(…)` survives
+  the swap — and only a second one turns it into an `AggregateError`.
+- **`emitStrictAsync()` never throws synchronously.** `emitAsync()` and
+  `emitSafeAsync()` do, for a wildcard name and for a corrupted bucket, so
+  wrapping the call rather than only the `await` matters for those two.
+- **The guarded step is process-wide and paid once.** Guarded and unguarded
+  dispatch are two callbacks reaching one call site inside the walk. A process
+  that never calls a guarded variant pays nothing; the moment anything in it
+  calls `emitSafe()` or `emitStrict()` once, **every** `emit()` in that process
+  pays roughly +29% on a 64-listener dispatch — emitters that code never touches
+  included, and transitively through a dependency. Using both variants costs the
+  same as using one: they share the callback and differ only in where the caught
+  error goes.
+- **A caller's own error is nobody's listener failure.** `'*'` as an event name
+  ends the dispatch under all six. `emit`/`emitSafe` throw it at you,
+  `emitStrict()` appends it to what it collected, `emitStrictAsync()` puts it in
+  the rejection.
+
 ## Pitfalls
 
 1. **`'*'` is subscribe-only.** `emit(ε, '*', …)` throws. In an array form, names
@@ -121,24 +175,16 @@ compile time) or an explicit `isEventized()` guard.
    the same `emit()` don't run, the throwing listener stays subscribed — a
    throwing `once()` therefore fires again — and `retain()` is not updated for
    that emit, because the write happens after all listeners.
-   Three ways out. Since v6.1.0, `emitSafe()` / `emitSafeAsync()` dispatch the
-   same event with each listener isolated: the throw is reported through
-   `console.warn` and the listeners behind it still run. What they guarantee is
-   execution, not completeness — no listener can prevent the others from
-   running, but you get no error object, `emitSafeAsync()` still rejects on a
-   rejected promise, and `'*'` still throws. Two things then differ from
-   `emit()`, both intended: the retained value **is** written, because the event
-   was delivered, and a `once()` queued behind the throwing listener is spent,
-   because it now runs. The throwing listener keeps its own subscription either
-   way. Since v6.2.0, `emitStrict()` / `emitStrictAsync()` give you both
-   halves: every listener runs, and then the failures are raised — one
-   unchanged (so an existing `toThrow(…)` survives the swap), several as an
-   `AggregateError` in dispatch order. A caller's own error, `'*'` included,
-   joins that list as its last entry instead of erasing what was collected, and
-   `emitStrictAsync()` reports through its promise only — it never throws
-   synchronously. The third way out is a `try/catch` in the listener body, which
-   is still right where one listener needs a policy the others don't. There is no global
-   error handler, by design.
+   Three ways out, and which to pick is "Choosing a dispatch function" above:
+   `emitSafe()` isolates each listener and reports through `console.warn`
+   (v6.1.0), `emitStrict()` isolates each listener and then raises what failed
+   (v6.2.0), and a `try/catch` in the listener body is still right where one
+   listener needs a policy the others don't. There is no global error handler,
+   by design. Under either guarded variant two things differ from `emit()`,
+   both intended: the retained value **is** written, because the event was
+   delivered, and a `once()` queued behind the throwing listener is spent,
+   because it now runs. The throwing listener keeps its own subscription in
+   every case.
    **A throw is not the only way a `once()` fires twice.** The one-shot is
    settled after the callback *returns*, so a callback that re-emits its own
    event before returning is dispatched to its own listener again, still fully
