@@ -1083,7 +1083,7 @@ describe('a write during a retained replay batch', () => {
     expect(seen).toEqual(['A', 'B2', 'B2']);
   });
 
-  // Where the new re-check meets the one throw the library swallows: the
+  // Where the new re-check meets the throw an unguarded dispatch swallows: the
   // isolation is unchanged, and so is what the throwing handler managed to do
   // before it threw. The unthrown half of the pair — a throwing replay leaving
   // its once() armed for the next replay of the same batch — is pinned above.

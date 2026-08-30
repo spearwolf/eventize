@@ -139,3 +139,17 @@ skip the rest.
 the others don't — a retry, a fallback value, a specific error to swallow.
 Eventize keeps no global error handler by design, so error policy stays visible
 at the site that owns it.
+
+**The choice is not free, and the cost is not local.** The guarded and unguarded
+dispatches are two different callbacks reaching the same call site inside the
+walk — one place in the whole library, shared by every emitter in the process.
+A program that never calls `emitSafe()` only ever sends one callback through it
+and pays nothing, measurably nothing: such a program stays inside the spread of
+its own baseline. The moment anything in the process calls `emitSafe()` once,
+that site sees two, and **every** `emit()` in the process pays the surcharge —
+measured at roughly **+29%** on a 64-listener dispatch, about 2 ns per listener.
+It applies to emitters that code never touches, and it is transitive: a
+dependency calling `emitSafe()` a single time taxes its host's unrelated
+`emit()` calls, invisibly. So reach for `emitSafe()` where the isolation is
+worth it, not by default — and if you publish a library, know that the choice
+is one your consumers cannot see.

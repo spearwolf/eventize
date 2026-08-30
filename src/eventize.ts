@@ -128,8 +128,8 @@ const eventizeMethods = {
 // target. The previous shape rebuilt both containers on every call — a
 // throwaway benchmark (five runs of 300,000 calls each, Node, median) put
 // `eventize.inject({})` at roughly 2025 ns/call before this change and
-// roughly 980 ns/call after; the nine `fn.bind(obj)` calls this exists to
-// install are a small fraction of what remains.
+// roughly 980 ns/call after; the `fn.bind(obj)` calls this exists to install
+// are a small fraction of what remains.
 const eventizeMethodEntries = Object.entries(eventizeMethods);
 
 /**

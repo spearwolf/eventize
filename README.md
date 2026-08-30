@@ -697,7 +697,7 @@ emitSafe(ε, 'foo'); // no throw; console.warn reports the failure
 console.log(calls); // => ["first", "third"]
 ```
 
-What they guarantee is **execution, not completeness**: no listener can prevent the others from running. They do not promise that nothing went wrong, they hand you no error object, and `emitSafeAsync()` still rejects if a listener returns a rejected promise — by then every listener has already run. `emit(ε, '*')` still throws from all four functions.
+What they guarantee is **execution, not completeness**: no listener can prevent the others from running. They do not promise that nothing went wrong, they hand you no error object, and `emitSafeAsync()` still rejects if a listener returns a rejected promise — by then every listener has already run. `emit(ε, '*')` still throws from all four functions. The third bullet above flips with them: nothing unwinds, so the retained value *is* written. [`docs/emit.md`](./docs/emit.md) has the rest, the cost included.
 
 Two behaviours differ from `emit()`, both on purpose: the retained value **is** written, because the event was delivered; and a `once()` queued behind a throwing listener is spent, because it now runs. The throwing listener itself keeps its subscription either way.
 

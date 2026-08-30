@@ -314,9 +314,10 @@ export function emit(
  * continues.
  *
  * The guarantee is **execution, not completeness** — no listener can prevent
- * the others from running. It is not a promise that nothing went wrong. Two
- * throws still leave this call: `'*'` as an event name (or inside a name
- * array), and a corrupted listener bucket. Neither comes from a listener.
+ * the others from running. It is not a promise that nothing went wrong. One
+ * throw still leaves this call: `'*'` as an event name, or inside a name
+ * array, where the names ahead of it dispatch first. It does not come from a
+ * listener, which is why the guard is not between you and it.
  *
  * Two consequences differ from `emit()` and are intended. The retained value
  * *is* written, because the event was delivered. And a `once()` queued behind

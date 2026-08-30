@@ -70,10 +70,14 @@ const EMPTY_EVENT_NAMES: Set<EventName> = Object.freeze(
  * single one of them end the batch.
  *
  * This is the tail of a `subscribeTo()` call, which is why a throw is
- * swallowed here and nowhere else in the library — `emitAsync()`'s catch
- * claims its collected promises and rethrows, this one does not rethrow: at
- * an `emit()` a throwing listener unwinds into the caller that *caused* the
- * event, and that caller is the right place for it. The caller of a replay is whoever just called `on()` or
+ * swallowed here and nowhere an unguarded dispatch reaches — the one catch
+ * the library applies without being asked. Since v6.1.0 there is a second
+ * catch site, but it is opt-in: `emitSafe()` / `emitSafeAsync()` guard each
+ * listener because the caller chose those functions over `emit()` /
+ * `emitAsync()`, which are unchanged. `emitAsync()`'s catch claims its
+ * collected promises and rethrows, this one does not rethrow: at an `emit()`
+ * a throwing listener unwinds into the caller that *caused* the event, and
+ * that caller is the right place for it. The caller of a replay is whoever just called `on()` or
  * `once()`; they did not produce the value, they may not know the emitter
  * retains anything at all, and by the time a replay runs their listeners are
  * already in the store. Letting the throw out would hand them a half-served

@@ -146,6 +146,14 @@ That is the duplication that already let the two dispatch paths disagree about
 function targets once, and repairing it cost a v6.0.0 behaviour change. Not worth
 buying before the price of A has been weighed.
 
+Recorded after the fact, because it was not weighed at the time: between A and
+B there is a middle. Build `walkBucket()` / `mergeWalk()` from a factory called
+twice at module load — one guarded instantiation, one unguarded — so the
+delicate logic exists once in the source while each closure gets its own
+feedback cell and both call sites stay monomorphic. Unmeasured, and it may not
+survive V8's feedback-cell sharing heuristics for closures from one source
+position. Noted so a future reader knows the option was seen, not as a plan.
+
 ### Why not an ambient flag (approach C)
 
 A module-level flag set before the walk and restored in a `finally`, read by the

@@ -7,6 +7,7 @@
 - **`emitSafe(ε, name, …args)` and `emitSafeAsync(ε, name, …args)`** — dispatch variants that isolate a throwing listener: the throw is reported through `console.warn` and the remaining listeners still run. Available on all three API surfaces. `emit()` and `emitAsync()` are unchanged.
 - The guarantee is execution, not completeness: no listener can prevent the others from running. `emitSafeAsync()` keeps `Promise.all`, so a listener returning a rejected promise still rejects the result — by then every listener has already run. A `'*'` event name still throws, from both variants.
 - Two differences from `emit()`, both intended: the retained value is written even when a listener threw, and a `once()` queued behind a throwing listener is spent because it now runs. A throwing listener keeps its own subscription either way.
+- The cost is process-wide, not per-call: guarded and unguarded dispatch share one call site, so once anything in a process calls `emitSafe()`, every `emit()` in it pays roughly +29% on a 64-listener dispatch. A process that never calls it pays nothing. [`docs/emit.md`](./docs/emit.md) has the detail.
 
 ## `v6.0.0` (2026-08-05) — the whole jump from `v5.1.0`
 
