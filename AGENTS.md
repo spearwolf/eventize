@@ -100,11 +100,13 @@ Progressive disclosure applies to this repo's own docs — the deep material liv
 | Dispatch semantics, retain behavior, or any quirk above | `skills/using-eventize/` — `SKILL.md` for the summary, `references/*.md` for detail |
 | Cleanup, retain lifetime, or handle semantics | `docs/lifecycle.md`, plus a case in `src/lifecycle.spec.ts` |
 | Deferring a fix, or accepting a known defect | the place a reader meets it — a doc comment at the code, a caveat in the `docs/*.md` that owns the topic, or the audit's accepted-points appendix when it belongs to no file. There is no backlog file; a list nobody reads while working is where a decision goes to rot |
+| A `ROADMAP.md` proposal reaching the code | delete the proposal's section in the same commit — a design that shipped is described by `docs/`, `CHANGELOG.md` and the specs, and a copy that outlives them is the second answer someone finds first |
 | Purely internal refactor | nothing |
 
-Two rules about how, not what:
+Three rules about how, not what:
 
 - **`skills/using-eventize/` must stay self-contained.** It gets symlinked into a user's agent directory, where a path out of the folder resolves to nothing. Everything it references lives under `skills/`; duplicating a paragraph from `docs/` is the correct trade.
+- **`ROADMAP.md` holds designs, never defects.** It is where an API that does not exist yet is argued out: the gap, the consumer that hit it, the semantics it would have, and what has to be measured before anyone writes the first line. Nothing in it authorises writing that line. It is not the backlog the "deferring a fix" row rules out, and the line between the two is whether a reader can meet the thing today — an accepted defect has a place in the code or the docs where someone runs into it, an unbuilt API has none.
 - **`CHANGELOG.md` is a record, not an essay.** One to three lines per entry: what changed, and for a breaking change what to write instead. Rationale, benchmark numbers and internal mechanics belong in a code comment beside the mechanism they explain.
 
 Docs are English. Prefer stating the gotcha over restating the signature.
