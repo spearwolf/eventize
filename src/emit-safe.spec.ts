@@ -26,6 +26,7 @@ import {
 } from './index';
 import {apiSurfaces} from './__test-utils__/expect2ImplEventizeApi';
 import {storeOf} from './__test-utils__/listeners';
+import {unhandledRejectionsDuring} from './__test-utils__/unhandledRejections';
 import {warn} from './utils';
 
 const warnSpy = warn as unknown as jest.Mock;
@@ -130,6 +131,71 @@ describe('emitSafe()', () => {
       calls += 1;
       throw new Error('boom');
     });
+
+    emitSafe(ε, 'foo');
+    expect(getSubscriptionCount(ε)).toBe(1);
+
+    emitSafe(ε, 'foo');
+    expect(calls).toBe(2);
+    expect(getSubscriptionCount(ε)).toBe(1);
+  });
+
+  // The three cases below reach the guard through the other two listener
+  // shapes. They matter because `EventListener.apply()` settles a `once()`
+  // from a `didCall` flag computed *after* the dispatch returns, and each
+  // shape computes it in its own branch — a guard placed one level deeper
+  // would spend the one-shot in some branches and not others.
+  it('isolates a throwing listener object and keeps dispatching', () => {
+    const ε = eventize();
+    const calls: string[] = [];
+    const thrower = {
+      foo() {
+        calls.push('thrower');
+        throw new Error('boom');
+      },
+    };
+
+    on(ε, 'foo', thrower);
+    on(ε, 'foo', () => {
+      calls.push('after');
+    });
+
+    expect(() => emitSafe(ε, 'foo')).not.toThrow();
+    expect(calls).toEqual(['thrower', 'after']);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('isolates a throwing method-name listener and keeps dispatching', () => {
+    const ε = eventize();
+    const calls: string[] = [];
+    const thrower = {
+      handler() {
+        calls.push('thrower');
+        throw new Error('boom');
+      },
+    };
+
+    on(ε, 'foo', 'handler', thrower);
+    on(ε, 'foo', () => {
+      calls.push('after');
+    });
+
+    expect(() => emitSafe(ε, 'foo')).not.toThrow();
+    expect(calls).toEqual(['thrower', 'after']);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a throwing once() in listener-object form subscribed, exactly as emit() does', () => {
+    const ε = eventize();
+    let calls = 0;
+    const listenerObject = {
+      foo() {
+        calls += 1;
+        throw new Error('boom');
+      },
+    };
+
+    once(ε, 'foo', listenerObject);
 
     emitSafe(ε, 'foo');
     expect(getSubscriptionCount(ε)).toBe(1);
@@ -299,17 +365,14 @@ describe('emitSafeAsync()', () => {
 
   it('claims collected promises when a wildcard aborts a name array', async () => {
     const ε = eventize();
-    const unhandled = jest.fn();
-    process.on('unhandledRejection', unhandled);
 
     on(ε, 'foo', () => Promise.reject(new Error('claimed')));
 
-    expect(() => emitSafeAsync(ε, ['foo', '*'])).toThrow(/cannot be emitted/);
+    const reported = await unhandledRejectionsDuring(() => {
+      expect(() => emitSafeAsync(ε, ['foo', '*'])).toThrow(/cannot be emitted/);
+    });
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    process.off('unhandledRejection', unhandled);
-
-    expect(unhandled).not.toHaveBeenCalled();
+    expect(reported).toEqual([]);
   });
 
   it('guards the duck-typed path too', async () => {

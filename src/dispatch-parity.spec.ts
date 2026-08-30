@@ -1,4 +1,26 @@
-import {emit, emitAsync, eventize, on, once} from './index';
+// `warn` is bound to `console.warn` at module load, so a `jest.spyOn(console,
+// 'warn')` installed from a spec never sees the call. Replacing the export
+// itself is the only way to observe it — and the only way to keep the guarded
+// cases at the bottom of this file from printing their reports into the test
+// run. Same workaround as emit-safe.spec.ts, for the same reason.
+jest.mock('./utils', () => ({
+  __esModule: true,
+  ...jest.requireActual('./utils'),
+  warn: jest.fn(),
+}));
+
+import {
+  emit,
+  emitAsync,
+  emitSafe,
+  emitSafeAsync,
+  eventize,
+  on,
+  once,
+} from './index';
+import {warn} from './utils';
+
+const warnSpy = warn as unknown as jest.Mock;
 
 /**
  * AGENTS.md ("The two dispatch paths in `emit` move in lockstep") states the
@@ -373,5 +395,83 @@ describe('dispatch parity: emitAsync() aggregation', () => {
 
     expect(listenerResult).toEqual(duckResult);
     expect(duckResult).toEqual(['via-foo']);
+  });
+});
+
+describe('dispatch parity: guarded dispatch (emitSafe / emitSafeAsync)', () => {
+  // The guard is a second dispatch callback reaching the same place on each
+  // path — `applyListenerSafe()` on the listener side, `dispatchGuarded()` on
+  // the duck side — and AGENTS.md's lockstep rule covers the guarded pair the
+  // way it covers the unguarded one: both paths carry the guard, or neither
+  // does. A red test here means one path isolates a throwing member while the
+  // other lets the throw out.
+  beforeEach(() => {
+    warnSpy.mockClear();
+  });
+
+  it('isolates a throwing member and still dispatches the next name on both paths', () => {
+    const duckLater = recorder();
+    const duckTarget = {
+      foo() {
+        throw new Error('boom');
+      },
+      bar: duckLater.fn,
+    };
+    expect(() => emitSafe(duckTarget, ['foo', 'bar'])).not.toThrow();
+    const duckWarnings = warnSpy.mock.calls.length;
+
+    warnSpy.mockClear();
+
+    const listenerLater = recorder();
+    const target = {
+      foo() {
+        throw new Error('boom');
+      },
+      bar: listenerLater.fn,
+    };
+    const ε = eventize();
+    on(ε, target);
+    expect(() => emitSafe(ε, ['foo', 'bar'])).not.toThrow();
+
+    expect(listenerLater.calls).toEqual(duckLater.calls);
+    // Absolute anchors: a comparison of two silent no-ops would pass on its
+    // own, and so would a comparison of two paths that both reported nothing.
+    expect(duckLater.calls).toEqual([[]]);
+    expect(warnSpy.mock.calls.length).toEqual(duckWarnings);
+    expect(duckWarnings).toBe(1);
+  });
+
+  it('aggregates past a throwing member the same way on both paths', async () => {
+    const duckResult = await emitSafeAsync(
+      {
+        foo() {
+          throw new Error('boom');
+        },
+        bar: () => 'collected',
+      },
+      ['foo', 'bar'],
+    );
+
+    const ε = eventize();
+    on(ε, {
+      foo() {
+        throw new Error('boom');
+      },
+      bar: () => 'collected',
+    });
+    const listenerResult = await emitSafeAsync(ε, ['foo', 'bar']);
+
+    expect(listenerResult).toEqual(duckResult);
+    expect(duckResult).toEqual(['collected']);
+  });
+
+  it("rejects '*' from both paths, guarded or not", () => {
+    expect(() => emitSafe({unrelated: 1}, '*', 'data')).toThrow(
+      /concrete event name/,
+    );
+
+    const ε = eventize();
+    on(ε, {unrelated: 1});
+    expect(() => emitSafe(ε, '*', 'data')).toThrow(/concrete event name/);
   });
 });
