@@ -166,6 +166,8 @@ For class-based patterns you can inject the same API as methods.
 | `onceAsync`   | the async version of subscribe only to the next event                |
 | `emit`        | dispatch an event                                                    |
 | `emitAsync`   | dispatch an event and wait for any promises returned by subscribers  |
+| `emitSafe`    | dispatch an event; a throwing listener does not stop the others       |
+| `emitSafeAsync` | the async version of `emitSafe`                                    |
 | `off`         | unsubscribe                                                          |
 | `retain`      | hold the last event until it is received by a subscriber             |
 | `retainClear` | clear the last event                                                 |
@@ -249,7 +251,7 @@ Eventize splits its API into four families by how each function treats a target 
 | Function                                    | On a non-eventized object                    |
 | ------------------------------------------- | -------------------------------------------- |
 | `on()`, `once()`, `onceAsync()`, `retain()` | Auto-eventizes the object                    |
-| `emit()`, `emitAsync()` (v5+)               | Duck-types: calls `obj[eventName](...args)` — a function target too (v6.0.0) |
+| `emit()`, `emitAsync()` (v5+), `emitSafe()`, `emitSafeAsync()` (v6.1.0) | Duck-types: calls `obj[eventName](...args)` — a function target too (v6.0.0) |
 | `off()`, `getSubscriptionCount()`, `getSubscribedEventNames()`, `getRetainedCount()`, `getRetainedEventNames()` | Silently does nothing / returns `0` / `[]` |
 | `retainClear()`, `unretain()`               | Throws `TypeError`                           |
 
@@ -678,8 +680,29 @@ try {
 console.log(calls); // => ["first"]
 ```
 
-**Recommendation:** if a single listener's failure should not stop dispatch to the others, wrap that listener's body in `try/catch` yourself.
-Eventize deliberately keeps no global error handler so error policy stays explicit at each subscription site.
+**Two ways out.** Since v6.1.0, `emitSafe()` and `emitSafeAsync()` dispatch the same event with each listener isolated: a throw is reported through `console.warn` and the listeners behind it still run.
+
+```javascript
+const calls = [];
+
+on(ε, 'foo', () => calls.push('first'));
+on(ε, 'foo', () => {
+  throw new Error('boom');
+});
+on(ε, 'foo', () => calls.push('third'));
+
+emitSafe(ε, 'foo'); // no throw; console.warn reports the failure
+
+console.log(calls); // => ["first", "third"]
+```
+
+What they guarantee is **execution, not completeness**: no listener can prevent the others from running. They do not promise that nothing went wrong, they hand you no error object, and `emitSafeAsync()` still rejects if a listener returns a rejected promise — by then every listener has already run. `emit(ε, '*')` still throws from all four functions.
+
+Two behaviours differ from `emit()`, both on purpose: the retained value **is** written, because the event was delivered; and a `once()` queued behind a throwing listener is spent, because it now runs. The throwing listener itself keeps its subscription either way.
+
+The other way out is unchanged and still the right one where a single listener needs its own policy: wrap that listener's body in `try/catch`. Eventize deliberately keeps no global error handler, so `emit()` stays the default and error policy stays explicit at the call site.
+
+See [`docs/emit.md`](./docs/emit.md) for the full dispatch semantics.
 
 > [!NOTE]
 > `emitAsync()` aggregates listener return values into a single `Promise.all`. A listener returning a **rejected promise** rejects the awaited result,
