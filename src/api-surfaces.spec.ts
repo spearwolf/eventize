@@ -2,7 +2,7 @@
 // (standalone functions, eventize.inject(obj), class Eventize), each against
 // a freshly created emitter, so "three surfaces, one implementation"
 // (AGENTS.md) is checked instead of merely claimed. expect2ImplEventizeApi
-// only proved the nine methods exist; these cases exercise what they do —
+// only proved the eleven methods exist; these cases exercise what they do —
 // including the five delegations that existing specs never called:
 // inject().off, inject().emitAsync, Eventize.once, Eventize.off and
 // Eventize.emitAsync.
@@ -239,9 +239,9 @@ describe('the class surface is the same contract as the other two', () => {
   });
 });
 
-// eventize.inject() used to install its nine methods with Object.assign(),
+// eventize.inject() used to install its eleven methods with Object.assign(),
 // as own enumerable properties — the class surface twelve lines away in
-// eventize.ts installs the same nine on the prototype with
+// eventize.ts installs the same eleven on the prototype with
 // Object.defineProperties() and {enumerable: false} instead, and its comment
 // names Object.assign() as the wrong choice for exactly this reason. This
 // suite pins the inject surface to the same descriptor, so a spread or an
@@ -291,7 +291,7 @@ describe('the inject surface installs its methods non-enumerable, like the class
     expect(listener).toHaveBeenCalledWith(42);
   });
 
-  it('all nine descriptors match the class prototype shape', () => {
+  it('all eleven descriptors match the class prototype shape', () => {
     const obj = eventize.inject({});
 
     for (const name of [
@@ -301,6 +301,8 @@ describe('the inject surface installs its methods non-enumerable, like the class
       'off',
       'emit',
       'emitAsync',
+      'emitSafe',
+      'emitSafeAsync',
       'retain',
       'retainClear',
       'unretain',

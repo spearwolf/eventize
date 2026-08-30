@@ -875,6 +875,29 @@ export interface EventizeApi<
     ...args: EventArgs
   ): Promise<any[] | undefined>;
 
+  emitSafe<K extends EventKeysOf<TEvents> | symbol>(
+    eventName: K,
+    ...args: ArgsFor<TEvents, K>
+  ): void;
+  emitSafe<K extends EventKeysOf<TEvents> | symbol>(
+    eventNames: K[],
+    ...args: ArgsFor<TEvents, K>
+  ): void;
+  emitSafe(eventNames: LooseEmitNames<TEvents>, ...args: EventArgs): void;
+
+  emitSafeAsync<K extends EventKeysOf<TEvents> | symbol>(
+    eventName: K,
+    ...args: ArgsFor<TEvents, K>
+  ): Promise<any[] | undefined>;
+  emitSafeAsync<K extends EventKeysOf<TEvents> | symbol>(
+    eventNames: K[],
+    ...args: ArgsFor<TEvents, K>
+  ): Promise<any[] | undefined>;
+  emitSafeAsync(
+    eventNames: LooseEmitNames<TEvents>,
+    ...args: EventArgs
+  ): Promise<any[] | undefined>;
+
   // The `| symbol` in the three name slots below is the same escape hatch
   // `on`, `once` and `emit` carry: a private symbol event is not in the map and
   // never will be, and the loose arm underneath is `never` for a typed map, so

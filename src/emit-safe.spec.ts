@@ -24,6 +24,7 @@ import {
   once,
   retain,
 } from './index';
+import {apiSurfaces} from './__test-utils__/expect2ImplEventizeApi';
 import {storeOf} from './__test-utils__/listeners';
 import {warn} from './utils';
 
@@ -324,6 +325,47 @@ describe('emitSafeAsync()', () => {
     await expect(emitSafeAsync(target, ['foo', 'bar'])).resolves.toEqual([
       'value',
     ]);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe.each(apiSurfaces)('$name — emitSafe()', ({create}) => {
+  beforeEach(() => {
+    warnSpy.mockClear();
+  });
+
+  it('isolates a throwing listener on every surface', () => {
+    const ε = create();
+    const calls: string[] = [];
+
+    ε.on('foo', () => {
+      throw new Error('boom');
+    });
+    ε.on('foo', () => {
+      calls.push('second');
+    });
+
+    expect(() => ε.emitSafe('foo')).not.toThrow();
+    expect(calls).toEqual(['second']);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe.each(apiSurfaces)('$name — emitSafeAsync()', ({create}) => {
+  beforeEach(() => {
+    warnSpy.mockClear();
+  });
+
+  it('isolates a throwing listener on every surface', async () => {
+    const ε = create();
+
+    ε.on('foo', () => 'first');
+    ε.on('foo', () => {
+      throw new Error('boom');
+    });
+    ε.on('foo', () => Promise.resolve('third'));
+
+    await expect(ε.emitSafeAsync('foo')).resolves.toEqual(['first', 'third']);
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 });
