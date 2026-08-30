@@ -18,7 +18,21 @@ import {
   dispatchToTarget,
   isAttachableTarget,
   rejectWildcard,
+  warn,
 } from './utils';
+
+/**
+ * The shape both walk callbacks share. Naming it keeps `store.forEach()`'s
+ * generic slots matched against what the callback actually reads, instead of
+ * widening to `WalkCallback`'s `any` triple at the one place that still knows
+ * the real types.
+ */
+type ApplyListenerFn = (
+  listener: EventListener,
+  eventName: EventName,
+  args: EventArgs,
+  returnValue?: (val: unknown) => void,
+) => void;
 
 /**
  * The dispatch callback, at module level and capturing nothing. Everything it
@@ -27,13 +41,52 @@ import {
  * escape into the walk and allocate a JSFunction plus context on every dispatch
  * that reaches a listener.
  */
-const applyListener = (
-  listener: EventListener,
-  eventName: EventName,
-  args: EventArgs,
-  returnValue?: (val: unknown) => void,
+const applyListener: ApplyListenerFn = (
+  listener,
+  eventName,
+  args,
+  returnValue,
 ) => {
   listener.apply(eventName, args, returnValue);
+};
+
+/**
+ * The one wording a guarded dispatch reports a caught throw with, shared by
+ * the two guarded callbacks (`applyListenerSafe()` here, and the duck path's
+ * `dispatchGuarded()`). Same reasoning as `rejectWildcard()` in `utils.ts`:
+ * a corrected wording in one place must not let the other drift.
+ */
+const warnListenerThrew = (eventName: EventName, error: unknown): void => {
+  warn('a listener threw; the dispatch continues. event:', eventName, error);
+};
+
+/**
+ * `applyListener`'s guarded twin, for `emitSafe()` / `emitSafeAsync()`.
+ *
+ * The `try` goes around `listener.apply()` and must not move inside it.
+ * `EventListener.apply()` settles a `once()` obligation *after* the listener
+ * returns, so a throw skipping that settle is what leaves a throwing `once()`
+ * subscribed — the behaviour `emit()` has always had and this variant keeps.
+ * Guarding one level deeper would silently spend the one-shot instead.
+ *
+ * A second module-level function rather than a flag read inside the existing
+ * one: the flag would put a branch and a `try` into the hottest function in the
+ * library, and a program that never calls `emitSafe` would pay for both. The
+ * cost of this shape is that `fn(listener, a, b, c)` in `walk.ts` goes
+ * bimorphic — but only in a program that actually mixes both variants; one that
+ * never emits guarded never sends a second callback through that site.
+ */
+const applyListenerSafe: ApplyListenerFn = (
+  listener,
+  eventName,
+  args,
+  returnValue,
+) => {
+  try {
+    listener.apply(eventName, args, returnValue);
+  } catch (error) {
+    warnListenerThrew(eventName, error);
+  }
 };
 
 // `internals` is an accumulator, not a cache: `_emit()`'s array branch passes
@@ -50,6 +103,7 @@ const _emitOne = (
   eventizedObj: EventizedObject,
   eventName: EventName,
   args: EventArgs,
+  apply: ApplyListenerFn,
   returnValue?: (val: unknown) => void,
   internals?: EventizeInternals,
 ): EventizeInternals => {
@@ -57,13 +111,7 @@ const _emitOne = (
     rejectWildcard('emitted');
   }
   const resolved = internals ?? internalsOf(eventizedObj);
-  resolved.store.forEach(
-    eventName,
-    applyListener,
-    eventName,
-    args,
-    returnValue,
-  );
+  resolved.store.forEach(eventName, apply, eventName, args, returnValue);
   resolved.keeper.retain(eventName, args);
   return resolved;
 };
@@ -72,6 +120,7 @@ const _emit = (
   eventizedObj: EventizedObject,
   eventNames: AnyEventNames,
   args: EventArgs,
+  apply: ApplyListenerFn,
   returnValue?: (val: unknown) => void,
 ) => {
   if (Array.isArray(eventNames)) {
@@ -96,12 +145,13 @@ const _emit = (
         eventizedObj,
         eventNames[i] as EventName,
         args,
+        apply,
         returnValue,
         internals,
       );
     }
   } else {
-    _emitOne(eventizedObj, eventNames, args, returnValue);
+    _emitOne(eventizedObj, eventNames, args, apply, returnValue);
   }
 };
 
@@ -200,7 +250,56 @@ export function emit(
   ...args: EventArgs
 ): void {
   if (isEventized(target)) {
-    _emit(target, eventNames, args);
+    _emit(target, eventNames, args, applyListener);
+  } else if (isDuckTarget(target)) {
+    _duckEmit(target, eventNames, args);
+  }
+}
+
+/**
+ * Like `emit()`, but a listener that throws does not stop the others: the
+ * throw is caught, reported through `console.warn`, and the dispatch
+ * continues.
+ *
+ * The guarantee is **execution, not completeness** — no listener can prevent
+ * the others from running. It is not a promise that nothing went wrong. Two
+ * throws still leave this call: `'*'` as an event name (or inside a name
+ * array), and a corrupted listener bucket. Neither comes from a listener.
+ *
+ * Two consequences differ from `emit()` and are intended. The retained value
+ * *is* written, because the event was delivered. And a `once()` queued behind
+ * a throwing listener is spent, because it now runs. The throwing listener
+ * itself keeps its subscription either way.
+ */
+export function emitSafe<
+  TEvents extends EventMap,
+  K extends EventKeysOf<TEvents> | symbol,
+>(
+  obj: EventizedObject<TEvents>,
+  eventName: K,
+  ...args: ArgsFor<TEvents, K>
+): void;
+export function emitSafe<
+  TEvents extends EventMap,
+  K extends EventKeysOf<TEvents> | symbol,
+>(
+  obj: EventizedObject<TEvents>,
+  eventNames: K[],
+  ...args: ArgsFor<TEvents, K>
+): void;
+export function emitSafe<T extends object>(
+  obj: NonTypedEmitter<T>,
+  eventNames: AnyEventNames,
+  ...args: EventArgs
+): void;
+// implementation
+export function emitSafe(
+  target: object,
+  eventNames: AnyEventNames,
+  ...args: EventArgs
+): void {
+  if (isEventized(target)) {
+    _emit(target, eventNames, args, applyListenerSafe);
   } else if (isDuckTarget(target)) {
     _duckEmit(target, eventNames, args);
   }
@@ -276,7 +375,7 @@ export function emitAsync(
   };
   try {
     if (isEventized(target)) {
-      _emit(target, eventNames, args, returnValue);
+      _emit(target, eventNames, args, applyListener, returnValue);
     } else if (isDuckTarget(target)) {
       _duckEmit(target, eventNames, args, returnValue);
     }
