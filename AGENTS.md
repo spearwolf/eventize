@@ -4,13 +4,13 @@ Canonical guide for coding agents in this repo. `CLAUDE.md` is a symlink to this
 
 `@spearwolf/eventize` makes any JS/TS object a **synchronous** event emitter. Zero runtime deps, ESM + CJS, opt-in typed event maps. All development happens in `src/`; `lib/` is build output.
 
-## Versioning right now
+## Versioning
 
-`package.json` carries **`6.1.0`**, prepared on 2026-08-30 and **not yet published**: `v6.0.0` (2026-08-05) is the last release that reached anyone. The `-dev` suffix that once held `scripts/publishPackage.cjs` back is gone, so `npm run publish:pkg` is armed. **Releasing, and choosing what the next version is called, stays a human's call.** Nothing here authorises a bump.
+**Releasing, and choosing what the next version is called, stays a human's call.** Nothing in this file authorises a bump, and `npm run publish:pkg` publishes for real — nothing holds it back for a dry run.
 
-One consequence outlives each release:
+One rule outlives each release:
 
-- **Version references in prose are `v5.1.0`, `v6.0.0` or `v6.1.0`, never anything between.** "Since v6.1.0" for what the guarded dispatch variants introduced, "since v6.0.0" for what that release introduced, "up to v5.1.0" for what it replaced. The intermediate versions reached nobody, and naming one sends a reader looking for an upgrade path that does not exist.
+- **A version reference in prose names a version a reader can act on**: one that shipped, or the one `package.json` currently prepares. Never a number between the two — those reached nobody, and naming one sends a reader looking for an upgrade path that does not exist. Which is which is not recorded here. `package.json`, `CHANGELOG.md` and the git tags answer it between them, and a second copy of that answer in this file would go stale silently.
 
 ## Verification
 
@@ -94,7 +94,7 @@ Progressive disclosure applies to this repo's own docs — the deep material liv
 
 | Change | Update |
 | --- | --- |
-| Public API or runtime behavior | `CHANGELOG.md`. `v6.0.0` is released, so its section is closed — a change landing after it needs a heading, and which version that heading names is a human's call |
+| Public API or runtime behavior | `CHANGELOG.md` — a released section is closed, so a change landing after one needs a new heading, and which version that heading names is a human's call |
 | Anything breaking against `v5.1.0` | `docs/migration.md` as well — with the grep pattern and the replacement, not just the fact |
 | Documented behavior or an example | `README.md`, plus the matching `docs/*.md` if the detail lives there |
 | Dispatch semantics, retain behavior, or any quirk above | `skills/using-eventize/` — `SKILL.md` for the summary, `references/*.md` for detail |
