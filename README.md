@@ -64,6 +64,7 @@ Skills are auto-discovered — no extra registration step.
 The deep material behind the summaries below:
 
 - [Unsubscribing in depth](./docs/off.md) — every `off()` signature, the interaction with `retain()`, and reference counting
+- [Dispatch in depth](./docs/emit.md) — `emit()`, `emitAsync()`, `emitSafe()`, `emitSafeAsync()`, and what a guarded dispatch does and does not promise
 - [Retained events in depth](./docs/retain.md) — `retain()`, `retainClear()`, `unretain()`, symbol names, and the wildcard bulk forms
 - [Typed event maps](./docs/typed-events.md) — generic event maps, the inject and class forms, symbol events as an escape hatch
 - [Lifecycle & cleanup](./docs/lifecycle.md) — what an emitter holds and what releases it

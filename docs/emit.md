@@ -39,15 +39,14 @@ console.log(calls); // => ["first", "third"]
 Priorities are unaffected: the walk continues where it was, so a listener
 scheduled behind the throwing one runs in its normal position.
 
-### Two throws still leave the call
+### The call's own errors still throw
 
-Neither of them comes from a listener, which is exactly why the guard does not
-reach them:
-
-- **`'*'` as an event name.** `emitSafe(ε, '*')` throws, the same as `emit()`.
-  The wildcard is reserved for subscribing.
-- **A corrupted listener bucket.** An internal invariant violation is reported,
-  not swallowed. This is not a state reachable through `on()` / `off()`.
+The guard covers what a listener does. It does not cover an error in the call
+itself, and there is one of those: **`'*'` as an event name.**
+`emitSafe(ε, '*')` throws exactly as `emit()` does, and so does a name array
+containing `'*'` — the wildcard is reserved for subscribing. That rejection
+happens before any listener runs, so there is nothing for the guard to be
+between.
 
 A caller's own error stays a caller's error.
 
