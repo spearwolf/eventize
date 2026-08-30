@@ -17,6 +17,7 @@ jest.mock('./utils', () => ({
 import {
   emit,
   emitSafe,
+  emitSafeAsync,
   eventize,
   getSubscriptionCount,
   on,
@@ -236,6 +237,15 @@ describe('emitSafe()', () => {
       expect(() => emitSafe(target, '*')).toThrow(/cannot be emitted/);
     });
 
+    it('dispatches the names ahead of a wildcard and then throws', () => {
+      const bar = jest.fn();
+      const target = {foo: jest.fn(), bar};
+
+      expect(() => emitSafe(target, ['foo', '*'])).toThrow(/cannot be emitted/);
+      expect(target.foo).toHaveBeenCalledTimes(1);
+      expect(bar).not.toHaveBeenCalled();
+    });
+
     it('leaves emit() untouched: the throw still reaches the caller', () => {
       const target = {
         foo() {
@@ -245,5 +255,75 @@ describe('emitSafe()', () => {
 
       expect(() => emit(target, 'foo')).toThrow('boom');
     });
+  });
+});
+
+describe('emitSafeAsync()', () => {
+  beforeEach(() => {
+    warnSpy.mockClear();
+  });
+
+  it('isolates a synchronous throw and still resolves the collected values', async () => {
+    const ε = eventize();
+
+    on(ε, 'load', () => 'first');
+    on(ε, 'load', () => {
+      throw new Error('boom');
+    });
+    on(ε, 'load', () => Promise.resolve('third'));
+
+    await expect(emitSafeAsync(ε, 'load')).resolves.toEqual(['first', 'third']);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves undefined when nothing was collected', async () => {
+    const ε = eventize();
+
+    on(ε, 'load', () => {
+      throw new Error('boom');
+    });
+
+    await expect(emitSafeAsync(ε, 'load')).resolves.toBeUndefined();
+  });
+
+  it('rejects when a listener returns a rejected promise — the guard covers execution, not results', async () => {
+    const ε = eventize();
+    const rejection = new Error('nope');
+
+    on(ε, 'load', () => 'first');
+    on(ε, 'load', () => Promise.reject(rejection));
+
+    await expect(emitSafeAsync(ε, 'load')).rejects.toBe(rejection);
+  });
+
+  it('claims collected promises when a wildcard aborts a name array', async () => {
+    const ε = eventize();
+    const unhandled = jest.fn();
+    process.on('unhandledRejection', unhandled);
+
+    on(ε, 'foo', () => Promise.reject(new Error('claimed')));
+
+    expect(() => emitSafeAsync(ε, ['foo', '*'])).toThrow(/cannot be emitted/);
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    process.off('unhandledRejection', unhandled);
+
+    expect(unhandled).not.toHaveBeenCalled();
+  });
+
+  it('guards the duck-typed path too', async () => {
+    const target = {
+      foo() {
+        throw new Error('boom');
+      },
+      bar() {
+        return 'value';
+      },
+    };
+
+    await expect(emitSafeAsync(target, ['foo', 'bar'])).resolves.toEqual([
+      'value',
+    ]);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 });

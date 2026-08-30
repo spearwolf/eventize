@@ -451,3 +451,67 @@ export function emitAsync(
       )
     : Promise.resolve(undefined);
 }
+
+/**
+ * Like `emitAsync()`, but a listener that throws synchronously does not stop
+ * the others — same guard as `emitSafe()`, same `console.warn` report.
+ *
+ * The aggregation is unchanged: `Promise.all`, fail-fast. A listener returning
+ * a rejected promise still rejects the returned promise. That is the guarantee
+ * drawn exactly where it belongs — a rejection prevents no execution, because
+ * every listener has already run synchronously by the time one arrives.
+ *
+ * The `try`/`catch` below is reached less often than `emitAsync()`'s, not
+ * never: a `'*'` inside a name array still throws after the preceding names
+ * have collected their promises, and so does a corrupted bucket. Dropping it
+ * would turn that case into an unhandled rejection.
+ */
+export function emitSafeAsync<
+  TEvents extends EventMap,
+  K extends EventKeysOf<TEvents> | symbol,
+>(
+  obj: EventizedObject<TEvents>,
+  eventName: K,
+  ...args: ArgsFor<TEvents, K>
+): Promise<any[] | undefined>;
+export function emitSafeAsync<
+  TEvents extends EventMap,
+  K extends EventKeysOf<TEvents> | symbol,
+>(
+  obj: EventizedObject<TEvents>,
+  eventNames: K[],
+  ...args: ArgsFor<TEvents, K>
+): Promise<any[] | undefined>;
+export function emitSafeAsync<T extends object>(
+  obj: NonTypedEmitter<T>,
+  eventNames: AnyEventNames,
+  ...args: EventArgs
+): Promise<any[] | undefined>;
+// implementation
+export function emitSafeAsync(
+  target: object,
+  eventNames: AnyEventNames,
+  ...args: EventArgs
+): Promise<any[] | undefined> {
+  const values: any[] = [];
+  const returnValue = (val: unknown) => {
+    values.push(val);
+  };
+  try {
+    if (isEventized(target)) {
+      _emit(target, eventNames, args, applyListenerSafe, returnValue);
+    } else if (isDuckTarget(target)) {
+      _duckEmit(target, eventNames, args, dispatchGuarded, returnValue);
+    }
+  } catch (err) {
+    markCollectedAsHandled(values);
+    throw err;
+  }
+  return values.length > 0
+    ? Promise.all(
+        values.map((val: any) =>
+          Array.isArray(val) ? Promise.all(val) : Promise.resolve(val),
+        ),
+      )
+    : Promise.resolve(undefined);
+}
