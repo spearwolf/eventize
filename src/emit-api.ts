@@ -20,6 +20,7 @@ import {
   rejectWildcard,
   warn,
 } from './utils';
+import type {DispatchTarget} from './utils';
 
 /**
  * The shape both walk callbacks share. Naming it keeps `store.forEach()`'s
@@ -165,22 +166,56 @@ const _emit = (
 // property of the loop below, not of a single dispatch.
 //
 // The duck path ignores the boolean, having no once() to spend on it.
+
+/**
+ * The duck path's counterpart to `ApplyListenerFn`. `dispatchToTarget()`
+ * itself satisfies it — its `boolean` return is assignable to `void`, and the
+ * duck path has no `once()` to spend on that boolean — so the unguarded path
+ * passes it directly and pays no wrapper frame.
+ */
+type DuckDispatchFn = (
+  target: DispatchTarget,
+  eventName: EventName,
+  args: EventArgs,
+  returnValue?: (retVal: unknown) => void,
+) => void;
+
+/**
+ * The duck path's guard, mirroring `applyListenerSafe()` down to the warning
+ * text. Same rule, same reason: both dispatch paths carry the guard, or
+ * neither does.
+ */
+const dispatchGuarded: DuckDispatchFn = (
+  target,
+  eventName,
+  args,
+  returnValue,
+) => {
+  try {
+    dispatchToTarget(target, eventName, args, returnValue);
+  } catch (error) {
+    warnListenerThrew(eventName, error);
+  }
+};
+
 const _duckEmitOne = (
   obj: object,
   eventName: EventName,
   args: EventArgs,
+  dispatch: DuckDispatchFn,
   returnValue?: (val: unknown) => void,
 ) => {
   if (eventName === EVENT_CATCH_EM_ALL) {
     rejectWildcard('emitted');
   }
-  dispatchToTarget(asDispatchTarget(obj), eventName, args, returnValue);
+  dispatch(asDispatchTarget(obj), eventName, args, returnValue);
 };
 
 const _duckEmit = (
   obj: object,
   eventNames: AnyEventNames,
   args: EventArgs,
+  dispatch: DuckDispatchFn,
   returnValue?: (val: unknown) => void,
 ) => {
   if (Array.isArray(eventNames)) {
@@ -189,10 +224,16 @@ const _duckEmit = (
     // AGENTS.md ("The two dispatch paths in `emit` move in lockstep").
     for (let i = 0; i < eventNames.length; i++) {
       if (!(i in eventNames)) continue;
-      _duckEmitOne(obj, eventNames[i] as EventName, args, returnValue);
+      _duckEmitOne(
+        obj,
+        eventNames[i] as EventName,
+        args,
+        dispatch,
+        returnValue,
+      );
     }
   } else {
-    _duckEmitOne(obj, eventNames, args, returnValue);
+    _duckEmitOne(obj, eventNames, args, dispatch, returnValue);
   }
 };
 
@@ -252,7 +293,7 @@ export function emit(
   if (isEventized(target)) {
     _emit(target, eventNames, args, applyListener);
   } else if (isDuckTarget(target)) {
-    _duckEmit(target, eventNames, args);
+    _duckEmit(target, eventNames, args, dispatchToTarget);
   }
 }
 
@@ -301,7 +342,7 @@ export function emitSafe(
   if (isEventized(target)) {
     _emit(target, eventNames, args, applyListenerSafe);
   } else if (isDuckTarget(target)) {
-    _duckEmit(target, eventNames, args);
+    _duckEmit(target, eventNames, args, dispatchGuarded);
   }
 }
 
@@ -377,7 +418,7 @@ export function emitAsync(
     if (isEventized(target)) {
       _emit(target, eventNames, args, applyListener, returnValue);
     } else if (isDuckTarget(target)) {
-      _duckEmit(target, eventNames, args, returnValue);
+      _duckEmit(target, eventNames, args, dispatchToTarget, returnValue);
     }
   } catch (err) {
     // The dispatch aborted mid-walk: a later listener threw, or a '*' inside an

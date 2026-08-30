@@ -197,4 +197,53 @@ describe('emitSafe()', () => {
     expect(() => emit(ε, 'foo')).toThrow('boom');
     expect(second).not.toHaveBeenCalled();
   });
+
+  describe('on a non-eventized (duck-typed) target', () => {
+    it('isolates a throwing event-named method and keeps dispatching later names', () => {
+      const calls: string[] = [];
+      const target = {
+        foo() {
+          throw new Error('boom');
+        },
+        bar() {
+          calls.push('bar');
+        },
+      };
+
+      expect(() => emitSafe(target, ['foo', 'bar'])).not.toThrow();
+      expect(calls).toEqual(['bar']);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('isolates a throwing .emit() fallback', () => {
+      const target = {
+        emit(eventName: string) {
+          throw new Error(`boom: ${eventName}`);
+        },
+      };
+
+      expect(() => emitSafe(target, 'foo')).not.toThrow();
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('still throws for the wildcard name', () => {
+      const target = {
+        foo() {
+          throw new Error('boom');
+        },
+      };
+
+      expect(() => emitSafe(target, '*')).toThrow(/cannot be emitted/);
+    });
+
+    it('leaves emit() untouched: the throw still reaches the caller', () => {
+      const target = {
+        foo() {
+          throw new Error('boom');
+        },
+      };
+
+      expect(() => emit(target, 'foo')).toThrow('boom');
+    });
+  });
 });
