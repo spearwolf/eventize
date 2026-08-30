@@ -64,7 +64,7 @@ Skills are auto-discovered — no extra registration step.
 The deep material behind the summaries below:
 
 - [Unsubscribing in depth](./docs/off.md) — every `off()` signature, the interaction with `retain()`, and reference counting
-- [Dispatch in depth](./docs/emit.md) — `emit()`, `emitAsync()`, `emitSafe()`, `emitSafeAsync()`, and what a guarded dispatch does and does not promise
+- [Dispatch in depth](./docs/emit.md) — all six dispatch functions, and what each one does with a listener that throws
 - [Retained events in depth](./docs/retain.md) — `retain()`, `retainClear()`, `unretain()`, symbol names, and the wildcard bulk forms
 - [Typed event maps](./docs/typed-events.md) — generic event maps, the inject and class forms, symbol events as an escape hatch
 - [Lifecycle & cleanup](./docs/lifecycle.md) — what an emitter holds and what releases it
@@ -169,6 +169,8 @@ For class-based patterns you can inject the same API as methods.
 | `emitAsync`   | dispatch an event and wait for any promises returned by subscribers  |
 | `emitSafe`    | dispatch an event; a throwing listener does not stop the others       |
 | `emitSafeAsync` | the async version of `emitSafe`                                    |
+| `emitStrict`  | dispatch an event; every listener runs and every failure is raised    |
+| `emitStrictAsync` | the async version of `emitStrict`                                 |
 | `off`         | unsubscribe                                                          |
 | `retain`      | hold the last event until it is received by a subscriber             |
 | `retainClear` | clear the last event                                                 |
@@ -252,7 +254,7 @@ Eventize splits its API into four families by how each function treats a target 
 | Function                                    | On a non-eventized object                    |
 | ------------------------------------------- | -------------------------------------------- |
 | `on()`, `once()`, `onceAsync()`, `retain()` | Auto-eventizes the object                    |
-| `emit()`, `emitAsync()` (v5+), `emitSafe()`, `emitSafeAsync()` (v6.1.0) | Duck-types: calls `obj[eventName](...args)` — a function target too (v6.0.0) |
+| `emit()`, `emitAsync()` (v5+), `emitSafe()`, `emitSafeAsync()` (v6.1.0), `emitStrict()`, `emitStrictAsync()` (v6.2.0) | Duck-types: calls `obj[eventName](...args)` — a function target too (v6.0.0) |
 | `off()`, `getSubscriptionCount()`, `getSubscribedEventNames()`, `getRetainedCount()`, `getRetainedEventNames()` | Silently does nothing / returns `0` / `[]` |
 | `retainClear()`, `unretain()`               | Throws `TypeError`                           |
 
@@ -681,7 +683,7 @@ try {
 console.log(calls); // => ["first"]
 ```
 
-**Two ways out.** Since v6.1.0, `emitSafe()` and `emitSafeAsync()` dispatch the same event with each listener isolated: a throw is reported through `console.warn` and the listeners behind it still run.
+**Three ways out.** Since v6.1.0, `emitSafe()` and `emitSafeAsync()` dispatch the same event with each listener isolated: a throw is reported through `console.warn` and the listeners behind it still run.
 
 ```javascript
 const calls = [];
@@ -697,11 +699,25 @@ emitSafe(ε, 'foo'); // no throw; console.warn reports the failure
 console.log(calls); // => ["first", "third"]
 ```
 
-What they guarantee is **execution, not completeness**: no listener can prevent the others from running. They do not promise that nothing went wrong, they hand you no error object, and `emitSafeAsync()` still rejects if a listener returns a rejected promise — by then every listener has already run. `emit(ε, '*')` still throws from all four functions. The third bullet above flips with them: nothing unwinds, so the retained value *is* written. [`docs/emit.md`](./docs/emit.md) has the rest, the cost included.
+What they guarantee is **execution, not completeness**: no listener can prevent the others from running. They do not promise that nothing went wrong, they hand you no error object, and `emitSafeAsync()` still rejects if a listener returns a rejected promise — by then every listener has already run. `emit(ε, '*')` still throws from every dispatch function. The third bullet above flips with them: nothing unwinds, so the retained value *is* written.
 
 Two behaviours differ from `emit()`, both on purpose: the retained value **is** written, because the event was delivered; and a `once()` queued behind a throwing listener is spent, because it now runs. The throwing listener itself keeps its subscription either way.
 
-The other way out is unchanged and still the right one where a single listener needs its own policy: wrap that listener's body in `try/catch`. Eventize deliberately keeps no global error handler, so `emit()` stays the default and error policy stays explicit at the call site.
+**When you need both halves**, `emitStrict()` and `emitStrictAsync()` (v6.2.0) run every listener and then raise what failed:
+
+```javascript
+on(ε, 'foo', () => calls.push('first'));
+on(ε, 'foo', () => {
+  throw new Error('boom');
+});
+on(ε, 'foo', () => calls.push('third'));
+
+emitStrict(ε, 'foo'); // throws "boom" — after both other listeners ran
+```
+
+One failure is rethrown unchanged, so an existing `toThrow('boom')` assertion survives the swap; two or more arrive as an `AggregateError` in dispatch order, which is a shape `emit()` could never produce. `emitStrictAsync()` collects rejected listener promises the same way and reports everything through its promise — it never throws synchronously, not even for `'*'`. [`docs/emit.md`](./docs/emit.md) has the rest, the cost included.
+
+The third way out is unchanged and still the right one where a single listener needs its own policy: wrap that listener's body in `try/catch`. Eventize deliberately keeps no global error handler, so `emit()` stays the default and error policy stays explicit at the call site.
 
 See [`docs/emit.md`](./docs/emit.md) for the full dispatch semantics.
 

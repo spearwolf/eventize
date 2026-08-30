@@ -47,7 +47,7 @@ eventized objects `ε` (epsilon).
 
 ```ts
 import {eventize, on, once, onceAsync, emit, emitAsync, emitSafe, emitSafeAsync,
-        off, retain, retainClear, unretain, Priority,
+        emitStrict, emitStrictAsync, off, retain, retainClear, unretain, Priority,
         isEventized, asEventized, getEventizeProtocol, getSubscriptionCount,
         getSubscribedEventNames, getRetainedCount, getRetainedEventNames,
         Eventize, EVENT_CATCH_EM_ALL} from '@spearwolf/eventize';
@@ -62,6 +62,8 @@ import {eventize, on, once, onceAsync, emit, emitAsync, emitSafe, emitSafeAsync,
 | `emitAsync(ε, name, …args)` | dispatch + collect non-null returns | `Promise<any[] \| undefined>` |
 | `emitSafe(ε, name, …args)` | sync dispatch; a throwing listener is isolated and reported via `console.warn`, the rest still run (v6.1.0) | `void` |
 | `emitSafeAsync(ε, name, …args)` | `emitSafe` + collect non-null returns; a rejected promise still rejects the result | `Promise<any[] \| undefined>` |
+| `emitStrict(ε, name, …args)` | sync dispatch; every listener runs, then the failures are raised — one unchanged, several as an `AggregateError` in dispatch order (v6.2.0) | `void` |
+| `emitStrictAsync(ε, name, …args)` | `emitStrict` + collect non-null returns; aggregates with `Promise.allSettled` and never throws synchronously | `Promise<any[] \| undefined>` |
 | `off(ε, …)` | unsubscribe; also clears retain for named events, and all retained state on `off(ε)` / `off(ε, '*')` / any array holding a `'*'` or a nullish element | `void` |
 | `retain(ε, name)` | replay last value to new subscribers | `void` |
 | `retainClear(ε, name)` | drop stored value, keep policy | `void` |
@@ -88,7 +90,7 @@ common source of surprise:
 | Functions | On a non-eventized target |
 | --- | --- |
 | `on`, `once`, `onceAsync`, `retain` | **auto-eventize** it, then proceed |
-| `emit`, `emitAsync`, `emitSafe`, `emitSafeAsync` | **duck-type**: `obj[eventName](…args)`, else `obj.emit(eventName, …args)`, else no-op — a function or class target too (v6.0.0), and an inherited `Object.prototype` / `Function.prototype` member is not a match (pitfall 11) |
+| `emit`, `emitAsync`, `emitSafe`, `emitSafeAsync`, `emitStrict`, `emitStrictAsync` | **duck-type**: `obj[eventName](…args)`, else `obj.emit(eventName, …args)`, else no-op — a function or class target too (v6.0.0), and an inherited `Object.prototype` / `Function.prototype` member is not a match (pitfall 11) |
 | `off`, `getSubscriptionCount`, `getSubscribedEventNames`, `getRetainedCount`, `getRetainedEventNames` | **permissive**: silent no-op / `0` / `[]`, even for `null` |
 | `retainClear`, `unretain` | **throw** a `TypeError` naming the function and the remedy |
 
@@ -119,7 +121,7 @@ compile time) or an explicit `isEventized()` guard.
    the same `emit()` don't run, the throwing listener stays subscribed — a
    throwing `once()` therefore fires again — and `retain()` is not updated for
    that emit, because the write happens after all listeners.
-   Two ways out. Since v6.1.0, `emitSafe()` / `emitSafeAsync()` dispatch the
+   Three ways out. Since v6.1.0, `emitSafe()` / `emitSafeAsync()` dispatch the
    same event with each listener isolated: the throw is reported through
    `console.warn` and the listeners behind it still run. What they guarantee is
    execution, not completeness — no listener can prevent the others from
@@ -128,8 +130,14 @@ compile time) or an explicit `isEventized()` guard.
    `emit()`, both intended: the retained value **is** written, because the event
    was delivered, and a `once()` queued behind the throwing listener is spent,
    because it now runs. The throwing listener keeps its own subscription either
-   way. The other way out is a `try/catch` in the listener body, which is still
-   right where one listener needs a policy the others don't. There is no global
+   way. Since v6.2.0, `emitStrict()` / `emitStrictAsync()` give you both
+   halves: every listener runs, and then the failures are raised — one
+   unchanged (so an existing `toThrow(…)` survives the swap), several as an
+   `AggregateError` in dispatch order. A caller's own error, `'*'` included,
+   joins that list as its last entry instead of erasing what was collected, and
+   `emitStrictAsync()` reports through its promise only — it never throws
+   synchronously. The third way out is a `try/catch` in the listener body, which
+   is still right where one listener needs a policy the others don't. There is no global
    error handler, by design.
    **A throw is not the only way a `once()` fires twice.** The one-shot is
    settled after the callback *returns*, so a callback that re-emits its own

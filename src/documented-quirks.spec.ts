@@ -1,4 +1,4 @@
-import {emitAsync, emit} from './emit-api';
+import {emitAsync, emit, emitSafeAsync, emitStrictAsync} from './emit-api';
 import {off, on} from './eventize-api';
 import {retain} from './retain-api';
 import {eventize} from './eventize';
@@ -263,6 +263,25 @@ describe('documented quirks', () => {
         // @ts-expect-error results may be undefined
         results.map((value: unknown) => value);
       }).toThrow(TypeError);
+    });
+  });
+
+  // AGENTS.md, "Known asymmetries": the strict async variant reports through
+  // its promise and nothing else, while the two older async variants throw a
+  // caller's own error synchronously. Three functions in one case, because the
+  // asymmetry *is* the comparison — split up, each half reads like a bug.
+  describe('a wildcard name reaches an async caller differently per variant', () => {
+    it('throws synchronously from emitAsync() and emitSafeAsync(), and rejects from emitStrictAsync()', async () => {
+      const ε = eventize();
+
+      expect(() => emitAsync(ε, '*')).toThrow(/cannot be emitted/);
+      expect(() => emitSafeAsync(ε, '*')).toThrow(/cannot be emitted/);
+
+      let promise: Promise<unknown> | undefined;
+      expect(() => {
+        promise = emitStrictAsync(ε, '*');
+      }).not.toThrow();
+      await expect(promise).rejects.toThrow(/cannot be emitted/);
     });
   });
 

@@ -126,9 +126,10 @@ const unsubscribe = on(ε, ['a', 'b'], (value) => {
 This is the one place where a throwing listener is swallowed without anyone
 asking for it. During an `emit()` it propagates to the caller that *caused* the
 event, which is where the decision about it belongs. Since v6.1.0 there is a
-second catch site, but you have to reach for it: `emitSafe()` / `emitSafeAsync()`
-isolate each listener the same way, and `emit()` / `emitAsync()` are unchanged
-(see [`emit.md`](./emit.md)). A replay has no such caller: whoever called `on()`
+second catch site, but you have to reach for it: the guarded variants —
+`emitSafe()` / `emitSafeAsync()`, joined in v6.2.0 by `emitStrict()` /
+`emitStrictAsync()` — isolate each listener the same way, and `emit()` /
+`emitAsync()` are unchanged (see [`emit.md`](./emit.md)). A replay has no such caller: whoever called `on()`
 did not produce the value, may not know the emitter retains anything, and their
 listeners are already registered by the time a replay runs — so letting the
 throw out handed them a half-served batch and no handle for subscriptions that
@@ -229,7 +230,7 @@ rewritten mid-batch keeps its place instead of moving to the end.
 - Events emitted **before** `retain()` was called are not stored.
 - Calling `retain()` repeatedly for the same event is idempotent.
 - New wildcard (`*`) subscribers also receive retained events.
-- A throwing listener leaves the previously retained value untouched under `emit()` / `emitAsync()` — the retain write happens after all listeners have run, and a throw unwinds before it. The guarded variants are the exception: `emitSafe()` / `emitSafeAsync()` catch the throw, so the dispatch completes and the value *is* written (see [`emit.md`](./emit.md)).
+- A throwing listener leaves the previously retained value untouched under `emit()` / `emitAsync()` — the retain write happens after all listeners have run, and a throw unwinds before it. The four guarded variants are the exception: they catch the throw, so the dispatch completes and the value *is* written — under `emitStrict()` too, which writes the value and *then* raises what failed (see [`emit.md`](./emit.md)).
 - Re-subscribing an identity that is already registered replays nothing. A second `on(ε, 'foo', listenerObject)` only raises the reference count, and the retained value is not delivered again. A `once()` landing on that same identity *does* get the replay, because the obligation it creates is new. Plain function listeners never aggregate, so two `on(ε, 'foo', fn)` calls both replay.
 
 ### Retain order under nested `emit()`

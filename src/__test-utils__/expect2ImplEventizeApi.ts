@@ -3,6 +3,8 @@ import {
   emitAsync,
   emitSafe,
   emitSafeAsync,
+  emitStrict,
+  emitStrictAsync,
   eventize,
   Eventize,
   off,
@@ -47,6 +49,12 @@ export const expect2ImplEventizeApi = (obj: any) => {
     it('.emitSafeAsync()', () => {
       expect(typeof obj.emitSafeAsync).toBe('function');
     });
+    it('.emitStrict()', () => {
+      expect(typeof obj.emitStrict).toBe('function');
+    });
+    it('.emitStrictAsync()', () => {
+      expect(typeof obj.emitStrictAsync).toBe('function');
+    });
     it('.retain()', () => {
       expect(typeof obj.retain).toBe('function');
     });
@@ -61,7 +69,7 @@ export const expect2ImplEventizeApi = (obj: any) => {
 
 // ---------------------------------------------------------------------------
 // apiSurfaces — the conformity-suite counterpart to expect2ImplEventizeApi
-// above. That helper only proves the eleven methods exist; this drives actual
+// above. That helper only proves the thirteen methods exist; this drives actual
 // behavior through all three surfaces documented in AGENTS.md ("Three API
 // surfaces, one implementation"): the standalone functions, the
 // eventize.inject(obj) methods, and the class Eventize instance methods.
@@ -84,6 +92,11 @@ export interface ConformityApi {
   ) => Promise<any[] | undefined>;
   emitSafe: (eventNames: AnyEventNames, ...args: EventArgs) => void;
   emitSafeAsync: (
+    eventNames: AnyEventNames,
+    ...args: EventArgs
+  ) => Promise<any[] | undefined>;
+  emitStrict: (eventNames: AnyEventNames, ...args: EventArgs) => void;
+  emitStrictAsync: (
     eventNames: AnyEventNames,
     ...args: EventArgs
   ) => Promise<any[] | undefined>;
@@ -132,6 +145,16 @@ const emitSafeAsyncLoose = emitSafeAsync as (
   eventNames: AnyEventNames,
   ...args: EventArgs
 ) => Promise<any[] | undefined>;
+const emitStrictLoose = emitStrict as (
+  obj: object,
+  eventNames: AnyEventNames,
+  ...args: EventArgs
+) => void;
+const emitStrictAsyncLoose = emitStrictAsync as (
+  obj: object,
+  eventNames: AnyEventNames,
+  ...args: EventArgs
+) => Promise<any[] | undefined>;
 const onceAsyncLoose = onceAsync as <ReturnType = void>(
   obj: object,
   eventNames: AnyEventNames,
@@ -166,6 +189,10 @@ export const apiSurfaces: ApiSurface[] = [
           emitSafeLoose(ε, eventNames, ...args),
         emitSafeAsync: (eventNames, ...args) =>
           emitSafeAsyncLoose(ε, eventNames, ...args),
+        emitStrict: (eventNames, ...args) =>
+          emitStrictLoose(ε, eventNames, ...args),
+        emitStrictAsync: (eventNames, ...args) =>
+          emitStrictAsyncLoose(ε, eventNames, ...args),
         retain: (eventNames) => retainLoose(ε, eventNames),
         retainClear: (eventNames) => retainClearLoose(ε, eventNames),
         unretain: (eventNames) => unretainLoose(ε, eventNames),
