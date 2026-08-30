@@ -256,8 +256,9 @@ declarations carry, and this adds none.
 
 Documentation, per the obligations table in AGENTS.md:
 
-- `CHANGELOG.md` — new section. **Which version it is named after is a human's
-  call**; nothing here authorises a bump.
+- `CHANGELOG.md` — new `v6.1.0` section. The version was chosen by the
+  maintainer on 2026-08-30; `package.json` moves from `6.0.0` to `6.1.0` with
+  it. Publishing stays a separate, human-run step.
 - `README.md` — the two functions and the guarantee sentence
 - `docs/emit.md` — new file. `docs/` has no home for dispatch semantics today
   (`lifecycle`, `migration`, `off`, `retain`, `typed-events`), and the guarded /
@@ -274,7 +275,9 @@ Documentation, per the obligations table in AGENTS.md:
 
 ## Open questions
 
-1. The version heading in `CHANGELOG.md`.
-2. Whether `emitSafeAsync()` ever grows an `allSettled` variant. Decided against
+1. Whether `emitSafeAsync()` ever grows an `allSettled` variant. Decided against
    for now on the strength of the guarantee sentence; recorded here so a future
    reader knows it was weighed rather than missed.
+
+Settled since this document was first written: the release is **v6.1.0**
+(maintainer's call, 2026-08-30).
