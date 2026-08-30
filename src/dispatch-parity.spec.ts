@@ -295,8 +295,9 @@ describe('dispatch parity: eventized listener-object vs. duck-typed target', () 
 // Not a parity comparison — the duck path has no once() to compare it
 // against, so a pure comparison between the two paths cannot see this
 // failure at all. This is the absolute anchor for the load-bearing return
-// value the remediation plan's package 6 will route through a shared
-// helper: EventListener.apply()'s LISTENER_IS_OBJ branch decides whether a
+// value both dispatch paths share through `dispatchToTarget()` in utils.ts,
+// whose own doc comment points back here for exactly this reason:
+// EventListener.apply()'s LISTENER_IS_OBJ branch decides whether a
 // once() is consumed from whether the dispatch actually invoked something.
 // A change that answers that question wrong — "yes" regardless of whether
 // apply() or the .emit() fallback fired — would settle a once() on a
