@@ -6,7 +6,7 @@ description: Use when code imports `@spearwolf/eventize`, mentions `eventize`/`E
 # @spearwolf/eventize
 
 A zero-dependency **synchronous** event emitter for any JS/TS object. ESM + CJS,
-opt-in generic event maps. Ships unminified (74.8 kB ESM); around 6.5 kB gzip
+opt-in generic event maps. Ships unminified (around 75 kB ESM); under 7 kB gzip
 once a bundler minifies it — regardless of what you import. The package is one
 bundled ESM file, and `sideEffects: false` only lets a bundler drop that whole
 file when nothing from it is used — it cannot prune statements inside a file
@@ -40,8 +40,11 @@ functions, `eventize.inject<M>()` and `class Eventize<M>`. Declare
 declared ones.
 
 Listeners run **synchronously**, highest priority first. `emitAsync` changes only
-how return values are aggregated, never when listeners run. Convention: name
-eventized objects `ε` (epsilon).
+how return values are aggregated, never when listeners run. Equal priorities keep
+registration order inside one bucket only — named listeners and wildcard
+listeners are two buckets merged by priority alone, so at equal priority the
+named one always runs first, regardless of which was registered first.
+Convention: name eventized objects `ε` (epsilon).
 
 ## API surface
 
@@ -95,10 +98,12 @@ common source of surprise:
 | `retainClear`, `unretain` | **throw** a `TypeError` naming the function and the remedy |
 
 `on`-family functions install behavior, so auto-eventizing is a meaningful
-reading of the intent. Retain-state mutators have no duck-typed equivalent, so
-they still surface typos. `emit()` does not throw on plain objects — for typo
-safety use a typed emitter (`eventize<TEvents>()`, which rejects unknown names at
-compile time) or an explicit `isEventized()` guard.
+reading of the intent — so long as the target can carry the marker: a frozen,
+sealed or otherwise non-extensible object, and every primitive, throws a
+`TypeError` naming the cause instead. Retain-state mutators have no duck-typed
+equivalent, so they still surface typos. `emit()` does not throw on plain
+objects — for typo safety use a typed emitter (`eventize<TEvents>()`, which
+rejects unknown names at compile time) or an explicit `isEventized()` guard.
 
 ## Choosing a dispatch function
 
@@ -138,9 +143,25 @@ bug, and an exception unwinding into your call is the fastest way to find out.
   written and a `once()` behind the failure is already spent when the error
   reaches you. One failure arrives unchanged — an existing `toThrow(…)` survives
   the swap — and only a second one turns it into an `AggregateError`.
-- **`emitStrictAsync()` never throws synchronously.** `emitAsync()` and
-  `emitSafeAsync()` do, for a wildcard name and for a corrupted bucket, so
-  wrapping the call rather than only the `await` matters for those two.
+- **`emitAsync()` loses everything it had collected.** The aggregation is built
+  after the walk, so whatever ends the walk early — a listener throwing, a `'*'`
+  behind concrete names — takes every return value gathered up to that point
+  with it. The guarded twins finish the walk, so under `emitSafeAsync()` and
+  `emitStrictAsync()` those values survive.
+- **Two of the three async variants still throw synchronously.** A dispatch runs
+  before any promise exists, so under `emitAsync()` a listener's synchronous
+  throw leaves the call as a throw, not as a rejection — `.catch()` on the
+  result never sees it. `emitSafeAsync()` guards the listeners but keeps
+  throwing the call's own errors: a wildcard name, a foreign protocol marker, a
+  corrupted bucket. For both, wrap the call rather than only the `await`.
+  `emitStrictAsync()` is the exception and throws none of them — all of it
+  arrives through the returned promise, which is what makes
+  `emitStrictAsync(…).catch(report)` a complete report.
+- **`emitSafeAsync()` still aggregates fail-fast.** `Promise.all` hands you the
+  promise that rejected first *in time* and drops the other reasons.
+  `emitStrictAsync()` swaps in `Promise.allSettled` for that and pays twice: it
+  waits for the slowest listener promise, and one failure means no result array
+  at all — the values it did collect are not handed back beside the error.
 - **The guarded step is process-wide and paid once.** Guarded and unguarded
   dispatch are two callbacks reaching one call site inside the walk. A process
   that never calls a guarded variant pays nothing; the moment anything in it
@@ -149,10 +170,18 @@ bug, and an exception unwinding into your call is the fastest way to find out.
   included, and transitively through a dependency. Using both variants costs the
   same as using one: they share the callback and differ only in where the caught
   error goes.
+- **The failure list belongs to the innermost strict frame.** Guarded dispatches
+  nest, and each call answers for its own listeners only. An `emitSafe()` that a
+  listener starts from inside an `emitStrict()` reports its catches to the
+  console as always — they never join the outer report. A nested `emitStrict()`
+  raises its own failures, which the outer guard catches as the single failure
+  that listener produced; a nested unguarded `emit()` lets the throw unwind into
+  the outer guard, which collects it.
 - **A caller's own error is nobody's listener failure.** `'*'` as an event name
-  ends the dispatch under all six. `emit`/`emitSafe` throw it at you,
-  `emitStrict()` appends it to what it collected, `emitStrictAsync()` puts it in
-  the rejection.
+  ends the dispatch under all six, the names ahead of it in an array having
+  dispatched first. `emit()`, `emitAsync()`, `emitSafe()` and `emitSafeAsync()`
+  throw it at you, `emitStrict()` appends it to what it collected, and
+  `emitStrictAsync()` puts it in the rejection.
 
 ## Pitfalls
 
@@ -203,7 +232,10 @@ bug, and an exception unwinding into your call is the fastest way to find out.
    of the batch: since v6.0.0 each replay reads the emitter when it runs, so an
    `unretain()`, a `retainClear()` or an `off()` from inside one takes effect for
    the names still ahead of it, and a name re-emitted there replays the new
-   value. Up to v5.1.0 only the `off()` route worked.
+   value. Only the values follow along: which names a batch carries, and in
+   which order, is settled before its first replay runs, so a name given its
+   first retained value from inside one does not join it. Up to v5.1.0 only the
+   `off()` route worked.
    **An `async` listener is covered too, since v6.0.0.** It returns before it
    fails, so the `try`/`catch` never sees the rejection; the replay watches the
    returned value instead and reports a rejection through the same
@@ -237,8 +269,13 @@ bug, and an exception unwinding into your call is the fastest way to find out.
     again. The bulk forms `off(ε)`, `off(ε, '*')` and any array holding a `'*'` or
     a nullish element do the same for *every* retained name. `off(ε, undefined)`
     is one of those bulk forms, not a no-op — forwarding a possibly-missing value
-    into `off()` wipes the emitter. The three-argument `off(ε, '*', listenerObject)`
-    is the one name-plus-object form that leaves retained state alone.
+    into `off()` wipes the emitter. Two name-plus-object forms leave retained
+    state alone, for opposite reasons: `off(ε, '*', listenerObject)` detaches
+    that object's wildcard subscription and `'*'` can carry no retained state
+    anyway, while `off(ε, [name, …], listenerObject)` is a complete no-op on
+    both halves — the store has no array-plus-object form, so nothing is
+    detached either. Drop the object (`off(ε, [names])`), or reach for
+    `unretain(ε, [names])`.
 11. **Event names inherited from `Object.prototype` dispatch to nothing.**
     `toString`, `toLocaleString`, `valueOf`, `constructor`, `hasOwnProperty`,
     `isPrototypeOf`, `propertyIsEnumerable` and V8's `__defineGetter__` family are
@@ -339,6 +376,17 @@ bug, and an exception unwinding into your call is the fastest way to find out.
     non-eventized target. Checked after the wildcard check (pitfall 1): an array
     containing `'*'` still takes the bulk path on `unretain()` / `retainClear()`
     whatever else it lists.
+18. **Eventizing a prototype gives the whole class one emitter.** The marker is a
+    property, and `isEventized()` reads it the way every property is read — up
+    the prototype chain. So `eventize(SomeClass.prototype)` makes every instance
+    answer `true`, `asEventized()` hands each one back unchanged, and all of them
+    share the one store and keeper: `on()` on one instance is reachable from
+    `emit()` on another, and `getSubscriptionCount()` cannot tell them apart.
+    Deliberate, and exactly right when one channel for the whole class is the
+    point. Per-instance subscriptions need the marker on the instance —
+    `eventize(this)` or `eventize.inject(this)` in the constructor, or
+    `class X extends Eventize`, which puts the thirteen methods on the prototype
+    and leaves each instance to attach its own slot on first use.
 
 ## Idiomatic shape
 

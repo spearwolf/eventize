@@ -20,7 +20,7 @@ without sacrificing performance or adding bloat.
 - 🚀 **Developer-Focused API**: Clean, modern, and functional.
 - ✨ **Wildcards & Priorities**: Subscribe to all events and control listener execution order.
 - 🔷 **Full TypeScript Support**: Optional generic event maps narrow `emit`, `on`, retained-event names and listener arguments — without losing first-class duck-typing for code that doesn't opt in.
-- 📦 **Zero Runtime Dependencies**: Lightweight with a minimal footprint (~6.5 kB gzipped, practically indivisible — see above).
+- 📦 **Zero Runtime Dependencies**: Lightweight with a minimal footprint (under 7 kB gzipped). One bundled ESM file, so `sideEffects: false` can only drop it whole: importing a single function costs about 96 % of importing everything — practically indivisible rather than tree-shakeable.
 - ESM & CommonJS Support.
 - Apache 2.0 Licensed.
 
