@@ -1,6 +1,10 @@
 import {
   emit,
   emitAsync,
+  emitSafe,
+  emitSafeAsync,
+  emitStrict,
+  emitStrictAsync,
   Eventize,
   eventize,
   getSubscriptionCount,
@@ -12,7 +16,14 @@ import {
   retainClear,
   unretain,
 } from './index';
-import type {AnyEventNames, EventizeApi} from './index';
+import type {
+  AnyEventNames,
+  ArgsFor,
+  EventizeApi,
+  EventizedObject,
+  EventKeysOf,
+  EventMap,
+} from './index';
 
 // Compile-time tests are interleaved with runtime assertions. The runtime
 // assertions verify duck-typing & backwards compatibility actually works;
@@ -958,6 +969,265 @@ describe('typed events — generic event-map support', () => {
       ε.emit(['opened', 'closed'], true);
       // @ts-expect-error same for the async sibling
       ε.emitAsync(['opened', 'closed'], true);
+    });
+  });
+
+  // A domain object announcing its events from many call sites wraps its
+  // emitter in one helper, generic over the key and taking the payload as a
+  // spread tuple. The key then reaches the emit function still generic — every
+  // call below forwards `K`, never a literal — and the payload arrives as the
+  // indexed access `RaceEvents[K]`, which a conditional argument type cannot
+  // be matched against while `K` is unresolved.
+  describe('a generic forwarder around the typed emit family', () => {
+    interface RaceEvents {
+      go: [];
+      land: [impactSpeed: number];
+      lap: [lap: number, lapTime: number, isBest: boolean];
+    }
+
+    const listen = (ε: EventizedObject<RaceEvents>) => {
+      const seen: unknown[][] = [];
+      on(ε, {
+        go: () => seen.push(['go']),
+        land: (impactSpeed) => seen.push(['land', impactSpeed]),
+        lap: (lap, lapTime, isBest) => seen.push(['lap', lap, lapTime, isBest]),
+      });
+      return seen;
+    };
+
+    const expectAllThree = (seen: unknown[][]) =>
+      expect(seen).toEqual([['go'], ['land', 12], ['lap', 1, 61.2, true]]);
+
+    it('forwards through each of the six standalone functions', async () => {
+      type Forward = <K extends keyof RaceEvents>(
+        ε: EventizedObject<RaceEvents>,
+        name: K,
+        ...args: RaceEvents[K]
+      ) => unknown;
+
+      const forwarders: Forward[] = [
+        (ε, name, ...args) => emit(ε, name, ...args),
+        (ε, name, ...args) => emitAsync(ε, name, ...args),
+        (ε, name, ...args) => emitSafe(ε, name, ...args),
+        (ε, name, ...args) => emitSafeAsync(ε, name, ...args),
+        (ε, name, ...args) => emitStrict(ε, name, ...args),
+        (ε, name, ...args) => emitStrictAsync(ε, name, ...args),
+      ];
+
+      for (const forward of forwarders) {
+        const ε = eventize<RaceEvents>();
+        const seen = listen(ε);
+        await forward(ε, 'go');
+        await forward(ε, 'land', 12);
+        await forward(ε, 'lap', 1, 61.2, true);
+        expectAllThree(seen);
+      }
+    });
+
+    // The method surfaces keep the overload set they had. Their map is fixed by
+    // the interface, so the per-call constraint the standalone arm uses to keep
+    // `RaceEvents[K]` a plain tuple has nowhere to go, and each spelling that
+    // does without it either strips the parameter names from every concrete
+    // call, breaks a forwarder already written against `ArgsFor`, or re-admits
+    // the narrowed override `api-surfaces.spec.ts` rejects. A forwarder on a
+    // class or an injected object hands the emitter to the standalone function
+    // instead — the same dispatch, reached by the one door that can follow `K`.
+    it('forwards from a class through the standalone functions, `this` as the emitter', async () => {
+      class Race extends Eventize<RaceEvents> {
+        viaEmit<K extends keyof RaceEvents>(n: K, ...a: RaceEvents[K]) {
+          emit(this, n, ...a);
+        }
+        viaEmitAsync<K extends keyof RaceEvents>(n: K, ...a: RaceEvents[K]) {
+          return emitAsync(this, n, ...a);
+        }
+        viaEmitSafe<K extends keyof RaceEvents>(n: K, ...a: RaceEvents[K]) {
+          emitSafe(this, n, ...a);
+        }
+        viaEmitSafeAsync<K extends keyof RaceEvents>(
+          n: K,
+          ...a: RaceEvents[K]
+        ) {
+          return emitSafeAsync(this, n, ...a);
+        }
+        viaEmitStrict<K extends keyof RaceEvents>(n: K, ...a: RaceEvents[K]) {
+          emitStrict(this, n, ...a);
+        }
+        viaEmitStrictAsync<K extends keyof RaceEvents>(
+          n: K,
+          ...a: RaceEvents[K]
+        ) {
+          return emitStrictAsync(this, n, ...a);
+        }
+      }
+
+      type Announce = <K extends keyof RaceEvents>(
+        n: K,
+        ...a: RaceEvents[K]
+      ) => unknown;
+
+      const via: Array<(race: Race) => Announce> = [
+        (race) => race.viaEmit.bind(race),
+        (race) => race.viaEmitAsync.bind(race),
+        (race) => race.viaEmitSafe.bind(race),
+        (race) => race.viaEmitSafeAsync.bind(race),
+        (race) => race.viaEmitStrict.bind(race),
+        (race) => race.viaEmitStrictAsync.bind(race),
+      ];
+
+      for (const pick of via) {
+        const race = new Race();
+        const seen = listen(race);
+        const announce = pick(race);
+        await announce('go');
+        await announce('land', 12);
+        await announce('lap', 1, 61.2, true);
+        expectAllThree(seen);
+      }
+    });
+
+    it('forwards from an injected object through the standalone functions', async () => {
+      const ε = eventize.inject<RaceEvents>({});
+      const seen = listen(ε);
+
+      const announce = <K extends keyof RaceEvents>(
+        n: K,
+        ...a: RaceEvents[K]
+      ) => emit(ε, n, ...a);
+
+      announce('land', 1);
+      expect(seen).toEqual([['land', 1]]);
+    });
+
+    // Pinned so the limitation and the paragraph in `docs/typed-events.md`
+    // that states it cannot drift apart: the day one of these compiles, the
+    // directive turns into TS2578 and the docs need the same edit. The class
+    // stands in for the inject surface too — both read `EventizeApi`.
+    it('does not forward a generic key through the method form', () => {
+      class Race extends Eventize<RaceEvents> {
+        announce<K extends keyof RaceEvents>(n: K, ...a: RaceEvents[K]) {
+          // @ts-expect-error no arm of the method's overload set follows K
+          this.emit(n, ...a);
+          // @ts-expect-error same for emitAsync
+          void this.emitAsync(n, ...a);
+          // @ts-expect-error same for emitSafe
+          this.emitSafe(n, ...a);
+          // @ts-expect-error same for emitSafeAsync
+          void this.emitSafeAsync(n, ...a);
+          // @ts-expect-error same for emitStrict
+          this.emitStrict(n, ...a);
+          // @ts-expect-error same for emitStrictAsync
+          void this.emitStrictAsync(n, ...a);
+        }
+      }
+      expect(new Race().announce).toBeInstanceOf(Function);
+    });
+
+    it('keeps the forwarder itself checked at both ends', () => {
+      const announce = <K extends keyof RaceEvents>(
+        ε: EventizedObject<RaceEvents>,
+        name: K,
+        ...args: RaceEvents[K]
+      ) => emit(ε, name, ...args);
+
+      const ε = eventize<RaceEvents>();
+      const seen = listen(ε);
+      announce(ε, 'land', 12);
+      expect(seen).toEqual([['land', 12]]);
+
+      // The caller's end: the forwarder's own signature does the checking
+      // the cast it replaces used to switch off.
+      // @ts-expect-error land carries [impactSpeed: number]
+      announce(ε, 'land', 'fast');
+      // @ts-expect-error 'nope' is not a key of RaceEvents
+      announce(ε, 'nope');
+
+      // The emitter's end: a forwarder typed against another map does not
+      // get through just because its key happens to be generic.
+      interface Elsewhere {
+        land: [impactSpeed: string];
+      }
+      const misrouted = <K extends keyof Elsewhere>(
+        target: EventizedObject<RaceEvents>,
+        name: K,
+        ...args: Elsewhere[K]
+        // @ts-expect-error Elsewhere['land'] is [string], RaceEvents['land'] is [number]
+      ) => emit(target, name, ...args);
+      expect(misrouted).toBeInstanceOf(Function);
+    });
+
+    it('accepts a readonly tuple, which is what `as const` produces', () => {
+      interface Frozen {
+        tick: readonly [frame: number];
+      }
+      const ε = eventize<Frozen>();
+      const frames: number[] = [];
+      on(ε, 'tick', (frame) => frames.push(frame));
+
+      const tick = <K extends keyof Frozen>(name: K, ...args: Frozen[K]) =>
+        emit(ε, name, ...args);
+      tick('tick', 7);
+      expect(frames).toEqual([7]);
+    });
+
+    // An optional key reads as `[x] | undefined`, which is not an argument
+    // list, so the indexed-access spelling cannot carry it. `ArgsFor` can: it
+    // strips the `undefined` first, and the same deferred type on both sides
+    // of the call is one TypeScript matches without resolving it.
+    it('needs ArgsFor in the forwarder when the key is optional', () => {
+      interface Sparse {
+        ping?: [seq: number];
+      }
+      const ε = eventize<Sparse>();
+      const seqs: number[] = [];
+      on(ε, 'ping', (seq) => seqs.push(seq));
+
+      const viaIndexed = <K extends keyof Sparse>(
+        name: K,
+        ...args: NonNullable<Sparse[K]>
+        // @ts-expect-error an optional key falls outside the indexed-access arm
+      ) => emit(ε, name, ...args);
+      const viaArgsFor = <K extends keyof Sparse>(
+        name: K,
+        ...args: ArgsFor<Sparse, K>
+      ) => emit(ε, name, ...args);
+
+      viaArgsFor('ping', 1);
+      expect(seqs).toEqual([1]);
+      expect(viaIndexed).toBeInstanceOf(Function);
+    });
+
+    // A base class generic over its map can forward too, as long as the
+    // constraint says every value is an argument list. `EventMap` alone is
+    // `object` and promises nothing about the values — `E[K]` under it is not
+    // even a legal rest parameter (TS2370) — so `ArgsFor` is the spelling that
+    // still works there.
+    it('forwards from a class generic over the event map itself', () => {
+      class Announcer<E extends {[P in keyof E]: unknown[]}> {
+        readonly events = eventize<E>();
+        announce<K extends EventKeysOf<E>>(name: K, ...args: E[K]) {
+          emit(this.events, name, ...args);
+        }
+      }
+      class LooseAnnouncer<E extends EventMap> {
+        readonly events = eventize<E>();
+        announce<K extends EventKeysOf<E>>(name: K, ...args: ArgsFor<E, K>) {
+          emit(this.events, name, ...args);
+        }
+        // The spelling the docs steer away from, pinned so the advice goes
+        // stale loudly rather than silently.
+        // @ts-expect-error TS2370 — E[K] under a bare EventMap is not an array
+        announceIndexed<K extends EventKeysOf<E>>(_name: K, ..._args: E[K]) {}
+      }
+
+      const strict = new Announcer<RaceEvents>();
+      const loose = new LooseAnnouncer<RaceEvents>();
+      const seenStrict = listen(strict.events);
+      const seenLoose = listen(loose.events);
+
+      strict.announce('lap', 1, 61.2, true);
+      loose.announce('lap', 1, 61.2, true);
+      expect(seenStrict).toEqual([['lap', 1, 61.2, true]]);
+      expect(seenLoose).toEqual([['lap', 1, 61.2, true]]);
     });
   });
 });

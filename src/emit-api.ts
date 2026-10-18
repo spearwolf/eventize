@@ -337,6 +337,32 @@ const isDuckTarget = isAttachableTarget;
 // ---------------------------------------------------------------------------
 // emit() / emitAsync() — typed overload first; loose fallback preserves
 // duck-typing on plain objects, multi-event-name calls, etc.
+//
+// Every emit function below carries the same three overloads, and three is a
+// ceiling, not a count. When more than three fail on the arguments,
+// TypeScript elaborates only the last — here the arm closed to typed
+// emitters — so every typo in every typed call would read "not assignable to
+// parameter of type 'never'". `typed-emit-diagnostics.spec.ts` holds the line.
+//
+// The first arm takes the payload as the indexed access `TEvents[K]`, with
+// the map constrained per call so that it is a tuple. That is what lets a
+// forwarder generic over `K` pass its `...args: Map[K]` straight through: a
+// conditional argument type such as `ArgsFor` stays deferred while `K` is
+// unresolved, and nothing generic is assignable to it but itself. A concrete
+// call resolves the same arm to a plain tuple, which keeps its parameter
+// names in signature help and its per-argument diagnostics.
+//
+// The second arm is the single-name and the array arm folded into one, which
+// is what pays for the first within the ceiling. It still carries what the
+// first cannot: a symbol the map never declares (`EventArgs`), an optional
+// key (`ArgsFor` strips the `undefined`), and every array of names.
+//
+// The method surfaces in `EventizeApi` keep their unfolded pair, on purpose.
+// Their map is fixed by the interface, so the per-call constraint has nowhere
+// to go, and the fold itself is not free there: a subclass override is
+// checked against generics erased to `any`, where `K[]` still rejects a
+// name-narrowed `emit(eventName: 'data', …)` and `K | K[]` no longer does.
+// A forwarder on a class reaches the first arm through `emit(this, …)`.
 // ---------------------------------------------------------------------------
 
 /**
@@ -347,19 +373,15 @@ const isDuckTarget = isAttachableTarget;
  * wildcard `'*'` — emit a concrete name instead.
  */
 export function emit<
-  TEvents extends EventMap,
-  K extends EventKeysOf<TEvents> | symbol,
->(
-  obj: EventizedObject<TEvents>,
-  eventName: K,
-  ...args: ArgsFor<TEvents, K>
-): void;
+  TEvents extends {[P in K]: readonly unknown[]},
+  K extends EventKeysOf<TEvents>,
+>(obj: EventizedObject<TEvents>, eventName: K, ...args: TEvents[K]): void;
 export function emit<
   TEvents extends EventMap,
   K extends EventKeysOf<TEvents> | symbol,
 >(
   obj: EventizedObject<TEvents>,
-  eventNames: K[],
+  eventNames: K | K[],
   ...args: ArgsFor<TEvents, K>
 ): void;
 export function emit<T extends object>(
@@ -397,19 +419,15 @@ export function emit(
  * itself keeps its subscription either way.
  */
 export function emitSafe<
-  TEvents extends EventMap,
-  K extends EventKeysOf<TEvents> | symbol,
->(
-  obj: EventizedObject<TEvents>,
-  eventName: K,
-  ...args: ArgsFor<TEvents, K>
-): void;
+  TEvents extends {[P in K]: readonly unknown[]},
+  K extends EventKeysOf<TEvents>,
+>(obj: EventizedObject<TEvents>, eventName: K, ...args: TEvents[K]): void;
 export function emitSafe<
   TEvents extends EventMap,
   K extends EventKeysOf<TEvents> | symbol,
 >(
   obj: EventizedObject<TEvents>,
-  eventNames: K[],
+  eventNames: K | K[],
   ...args: ArgsFor<TEvents, K>
 ): void;
 export function emitSafe<T extends object>(
@@ -470,19 +488,15 @@ export function emitSafe(
  * runs, and a throwing `once()` keeps its own subscription.
  */
 export function emitStrict<
-  TEvents extends EventMap,
-  K extends EventKeysOf<TEvents> | symbol,
->(
-  obj: EventizedObject<TEvents>,
-  eventName: K,
-  ...args: ArgsFor<TEvents, K>
-): void;
+  TEvents extends {[P in K]: readonly unknown[]},
+  K extends EventKeysOf<TEvents>,
+>(obj: EventizedObject<TEvents>, eventName: K, ...args: TEvents[K]): void;
 export function emitStrict<
   TEvents extends EventMap,
   K extends EventKeysOf<TEvents> | symbol,
 >(
   obj: EventizedObject<TEvents>,
-  eventNames: K[],
+  eventNames: K | K[],
   ...args: ArgsFor<TEvents, K>
 ): void;
 export function emitStrict<T extends object>(
@@ -559,19 +573,19 @@ const markCollectedAsHandled = (values: any[]) => {
  * for a wildcard name.
  */
 export function emitAsync<
-  TEvents extends EventMap,
-  K extends EventKeysOf<TEvents> | symbol,
+  TEvents extends {[P in K]: readonly unknown[]},
+  K extends EventKeysOf<TEvents>,
 >(
   obj: EventizedObject<TEvents>,
   eventName: K,
-  ...args: ArgsFor<TEvents, K>
+  ...args: TEvents[K]
 ): Promise<any[] | undefined>;
 export function emitAsync<
   TEvents extends EventMap,
   K extends EventKeysOf<TEvents> | symbol,
 >(
   obj: EventizedObject<TEvents>,
-  eventNames: K[],
+  eventNames: K | K[],
   ...args: ArgsFor<TEvents, K>
 ): Promise<any[] | undefined>;
 export function emitAsync<T extends object>(
@@ -642,19 +656,19 @@ export function emitAsync(
  * would turn that case into an unhandled rejection.
  */
 export function emitSafeAsync<
-  TEvents extends EventMap,
-  K extends EventKeysOf<TEvents> | symbol,
+  TEvents extends {[P in K]: readonly unknown[]},
+  K extends EventKeysOf<TEvents>,
 >(
   obj: EventizedObject<TEvents>,
   eventName: K,
-  ...args: ArgsFor<TEvents, K>
+  ...args: TEvents[K]
 ): Promise<any[] | undefined>;
 export function emitSafeAsync<
   TEvents extends EventMap,
   K extends EventKeysOf<TEvents> | symbol,
 >(
   obj: EventizedObject<TEvents>,
-  eventNames: K[],
+  eventNames: K | K[],
   ...args: ArgsFor<TEvents, K>
 ): Promise<any[] | undefined>;
 export function emitSafeAsync<T extends object>(
@@ -790,19 +804,19 @@ const splitSettled = (
  * anyone has to answer.
  */
 export function emitStrictAsync<
-  TEvents extends EventMap,
-  K extends EventKeysOf<TEvents> | symbol,
+  TEvents extends {[P in K]: readonly unknown[]},
+  K extends EventKeysOf<TEvents>,
 >(
   obj: EventizedObject<TEvents>,
   eventName: K,
-  ...args: ArgsFor<TEvents, K>
+  ...args: TEvents[K]
 ): Promise<any[] | undefined>;
 export function emitStrictAsync<
   TEvents extends EventMap,
   K extends EventKeysOf<TEvents> | symbol,
 >(
   obj: EventizedObject<TEvents>,
-  eventNames: K[],
+  eventNames: K | K[],
   ...args: ArgsFor<TEvents, K>
 ): Promise<any[] | undefined>;
 export function emitStrictAsync<T extends object>(

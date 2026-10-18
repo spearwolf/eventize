@@ -116,6 +116,24 @@ Since v6.0.0 `onceAsync`, `retain`, `retainClear`, `unretain` and the array arm 
 
 Add the symbol to the map (`[PRIVATE]: [reason: string]`) if you want it checked.
 
+## Forwarding a generic key through `emit()`
+
+A helper generic over the key, taking the payload as a spread tuple, forwards to the **standalone** emit functions without a cast — all six of them:
+
+```ts
+class Race {
+  readonly events = eventize<RaceEvents>();
+  #emit<K extends keyof RaceEvents>(name: K, ...args: RaceEvents[K]): void {
+    emit(this.events, name, ...args); // ✅ checked at both ends
+  }
+}
+```
+
+- **Class or injected object:** forward with `emit(this, name, ...args)`. The method form `this.emit(name, ...args)` cannot follow a generic key and fails with `TS2769`.
+- **Class generic over its map:** constrain it as `E extends {[K in keyof E]: unknown[]}` and spell the key `K extends EventKeysOf<E>`. Under a bare `E extends EventMap`, `E[K]` is not a legal rest parameter.
+- **Optional key, or a bare `EventMap`:** type the helper's payload as `...args: ArgsFor<Map, K>` instead of `Map[K]`.
+- Never replace the forward with a cast to a loose signature — it switches off the check on the map, so a renamed event or a changed payload only shows at runtime.
+
 ## Caveats
 
 - Multi-event `emit(ε, ['a', 'b'], …)` is checked against the **union** of the listed tuples, not a shared one: it compiles as soon as the arguments match at least one listed name, and the runtime then hands the same arguments to every name. `emit(ε, ['message', 'joined'], 'alice')` compiles and dispatches `message` one argument short. Use separate calls when the tuples differ — the compiler will not stop you. Sharpest edge of the same rule: an undeclared symbol in the list contributes `any[]` to that union, so `emit(ε, [PRIVATE, 'message'], 1)` checks nothing at all, the declared name included.

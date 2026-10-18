@@ -851,7 +851,10 @@ export interface EventizeApi<
 
   off(listener?: unknown, listenerObject?: unknown): void;
 
-  // typed emit — strict event name and argument tuple; symbol always allowed
+  // typed emit — strict event name and argument tuple; symbol always allowed.
+  // The single-name and array arms stay two here, where the standalone set
+  // folds them into one: folded, they stop rejecting a name-narrowed subclass
+  // override. Reasoning above `emit()` in `src/emit-api.ts`.
   emit<K extends EventKeysOf<TEvents> | symbol>(
     eventName: K,
     ...args: ArgsFor<TEvents, K>

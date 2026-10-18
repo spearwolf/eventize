@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## Unreleased
+
+### Added
+
+- **A helper generic over the event key forwards to the typed standalone emit functions without a cast.** `#emit<K extends keyof M>(name: K, ...args: M[K]) { emit(this.events, name, ...args); }` failed with `TS2769` naming a `never` on the first argument; `emit`, `emitAsync`, `emitSafe`, `emitSafeAsync`, `emitStrict` and `emitStrictAsync` now accept it. The method forms (`this.emit(…)`, `ε.emit(…)`) do not — forward through `emit(this, …)`. Types only, no runtime change.
+- Each of those six standalone functions now lists the single-name and the array overload as one (`eventNames: K | K[]`), which is what keeps the set at three overloads and the diagnostics of a mistyped call intact. Visible in overload listings; nothing that compiled before stops compiling.
+
 ## `v6.2.0` (2026-08-30)
 
 ### Added

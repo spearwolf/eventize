@@ -188,6 +188,52 @@ interface ChatEvents {
 - `getSubscriptionCount(ε)` and `EVENT_CATCH_EM_ALL` are intentionally untyped against `TEvents` — they are diagnostic or structural and don't depend on the event map. Untyped is not the same as usable, though: `EVENT_CATCH_EM_ALL` is `'*'`, which no typed map declares, so `on(ε, '*', fn)`, `ε.on('*', fn)` and both spelled with the constant are compile errors on a typed emitter. Reach the wildcard through a form that carries no event name — `on(ε, fn)`, `ε.on(fn)`, or a listener object with an `emit()` member. `isEventized()` is no longer in that group: since v6.0.0 it preserves the map of the emitter it narrows, so a typed `emit()` inside the `if` is checked exactly as it is outside.
 - `off(ε, …)` is also intentionally untyped against `TEvents`. Cleanup paths routinely hand off arbitrary values (a saved unsubscribe handle, an event name from a config, a listener object of unknown origin), so `off()` accepts `unknown` for every argument and the runtime decides what to remove. This matches its permissive runtime contract — no type-level surprises in teardown code.
 
+## Wrapping `emit()`
+
+A domain object that announces its events from many call sites usually wraps
+its emitter in one helper, generic over the event key and taking the payload as
+a spread tuple. The standalone functions accept the forward without a cast —
+`emit`, `emitAsync`, `emitSafe`, `emitSafeAsync`, `emitStrict` and
+`emitStrictAsync` alike:
+
+```ts
+interface RaceEvents {
+  go: [];
+  land: [impactSpeed: number];
+  lap: [lap: number, lapTime: number, isBest: boolean];
+}
+
+class Race {
+  readonly events = eventize<RaceEvents>();
+
+  #emit<K extends keyof RaceEvents>(name: K, ...args: RaceEvents[K]): void {
+    emit(this.events, name, ...args);
+  }
+}
+```
+
+The helper's own signature checks its callers — `#emit('land', 'fast')` and
+`#emit('nope')` are compile errors — and the forward is checked against the
+emitter's map, so a helper typed against a different map does not get through.
+
+Four things to know:
+
+- **On a class or an injected object, forward through the standalone
+  function**, not the method: `emit(this, name, ...args)` compiles inside
+  `class Race extends Eventize<RaceEvents>`, `this.emit(name, ...args)` does
+  not. The method forms keep checking every concrete call; they only cannot
+  follow a key that is still generic.
+- **A class generic over its map** needs a constraint saying every value is an
+  argument list, and the key spelled with `EventKeysOf`:
+  `class Announcer<E extends {[K in keyof E]: unknown[]}>` with
+  `announce<K extends EventKeysOf<E>>(name: K, ...args: E[K])`. Under a bare
+  `E extends EventMap`, `E[K]` is not a legal rest parameter.
+- **An optional key** (`ping?: [seq: number]`) cannot be forwarded as
+  `Map[K]`, which includes `undefined`, nor as `NonNullable<Map[K]>`.
+- For both of the last two, `...args: ArgsFor<Map, K>` is the spelling that
+  works: it is the same type the typed overloads take, and a forward of the
+  identical deferred type compiles without resolving it.
+
 ## Wrapping `on()` / `once()`
 
 TypeScript refuses to spread a union of tuples into a fixed-arity call, so no
