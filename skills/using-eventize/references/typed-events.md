@@ -118,7 +118,7 @@ Add the symbol to the map (`[PRIVATE]: [reason: string]`) if you want it checked
 
 ## Forwarding a generic key through `emit()`
 
-A helper generic over the key, taking the payload as a spread tuple, forwards to the **standalone** emit functions without a cast — all six of them:
+Since v6.3.0, a helper generic over the key, taking the payload as a spread tuple, forwards to the **standalone** emit functions without a cast — all six of them. Up to v6.2.0 the same forward fails with `TS2769` naming a `never` on the first argument; there, type the helper's payload as `...args: ArgsFor<Map, K>`, which works on both.
 
 ```ts
 class Race {

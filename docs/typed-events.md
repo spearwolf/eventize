@@ -192,7 +192,8 @@ interface ChatEvents {
 
 A domain object that announces its events from many call sites usually wraps
 its emitter in one helper, generic over the event key and taking the payload as
-a spread tuple. The standalone functions accept the forward without a cast —
+a spread tuple. Since v6.3.0 the standalone functions accept the forward
+without a cast —
 `emit`, `emitAsync`, `emitSafe`, `emitSafeAsync`, `emitStrict` and
 `emitStrictAsync` alike:
 

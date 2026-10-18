@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## `v6.3.0` (2026-10-18)
 
 ### Added
 
