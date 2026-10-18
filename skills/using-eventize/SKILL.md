@@ -19,7 +19,7 @@ Deeper material — load only when the task needs it:
 | --- | --- |
 | `references/api-details.md` | every `on()` / `off()` shape, per-event priorities, retain semantics in full |
 | `references/lifecycle.md` | what an emitter holds, what each `off()` form releases, handle and `once()` lifetime |
-| `references/typed-events.md` | generic event maps, the `EventMap` trap, symbol escape hatch |
+| `references/typed-events.md` | generic event maps, the `EventMap` trap, symbol escape hatch, forwarding a generic key through `emit()` |
 | `references/migration.md` | v5 → v6 breaking changes, the v4 → v5 emit change, the v4.3 type-brand migration for classes |
 
 ## Mental model

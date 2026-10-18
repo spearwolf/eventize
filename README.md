@@ -928,6 +928,8 @@ Everything below is exported from the package root, and each exists to be writte
 | `StandaloneSubscribeFunc` | the exported overload set of the standalone `on()` / `once()`, for a wrapper that needs to match it exactly rather than widen to `SubscribeImpl` |
 | `ListenerObjectSlot<L>` | the listener-object constraint that rejects an array, a function and nullish — appears in the published `on()` / `once()` signatures |
 | `MultiArgsFor<T, K>` | the merged argument list for a listener serving several event keys at once |
+| `EventKeysOf<T>` | the event keys of a map, narrowed to `string \| symbol` — the key constraint for a helper generic over the map, `announce<K extends EventKeysOf<E>>(…)` |
+| `ArgsFor<T, K>` | the argument tuple of event `K` — the payload type for a forwarding `emit()` helper where `Map[K]` does not work: an optional key, or a map typed only as `EventMap`; see [Wrapping `emit()`](./docs/typed-events.md#wrapping-emit) |
 | `AnyEventNames` | the event-name argument of `emit()` / `retain()`: a single name or an array of names, with no notion of priority |
 | `EventArgs` | `any[]`, the loose argument-list type a subclass override of `emit()` forwards through untyped |
 | `SubscribeImpl` | the implementation signature to cast to when writing a forwarding wrapper around `on()` / `once()` |
