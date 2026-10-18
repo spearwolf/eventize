@@ -8,6 +8,8 @@ Canonical guide for coding agents in this repo. `CLAUDE.md` is a symlink to this
 
 **Releasing, and choosing what the next version is called, stays a human's call.** Nothing in this file authorises a bump, and `npm run publish:pkg` publishes for real — nothing holds it back for a dry run.
 
+**A version bump that reaches `main` is the release.** Nobody runs `publish:pkg` by hand: `.github/workflows/main.yml` runs it on every push to `main`, once `cbt` has passed, and it publishes whenever `package.json` carries a version the registry does not have yet. A push that leaves the version alone publishes nothing, which is why a merge is not a release — but a bump is never a step to push along with something else, and never one to push without the human having said this is the release.
+
 One rule outlives each release:
 
 - **A version reference in prose names a version a reader can act on**: one that shipped, or the one `package.json` currently prepares. Never a number between the two — those reached nobody, and naming one sends a reader looking for an upgrade path that does not exist. Which is which is not recorded here. `package.json`, `CHANGELOG.md` and the git tags answer it between them, and a second copy of that answer in this file would go stale silently.
