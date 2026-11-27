@@ -2,8 +2,9 @@
 
 ## v5 → v6
 
-Against the last released version, `v5.1.0` — and `v6.0.0` is the only
-`6.x` there is, so this is the whole jump. Twenty-two breaking changes.
+Against `v5.1.0`, the last 5.x. Every break and fix below landed in
+`v6.0.0`; the `6.x` minors after it only add API, so this is the whole
+jump whichever `6.x` you install. Twenty-two breaking changes.
 Thirteen are runtime changes on signatures that don't change shape, so grep
 for the call patterns rather than relying on the type checker to find
 affected sites. Nine are type-only and surface as compile errors
@@ -308,7 +309,7 @@ remedy. Check with `npm ls @spearwolf/eventize`, fix with `npm dedupe` or an
 `overrides` / `resolutions` entry pinning `^6.0.0`. At runtime,
 `getEventizeProtocol(obj)` says which copy owns an object without throwing.
 
-Eleven more runtime changes ride along, all filed as **fixes** rather than
+Thirteen more runtime changes ride along, all filed as **fixes** rather than
 breaking changes — one stopped dispatching to code the subscriber never
 wrote, one widened what a target may be, one turned a silent no-op into a
 throw, one made a call do the one thing its arguments ask for, one made a
@@ -318,7 +319,8 @@ made an identity `off()` finish the sweep it started, one stopped an API
 surface from contradicting itself, one closed a `retain()` that ended in a
 stack overflow, one kept a throwing retained replay from taking the rest of
 its batch down with it, one let a replay batch hear what its own handlers do
-to retained state — but a `v5.1.0` consumer meets all eleven in the same
+to retained state, one caught the rejection of an `async` replay, one made the
+marker slot undeletable — but a `v5.1.0` consumer meets all thirteen in the same
 upgrade and none of them is visible to the type checker:
 
 - **An event name that only matches an inherited `Object.prototype` member
@@ -493,6 +495,18 @@ upgrade and none of them is visible to the type checker:
   shows up. Only the values follow the emitter: membership in a batch is
   still decided when it is built, and the order is still fixed before the
   first replay runs.
+- **An `async` listener that rejects on a retained replay is reported, not
+  left unhandled.** Up to v5.1.0 the rejection escaped as an unhandled
+  rejection, fatal under Node's default settings. The replay now watches the
+  returned promise and reports a rejection through `console.warn`
+  (`a retained replay rejected; …`), a microtask later; the `once()` counts as
+  spent.
+- **The marker slot cannot be deleted.** Up to v5.1.0
+  `delete ε[Symbol.for('eventize')]` silently succeeded and left the listeners
+  and retained values stranded in collaborators nothing could reach any more.
+  It now throws in strict mode. Grep for
+  `delete` next to `Symbol.for('eventize')`; to tear an emitter down, use
+  `off(ε)`.
 
 ## v4 → v5: `emit()` stopped throwing
 

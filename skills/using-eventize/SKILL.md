@@ -225,8 +225,7 @@ bug, and an exception unwinding into your call is the fastest way to find out.
    v6.0.0 each replay queued by an `on()`/`once()` call runs in its own
    `try`/`catch`: the throw is reported through `console.warn` with the event
    name, the remaining replays of that batch still run, and the call returns its
-   handle. Up to v5.1.0 it threw out of `on()`, leaving registered
-   subscriptions the caller had no handle for. A `once()` sees the third way to
+   handle. A `once()` sees the third way to
    fire twice here — a replay that throws settles nothing, so the next replay of
    the same batch calls it again. What such a handler *can* do is stop the rest
    of the batch: since v6.0.0 each replay reads the emitter when it runs, so an
@@ -234,13 +233,11 @@ bug, and an exception unwinding into your call is the fastest way to find out.
    the names still ahead of it, and a name re-emitted there replays the new
    value. Only the values follow along: which names a batch carries, and in
    which order, is settled before its first replay runs, so a name given its
-   first retained value from inside one does not join it. Up to v5.1.0 only the
-   `off()` route worked.
+   first retained value from inside one does not join it.
    **An `async` listener is covered too, since v6.0.0.** It returns before it
    fails, so the `try`/`catch` never sees the rejection; the replay watches the
    returned value instead and reports a rejection through the same
-   `console.warn` (`a retained replay rejected; …`). Up to v5.1.0 that was an
-   unhandled rejection, fatal under Node's default settings. Two differences to
+   `console.warn` (`a retained replay rejected; …`). Two differences to
    the synchronous case: the report arrives a microtask later, and the `once()`
    counts as spent — the dispatch saw a listener that returned normally.
 6. **Nested `emit()` retains out of order.** The same after-dispatch write means
@@ -308,28 +305,23 @@ bug, and an exception unwinding into your call is the fastest way to find out.
     that says whose slot it is, and it never throws. `undefined` from it plus
     `isEventized(obj) === true` means a copy older than the field.
 13. **The marker slot cannot be deleted.** `delete ε[Symbol.for('eventize')]`
-    throws in strict mode since v6.0.0. Up to v5.1.0 it silently succeeded and
-    left the listeners and retained values stranded in collaborators nothing
-    could reach any more.
+    throws in strict mode since v6.0.0, so the listeners and retained values
+    can never be stranded in collaborators nothing reaches any more.
 14. **`on()` rejects what it cannot dispatch.** The listener slot is type-checked,
     not truthiness-checked: a function, a string, a symbol or a non-null object
-    passes, anything else throws. An empty array of event names throws too —
-    `on(ε, [], fn)` used to hand back a handle for zero subscriptions and
-    `onceAsync(ε, [])` a promise that never settled — and so does a *sparse*
-    one: `on(ε, new Array(2), fn)` used to register nothing and hand back the
-    same kind of dangling handle, and a hole anywhere else in the array (`['a',
-    , 'b']`) used to register only the names around it, silently. Every event
+    passes, anything else throws. An empty array of event names throws too
+    (`on(ε, [], fn)`, `onceAsync(ε, [])`), and so does a *sparse* one:
+    `new Array(2)`, or a hole anywhere in the array (`['a', , 'b']`). Every event
     name has to be a string or a symbol as well: `on(ε, [123], fn)`, `[null]`,
     `[[]]`, an element explicitly set to `undefined`, and — wherever a priority
     follows the name — the single-name spellings `on(ε, {}, 10, fn)` and
-    `on(ε, null, 10, fn)` used to file a bucket under that value, unreachable by
-    `emit()` and, for a number, unreachable by `off(ε, 123)` too. The catch-all
+    `on(ε, null, 10, fn)` all throw instead of filing a bucket no `emit()` could
+    reach. The catch-all
     forms fill the name slot with `'*'` themselves and are unaffected, as is
     `on(ε, 123, fn)`, where `123` is a priority. And a method name needs an
     object to be read off:
-    `on(ε, 'foo', 'handler', null)` used to register a subscription nothing could
-    ever fill, because late binding covers the method, not the object it lives
-    on. Seven mistakes share the one
+    `on(ε, 'foo', 'handler', null)` throws, because late binding covers the
+    method, not the object it lives on. Seven mistakes share the one
     message `subscribeTo() called with insufficient arguments`, and `Error.cause`
     names which: `'missing-listener'`, `'not-dispatchable'`, `'empty-method-name'`,
     `'missing-listener-object'`, `'empty-names'`, `'sparse-names'`, `'invalid-name'`.
@@ -351,10 +343,7 @@ bug, and an exception unwinding into your call is the fastest way to find out.
     that draws `fn` as some *other* listener's context, `on(ε, name, other, fn)`,
     goes with it too, because a function is a listener object like any other.
     `off(ε, fn, ctx)` stays exact and is the way to name
-    one of them; the handle `on()` returned is the way to name none of them. Up
-    to v5.1.0 the two-argument form matched only registrations whose context was
-    `null`, which failed the other way round — silently leaving the emitter
-    holding both the function and the context object.
+    one of them; the handle `on()` returned is the way to name none of them.
 16. **The event name `'emit'` collides with the fallback method.** On a target with
     its own `.emit`, `emit(obj, 'emit', ...args)` calls `obj.emit(...args)`
     instead of `obj.emit('emit', ...args)` — the object's method matches in stage 1,
@@ -365,10 +354,7 @@ bug, and an exception unwinding into your call is the fastest way to find out.
 17. **`retain()` / `unretain()` / `retainClear()` reject what they cannot file a
     policy under**, since v6.0.0 — the same shapes `on()` rejects (pitfall 14),
     minus the listener and priority checks that don't apply here: a value that
-    is not a string or a symbol, an empty array, a sparse array. `retain(ε, 42)`
-    used to file a policy under `42` that no `emit()` could ever fill, and
-    `retain(ε, [])` was a silent no-op instead of throwing — the second half of
-    that asymmetry with `on(ε, [], fn)`, which has thrown since v6.0.0 too. All
+    is not a string or a symbol, an empty array, a sparse array. All
     three reject atomically, before the keeper changes, with `Error.cause`:
     `'invalid-name'`, `'empty-names'`, `'sparse-names'`. The message names its
     own function (`retain() called with …`) rather than reusing `subscribeTo()`'s

@@ -8,13 +8,14 @@ to grep for and what to write instead.
 
 ## v5 → v6
 
-`v6.0.0` is the only `6.x` there is, so a `v5.1.0` consumer takes the whole jump
-at once. Twenty-two breaking changes. Thirteen are runtime changes on signatures that
+Every break and fix below landed in `v6.0.0`; the `6.x` minors after it only add
+API. So a `v5.1.0` consumer takes the whole jump at once, whichever `6.x` they
+install. Twenty-two breaking changes. Thirteen are runtime changes on signatures that
 do not change shape, so the type checker will not find the call sites for you —
 grep for the patterns below where one is given. Nine are type-only and do surface
 as compile errors.
 
-Eleven further changes are filed as fixes rather than breaks, but a v5 consumer
+Thirteen further changes are filed as fixes rather than breaks, but a v5 consumer
 meets them in the same install; they are at the end.
 
 ### Dedupe `@spearwolf/eventize` before you install v6
@@ -694,9 +695,9 @@ counted among the twenty-two above.
   yourself, which the package has never exported in either namespace — no
   `v5.1.0` consumer could reach this path.
 
-### Eleven fixes that behave like breaks
+### Thirteen fixes that behave like breaks
 
-None of them is visible to the type checker, and all eleven change what runs.
+None of them is visible to the type checker, and all thirteen change what runs.
 
 **Event names inherited from `Object.prototype` dispatch to nothing.**
 `toString`, `toLocaleString`, `valueOf`, `constructor`, `hasOwnProperty`,
@@ -1006,6 +1007,46 @@ the ones on an emitter that retains something — cross-check against
 that re-emits a retained name is affected too and greps the same way, through
 `retain(` rather than through the `emit()`, since the shape that changes is
 "emit a name this emitter retains, from inside a replay of another one".
+
+**An `async` listener that rejects on a retained replay is reported, not left
+unhandled.** The replay isolation above caught a synchronous throw only. An
+`async` listener returns before it fails, so up to v5.1.0 its rejection
+surfaced as an unhandled rejection — process-ending under Node's default
+`--unhandled-rejections=throw`, at a call site that had done nothing but
+`on()`. Since v6.0.0 the replay watches what the listener returns and reports a
+rejection through the same `console.warn`, a microtask later:
+
+```
+a retained replay rejected; the batch continues. event: config Error: …
+```
+
+The rest of the batch runs, and a `once()` counts as spent, because its
+listener returned. Code that relied on the process dying, or on a global
+`unhandledRejection` handler to see the failure, has to catch it inside the
+listener instead — the same move as for the synchronous throw above. `emit()`
+is unchanged: a rejection there still belongs to the caller.
+
+```
+rg "\b(on|once)\([^)]*async\b" src/
+```
+
+That finds the `async` arrow and function listeners written inline; cross-check
+the hits against `rg "\bretain\("`, since only a retained name replays.
+
+**The marker slot cannot be deleted.** Up to v5.1.0 the slot behind
+`Symbol.for('eventize')` was configurable, so
+`delete ε[Symbol.for('eventize')]` succeeded silently: the object read as not
+eventized while its listeners and retained values stayed stranded in
+collaborators nothing could reach any more, and the next `on()` built a second,
+empty set. The slot is non-configurable now, and the `delete` throws a
+`TypeError` in strict mode — which every ES module and class body is.
+
+```
+rg "delete\s+\w+\[\s*Symbol\.for\(\s*['\"]eventize['\"]\s*\)" src/
+```
+
+To tear an emitter down, call `off(ε)`: it detaches every listener and clears
+the retained state, and the object stays eventized.
 
 ### Verifying the upgrade
 
